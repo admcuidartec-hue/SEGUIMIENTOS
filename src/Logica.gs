@@ -506,3 +506,127 @@ function limpiarParaEnvio(v) {
   }
   return v;
 }
+/* ==========================================================================
+   INDICADORES (diseño §7.3)
+   ========================================================================== */
+
+function compararCampos_(campos) {
+  return function (a, b) {
+    for (var i = 0; i < campos.length; i++) {
+      var x = a[campos[i]], y = b[campos[i]];
+      if (x < y) return -1;
+      if (x > y) return 1;
+    }
+    return 0;
+  };
+}
+
+/**
+ * Retorno por cohorte. La cohorte es el mes de la primera cita realizada de
+ * la serie. Un paciente cuenta en la etapa k solo si ya volvió o si su
+ * plazo de esa etapa ya venció ("maduro"): así un mes reciente no aparece
+ * con un retorno artificialmente bajo.
+ */
+function kpiCohortes(citas, reglas, hoy) {
+  var series = armarSeries(citas), acc = {};
+  Object.keys(series).forEach(function (k) {
+    var s = series[k], r = s.realizadas;
+    if (!r.length) return;
+    var plazo = plazoDe(reglas, s.especialidad);
+    for (var etapa = 1; etapa <= 3 && r.length >= etapa; etapa++) {
+      var volvio = r.length >= etapa + 1;
+      if (!volvio && sumarDias(r[etapa - 1].FECHA, plazo.vence) > hoy) continue;
+      var clave = [mesDe(r[0].FECHA), s.especialidad, r[0].MEDICO, etapa].join('|');
+      if (!acc[clave]) acc[clave] = { COHORTE: mesDe(r[0].FECHA), ESPECIALIDAD: s.especialidad, MEDICO: r[0].MEDICO, ETAPA: etapa, ELEGIBLES: 0, VOLVIERON: 0 };
+      acc[clave].ELEGIBLES++;
+      if (volvio) acc[clave].VOLVIERON++;
+    }
+  });
+  return Object.keys(acc).map(function (k) { return acc[k]; })
+    .sort(compararCampos_(['COHORTE', 'ESPECIALIDAD', 'MEDICO', 'ETAPA']));
+}
+
+function realizadasPorDni_(citas) {
+  var out = {};
+  (citas || []).forEach(function (c) {
+    if (normTexto(c.ESTADO) === 'REALIZADO') (out[c.DNI] = out[c.DNI] || []).push(c);
+  });
+  Object.keys(out).forEach(function (d) { out[d].sort(porFecha); });
+  return out;
+}
+
+function ultimaAntesDe_(lista, fecha) {
+  var u = null;
+  (lista || []).forEach(function (c) { if (c.FECHA <= fecha) u = c; });
+  return u;
+}
+
+function kpiIndicaciones(indicaciones, citas) {
+  var porDni = realizadasPorDni_(citas), acc = {};
+  (indicaciones || []).forEach(function (i) {
+    var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
+    var medico = i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO';
+    var clave = [mesDe(i.FECHA), i.TIPO, i.DETALLE, medico].join('|');
+    if (!acc[clave]) acc[clave] = { MES: mesDe(i.FECHA), TIPO: i.TIPO, DETALLE: i.DETALLE, MEDICO: medico, INDICADAS: 0, ACEPTADAS: 0 };
+    acc[clave].INDICADAS++;
+    if (i.ESTADO === 'ACEPTÓ') acc[clave].ACEPTADAS++;
+  });
+  return Object.keys(acc).map(function (k) { return acc[k]; })
+    .sort(compararCampos_(['MES', 'TIPO', 'DETALLE', 'MEDICO']));
+}
+
+function kpiRecuperacion(seguimientos, citas) {
+  var series = armarSeries(citas);
+  return (seguimientos || []).filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; }).map(function (s) {
+    var f = fechaIso(s.FECHA_HORA);
+    var serie = series[claveSerie(s.DNI, s.ESPECIALIDAD)];
+    var despues = serie ? serie.realizadas.concat(serie.agendadas).filter(function (c) { return c.FECHA > f; }).sort(porFecha) : [];
+    var previa = serie ? ultimaAntesDe_(serie.realizadas, f) : null;
+    return {
+      MES: mesDe(f),
+      RESPONSABLE: s.RESPONSABLE,
+      ESPECIALIDAD: s.ESPECIALIDAD,
+      MEDICO: previa ? previa.MEDICO : '',
+      VOLVIO: despues.length ? 1 : 0,
+      DIAS: despues.length ? diasEntre(f, despues[0].FECHA) : ''
+    };
+  });
+}
+
+function kpiMotivos(seguimientos) {
+  var acc = {};
+  (seguimientos || []).forEach(function (s) {
+    if (normTexto(s.ACCION) !== 'DESCARTADO') return;
+    var m = s.MOTIVO || 'SIN MOTIVO';
+    acc[m] = (acc[m] || 0) + 1;
+  });
+  return Object.keys(acc).map(function (m) { return { MOTIVO: m, N: acc[m] }; })
+    .sort(function (a, b) { return (b.N - a.N) || (a.MOTIVO < b.MOTIVO ? -1 : 1); });
+}
+
+function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy) {
+  return {
+    cohortes: kpiCohortes(citas, reglas, hoy),
+    indicaciones: kpiIndicaciones(indicaciones, citas),
+    recuperacion: kpiRecuperacion(seguimientos, citas),
+    motivos: kpiMotivos(seguimientos),
+    sinCandidato: (indicaciones || []).filter(function (i) { return normTexto(i.EMPAREJAMIENTO) === 'SIN CANDIDATO'; })
+      .map(function (i) { return { ID: i.ID, FECHA: i.FECHA, TIPO: i.TIPO, NOMBRE: i.NOMBRE, TELEFONO: i.TELEFONO }; })
+  };
+}
+
+/** Las dos tablas de la hoja KPI, una debajo de otra, todas las filas de 7 columnas. */
+function filasHojaKpi(kpi) {
+  var vacia = ['', '', '', '', '', '', ''];
+  var f = [['RETORNO POR COHORTE', '', '', '', '', '', ''], ['COHORTE', 'ESPECIALIDAD', 'MEDICO', 'ETAPA', 'ELEGIBLES', 'VOLVIERON', 'TASA']];
+  kpi.cohortes.forEach(function (r) {
+    f.push([r.COHORTE, r.ESPECIALIDAD, r.MEDICO, r.ETAPA, r.ELEGIBLES, r.VOLVIERON, r.ELEGIBLES ? r.VOLVIERON / r.ELEGIBLES : '']);
+  });
+  f.push(vacia.slice());
+  f.push(['INDICACIONES', '', '', '', '', '', '']);
+  f.push(['MES', 'TIPO', 'DETALLE', 'MEDICO', 'INDICADAS', 'ACEPTADAS', 'TASA']);
+  kpi.indicaciones.forEach(function (r) {
+    f.push([r.MES, r.TIPO, r.DETALLE, r.MEDICO, r.INDICADAS, r.ACEPTADAS, r.INDICADAS ? r.ACEPTADAS / r.INDICADAS : '']);
+  });
+  return f;
+}

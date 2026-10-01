@@ -393,3 +393,116 @@ function aplicarEmparejamientos(indicaciones, indice) {
   });
   return cambios;
 }
+/* ==========================================================================
+   PACIENTES Y BANDEJA
+   ========================================================================== */
+
+var COLUMNAS_PACIENTES = ['DNI', 'ESPECIALIDAD', 'NOMBRE', 'TELEFONOS', 'MEDICO_ULTIMO', 'PRIMERA_CITA', 'ULTIMA_CITA',
+  'N_REALIZADAS', 'PROXIMA_ESPERADA', 'VENCE', 'DIAS_ATRASO', 'PROXIMA_AGENDADA', 'ESTADO', 'N_SEGUIMIENTOS',
+  'ULTIMO_SEGUIMIENTO', 'PENDIENTE'];
+
+function telefonosPorDni(indicaciones) {
+  var out = {};
+  (indicaciones || []).forEach(function (i) {
+    var t = normTelefono(i.TELEFONO);
+    if (!i.DNI || !t) return;
+    out[i.DNI] = out[i.DNI] || [];
+    if (out[i.DNI].indexOf(t) < 0) out[i.DNI].push(t);
+  });
+  return out;
+}
+
+/** Cotizado y no aceptado después (mismo DNI y mismo tipo) = pendiente. */
+function pendientesPorDni(indicaciones) {
+  var aceptado = {}, out = {};
+  (indicaciones || []).forEach(function (i) {
+    if (!i.DNI || i.ESTADO !== 'ACEPTÓ') return;
+    var k = i.DNI + '|' + i.TIPO;
+    if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
+  });
+  (indicaciones || []).forEach(function (i) {
+    if (!i.DNI || i.ESTADO !== 'COTIZÓ') return;
+    var a = aceptado[i.DNI + '|' + i.TIPO];
+    if (a && a >= i.FECHA) return;
+    var cantidad = Number(i.CANTIDAD);
+    var texto = (i.TIPO === 'HIERRO' ? 'Hierro' : (i.DETALLE || 'Procedimiento')) + (cantidad > 1 ? ' ×' + cantidad : '') + ' cotizado';
+    (out[i.DNI] = out[i.DNI] || []).push(texto);
+  });
+  return out;
+}
+
+function segsPorSerie(seguimientos) {
+  var out = {};
+  (seguimientos || []).forEach(function (s) {
+    var k = claveSerie(s.DNI, s.ESPECIALIDAD);
+    (out[k] = out[k] || []).push(s);
+  });
+  return out;
+}
+
+function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy) {
+  var series = armarSeries(citas);
+  var tel = telefonosPorDni(indicaciones), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
+  var out = [];
+  Object.keys(series).forEach(function (k) {
+    var s = series[k];
+    if (!s.realizadas.length) return;
+    var e = estadoDeSerie(s, segs[k], reglas, hoy);
+    out.push({
+      DNI: s.dni,
+      ESPECIALIDAD: s.especialidad,
+      NOMBRE: s.nombre,
+      TELEFONOS: (tel[s.dni] || []).join(' / '),
+      MEDICO_ULTIMO: s.realizadas[s.realizadas.length - 1].MEDICO,
+      PRIMERA_CITA: s.realizadas[0].FECHA,
+      ULTIMA_CITA: e.ultima,
+      N_REALIZADAS: s.realizadas.length,
+      PROXIMA_ESPERADA: e.esperada,
+      VENCE: e.vence,
+      DIAS_ATRASO: e.atraso,
+      PROXIMA_AGENDADA: e.proximaAgendada,
+      ESTADO: e.estado,
+      N_SEGUIMIENTOS: e.intentos,
+      ULTIMO_SEGUIMIENTO: e.ultimoSeguimiento,
+      PENDIENTE: (pend[s.dni] || []).join('; ')
+    });
+  });
+  return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });
+}
+
+/** Diseño §7.1: primer intento antes; con indicación pendiente antes; menos atraso antes. */
+function ordenarBandeja(pacientes) {
+  return (pacientes || []).filter(function (p) { return p.ESTADO === 'VENCIDO'; }).sort(function (a, b) {
+    return (a.N_SEGUIMIENTOS - b.N_SEGUIMIENTOS) ||
+      ((a.PENDIENTE ? 0 : 1) - (b.PENDIENTE ? 0 : 1)) ||
+      (a.DIAS_ATRASO - b.DIAS_ATRASO) ||
+      (a.DNI < b.DNI ? -1 : a.DNI > b.DNI ? 1 : 0);
+  });
+}
+
+function validarAccion(p, catalogos, accion) {
+  if (!p || !normTexto(p.usuario)) return 'Elija quién es usted en el selector de arriba.';
+  if (catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {
+    return 'El usuario «' + p.usuario + '» no está en CATALOGOS.';
+  }
+  if (!normDni(p.dni)) return 'Falta el DNI del paciente.';
+  if (!normTexto(p.especialidad)) return 'Falta la especialidad.';
+  if (accion === 'DESCARTADO' && catalogos.motivos.map(normTexto).indexOf(normTexto(p.motivo)) < 0) {
+    return 'Elija un motivo de descarte.';
+  }
+  return '';
+}
+
+/** Un NaN en la respuesta hace que google.script.run devuelva null entero. */
+function limpiarParaEnvio(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return isFinite(v) ? v : '';
+  if (Array.isArray(v)) return v.map(limpiarParaEnvio);
+  if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : v.toISOString();
+  if (typeof v === 'object') {
+    var o = {};
+    Object.keys(v).forEach(function (k) { o[k] = limpiarParaEnvio(v[k]); });
+    return o;
+  }
+  return v;
+}

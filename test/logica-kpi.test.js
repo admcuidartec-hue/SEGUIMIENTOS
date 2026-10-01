@@ -37,8 +37,8 @@ test('recuperación: volvió si hay cita realizada o agendada después del segui
   const segs = [seg({ dni: '1', fecha: '2026-09-01' }), seg({ dni: '2', fecha: '2026-09-01' }),
     seg({ dni: '2', fecha: '2026-09-20', accion: 'DESCARTADO', motivo: 'OTRO' })];
   assert.deepEqual(plano(L.kpiRecuperacion(segs, citas)), [
-    { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, VOLVIO: 1, DIAS: 11 },
-    { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, VOLVIO: 0, DIAS: '' }
+    { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, VOLVIO: 1, DIAS: 11, FECHA_RETORNO: '2026-09-12' },
+    { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, VOLVIO: 0, DIAS: '', FECHA_RETORNO: '' }
   ]);
 });
 

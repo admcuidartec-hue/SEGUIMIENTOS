@@ -70,14 +70,16 @@ function prepararHojas() {
     : 'Todas las hojas ya existían. No se cambió nada.');
 }
 
+/** El aviso se muestra con el candado ya suelto: mientras está abierto, nadie más podría guardar. */
 function actualizar() {
-  var ui = SpreadsheetApp.getUi(), lock;
+  var ui = SpreadsheetApp.getUi(), lock, mensaje;
   try { lock = bloquear_(); } catch (e) { ui.alert('Otra actualización está en curso. Intente en un minuto.'); return; }
   try {
-    ui.alert(actualizar_().mensaje);
+    mensaje = actualizar_().mensaje;
   } finally {
     lock.releaseLock();
   }
+  ui.alert(mensaje);
 }
 
 /** Hoja 1 -> CITAS -> emparejamientos -> PACIENTES -> KPI. Si algo no cuadra, no escribe nada. */
@@ -124,6 +126,11 @@ function emparejarIndicacionesEnHoja_(citas) {
   var filas = datos.slice(1).map(function (f) {
     return { NOMBRE: f[cN], DNI: normDni(f[cD]), EMPAREJAMIENTO: String(f[cE] || '') };
   });
+  var cId = cab.indexOf('ID');
+  if (cId < 0) throw new Error('INDICACIONES necesita la columna ID.');
+  filas.forEach(function (f, i) { f.ID = String(datos[i + 1][cId] || ''); });
+  var nuevosIds = completarIds(filas);
+  if (nuevosIds) sh.getRange(2, cId + 1, filas.length, 1).setNumberFormat('@').setValues(filas.map(function (f) { return [f.ID]; }));
   var conNombre = filas.filter(function (f) { return String(f.NOMBRE).trim(); });
   var cambios = aplicarEmparejamientos(conNombre, construirIndiceNombres(citas));
   if (!cambios) return 0;
@@ -140,38 +147,41 @@ function escribirKpi_(filas) {
   sh.getRange(1, 1, filas.length, 7).setValues(filas);
 }
 
+/** El aviso se muestra con el candado ya suelto (ver actualizar). */
 function importarIndicaciones() {
-  var ui = SpreadsheetApp.getUi(), lock;
+  var ui = SpreadsheetApp.getUi(), lock, mensaje;
   try { lock = bloquear_(); } catch (e) { ui.alert('Otra operación está en curso. Intente en un minuto.'); return; }
   try {
-    if (leerObjetos_('INDICACIONES').length) {
-      ui.alert('INDICACIONES ya tiene filas. La importación se hace una sola vez y no se repite, para no duplicar.');
-      return;
-    }
-    var citas = leerCitas_();
-    if (!citas.length) {
-      ui.alert('Primero use «Actualizar» para cargar las citas: sin ellas no se puede emparejar.');
-      return;
-    }
-    var origen = SpreadsheetApp.openById(CONFIG.HIERRO_ID), todas = [];
-    ['HIERRO', 'PROCEDIMIENTOS'].forEach(function (n) {
-      var sh = origen.getSheetByName(n);
-      if (!sh) throw new Error('La base de hierro no tiene la pestaña ' + n + '.');
-      var v = sh.getDataRange().getValues().map(function (f) {
-        return f.map(function (x) { return x instanceof Date ? fechaHoraTexto_(x) : x; });
-      });
-      todas = todas.concat(indicacionesDesdeHierro(n, v[0], v.slice(1), todas.length + 1));
-    });
-    aplicarEmparejamientos(todas, construirIndiceNombres(citas));
-    escribirObjetos_('INDICACIONES', COLUMNAS_INDICACIONES, todas);
-    var cuenta = {};
-    todas.forEach(function (i) { cuenta[i.EMPAREJAMIENTO] = (cuenta[i.EMPAREJAMIENTO] || 0) + 1; });
-    var detalle = todas.length + ' indicaciones: ' + Object.keys(cuenta).map(function (k) { return cuenta[k] + ' ' + k; }).join(', ');
-    bitacora_('MENÚ', 'IMPORTAR', detalle);
-    ui.alert('Importadas ' + detalle + '. Ahora use «Actualizar».');
+    mensaje = importar_();
   } finally {
     lock.releaseLock();
   }
+  ui.alert(mensaje);
+}
+
+/** Devuelve el mensaje para el usuario. Se niega si INDICACIONES ya tiene filas o si no hay citas. */
+function importar_() {
+  if (leerObjetos_('INDICACIONES').length) {
+    return 'INDICACIONES ya tiene filas. La importación se hace una sola vez y no se repite, para no duplicar.';
+  }
+  var citas = leerCitas_();
+  if (!citas.length) return 'Primero use «Actualizar» para cargar las citas: sin ellas no se puede emparejar.';
+  var origen = SpreadsheetApp.openById(CONFIG.HIERRO_ID), todas = [];
+  ['HIERRO', 'PROCEDIMIENTOS'].forEach(function (n) {
+    var sh = origen.getSheetByName(n);
+    if (!sh) throw new Error('La base de hierro no tiene la pestaña ' + n + '.');
+    var v = sh.getDataRange().getValues().map(function (f) {
+      return f.map(function (x) { return x instanceof Date ? fechaHoraTexto_(x) : x; });
+    });
+    todas = todas.concat(indicacionesDesdeHierro(n, v[0], v.slice(1), todas.length + 1));
+  });
+  aplicarEmparejamientos(todas, construirIndiceNombres(citas));
+  escribirObjetos_('INDICACIONES', COLUMNAS_INDICACIONES, todas);
+  var cuenta = {};
+  todas.forEach(function (i) { cuenta[i.EMPAREJAMIENTO] = (cuenta[i.EMPAREJAMIENTO] || 0) + 1; });
+  var detalle = todas.length + ' indicaciones: ' + Object.keys(cuenta).map(function (k) { return cuenta[k] + ' ' + k; }).join(', ');
+  bitacora_('MENÚ', 'IMPORTAR', detalle);
+  return 'Importadas ' + detalle + '. Ahora use «Actualizar».';
 }
 
 /** Revisión de salud. No escribe nada. */

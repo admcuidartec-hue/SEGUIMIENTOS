@@ -87,7 +87,7 @@ function celdaParaHoja_(v, columna) {
   if (v === undefined || v === null) return '';
   if (COLUMNAS_FECHA[columna] || COLUMNAS_FECHA_HORA[columna]) return aFecha_(v);
   if (typeof v === 'number') return isFinite(v) ? v : '';
-  return v;
+  return textoSeguro(v);
 }
 
 /** Una hoja con encabezado en la fila 1 -> objetos { COLUMNA: texto }. Las filas vacías se saltan. */
@@ -230,8 +230,8 @@ function getBandeja() {
   var hechosHoy = d.seguimientos.filter(function (s) {
     return fechaIso(s.FECHA_HORA) === d.hoy && normTexto(s.ACCION) === 'HECHO';
   }).length;
-  var recuperadosMes = kpiRecuperacion(d.seguimientos, d.citas).filter(function (r) {
-    return r.MES === mes && r.VOLVIO;
+  var recuperadosMes = kpiRecuperacion(d.seguimientos, d.citas, d.hoy).filter(function (r) {
+    return r.VOLVIO && mesDe(r.FECHA_RETORNO) === mes;
   }).length;
   return limpiarParaEnvio({
     tarjetas: tarjetas,
@@ -281,7 +281,7 @@ function buscar(texto) {
 
 function registrar_(p, accion) {
   var d = datos_();
-  var error = validarAccion(p, d.catalogos, accion);
+  var error = validarAccion(p, d.catalogos, accion, d.pacientes);
   if (error) throw new Error(error);
   var lock = bloquear_();
   try {
@@ -319,15 +319,13 @@ function confirmarEmparejamiento(p) {
   try {
     var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();
     var cab = datos[0].map(function (c) { return String(c).trim(); });
-    var cId = cab.indexOf('ID'), cDni = cab.indexOf('DNI'), cEm = cab.indexOf('EMPAREJAMIENTO');
-    for (var i = 1; i < datos.length; i++) {
-      if (String(datos[i][cId]) !== String(p.id)) continue;
-      sh.getRange(i + 1, cDni + 1).setNumberFormat('@').setValue(dni);
-      sh.getRange(i + 1, cEm + 1).setValue('CONFIRMADO');
-      bitacora_(String(p.usuario).trim(), 'EMPAREJAMIENTO', p.id + ' → ' + dni);
-      return { ok: true };
-    }
-    throw new Error('No encontré la indicación ' + p.id + '.');
+    var cDni = cab.indexOf('DNI'), cEm = cab.indexOf('EMPAREJAMIENTO');
+    var r = buscarFilaParaConfirmar(datos[0], datos.slice(1), p.id, dni, construirIndiceNombres(d.citas));
+    if (r.error) throw new Error(r.error);
+    sh.getRange(r.fila + 2, cDni + 1).setNumberFormat('@').setValue(dni);
+    sh.getRange(r.fila + 2, cEm + 1).setValue('CONFIRMADO');
+    bitacora_(String(p.usuario).trim(), 'EMPAREJAMIENTO', p.id + ' → ' + dni);
+    return { ok: true };
   } finally {
     lock.releaseLock();
   }

@@ -385,13 +385,57 @@ function aplicarEmparejamientos(indicaciones, indice) {
     var e = normTexto(ind.EMPAREJAMIENTO);
     var dni = normDni(ind.DNI);
     if ((e === 'CONFIRMADO' || e === 'AUTOMATICO') && dni) return;
-    if (!e && dni) { ind.DNI = dni; ind.EMPAREJAMIENTO = 'CONFIRMADO'; cambios++; return; }
+    // El script nunca escribe un DNI junto a POR CONFIRMAR o SIN CANDIDATO: si lo hay, lo puso una persona.
+    if (dni) {
+      if (ind.DNI !== dni || ind.EMPAREJAMIENTO !== 'CONFIRMADO') cambios++;
+      ind.DNI = dni;
+      ind.EMPAREJAMIENTO = 'CONFIRMADO';
+      return;
+    }
     var r = emparejar(ind.NOMBRE, indice);
     if (dni !== r.dni || ind.EMPAREJAMIENTO !== r.estado) cambios++;
     ind.DNI = r.dni;
     ind.EMPAREJAMIENTO = r.estado;
   });
   return cambios;
+}
+
+/** Da un ID 'IND-nnnn' a las indicaciones anotadas a mano sin ID. Devuelve cuántas cambió. */
+function completarIds(filas) {
+  var mayor = 0, cambios = 0;
+  (filas || []).forEach(function (f) {
+    var m = String(f.ID || '').match(/^IND-(\d+)$/);
+    if (m && Number(m[1]) > mayor) mayor = Number(m[1]);
+  });
+  (filas || []).forEach(function (f) {
+    if (String(f.ID || '').trim() || !textoLimpio_(f.NOMBRE)) return;
+    mayor++;
+    f.ID = 'IND-' + ('000' + mayor).slice(-4);
+    cambios++;
+  });
+  return cambios;
+}
+
+/**
+ * Fila (base 0, debajo del encabezado) que se puede confirmar: la del ID dado,
+ * todavía POR CONFIRMAR, y con el DNI entre sus candidatos.
+ */
+function buscarFilaParaConfirmar(encabezado, filas, id, dni, indice) {
+  var idx = indiceDeEncabezado(encabezado);
+  id = textoLimpio_(id);
+  if (!id) return { fila: -1, error: 'Esta indicación no tiene ID. Ejecute «Actualizar» y vuelva a intentarlo.' };
+  for (var i = 0; i < filas.length; i++) {
+    if (textoLimpio_(filas[i][idx.ID]) !== id) continue;
+    if (normTexto(filas[i][idx.EMPAREJAMIENTO]) !== 'POR CONFIRMAR') {
+      return { fila: -1, error: 'La indicación ' + id + ' ya no está por confirmar.' };
+    }
+    var candidatos = emparejar(filas[i][idx.NOMBRE], indice).candidatos;
+    if (!candidatos.some(function (c) { return c.dni === normDni(dni); })) {
+      return { fila: -1, error: 'El DNI ' + dni + ' no es candidato de la indicación ' + id + '.' };
+    }
+    return { fila: i, error: '' };
+  }
+  return { fila: -1, error: 'No encontré la indicación ' + id + '.' };
 }
 /* ==========================================================================
    PACIENTES Y BANDEJA
@@ -480,7 +524,12 @@ function ordenarBandeja(pacientes) {
   });
 }
 
-function validarAccion(p, catalogos, accion) {
+/** Sheets toma como fórmula un texto que empieza por = + - @: se le antepone un apóstrofo. */
+function textoSeguro(v) {
+  return (typeof v === 'string' && /^[=+\-@]/.test(v)) ? "'" + v : v;
+}
+
+function validarAccion(p, catalogos, accion, pacientes) {
   if (!p || !normTexto(p.usuario)) return 'Elija quién es usted en el selector de arriba.';
   if (catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {
     return 'El usuario «' + p.usuario + '» no está en CATALOGOS.';
@@ -489,6 +538,11 @@ function validarAccion(p, catalogos, accion) {
   if (!normTexto(p.especialidad)) return 'Falta la especialidad.';
   if (accion === 'DESCARTADO' && catalogos.motivos.map(normTexto).indexOf(normTexto(p.motivo)) < 0) {
     return 'Elija un motivo de descarte.';
+  }
+  if (pacientes && !pacientes.some(function (x) {
+    return x.DNI === normDni(p.dni) && normTexto(x.ESPECIALIDAD) === normTexto(p.especialidad);
+  })) {
+    return 'Ese paciente no está en la lista. Recargue la página.';
   }
   return '';
 }
@@ -575,22 +629,36 @@ function kpiIndicaciones(indicaciones, citas) {
     .sort(compararCampos_(['MES', 'TIPO', 'DETALLE', 'MEDICO']));
 }
 
-function kpiRecuperacion(seguimientos, citas) {
-  var series = armarSeries(citas);
-  return (seguimientos || []).filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; }).map(function (s) {
-    var f = fechaIso(s.FECHA_HORA);
-    var serie = series[claveSerie(s.DNI, s.ESPECIALIDAD)];
-    var despues = serie ? serie.realizadas.concat(serie.agendadas).filter(function (c) { return c.FECHA > f; }).sort(porFecha) : [];
-    var previa = serie ? ultimaAntesDe_(serie.realizadas, f) : null;
-    return {
-      MES: mesDe(f),
-      RESPONSABLE: s.RESPONSABLE,
-      ESPECIALIDAD: s.ESPECIALIDAD,
-      MEDICO: previa ? previa.MEDICO : '',
-      VOLVIO: despues.length ? 1 : 0,
-      DIAS: despues.length ? diasEntre(f, despues[0].FECHA) : ''
-    };
-  });
+/**
+ * Una fila por serie y por ciclo (la última cita realizada antes del
+ * seguimiento): tres seguimientos seguidos y un retorno son UNA recuperación,
+ * contada en el mes del primer seguimiento. Una cita agendada que ya pasó no
+ * cuenta como retorno: nadie la actualizó en SOFDOC, pero no se sabe si vino.
+ */
+function kpiRecuperacion(seguimientos, citas, hoy) {
+  var series = armarSeries(citas), vistos = {}, out = [];
+  (seguimientos || []).filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; })
+    .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; })
+    .forEach(function (s) {
+      var f = fechaIso(s.FECHA_HORA);
+      var serie = series[claveSerie(s.DNI, s.ESPECIALIDAD)];
+      var previa = serie ? ultimaAntesDe_(serie.realizadas, f) : null;
+      var ciclo = claveSerie(s.DNI, s.ESPECIALIDAD) + '|' + (previa ? previa.FECHA : '');
+      if (vistos[ciclo]) return;
+      vistos[ciclo] = 1;
+      var despues = serie ? serie.realizadas.concat(serie.agendadas.filter(function (c) { return !hoy || c.FECHA >= hoy; }))
+        .filter(function (c) { return c.FECHA > f; }).sort(porFecha) : [];
+      out.push({
+        MES: mesDe(f),
+        RESPONSABLE: s.RESPONSABLE,
+        ESPECIALIDAD: s.ESPECIALIDAD,
+        MEDICO: previa ? previa.MEDICO : '',
+        VOLVIO: despues.length ? 1 : 0,
+        DIAS: despues.length ? diasEntre(f, despues[0].FECHA) : '',
+        FECHA_RETORNO: despues.length ? despues[0].FECHA : ''
+      });
+    });
+  return out;
 }
 
 function kpiMotivos(seguimientos) {
@@ -608,7 +676,7 @@ function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy) {
   return {
     cohortes: kpiCohortes(citas, reglas, hoy),
     indicaciones: kpiIndicaciones(indicaciones, citas),
-    recuperacion: kpiRecuperacion(seguimientos, citas),
+    recuperacion: kpiRecuperacion(seguimientos, citas, hoy),
     motivos: kpiMotivos(seguimientos),
     sinCandidato: (indicaciones || []).filter(function (i) { return normTexto(i.EMPAREJAMIENTO) === 'SIN CANDIDATO'; })
       .map(function (i) { return { ID: i.ID, FECHA: i.FECHA, TIPO: i.TIPO, NOMBRE: i.NOMBRE, TELEFONO: i.TELEFONO }; })

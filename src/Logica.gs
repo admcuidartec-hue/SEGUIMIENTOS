@@ -300,3 +300,96 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy) {
   out.estado = out.atraso <= reglas.corte ? 'VENCIDO' : 'ANTIGUO';
   return out;
 }
+/* ==========================================================================
+   EMPAREJAMIENTO POR NOMBRE
+
+   SOFDOC no trae teléfono y la base de hierro no trae DNI. Se unen por el
+   nombre: una indicación es candidata de un paciente si TODAS sus palabras
+   están en el nombre del paciente. Solo un candidato único, con al menos dos
+   palabras, se empareja solo; lo demás lo confirma una persona.
+   ========================================================================== */
+
+function tokensNombre(nombre) {
+  return normTexto(nombre).split(/[^A-Z]+/).filter(function (t) { return t && !PALABRAS_VACIAS[t]; });
+}
+
+function construirIndiceNombres(citas) {
+  var porDni = {}, orden = [];
+  (citas || []).forEach(function (c) {
+    if (!c.DNI) return;
+    if (!porDni[c.DNI]) { porDni[c.DNI] = { dni: c.DNI, nombre: c.NOMBRE, tokens: {} }; orden.push(c.DNI); }
+    if (c.NOMBRE) porDni[c.DNI].nombre = c.NOMBRE;
+    tokensNombre(c.NOMBRE).forEach(function (t) { porDni[c.DNI].tokens[t] = 1; });
+  });
+  return orden.map(function (d) { return porDni[d]; });
+}
+
+function emparejar(nombre, indice) {
+  var t = tokensNombre(nombre);
+  var cand = t.length ? indice.filter(function (p) { return t.every(function (x) { return p.tokens[x]; }); }) : [];
+  var lista = cand.slice(0, 5).map(function (p) { return { dni: p.dni, nombre: p.nombre }; });
+  if (cand.length === 1 && t.length >= 2) return { estado: 'AUTOMÁTICO', dni: cand[0].dni, candidatos: lista };
+  return { estado: cand.length ? 'POR CONFIRMAR' : 'SIN CANDIDATO', dni: '', candidatos: lista };
+}
+
+function normalizarEstadoIndicacion(v) {
+  var n = normTexto(v);
+  if (n.indexOf('ACEPT') === 0) return 'ACEPTÓ';
+  if (n.indexOf('COTIZ') === 0) return 'COTIZÓ';
+  return n;
+}
+
+var COLUMNAS_INDICACIONES = ['ID', 'FECHA', 'TIPO', 'DETALLE', 'CANTIDAD', 'MEDICO_SOLICITANTE', 'ASESORA', 'NOMBRE',
+  'TELEFONO', 'ESTADO', 'OBSERVACIONES', 'DNI', 'EMPAREJAMIENTO', 'ORIGEN'];
+
+/**
+ * Filas de la pestaña HIERRO o PROCEDIMIENTOS -> indicaciones.
+ * `filas` son las filas debajo del encabezado, vacías incluidas, para que
+ * ORIGEN apunte a la fila real de la hoja (encabezado en la fila 1).
+ */
+function indicacionesDesdeHierro(pestana, encabezado, filas, desde) {
+  var idx = indiceDeEncabezado(encabezado);
+  var tipo = normTexto(pestana) === 'HIERRO' ? 'HIERRO' : 'PROCEDIMIENTO';
+  function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
+  var out = [], n = desde || 1;
+  (filas || []).forEach(function (f, i) {
+    var nombre = textoLimpio_(celda(f, 'NOMBRE'));
+    if (!nombre) return;
+    out.push({
+      ID: 'IND-' + ('000' + n++).slice(-4),
+      FECHA: fechaIso(celda(f, 'FECHA')),
+      TIPO: tipo,
+      DETALLE: tipo === 'HIERRO' ? 'HIERRO' : textoLimpio_(celda(f, 'TIPO DE EXAMENES')),
+      CANTIDAD: tipo === 'HIERRO' ? celda(f, 'CANTIDAD') : '',
+      MEDICO_SOLICITANTE: '',
+      ASESORA: normTexto(celda(f, 'ASESOR')),
+      NOMBRE: nombre,
+      TELEFONO: normTelefono(celda(f, 'TELEFONO')),
+      ESTADO: normalizarEstadoIndicacion(celda(f, '¿ACEPTARON? ¿COTIZACION?')),
+      OBSERVACIONES: textoLimpio_(celda(f, 'OBSERVACIONES')),
+      DNI: '',
+      EMPAREJAMIENTO: '',
+      ORIGEN: pestana + '!' + (i + 2)
+    });
+  });
+  return out;
+}
+
+/**
+ * Empareja lo que falta. Lo CONFIRMADO o AUTOMÁTICO con DNI no se toca; un
+ * DNI escrito a mano sin estado se respeta y queda CONFIRMADO.
+ */
+function aplicarEmparejamientos(indicaciones, indice) {
+  var cambios = 0;
+  (indicaciones || []).forEach(function (ind) {
+    var e = normTexto(ind.EMPAREJAMIENTO);
+    var dni = normDni(ind.DNI);
+    if ((e === 'CONFIRMADO' || e === 'AUTOMATICO') && dni) return;
+    if (!e && dni) { ind.DNI = dni; ind.EMPAREJAMIENTO = 'CONFIRMADO'; cambios++; return; }
+    var r = emparejar(ind.NOMBRE, indice);
+    if (dni !== r.dni || ind.EMPAREJAMIENTO !== r.estado) cambios++;
+    ind.DNI = r.dni;
+    ind.EMPAREJAMIENTO = r.estado;
+  });
+  return cambios;
+}

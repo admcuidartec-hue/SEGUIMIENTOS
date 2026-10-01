@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguimientos — Centro Hematológico del Perú</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   PALETA — los --chp-* son la ÚNICA fuente de color. Fuera de estos dos
+   bloques no se escribe un color a mano: un #fff olvidado es un foco de luz
+   en mitad del modo oscuro (lo comprueba test/ui.test.js).
+   ========================================================================== */
+:root{
+  --chp-bg:#EFE7DE;--chp-panel:#FAF6F1;--chp-panel-alt:#FFFDFA;--chp-border:#DBCCBF;--chp-border-soft:#E7DBD0;
+  --chp-text:#2A1B18;--chp-soft:#4C3A34;--chp-muted:#7C6A62;--chp-accent:#A8352C;--chp-on-accent:#FFFFFF;
+  --chp-brand:#6F1713;--chp-on-brand:#FAF6F1;--chp-green:#2F6B45;--chp-green-bg:#DEE9E0;--chp-red-bg:#F6E2DF;
+  --chp-amber:#B26B00;--chp-amber-bg:#F7E9CF;--chp-track:#E3D6C9;--chp-field:#FFFFFF;--chp-field-border:#C6B3A4;
+  --chp-backdrop:rgba(42,27,24,.45);
+  --sombra:0 1px 2px rgba(42,27,24,.05), 0 10px 30px -20px rgba(42,27,24,.45);
+}
+html[data-modo="oscuro"]{
+  --chp-bg:#150A0A;--chp-panel:#24100F;--chp-panel-alt:#1B0C0C;--chp-border:#3A1C1C;--chp-border-soft:#33191A;
+  --chp-text:#F3E7E1;--chp-soft:#C9AAA3;--chp-muted:#B99A93;--chp-accent:#E0736B;--chp-on-accent:#FFF3F0;
+  --chp-brand:#6F1713;--chp-on-brand:#F3E7E1;--chp-green:#6FBF8B;--chp-green-bg:#1D3A28;--chp-red-bg:#2E1212;
+  --chp-amber:#E0A96B;--chp-amber-bg:#3A2614;--chp-track:#33191A;--chp-field:#3A1D1C;--chp-field-border:#6B3533;
+  --chp-backdrop:rgba(0,0,0,.6);
+  --sombra:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -18px rgba(0,0,0,.75);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--chp-bg);color:var(--chp-text);font-family:'Barlow',system-ui,sans-serif;font-size:14px;line-height:1.45}
+h1,h2,h3{font-family:'Barlow Condensed','Barlow',sans-serif;font-weight:600;margin:0;line-height:1.15}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--chp-accent);outline-offset:2px}
+.marco{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
+.lateral{background:var(--chp-brand);color:var(--chp-on-brand);padding:22px 16px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
+.marca{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;line-height:1.1}
+.marca small{display:block;font-family:'Barlow',sans-serif;font-size:10px;letter-spacing:.1em;opacity:.75}
+.nav{display:flex;flex-direction:column;gap:4px}
+.nav button{background:transparent;border:0;color:inherit;text-align:left;padding:9px 12px;border-radius:10px;cursor:pointer;opacity:.85}
+.nav button[aria-current="page"]{background:var(--chp-on-brand);color:var(--chp-brand);opacity:1;font-weight:600}
+.lateral label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+.lateral select{display:block;width:100%;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--chp-field-border);background:var(--chp-field);color:var(--chp-text)}
+.modo{margin-top:auto;background:transparent;border:1px solid var(--chp-on-brand);color:var(--chp-on-brand);border-radius:8px;padding:8px;cursor:pointer}
+main{padding:24px clamp(16px,3vw,36px);min-width:0}
+.vista[hidden]{display:none}
+.cabecera{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.cabecera h1{font-size:28px}
+.contador{display:flex;gap:10px;flex-wrap:wrap}
+.cifra{background:var(--chp-panel);border:1px solid var(--chp-border);border-radius:12px;padding:8px 14px;min-width:110px}
+.cifra b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:24px}
+.cifra span{font-size:12px;color:var(--chp-muted)}
+.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+.campo{padding:8px 10px;border-radius:8px;border:1px solid var(--chp-field-border);background:var(--chp-field);color:var(--chp-text)}
+.rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.tarjeta{background:var(--chp-panel);border:1px solid var(--chp-border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--sombra)}
+.tarjeta h3{font-size:19px;cursor:pointer;color:var(--chp-accent)}
+.dato{font-size:13px;color:var(--chp-soft)}
+.etiqueta{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--chp-amber-bg);color:var(--chp-amber)}
+.etiqueta.roja{background:var(--chp-red-bg);color:var(--chp-accent)}
+.etiqueta.verde{background:var(--chp-green-bg);color:var(--chp-green)}
+.tel{display:flex;gap:8px;align-items:center;font-family:ui-monospace,monospace;font-size:15px}
+.acciones{display:flex;gap:8px;margin-top:auto;flex-wrap:wrap}
+.btn{border:1px solid var(--chp-border);background:var(--chp-panel-alt);border-radius:10px;padding:8px 12px;cursor:pointer}
+.btn.primario{background:var(--chp-accent);color:var(--chp-on-accent);border-color:var(--chp-accent);font-weight:600}
+.btn.chico{padding:2px 8px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:wait}
+.nota{width:100%;min-height:54px;resize:vertical}
+.vacio{padding:40px;text-align:center;color:var(--chp-muted)}
+.aviso{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--chp-text);color:var(--chp-bg);padding:10px 16px;border-radius:10px;z-index:10;max-width:calc(100% - 32px)}
+.aviso[hidden]{display:none}
+.panel{background:var(--chp-panel);border:1px solid var(--chp-border);border-radius:16px;padding:16px;margin-bottom:16px;overflow-x:auto}
+.panel h2{font-size:20px;margin-bottom:10px}
+.sub{font-size:16px;margin:14px 0 6px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--chp-border-soft);vertical-align:top}
+th{color:var(--chp-muted);font-weight:600}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.linea{list-style:none;padding:0;margin:0;border-left:2px solid var(--chp-border)}
+.linea li{padding:2px 0 10px 14px;position:relative}
+.linea li::before{content:'';position:absolute;left:-6px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--chp-accent)}
+.linea li.esperada::before{background:var(--chp-panel);border:2px dashed var(--chp-accent)}
+.barra{height:8px;border-radius:4px;background:var(--chp-track);overflow:hidden;min-width:80px;margin-top:4px}
+.barra i{display:block;height:100%;background:var(--chp-accent)}
+dialog{border:1px solid var(--chp-border);border-radius:16px;background:var(--chp-panel);color:var(--chp-text);max-width:420px;width:calc(100% - 32px)}
+dialog::backdrop{background:var(--chp-backdrop)}
+dialog form{display:flex;flex-direction:column;gap:12px}
+dialog label{display:flex;flex-direction:column;gap:4px}
+@media (max-width:760px){
+  .marco{grid-template-columns:1fr}
+  .lateral{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
+  .nav{flex-direction:row;flex-wrap:wrap}
+  .modo{margin-top:0}
+}
+</style>
+</head>
+<body>
+<div class="marco">
+  <aside class="lateral">
+    <div class="marca">Seguimientos<small>CENTRO HEMATOLÓGICO DEL PERÚ</small></div>
+    <nav class="nav">
+      <button type="button" data-vista="bandeja" aria-current="page">Bandeja</button>
+      <button type="button" data-vista="ficha">Buscar paciente</button>
+      <button type="button" data-vista="tablero">Tablero</button>
+    </nav>
+    <div>
+      <label for="usuario">¿Quién es usted?</label>
+      <select id="usuario"><option value="">— Elija —</option></select>
+    </div>
+    <button class="modo" id="modo" type="button">Modo oscuro</button>
+  </aside>
+  <main>
+    <section class="vista" id="v-bandeja">
+      <div class="cabecera"><h1>Bandeja del día</h1><div class="contador" id="contador"></div></div>
+      <div class="filtros">
+        <select id="f-esp" class="campo"><option value="">Todas las especialidades</option></select>
+        <select id="f-med" class="campo"><option value="">Todos los médicos</option></select>
+        <label><input type="checkbox" id="f-sintel"> Solo sin teléfono</label>
+      </div>
+      <div class="rejilla" id="tarjetas"></div>
+    </section>
+    <section class="vista" id="v-ficha" hidden>
+      <div class="cabecera"><h1>Buscar paciente</h1></div>
+      <div class="filtros"><input id="q" class="campo" placeholder="DNI o nombre (mínimo 3 letras)" autocomplete="off"></div>
+      <div id="resultados"></div>
+      <div id="ficha"></div>
+    </section>
+    <section class="vista" id="v-tablero" hidden>
+      <div class="cabecera"><h1>Tablero de conversión</h1></div>
+      <div id="tablero"></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlg-descartar">
+  <form method="dialog">
+    <h2>Descartar paciente</h2>
+    <p id="dlg-nombre" class="dato"></p>
+    <label>Motivo <select id="dlg-motivo" class="campo" required><option value="">— Elija —</option></select></label>
+    <label>Nota <textarea id="dlg-nota" class="campo nota"></textarea></label>
+    <div class="acciones">
+      <button class="btn" value="cancelar" formnovalidate>Cancelar</button>
+      <button class="btn primario" value="ok">Descartar</button>
+    </div>
+  </form>
+</dialog>
+<div class="aviso" id="aviso" role="status" hidden></div>
+
+<script>
+/* ==========================================================================
+   PUENTE CON APPS SCRIPT. Abierto como archivo, usa el bloque DEMO del final.
+   ========================================================================== */
+const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
+
+function llamar(fn, ...args) {
+  if (EN_APPS_SCRIPT) {
+    return new Promise((res, rej) => google.script.run
+      .withSuccessHandler(res)
+      .withFailureHandler(e => rej(new Error(e.message || e)))[fn](...args));
+  }
+  if (!DEMO[fn]) return Promise.reject(new Error('El modo de demostración no tiene ' + fn + '.'));
+  return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(x)));
+}
+
+const E = { boot: null, bandeja: null, fichaDni: '', kpi: null };
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+
+function fechaCorta(iso) {
+  if (!iso) return '—';
+  const [a, m, d] = String(iso).slice(0, 10).split('-');
+  return `${d}/${m}/${a}`;
+}
+
+function avisar(texto) {
+  const a = $('#aviso');
+  a.textContent = texto;
+  a.hidden = false;
+  clearTimeout(avisar.t);
+  avisar.t = setTimeout(() => { a.hidden = true; }, 3500);
+}
+
+function leerPref(k) { try { return localStorage.getItem('seg.' + k) || ''; } catch (e) { return ''; } }
+function guardarPref(k, v) { try { localStorage.setItem('seg.' + k, v); } catch (e) { /* sin almacenamiento: no pasa nada */ } }
+
+function llenarSelect(sel, lista) {
+  lista.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+}
+
+function usuario() { return $('#usuario').value; }
+
+function exigirUsuario() {
+  if (usuario()) return true;
+  avisar('Elija quién es usted en el selector de la izquierda.');
+  $('#usuario').focus();
+  return false;
+}
+
+function ponerModo(m) {
+  document.documentElement.dataset.modo = m;
+  $('#modo').textContent = m === 'oscuro' ? 'Modo claro' : 'Modo oscuro';
+  guardarPref('modo', m);
+}
+
+function irA(vista) {
+  document.querySelectorAll('.nav button').forEach(b =>
+    b.dataset.vista === vista ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  document.querySelectorAll('.vista').forEach(s => { s.hidden = s.id !== 'v-' + vista; });
+  if (vista === 'tablero') cargarTablero();
+}
+
+/* ==========================================================================
+   BANDEJA
+   ========================================================================== */
+async function cargarBandeja() {
+  $('#tarjetas').innerHTML = '<div class="vacio">Cargando…</div>';
+  try {
+    E.bandeja = await llamar('getBandeja');
+    pintarBandeja();
+  } catch (e) {
+    $('#tarjetas').innerHTML = `<div class="vacio">No se pudo cargar la bandeja: ${esc(e.message)}</div>`;
+  }
+}
+
+function pintarBandeja() {
+  if (!E.bandeja) return;
+  const c = E.bandeja.contador;
+  $('#contador').innerHTML = [['Por atender', c.porAtender], ['Seguimientos hoy', c.hechosHoy], ['Recuperados este mes', c.recuperadosMes]]
+    .map(([t, n]) => `<div class="cifra"><b>${n}</b><span>${t}</span></div>`).join('');
+  const fe = $('#f-esp').value, fm = $('#f-med').value, sinTel = $('#f-sintel').checked;
+  const lista = E.bandeja.tarjetas.filter(t =>
+    (!fe || t.ESPECIALIDAD === fe) && (!fm || t.MEDICO_ULTIMO === fm) && (!sinTel || !t.TELEFONOS));
+  $('#tarjetas').innerHTML = lista.length
+    ? lista.map(tarjetaHtml).join('')
+    : '<div class="vacio">No hay pacientes por atender con estos filtros.</div>';
+}
+
+function tarjetaHtml(t) {
+  const tels = String(t.TELEFONOS || '').split(' / ').filter(Boolean);
+  return `<article class="tarjeta" data-dni="${esc(t.DNI)}" data-esp="${esc(t.ESPECIALIDAD)}">
+    <h3 data-abrir="${esc(t.DNI)}">${esc(t.NOMBRE)}</h3>
+    <div class="dato">DNI ${esc(t.DNI)} · ${esc(t.ESPECIALIDAD)} · ${esc(t.MEDICO_ULTIMO)}</div>
+    <div>${tels.length
+      ? tels.map(n => `<div class="tel">${esc(n)} <button type="button" class="btn chico" data-copiar="${esc(n)}">Copiar</button></div>`).join('')
+      : '<span class="etiqueta roja">Sin teléfono</span>'}</div>
+    <div class="dato">Última cita ${fechaCorta(t.ULTIMA_CITA)} · <b>${t.DIAS_ATRASO} días de atraso</b></div>
+    ${t.PENDIENTE ? `<div><span class="etiqueta">${esc(t.PENDIENTE)}</span></div>` : ''}
+    ${t.N_SEGUIMIENTOS ? `<div class="dato">Intento ${t.N_SEGUIMIENTOS + 1} · último seguimiento ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
+    <textarea class="campo nota" placeholder="Nota (opcional)"></textarea>
+    <div class="acciones">
+      <button type="button" class="btn primario hecho">Seguimiento hecho</button>
+      <button type="button" class="btn descartar">Descartar</button>
+    </div>
+  </article>`;
+}
+
+function quitarTarjeta(t, hecho) {
+  E.bandeja.tarjetas = E.bandeja.tarjetas.filter(x => x !== t);
+  E.bandeja.contador.porAtender--;
+  if (hecho) E.bandeja.contador.hechosHoy++;
+  E.kpi = null;
+  pintarBandeja();
+}
+
+function copiar(numero) {
+  const hecho = () => avisar('Copiado: ' + numero);
+  if (navigator.clipboard) navigator.clipboard.writeText(numero).then(hecho, () => avisar(numero));
+  else avisar(numero);
+}
+
+$('#tarjetas').addEventListener('click', async ev => {
+  const b = ev.target.closest('button, [data-abrir]');
+  if (!b) return;
+  if (b.dataset.copiar) { copiar(b.dataset.copiar); return; }
+  if (b.dataset.abrir) { abrirFicha(b.dataset.abrir); return; }
+  const card = b.closest('.tarjeta');
+  const t = E.bandeja.tarjetas.find(x => x.DNI === card.dataset.dni && x.ESPECIALIDAD === card.dataset.esp);
+  if (!t || !exigirUsuario()) return;
+  if (b.classList.contains('hecho')) {
+    b.disabled = true;
+    try {
+      await llamar('marcarSeguimiento', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, nota: card.querySelector('textarea').value });
+      quitarTarjeta(t, true);
+      avisar('Seguimiento registrado: ' + t.NOMBRE);
+    } catch (e) {
+      b.disabled = false;
+      avisar(e.message);
+    }
+  }
+  if (b.classList.contains('descartar')) abrirDescarte(t);
+});
+
+let aDescartar = null;
+function abrirDescarte(t) {
+  aDescartar = t;
+  $('#dlg-nombre').textContent = t.NOMBRE + ' · ' + t.ESPECIALIDAD;
+  $('#dlg-motivo').value = '';
+  $('#dlg-nota').value = '';
+  $('#dlg-descartar').showModal();
+}
+
+$('#dlg-descartar').addEventListener('close', async () => {
+  const t = aDescartar;
+  aDescartar = null;
+  if ($('#dlg-descartar').returnValue !== 'ok' || !t) return;
+  try {
+    await llamar('descartar', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, motivo: $('#dlg-motivo').value, nota: $('#dlg-nota').value });
+    quitarTarjeta(t, false);
+    avisar('Descartado: ' + t.NOMBRE);
+  } catch (e) {
+    avisar(e.message);
+  }
+});
+
+/* ==========================================================================
+   BUSCADOR Y FICHA
+   ========================================================================== */
+let esperaBusqueda;
+$('#q').addEventListener('input', () => { clearTimeout(esperaBusqueda); esperaBusqueda = setTimeout(buscarAhora, 300); });
+
+async function buscarAhora() {
+  const q = $('#q').value.trim();
+  if (q.length < 3) { $('#resultados').innerHTML = ''; return; }
+  let r = [];
+  try { r = await llamar('buscar', q); } catch (e) { avisar(e.message); }
+  $('#resultados').innerHTML = r.length
+    ? '<div class="filtros">' + r.map(p => `<button type="button" class="btn" data-abrir="${esc(p.DNI)}">${esc(p.NOMBRE)} · ${esc(p.DNI)}</button>`).join('') + '</div>'
+    : '<p class="dato">Sin resultados.</p>';
+}
+
+$('#resultados').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-abrir]');
+  if (b) abrirFicha(b.dataset.abrir);
+});
+
+async function abrirFicha(dni) {
+  irA('ficha');
+  E.fichaDni = dni;
+  $('#ficha').innerHTML = '<div class="vacio">Cargando…</div>';
+  try {
+    pintarFicha(await llamar('getPaciente', dni));
+  } catch (e) {
+    $('#ficha').innerHTML = `<div class="vacio">${esc(e.message)}</div>`;
+  }
+}
+
+const COLOR_ESTADO = { 'VENCIDO': 'roja', 'DESCARTADO': 'roja', 'ANTIGUO': 'roja', 'AL DÍA': 'verde', 'RECUPERADO': 'verde', 'AGENDADO': 'verde' };
+
+function lineaDeTiempo(citas) {
+  let n = 0;
+  return citas.map(c => {
+    const realizada = norm(c.ESTADO) === 'REALIZADO';
+    const titulo = realizada ? (n++ === 0 ? 'Primera cita' : 'Reevaluación ' + (n - 1)) : esc(c.ESTADO);
+    return `<li><b>${titulo}</b> · ${fechaCorta(c.FECHA)} · ${esc(c.MEDICO)}${c.MODALIDAD ? ' · ' + esc(c.MODALIDAD) : ''}</li>`;
+  }).join('');
+}
+
+function pintarFicha(p) {
+  const confirmar = p.porConfirmar.map(i => `<div class="panel confirmar">
+      <h2>¿Es esta la misma persona?</h2>
+      <p class="dato">${esc(i.TIPO)} del ${fechaCorta(i.FECHA)} a nombre de <b>${esc(i.NOMBRE)}</b> · teléfono ${esc(i.TELEFONO)}</p>
+      <div class="acciones">${i.candidatos.map(c => `<button type="button" class="btn${c.dni === p.dni ? ' primario' : ''}" data-confirmar="${esc(i.ID)}" data-dni="${esc(c.dni)}">${esc(c.nombre)} · ${esc(c.dni)}</button>`).join('')}</div>
+    </div>`).join('');
+
+  const series = p.series.map(s => {
+    const citas = p.citas.filter(c => norm(c.ESPECIALIDAD) === norm(s.ESPECIALIDAD));
+    return `<div class="panel">
+      <h2>${esc(s.ESPECIALIDAD)} <span class="etiqueta ${COLOR_ESTADO[s.ESTADO] || ''}">${esc(s.ESTADO)}</span></h2>
+      <p class="dato">Teléfonos: ${esc(s.TELEFONOS) || '—'}${s.PENDIENTE ? ' · Pendiente: ' + esc(s.PENDIENTE) : ''}</p>
+      <ul class="linea">${lineaDeTiempo(citas)}
+        <li class="esperada">Reevaluación esperada ${fechaCorta(s.PROXIMA_ESPERADA)} · vence ${fechaCorta(s.VENCE)}</li>
+      </ul>
+    </div>`;
+  }).join('');
+
+  const indicaciones = p.indicaciones.length
+    ? `<table><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Estado</th><th>Teléfono</th><th>Observaciones</th></tr>${p.indicaciones.map(i =>
+        `<tr><td>${fechaCorta(i.FECHA)}</td><td>${esc(i.TIPO)}</td><td>${esc(i.DETALLE)}${Number(i.CANTIDAD) > 1 ? ' ×' + esc(i.CANTIDAD) : ''}</td><td>${esc(i.ESTADO)}</td><td>${esc(i.TELEFONO)}</td><td>${esc(i.OBSERVACIONES)}</td></tr>`).join('')}</table>`
+    : '<p class="dato">Sin indicaciones registradas.</p>';
+
+  const seguimientos = p.seguimientos.length
+    ? `<table><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Especialidad</th><th>Motivo</th><th>Nota</th></tr>${p.seguimientos.map(s =>
+        `<tr><td>${esc(s.FECHA_HORA)}</td><td>${esc(s.RESPONSABLE)}</td><td>${esc(s.ACCION)}</td><td>${esc(s.ESPECIALIDAD)}</td><td>${esc(s.MOTIVO)}</td><td>${esc(s.NOTA)}</td></tr>`).join('')}</table>`
+    : '<p class="dato">Todavía no hay seguimientos.</p>';
+
+  $('#ficha').innerHTML = `<div class="cabecera"><h1>${esc(p.nombre)}</h1><span class="dato">DNI ${esc(p.dni)}</span></div>
+    ${confirmar}${series}
+    <div class="panel"><h2>Indicaciones</h2>${indicaciones}</div>
+    <div class="panel"><h2>Seguimientos</h2>${seguimientos}</div>`;
+}
+
+$('#ficha').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-confirmar]');
+  if (!b || !exigirUsuario()) return;
+  b.disabled = true;
+  try {
+    await llamar('confirmarEmparejamiento', { usuario: usuario(), id: b.dataset.confirmar, dni: b.dataset.dni });
+    avisar('Emparejamiento confirmado.');
+    E.bandeja = null;
+    abrirFicha(E.fichaDni);
+    cargarBandeja();
+  } catch (e) {
+    b.disabled = false;
+    avisar(e.message);
+  }
+});
+
+/* ==========================================================================
+   TABLERO — la Tarea 11 reemplaza esta función entera.
+   ========================================================================== */
+function cargarTablero() {
+  $('#tablero').innerHTML = '<div class="vacio">Tablero en construcción.</div>';
+}
+
+/* ==========================================================================
+   ARRANQUE
+   ========================================================================== */
+async function iniciar() {
+  ponerModo(leerPref('modo') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro'));
+  $('#modo').addEventListener('click', () => ponerModo(document.documentElement.dataset.modo === 'oscuro' ? 'claro' : 'oscuro'));
+  document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => irA(b.dataset.vista)));
+  ['#f-esp', '#f-med', '#f-sintel'].forEach(s => $(s).addEventListener('change', pintarBandeja));
+  $('#usuario').addEventListener('change', () => guardarPref('usuario', usuario()));
+  try {
+    E.boot = await llamar('bootstrap');
+  } catch (e) {
+    $('#tarjetas').innerHTML = `<div class="vacio">No se pudo iniciar: ${esc(e.message)}</div>`;
+    return;
+  }
+  llenarSelect($('#usuario'), E.boot.usuarios);
+  llenarSelect($('#f-esp'), E.boot.especialidades);
+  llenarSelect($('#f-med'), E.boot.medicos);
+  llenarSelect($('#dlg-motivo'), E.boot.motivos);
+  const recordado = leerPref('usuario');
+  if (E.boot.usuarios.includes(recordado)) $('#usuario').value = recordado;
+  cargarBandeja();
+}
+
+/* ==========================================================================
+   DEMO — datos INVENTADOS para abrir este archivo en el navegador sin
+   desplegar. No lo elimine: es como se prueba la interfaz (npm run test:ui).
+   ========================================================================== */
+const DEMO = (() => {
+  const hoy = '2026-10-01';
+  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS'];
+  const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
+  const ELI = 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA', KAREN = 'Dra. KAREN DIANA MATOS PEÑA';
+  function mas(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  const p = (DNI, ESPECIALIDAD, NOMBRE, TELEFONOS, MEDICO_ULTIMO, PRIMERA_CITA, ULTIMA_CITA, N_REALIZADAS, ESTADO, DIAS_ATRASO, N_SEGUIMIENTOS, ULTIMO_SEGUIMIENTO, PENDIENTE) =>
+    ({ DNI, ESPECIALIDAD, NOMBRE, TELEFONOS, MEDICO_ULTIMO, PRIMERA_CITA, ULTIMA_CITA, N_REALIZADAS,
+       PROXIMA_ESPERADA: mas(ULTIMA_CITA, 30), VENCE: mas(ULTIMA_CITA, 45), DIAS_ATRASO, PROXIMA_AGENDADA: '',
+       ESTADO, N_SEGUIMIENTOS, ULTIMO_SEGUIMIENTO, PENDIENTE });
+  const pacientes = [
+    p('40111222', 'HEMATOLOGÍA', 'ROSA ELENA QUISPE HUAMÁN', '987654321', ELI, '2026-06-10', '2026-08-05', 2, 'VENCIDO', 12, 0, '', 'Hierro ×2 cotizado'),
+    p('40222333', 'HEMATOLOGÍA', 'JORGE LUIS MENDOZA PAREDES', '', KAREN, '2026-07-18', '2026-07-18', 1, 'VENCIDO', 30, 0, '', ''),
+    p('40333444', 'REUMATOLOGÍA', 'CARMEN SOFÍA TORRES DÍAZ', '912345678 / 998877665', 'Dr. JUVENAL HANAMPA ROQUE', '2026-05-02', '2026-06-23', 2, 'VENCIDO', 55, 1, '2026-09-10', ''),
+    p('40444555', 'HEMATOLOGÍA', 'LUIS ALBERTO RAMOS VEGA', '923456789', 'Dra. ALEJANDRA LA TORRE MATUK', '2026-08-12', '2026-08-12', 1, 'VENCIDO', 5, 0, '', 'AMO + BIOPSIA cotizado'),
+    p('40555666', 'HEMATOLOGÍA', 'ANA MARÍA FLORES RÍOS', '934567890', ELI, '2026-08-20', '2026-09-20', 2, 'AL DÍA', 0, 0, '', '')
+  ];
+  const indicaciones = [
+    { ID: 'IND-0001', FECHA: '2026-08-05', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 2, ESTADO: 'COTIZÓ', TELEFONO: '987654321', OBSERVACIONES: 'VA A COORDINAR', DNI: '40111222' },
+    { ID: 'IND-0002', FECHA: '2026-08-12', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', CANTIDAD: '', ESTADO: 'COTIZÓ', TELEFONO: '923456789', OBSERVACIONES: '', DNI: '40444555' }
+  ];
+  let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
+    candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
+  const seguimientos = [{ ID: 'SEG-1', FECHA_HORA: '2026-09-10 11:20', DNI: '40333444', ESPECIALIDAD: 'REUMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: 'Dijo que llamará' }];
+
+  function exigir(x, conMotivo) {
+    if (!x || !usuarios.includes(x.usuario)) throw new Error('Elija quién es usted en el selector de arriba.');
+    if (conMotivo && !motivos.includes(x.motivo)) throw new Error('Elija un motivo de descarte.');
+  }
+  function registrar(x, accion) {
+    exigir(x, accion === 'DESCARTADO');
+    seguimientos.push({ ID: 'SEG-' + (seguimientos.length + 1), FECHA_HORA: hoy + ' 10:00', DNI: x.dni, ESPECIALIDAD: x.especialidad,
+      RESPONSABLE: x.usuario, ACCION: accion, MOTIVO: x.motivo || '', NOTA: x.nota || '' });
+    const pac = pacientes.find(q => q.DNI === x.dni && q.ESPECIALIDAD === x.especialidad);
+    if (pac) pac.ESTADO = accion === 'HECHO' ? 'CONTACTADO' : 'DESCARTADO';
+    return { ok: true };
+  }
+  return {
+    bootstrap: () => ({
+      hoy, usuarios, motivos,
+      especialidades: [...new Set(pacientes.map(x => x.ESPECIALIDAD))].sort(),
+      medicos: [...new Set(pacientes.map(x => x.MEDICO_ULTIMO))].sort()
+    }),
+    getBandeja: () => {
+      const tarjetas = pacientes.filter(x => x.ESTADO === 'VENCIDO').sort((a, b) =>
+        (a.N_SEGUIMIENTOS - b.N_SEGUIMIENTOS) || ((a.PENDIENTE ? 0 : 1) - (b.PENDIENTE ? 0 : 1)) || (a.DIAS_ATRASO - b.DIAS_ATRASO));
+      return { tarjetas, contador: { porAtender: tarjetas.length,
+        hechosHoy: seguimientos.filter(s => s.FECHA_HORA.startsWith(hoy) && s.ACCION === 'HECHO').length, recuperadosMes: 3 } };
+    },
+    getPaciente: dni => {
+      const series = pacientes.filter(x => x.DNI === dni);
+      const citas = series.flatMap(s => {
+        const c = [{ FECHA: s.PRIMERA_CITA, ESTADO: 'REALIZADO', ESPECIALIDAD: s.ESPECIALIDAD, MEDICO: s.MEDICO_ULTIMO, MODALIDAD: 'CLÍNICA' }];
+        if (s.N_REALIZADAS > 1) c.push({ FECHA: s.ULTIMA_CITA, ESTADO: 'REALIZADO', ESPECIALIDAD: s.ESPECIALIDAD, MEDICO: s.MEDICO_ULTIMO, MODALIDAD: 'VIRTUAL' });
+        return c;
+      });
+      return { dni, nombre: series.length ? series[0].NOMBRE : '', series, citas,
+        indicaciones: indicaciones.filter(i => i.DNI === dni),
+        porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === dni)),
+        seguimientos: seguimientos.filter(s => s.DNI === dni) };
+    },
+    buscar: q => {
+      const n = norm(q), d = q.trim();
+      return pacientes.filter((x, i, a) => a.findIndex(y => y.DNI === x.DNI) === i)
+        .filter(x => (/\d/.test(d) && x.DNI.startsWith(d)) || norm(x.NOMBRE).includes(n))
+        .map(x => ({ DNI: x.DNI, NOMBRE: x.NOMBRE }));
+    },
+    marcarSeguimiento: x => registrar(x, 'HECHO'),
+    descartar: x => registrar(x, 'DESCARTADO'),
+    confirmarEmparejamiento: x => {
+      exigir(x, false);
+      const i = porConfirmar.find(y => y.ID === x.id);
+      if (!i) throw new Error('No encontré la indicación ' + x.id + '.');
+      porConfirmar = porConfirmar.filter(y => y !== i);
+      indicaciones.push({ ID: i.ID, FECHA: i.FECHA, TIPO: i.TIPO, DETALLE: i.DETALLE, CANTIDAD: 1, ESTADO: 'COTIZÓ', TELEFONO: i.TELEFONO, OBSERVACIONES: '', DNI: x.dni });
+      const pac = pacientes.find(q => q.DNI === x.dni);
+      if (pac && !pac.TELEFONOS) pac.TELEFONOS = i.TELEFONO;
+      return { ok: true };
+    }
+  };
+})();
+
+iniciar();
+</script>
+</body>
+</html>

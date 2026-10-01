@@ -170,3 +170,133 @@ function fusionarCitas(previas, nuevas) {
   var citas = orden.map(function (id) { return porId[id]; }).sort(ordenCitas_);
   return { citas: citas, nuevas: nNuevas, cambiadas: cambiadas };
 }
+/* ==========================================================================
+   REGLAS Y CATÁLOGOS (vienen de las hojas REGLAS y CATALOGOS)
+   ========================================================================== */
+
+function entero_(v, porDefecto, minimo) {
+  var n = parseInt(v, 10);
+  if (isNaN(n) || n < (minimo || 0)) return porDefecto;
+  return n;
+}
+
+/**
+ * REGLAS tiene dos tablas lado a lado con un solo encabezado:
+ * ESPECIALIDAD | ESPERADO_DIAS | VENCE_DIAS | (vacía) | PARAMETRO | VALOR
+ */
+function reglasDesdeFilas(encabezado, filas) {
+  var idx = indiceDeEncabezado(encabezado);
+  var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180 };
+  function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
+  (filas || []).forEach(function (f) {
+    var esp = normTexto(celda(f, 'ESPECIALIDAD'));
+    if (esp) r.plazos[esp] = { esperado: entero_(celda(f, 'ESPERADO_DIAS'), 30), vence: entero_(celda(f, 'VENCE_DIAS'), 45) };
+    var par = normTexto(celda(f, 'PARAMETRO')).replace(/ /g, '_');
+    var val = celda(f, 'VALOR');
+    if (par === 'ESPERA_TRAS_SEGUIMIENTO_DIAS') r.espera = entero_(val, 15);
+    if (par === 'MAX_SEGUIMIENTOS') r.maxSeguimientos = entero_(val, 3, 1);
+    if (par === 'CORTE_BANDEJA_DIAS') r.corte = entero_(val, 180);
+  });
+  Object.keys(r.plazos).forEach(function (k) {
+    if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;
+  });
+  return r;
+}
+
+function plazoDe(reglas, especialidad) {
+  return reglas.plazos[normTexto(especialidad)] || reglas.plazos['*'];
+}
+
+/** CATALOGOS: una columna por lista. USUARIOS | MOTIVOS_DESCARTE | MEDICO_ALIAS | MEDICO_NOMBRE */
+function catalogosDesdeFilas(encabezado, filas) {
+  var idx = indiceDeEncabezado(encabezado);
+  var out = { usuarios: [], motivos: [], alias: {} };
+  function celda(f, k) { return idx[k] === undefined ? '' : textoLimpio_(f[idx[k]]); }
+  (filas || []).forEach(function (f) {
+    var u = celda(f, 'USUARIOS'), m = celda(f, 'MOTIVOS_DESCARTE');
+    var a = celda(f, 'MEDICO_ALIAS'), n = celda(f, 'MEDICO_NOMBRE');
+    if (u) out.usuarios.push(u);
+    if (m) out.motivos.push(m);
+    if (a && n) out.alias[normTexto(a)] = n;
+  });
+  return out;
+}
+
+/* ==========================================================================
+   SERIES Y ESTADO
+
+   Una serie es un DNI dentro de una especialidad: ir a nutrición no cuenta
+   como reevaluación de hematología.
+   ========================================================================== */
+
+function claveSerie(dni, especialidad) {
+  return dni + '|' + normTexto(especialidad);
+}
+
+function porFecha(a, b) {
+  return a.FECHA < b.FECHA ? -1 : a.FECHA > b.FECHA ? 1 : 0;
+}
+
+function armarSeries(citas) {
+  var s = {};
+  (citas || []).forEach(function (c) {
+    var k = claveSerie(c.DNI, c.ESPECIALIDAD);
+    if (!s[k]) s[k] = { clave: k, dni: c.DNI, especialidad: c.ESPECIALIDAD, nombre: c.NOMBRE, realizadas: [], agendadas: [] };
+    var e = normTexto(c.ESTADO);
+    if (e === 'REALIZADO') s[k].realizadas.push(c);
+    else if (e === 'AGENDADO') s[k].agendadas.push(c);
+  });
+  Object.keys(s).forEach(function (k) {
+    s[k].realizadas.sort(porFecha);
+    s[k].agendadas.sort(porFecha);
+    var r = s[k].realizadas;
+    if (r.length && r[r.length - 1].NOMBRE) s[k].nombre = r[r.length - 1].NOMBRE;
+  });
+  return s;
+}
+
+/**
+ * Estado de una serie. Gana la primera regla que se cumple (diseño §5):
+ * DESCARTADO, AGENDADO, CONTACTADO, RECUPERADO, AL DÍA, POR VENCER, VENCIDO, ANTIGUO.
+ */
+function estadoDeSerie(serie, seguimientos, reglas, hoy) {
+  var plazo = plazoDe(reglas, serie.especialidad);
+  var r = serie.realizadas;
+  var ultima = r.length ? r[r.length - 1].FECHA : '';
+  var penultima = r.length > 1 ? r[r.length - 2].FECHA : '';
+  var out = { estado: '', ultima: ultima, esperada: '', vence: '', atraso: 0, intentos: 0, ultimoSeguimiento: '', proximaAgendada: '' };
+
+  var futura = serie.agendadas.filter(function (c) { return c.FECHA >= hoy; })[0];
+  if (futura) out.proximaAgendada = futura.FECHA;
+  if (!ultima) { out.estado = 'SIN ATENCIÓN'; return out; }
+
+  out.esperada = sumarDias(ultima, plazo.esperado);
+  out.vence = sumarDias(ultima, plazo.vence);
+  out.atraso = Math.max(0, diasEntre(out.vence, hoy));
+
+  var lista = (seguimientos || []).slice().sort(function (a, b) {
+    return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0;
+  });
+  if (lista.length) out.ultimoSeguimiento = fechaIso(lista[lista.length - 1].FECHA_HORA);
+  var posteriores = lista.filter(function (s) { return fechaIso(s.FECHA_HORA) > ultima; });
+  var hechos = posteriores.filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; });
+  out.intentos = hechos.length;
+  var ultimoPost = posteriores[posteriores.length - 1];
+  var ultimoHecho = hechos[hechos.length - 1];
+  var diasDesdeHecho = ultimoHecho ? diasEntre(fechaIso(ultimoHecho.FECHA_HORA), hoy) : null;
+
+  if (ultimoPost && normTexto(ultimoPost.ACCION) === 'DESCARTADO') { out.estado = 'DESCARTADO'; return out; }
+  if (hechos.length >= reglas.maxSeguimientos && diasDesdeHecho >= reglas.espera) { out.estado = 'DESCARTADO'; return out; }
+  if (futura) { out.estado = 'AGENDADO'; return out; }
+  if (ultimoHecho && diasDesdeHecho < reglas.espera) { out.estado = 'CONTACTADO'; return out; }
+
+  var hechoAntesDeVolver = lista.some(function (s) {
+    var f = fechaIso(s.FECHA_HORA);
+    return normTexto(s.ACCION) === 'HECHO' && f <= ultima && (!penultima || f > penultima);
+  });
+  if (hechoAntesDeVolver && hoy < out.vence) { out.estado = 'RECUPERADO'; return out; }
+  if (hoy < out.esperada) { out.estado = 'AL DÍA'; return out; }
+  if (hoy < out.vence) { out.estado = 'POR VENCER'; return out; }
+  out.estado = out.atraso <= reglas.corte ? 'VENCIDO' : 'ANTIGUO';
+  return out;
+}

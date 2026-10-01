@@ -61,18 +61,21 @@ SOFDOC **no trae teléfono**.
 
 ### 3.2 Base de hierro y procedimientos
 
-`BASE DE SEGUIMIENTOS DE HIERRO Y PROCEDIMIENTOS` (`1ALRvzPc7jzcCaqztE6-1ADgBmsooqCUU`)
-está en la misma carpeta que el libro madre. **Hoy es un `.xlsx`** y hay que guardarlo
-como Hojas de cálculo de Google antes de importarlo (ver §10).
+`BASE DE SEGUIMIENTOS DE HIERRO Y PROCEDIMIENTOS` (`1FrJ9oXyeHLLABqLcSA2VyXry-x_ZeFow6LsSACeJw8o`)
+es una hoja de cálculo de Google en la misma carpeta que el libro madre. Se convirtió del `.xlsx` el 01/10/2026.
+Tiene dos pestañas con la misma estructura y el encabezado en la fila 1:
 
-| Pestaña | Columnas |
-|---|---|
-| `HIERRO` | FECHA, (mes), ASESOR, NOMBRE, TELÉFONO, CANTIDAD, ¿ACEPTARON? ¿COTIZACIÓN?, OBSERVACIONES |
-| `PROCEDIMIENTOS` | FECHA, ASESOR, NOMBRE, TELÉFONO, TIPO DE EXÁMENES, ¿ACEPTARON? ¿COTIZACIÓN?, OBSERVACIONES |
-| `HIERRO NUEVO` (si existe) | FECHA, ASESOR, NOMBRE, DNI, TELÉFONO, CANTIDAD, ¿ACEPTARON?, TIPO DE HIERRO, MÉDICO SOLICITANTE, OBSERVACIÓN |
+| Pestaña | Filas | Columnas |
+|---|---|---|
+| `HIERRO` | 227 | FECHA, (mes, sin título), ASESOR, NOMBRE, TELÉFONO, CANTIDAD, ¿ACEPTARON? ¿COTIZACIÓN?, OBSERVACIONES |
+| `PROCEDIMIENTOS` | 68 | FECHA, (mes, sin título), ASESOR, NOMBRE, TELÉFONO, TIPO DE EXÁMENES, ¿ACEPTARON? ¿COTIZACIÓN?, OBSERVACIONES |
 
-Estas pestañas no traen DNI (salvo `HIERRO NUEVO`, que lo tiene vacío). El emparejamiento por nombre
-con SOFDOC funciona en el 86 % de HIERRO y el 91 % de PROCEDIMIENTOS (medido el 01/10/2026).
+- La importación busca las columnas **por el nombre del encabezado** (sin espacios sobrantes ni
+  tildes), no por su posición.
+- No hay DNI ni médico solicitante. A veces el médico aparece en OBSERVACIONES («DR ALVARO»),
+  pero no se interpreta: queda como texto.
+- El emparejamiento por nombre con SOFDOC funciona en el 86 % de HIERRO y el 91 % de
+  PROCEDIMIENTOS (medido el 01/10/2026).
 
 ## 4. Pestañas del libro madre
 
@@ -124,6 +127,7 @@ OBSERVACIONES, DNI, EMPAREJAMIENTO, ORIGEN`
 - `ESTADO`: `COTIZÓ` o `ACEPTÓ`.
 - `EMPAREJAMIENTO`: `AUTOMÁTICO`, `CONFIRMADO`, `POR CONFIRMAR` o `SIN CANDIDATO`.
 - `ORIGEN`: pestaña y fila de la base de hierro (por ejemplo `HIERRO!14`), o `MANUAL`.
+- `MEDICO_SOLICITANTE`: queda vacío en lo importado; se llena en las indicaciones nuevas.
 - Si falta `MEDICO_SOLICITANTE`, los KPI usan el médico de la última cita realizada del
   paciente en o antes de la fecha de la indicación.
 
@@ -261,8 +265,7 @@ El script va **incrustado en el libro madre** y se sube con clasp 2.x, igual que
 
 ## 10. Requisitos antes de construir
 
-1. Abrir la base de hierro → **Archivo → Guardar como Hojas de cálculo de Google**, y pasar el
-   ID del nuevo archivo.
+1. ~~Convertir la base de hierro a Hojas de cálculo de Google~~. Hecho el 01/10/2026 (`1FrJ9oXy…`).
 2. Confirmar que desde ahora hierro y procedimientos se anotan en el libro madre y no en el
    archivo de enfermería.
 

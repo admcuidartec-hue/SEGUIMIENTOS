@@ -156,8 +156,10 @@ Parámetros generales (clave y valor): `ESPERA_TRAS_SEGUIMIENTO_DIAS = 15`,
 El estado se calcula para cada serie (DNI + especialidad). **Las especialidades no se
 mezclan**: ir a nutrición no cuenta como reevaluación de hematología. Gana la primera regla que se cumpla:
 
-1. **DESCARTADO**: el último seguimiento es un `DESCARTADO`, o se hicieron
-   `MAX_SEGUIMIENTOS` sin que el paciente volviera después del primero.
+1. **DESCARTADO**: el último seguimiento posterior a la última cita realizada es un
+   `DESCARTADO`; o hay `MAX_SEGUIMIENTOS` seguimientos `HECHO` posteriores a la última cita realizada
+   y ya pasaron `ESPERA_TRAS_SEGUIMIENTO_DIAS` desde el último. El tercer intento también tiene su espera.
+   Si el paciente vuelve después de un descarte, deja de estar descartado.
 2. **AGENDADO**: tiene una cita `Agendado` con fecha de hoy o posterior.
 3. **CONTACTADO**: hay un seguimiento `HECHO` posterior a la última cita realizada y
    todavía no han pasado `ESPERA_TRAS_SEGUIMIENTO_DIAS` días desde él.

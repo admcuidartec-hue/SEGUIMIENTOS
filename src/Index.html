@@ -408,10 +408,98 @@ $('#ficha').addEventListener('click', async ev => {
 });
 
 /* ==========================================================================
-   TABLERO — la Tarea 11 reemplaza esta función entera.
+   TABLERO
    ========================================================================== */
-function cargarTablero() {
-  $('#tablero').innerHTML = '<div class="vacio">Tablero en construcción.</div>';
+async function cargarTablero() {
+  if (E.kpi) { pintarTablero(); return; }
+  $('#tablero').innerHTML = '<div class="vacio">Calculando…</div>';
+  try {
+    E.kpi = await llamar('getKpi');
+    pintarTablero();
+  } catch (e) {
+    $('#tablero').innerHTML = `<div class="vacio">No se pudo calcular el tablero: ${esc(e.message)}</div>`;
+  }
+}
+
+const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+const barra = (a, b) => `<div class="barra"><i style="width:${b ? Math.round(100 * a / b) : 0}%"></i></div>`;
+
+function mediana(lista) {
+  if (!lista.length) return '—';
+  const s = [...lista].sort((x, y) => x - y), m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+}
+
+/** cab: [{t, num}]; filas: arrays de HTML ya escapado. */
+function tabla(cab, filas) {
+  if (!filas.length) return '<p class="dato">Sin datos con estos filtros.</p>';
+  const td = (v, i) => `<td${cab[i].num ? ' class="num"' : ''}>${v}</td>`;
+  return `<table><tr>${cab.map(c => `<th${c.num ? ' class="num"' : ''}>${esc(c.t)}</th>`).join('')}</tr>` +
+    filas.map(f => `<tr>${f.map(td).join('')}</tr>`).join('') + '</table>';
+}
+
+function agrupar(filas, clave, nuevo, sumar) {
+  const m = new Map();
+  filas.forEach(f => { const k = clave(f); if (!m.has(k)) m.set(k, nuevo()); sumar(m.get(k), f); });
+  return [...m.entries()].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+}
+
+function opciones(id, etiqueta, valores, actual) {
+  return `<select id="${id}" class="campo"><option value="">${esc(etiqueta)}</option>` +
+    valores.map(v => `<option value="${esc(v)}"${v === actual ? ' selected' : ''}>${esc(v)}</option>`).join('') + '</select>';
+}
+
+function pintarTablero() {
+  const k = E.kpi;
+  const valor = id => ($(id) ? $(id).value : '');
+  const fMes = valor('#t-mes'), fEsp = valor('#t-esp'), fMed = valor('#t-med');
+  const unicos = a => [...new Set(a.filter(Boolean))].sort();
+  const meses = unicos(k.cohortes.map(r => r.COHORTE).concat(k.indicaciones.map(r => r.MES), k.recuperacion.map(r => r.MES)));
+  const esps = unicos(k.cohortes.map(r => r.ESPECIALIDAD).concat(k.recuperacion.map(r => r.ESPECIALIDAD)));
+  const meds = unicos(k.cohortes.map(r => r.MEDICO).concat(k.indicaciones.map(r => r.MEDICO), k.recuperacion.map(r => r.MEDICO)));
+  const okMes = m => !fMes || m === fMes, okEsp = e => !fEsp || e === fEsp, okMed = m => !fMed || m === fMed;
+  const T = t => ({ t }), N = t => ({ t, num: true });
+
+  const coh = agrupar(k.cohortes.filter(r => okMes(r.COHORTE) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO)),
+    r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0] }),
+    (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); });
+  const filasCoh = coh.map(([c, o]) => [esc(c)].concat([1, 2, 3].map(e =>
+    `${pct(o[e][0], o[e][1])} <span class="dato">(${o[e][0]}/${o[e][1]})</span>${barra(o[e][0], o[e][1])}`)));
+
+  const ind = k.indicaciones.filter(r => okMes(r.MES) && okMed(r.MEDICO));
+  const sumaInd = (o, r) => { o.n += Number(r.INDICADAS); o.a += Number(r.ACEPTADAS); };
+  const filaInd = ([c, o]) => [esc(c), o.n, o.a, pct(o.a, o.n) + barra(o.a, o.n)];
+  const indTipo = agrupar(ind, r => r.TIPO === 'HIERRO' ? 'Hierro' : r.DETALLE, () => ({ n: 0, a: 0 }), sumaInd).map(filaInd);
+  const indMed = agrupar(ind, r => r.MEDICO, () => ({ n: 0, a: 0 }), sumaInd).map(filaInd);
+
+  const rec = k.recuperacion.filter(r => okMes(r.MES) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO));
+  const sumaRec = (o, r) => { o.n++; if (Number(r.VOLVIO)) { o.v++; o.d.push(Number(r.DIAS)); } };
+  const filaRec = ([c, o]) => [esc(c), o.n, o.v, pct(o.v, o.n) + barra(o.v, o.n), mediana(o.d)];
+  const recResp = agrupar(rec, r => r.RESPONSABLE, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec);
+  const recMes = agrupar(rec, r => r.MES, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec);
+
+  $('#tablero').innerHTML = `
+    <div class="filtros">${opciones('t-mes', 'Todos los meses', meses, fMes)}${opciones('t-esp', 'Todas las especialidades', esps, fEsp)}${opciones('t-med', 'Todos los médicos', meds, fMed)}</div>
+    <div class="panel"><h2>Retorno por cohorte</h2>
+      <p class="dato">Mes de la primera cita. Solo cuentan los pacientes a quienes ya les tocaba volver.</p>
+      ${tabla([T('Cohorte'), N('Reevaluación 1'), N('Reevaluación 2'), N('Reevaluación 3')], filasCoh)}</div>
+    <div class="panel"><h2>Indicaciones</h2>
+      <p class="dato">De lo indicado, cuánto se aceptó. Las indicaciones no tienen especialidad: ese filtro no las cambia.</p>
+      ${tabla([T('Tipo'), N('Indicadas'), N('Aceptadas'), N('Tasa')], indTipo)}
+      <h3 class="sub">Por médico</h3>
+      ${tabla([T('Médico'), N('Indicadas'), N('Aceptadas'), N('Tasa')], indMed)}</div>
+    <div class="panel"><h2>Recuperación</h2>
+      <p class="dato">De los seguimientos hechos, cuántos pacientes volvieron y en cuántos días (mediana).</p>
+      ${tabla([T('Responsable'), N('Seguimientos'), N('Volvieron'), N('Tasa'), N('Días')], recResp)}
+      <h3 class="sub">Por mes</h3>
+      ${tabla([T('Mes'), N('Seguimientos'), N('Volvieron'), N('Tasa'), N('Días')], recMes)}</div>
+    <div class="panel"><h2>Motivos de descarte</h2>
+      ${tabla([T('Motivo'), N('Pacientes')], k.motivos.map(m => [esc(m.MOTIVO), m.N]))}</div>
+    <div class="panel"><h2>Indicaciones sin paciente</h2>
+      <p class="dato">No se encontró a nadie con ese nombre en SOFDOC. Revíselas a mano en la pestaña INDICACIONES.</p>
+      ${tabla([T('ID'), T('Fecha'), T('Tipo'), T('Nombre'), T('Teléfono')],
+        k.sinCandidato.map(i => [esc(i.ID), fechaCorta(i.FECHA), esc(i.TIPO), esc(i.NOMBRE), esc(i.TELEFONO)]))}</div>`;
+  ['#t-mes', '#t-esp', '#t-med'].forEach(s => $(s).addEventListener('change', pintarTablero));
 }
 
 /* ==========================================================================
@@ -509,6 +597,30 @@ const DEMO = (() => {
         .filter(x => (/\d/.test(d) && x.DNI.startsWith(d)) || norm(x.NOMBRE).includes(n))
         .map(x => ({ DNI: x.DNI, NOMBRE: x.NOMBRE }));
     },
+    getKpi: () => ({
+      cohortes: [
+        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 40, VOLVIERON: 15 },
+        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 2, ELEGIBLES: 15, VOLVIERON: 8 },
+        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 3, ELEGIBLES: 8, VOLVIERON: 5 },
+        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 52, VOLVIERON: 17 },
+        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 2, ELEGIBLES: 17, VOLVIERON: 9 },
+        { COHORTE: '2026-07', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: 'Dr. JUVENAL HANAMPA ROQUE', ETAPA: 1, ELEGIBLES: 6, VOLVIERON: 2 },
+        { COHORTE: '2026-08', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 48, VOLVIERON: 12 }
+      ],
+      indicaciones: [
+        { MES: '2026-08', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: ELI, INDICADAS: 30, ACEPTADAS: 14 },
+        { MES: '2026-08', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', MEDICO: KAREN, INDICADAS: 9, ACEPTADAS: 1 },
+        { MES: '2026-09', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: KAREN, INDICADAS: 25, ACEPTADAS: 13 }
+      ],
+      recuperacion: [
+        { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 6 },
+        { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, VOLVIO: 0, DIAS: '' },
+        { MES: '2026-09', RESPONSABLE: 'RACHEL', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: 'Dr. JUVENAL HANAMPA ROQUE', VOLVIO: 1, DIAS: 12 },
+        { MES: '2026-09', RESPONSABLE: 'DR. ELI CABANILLAS', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 9 }
+      ],
+      motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }],
+      sinCandidato: [{ ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' }]
+    }),
     marcarSeguimiento: x => registrar(x, 'HECHO'),
     descartar: x => registrar(x, 'DESCARTADO'),
     confirmarEmparejamiento: x => {

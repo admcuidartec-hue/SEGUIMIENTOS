@@ -91,3 +91,20 @@ test('no hay colores escritos a mano fuera de la paleta', () => {
     .replace(/:root\{[^}]*\}/, '').replace(/html\[data-modo="oscuro"\]\{[^}]*\}/, '');
   assert.equal(resto.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g), null);
 });
+
+test('el tablero pinta sus cinco secciones y filtra sin errores', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.locator('.nav button[data-vista="tablero"]').click();
+    await pagina.waitForSelector('#tablero table');
+    const texto = await pagina.locator('#tablero').textContent();
+    for (const t of ['Retorno por cohorte', 'Indicaciones', 'Recuperación', 'Motivos de descarte', 'Indicaciones sin paciente']) {
+      assert.ok(texto.includes(t), t);
+    }
+    assert.ok(texto.includes('38%'), 'cohorte 2026-06, reevaluación 1: 15/40');
+    await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
+    await pagina.waitForFunction(() => document.querySelector('#t-esp').value === 'REUMATOLOGÍA');
+    assert.ok((await pagina.locator('#tablero').textContent()).includes('33%'), 'reumatología: 2/6');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

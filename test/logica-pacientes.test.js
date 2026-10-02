@@ -20,7 +20,7 @@ test('armarPacientes: teléfonos y pendientes vienen de las indicaciones emparej
   const rosa = p.find(x => x.DNI === '40111222');
   assert.deepEqual(Object.keys(rosa), plano(L.COLUMNAS_PACIENTES));
   assert.equal(rosa.TELEFONOS, '987654321 / 912345678');
-  assert.equal(rosa.PENDIENTE, 'Hierro ×2 cotizado; AMO + BIOPSIA cotizado; Hierro cotizado');
+  assert.equal(rosa.PENDIENTE, 'Hierro (Ferinject) ×2: cotizó y no lo hizo; AMO + BIOPSIA: cotizó y no lo hizo; Hierro (Ferinject): cotizó y no lo hizo');
   assert.equal(rosa.ESTADO, 'VENCIDO');
   assert.equal(rosa.DIAS_ATRASO, 47);
   assert.equal(rosa.N_REALIZADAS, 1);

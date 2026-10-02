@@ -335,3 +335,12 @@ function getKpi() {
   var d = datos_();
   return limpiarParaEnvio(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy));
 }
+
+/** Pantalla «Resumen»: filas por mes y médico; la app suma según el filtro elegido. */
+function getResumen() {
+  var d = datos_();
+  var filas = resumenPorMes(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy);
+  var medicos = {};
+  filas.forEach(function (f) { if (f.MEDICO !== 'SIN MÉDICO') medicos[f.MEDICO] = 1; });
+  return limpiarParaEnvio({ hoy: d.hoy, filas: filas, medicos: Object.keys(medicos).sort() });
+}

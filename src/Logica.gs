@@ -469,7 +469,7 @@ function pendientesPorDni(indicaciones) {
     var a = aceptado[i.DNI + '|' + i.TIPO];
     if (a && a >= i.FECHA) return;
     var cantidad = Number(i.CANTIDAD);
-    var texto = (i.TIPO === 'HIERRO' ? 'Hierro' : (i.DETALLE || 'Procedimiento')) + (cantidad > 1 ? ' ×' + cantidad : '') + ' cotizado';
+    var texto = (i.TIPO === 'HIERRO' ? 'Hierro (Ferinject)' : (i.DETALLE || 'Procedimiento')) + (cantidad > 1 ? ' ×' + cantidad : '') + ': cotizó y no lo hizo';
     (out[i.DNI] = out[i.DNI] || []).push(texto);
   });
   return out;
@@ -681,6 +681,85 @@ function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy) {
     sinCandidato: (indicaciones || []).filter(function (i) { return normTexto(i.EMPAREJAMIENTO) === 'SIN CANDIDATO'; })
       .map(function (i) { return { ID: i.ID, FECHA: i.FECHA, TIPO: i.TIPO, NOMBRE: i.NOMBRE, TELEFONO: i.TELEFONO }; })
   };
+}
+
+/* ==========================================================================
+   RESUMEN MENSUAL (pantalla «Resumen»)
+
+   Una fila por mes y médico. Regla acordada el 02/10/2026: un paciente que no
+   volvió cuenta en el MES DE SU ÚLTIMA CONSULTA de ese mes ("de los atendidos
+   en julio, cuántos no volvieron"). Mientras no venza su plazo queda "en curso"
+   y no entra en el porcentaje.
+   ========================================================================== */
+
+var CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO',
+  'HIERRO', 'HIERRO_NO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
+
+function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy) {
+  var acc = {};
+  function fila(mes, medico) {
+    var k = mes + '|' + medico;
+    if (!acc[k]) {
+      acc[k] = { MES: mes, MEDICO: medico };
+      CAMPOS_RESUMEN.forEach(function (c) { acc[k][c] = 0; });
+    }
+    return acc[k];
+  }
+
+  // Reevaluaciones: la última consulta de cada serie en cada mes.
+  var series = armarSeries(citas);
+  Object.keys(series).forEach(function (k) {
+    var s = series[k], r = s.realizadas, plazo = plazoDe(reglas, s.especialidad);
+    r.forEach(function (c, i) {
+      var siguiente = r[i + 1];
+      if (siguiente && mesDe(siguiente.FECHA) === mesDe(c.FECHA)) return;
+      var tipo = i === 0 ? 'NUEVOS' : 'CONTROL';
+      var f = fila(mesDe(c.FECHA), c.MEDICO || 'SIN MÉDICO');
+      f[tipo]++;
+      if (siguiente) return;
+      if (sumarDias(c.FECHA, plazo.vence) <= hoy) f[tipo + '_NO']++;
+      else f[tipo + '_CURSO']++;
+    });
+  });
+
+  // Hierro y procedimientos: una vez por paciente, tipo y mes.
+  var porDni = realizadasPorDni_(citas), grupos = {}, aceptado = {};
+  (indicaciones || []).forEach(function (i) {
+    if (i.DNI && i.ESTADO === 'ACEPTÓ') {
+      var a = i.DNI + '|' + i.TIPO;
+      if (!aceptado[a] || i.FECHA > aceptado[a]) aceptado[a] = i.FECHA;
+    }
+  });
+  (indicaciones || []).forEach(function (i) {
+    if (!i.FECHA) return;
+    var g = [i.DNI || i.ID, i.TIPO, mesDe(i.FECHA)].join('|');
+    if (!grupos[g]) {
+      var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
+      grupos[g] = { mes: mesDe(i.FECHA), tipo: i.TIPO, dni: i.DNI, primera: i.FECHA,
+        medico: i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO', acepto: false };
+    }
+    if (i.FECHA < grupos[g].primera) grupos[g].primera = i.FECHA;
+    if (i.ESTADO === 'ACEPTÓ') grupos[g].acepto = true;
+  });
+  Object.keys(grupos).forEach(function (k) {
+    var g = grupos[k];
+    var siguio = g.acepto || (g.dni && aceptado[g.dni + '|' + g.tipo] >= g.primera);
+    var campo = g.tipo === 'HIERRO' ? 'HIERRO' : 'PROC';
+    var f = fila(g.mes, g.medico);
+    f[campo]++;
+    if (!siguio) f[campo + '_NO']++;
+  });
+
+  // Seguimientos hechos y cuántos volvieron.
+  kpiRecuperacion(seguimientos, citas, hoy).forEach(function (r) {
+    var f = fila(r.MES, r.MEDICO || 'SIN MÉDICO');
+    f.SEGUIMIENTOS++;
+    if (r.VOLVIO) f.RECUPERADOS++;
+  });
+
+  return Object.keys(acc).map(function (k) { return acc[k]; }).sort(function (a, b) {
+    return a.MES < b.MES ? 1 : a.MES > b.MES ? -1 : (a.MEDICO < b.MEDICO ? -1 : a.MEDICO > b.MEDICO ? 1 : 0);
+  });
 }
 
 /** Las dos tablas de la hoja KPI, una debajo de otra, todas las filas de 7 columnas. */

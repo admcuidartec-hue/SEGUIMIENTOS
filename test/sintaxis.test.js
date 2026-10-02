@@ -6,7 +6,7 @@ const { cargar } = require('./cargar');
 test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', () => {
   const ctx = cargar(['Logica.gs', 'Codigo.gs']);
   for (const f of ['doGet', 'bootstrap', 'getBandeja', 'getPaciente', 'buscar', 'marcarSeguimiento',
-    'descartar', 'confirmarEmparejamiento', 'getKpi']) {
+    'descartar', 'confirmarEmparejamiento', 'getKpi', 'getResumen']) {
     assert.equal(typeof ctx[f], 'function', f);
   }
   assert.equal(ctx.CONFIG.SS_ID, '1L8fY-NXWE1agakIPEdqoLnLry0-lvYr0Z-9JfsfGxRM');

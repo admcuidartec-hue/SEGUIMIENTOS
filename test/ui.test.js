@@ -98,13 +98,59 @@ test('el tablero pinta sus cinco secciones y filtra sin errores', async () => {
     await pagina.locator('.nav button[data-vista="tablero"]').click();
     await pagina.waitForSelector('#tablero table');
     const texto = await pagina.locator('#tablero').textContent();
-    for (const t of ['Retorno por cohorte', 'Indicaciones', 'Recuperación', 'Motivos de descarte', 'Indicaciones sin paciente']) {
+    for (const t of ['¿Vuelven los pacientes nuevos?', 'Procedimientos', 'Recuperación', 'Motivos de descarte', 'Procedimientos sin paciente']) {
       assert.ok(texto.includes(t), t);
     }
     assert.ok(texto.includes('38%'), 'cohorte 2026-06, reevaluación 1: 15/40');
     await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
     await pagina.waitForFunction(() => document.querySelector('#t-esp').value === 'REUMATOLOGÍA');
     assert.ok((await pagina.locator('#tablero').textContent()).includes('33%'), 'reumatología: 2/6');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+
+test('la tarjeta dice qué se perdió y cuándo debía volver', async () => {
+  const { navegador, pagina } = await abrir();
+  try {
+    const luis = await pagina.locator('.tarjeta', { hasText: 'LUIS ALBERTO RAMOS VEGA' }).textContent();
+    assert.match(luis, /Paciente nuevo · no volvió a su 1\.ª reevaluación/);
+    assert.match(luis, /Debía volver el 11\/09\/2026 · hace 20 días que no vuelve/);
+    assert.match(luis, /Procedimiento pendiente: AMO \+ BIOPSIA: cotizó y no lo hizo/);
+    const rosa = await pagina.locator('.tarjeta', { hasText: 'ROSA ELENA QUISPE HUAMÁN' }).textContent();
+    assert.match(rosa, /En control · faltó a su 2\.ª reevaluación/);
+  } finally { await navegador.close(); }
+});
+
+test('las palabras «cohorte» y «atraso» ya no aparecen en ninguna pantalla', async () => {
+  const { navegador, pagina } = await abrir();
+  try {
+    let texto = await pagina.locator('body').innerText();
+    for (const v of ['resumen', 'tablero']) {
+      await pagina.locator(`.nav button[data-vista="${v}"]`).click();
+      await pagina.waitForSelector(v === 'resumen' ? '.resumen-tarjeta' : '#tablero table');
+      texto += await pagina.locator('body').innerText();
+    }
+    assert.doesNotMatch(texto, /cohorte|atraso/i);
+  } finally { await navegador.close(); }
+});
+
+test('resumen: el Dr. Eli lo ve filtrado en sus pacientes, con cantidad y porcentaje del mes', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'DR. ELI CABANILLAS');
+    assert.equal(await pagina.locator('.tarjeta').count(), 1, 'la bandeja queda en sus pacientes');
+    await pagina.locator('.nav button[data-vista="resumen"]').click();
+    await pagina.waitForSelector('.resumen-tarjeta');
+    assert.equal(await pagina.locator('#r-med').inputValue(), 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
+    assert.equal(await pagina.locator('.resumen-tarjeta').count(), 4);
+    await pagina.selectOption('#r-mes', '2026-08');
+    const texto = await pagina.locator('#resumen').innerText();
+    assert.match(texto, /47%/);
+    assert.match(texto, /33 de 70 pacientes/);
+    assert.match(texto, /Mes a mes/);
+    await pagina.selectOption('#r-med', '');
+    assert.match(await pagina.locator('#resumen').innerText(), /59 de 125 pacientes/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

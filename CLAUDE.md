@@ -23,7 +23,7 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 
 - `npm test` (lógica) y `npm run test:ui` (interfaz) deben pasar antes de subir.
 - No cambie los nombres `doGet`, `bootstrap`, `getBandeja`, `getPaciente`, `buscar`,
-  `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`.
+  `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.

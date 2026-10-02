@@ -9,7 +9,8 @@
     "login": "clasp login",
     "subir": "clasp push --force",
     "url": "clasp deployments",
-    "registros": "clasp logs --watch"
+    "registros": "clasp logs --watch",
+    "actualizar": "clasp push --force && clasp deploy --deploymentId AKfycbzSvnyttpl1VOiKNDilyPPoqlD7VkxPDxwExa4kS75mgbgTfRbe16kJj6fpfGoBUWCkcA --description \"Seguimientos CHP\""
   },
   "devDependencies": {
     "@google/clasp": "^2.4.2",

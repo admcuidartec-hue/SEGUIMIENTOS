@@ -36,7 +36,7 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 
 ## Publicar
 
-En producción desde el 02/10/2026, versión 1.
+En producción desde el 02/10/2026. Versión 3 (03/10/2026): interfaz editorial de Claude Design, en `docs/diseno/handoff-2a`.
 
 ```bash
 git pull                 # siempre primero

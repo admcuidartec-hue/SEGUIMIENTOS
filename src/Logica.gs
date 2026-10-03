@@ -503,14 +503,17 @@ var COLUMNAS_PACIENTES = ['DNI', 'ESPECIALIDAD', 'NOMBRE', 'TELEFONOS', 'MEDICO_
   'N_REALIZADAS', 'PROXIMA_ESPERADA', 'VENCE', 'DIAS_ATRASO', 'PROXIMA_AGENDADA', 'ESTADO', 'N_SEGUIMIENTOS',
   'ULTIMO_SEGUIMIENTO', 'PENDIENTE'];
 
-function telefonosPorDni(indicaciones) {
+/** Teléfonos de cada paciente: primero los de hierro y procedimientos, luego los del CRM, sin repetir. */
+function telefonosPorDni(indicaciones, contactos) {
   var out = {};
-  (indicaciones || []).forEach(function (i) {
-    var t = normTelefono(i.TELEFONO);
-    if (!i.DNI || !t) return;
-    out[i.DNI] = out[i.DNI] || [];
-    if (out[i.DNI].indexOf(t) < 0) out[i.DNI].push(t);
-  });
+  function sumar(dni, telefono) {
+    var t = normTelefono(telefono);
+    if (!dni || !t) return;
+    out[dni] = out[dni] || [];
+    if (out[dni].indexOf(t) < 0) out[dni].push(t);
+  }
+  (indicaciones || []).forEach(function (i) { sumar(i.DNI, i.TELEFONO); });
+  (contactos || []).forEach(function (c) { sumar(c.DNI_PACIENTE, c.TELEFONO); });
   return out;
 }
 
@@ -542,9 +545,9 @@ function segsPorSerie(seguimientos) {
   return out;
 }
 
-function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy) {
+function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos) {
   var series = armarSeries(citas);
-  var tel = telefonosPorDni(indicaciones), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
+  var tel = telefonosPorDni(indicaciones, contactos), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
   var out = [];
   Object.keys(series).forEach(function (k) {
     var s = series[k];
@@ -730,12 +733,69 @@ function kpiMotivos(seguimientos) {
     .sort(function (a, b) { return (b.N - a.N) || (a.MOTIVO < b.MOTIVO ? -1 : 1); });
 }
 
-function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy) {
+/** Primera cita realizada de cada DNI, en cualquier especialidad. */
+function primerasConsultas_(citas) {
+  var p = {};
+  (citas || []).forEach(function (c) {
+    if (normTexto(c.ESTADO) !== 'REALIZADO') return;
+    if (!p[c.DNI] || c.FECHA < p[c.DNI].FECHA) p[c.DNI] = c;
+  });
+  return p;
+}
+
+/**
+ * Cada paciente va al lead más reciente con fecha <= su primera consulta (en
+ * empate, el ID mayor). Los pacientes anteriores al lead más antiguo del CRM
+ * quedan fuera: el CRM aún no existía.
+ */
+function atribuirCampanas(citas, contactos) {
+  var todos = (contactos || []).filter(function (c) { return c.FECHA; });
+  if (!todos.length) return {};
+  var inicio = todos.reduce(function (m, c) { return c.FECHA < m ? c.FECHA : m; }, todos[0].FECHA);
+  var porDni = {};
+  todos.forEach(function (c) { if (c.DNI_PACIENTE) (porDni[c.DNI_PACIENTE] = porDni[c.DNI_PACIENTE] || []).push(c); });
+  var primeras = primerasConsultas_(citas), out = {};
+  Object.keys(primeras).forEach(function (dni) {
+    var f = primeras[dni].FECHA;
+    if (f < inicio) return;
+    var elegido = null;
+    (porDni[dni] || []).forEach(function (c) {
+      if (c.FECHA > f) return;
+      if (!elegido || c.FECHA > elegido.FECHA || (c.FECHA === elegido.FECHA && c.ID_LEAD > elegido.ID_LEAD)) elegido = c;
+    });
+    out[dni] = elegido
+      ? { CANAL: elegido.CANAL, CAMPANA: elegido.CAMPANA, ID_LEAD: elegido.ID_LEAD }
+      : { CANAL: 'Sin lead en el CRM', CAMPANA: 'Sin lead en el CRM', ID_LEAD: '' };
+  });
+  return out;
+}
+
+/** ¿Volvió a su 1.ª reevaluación? Por canal y campaña, contando solo a quienes ya debían volver. */
+function kpiCampanas(citas, contactos, reglas, hoy) {
+  var atrib = atribuirCampanas(citas, contactos), primeras = primerasConsultas_(citas), series = armarSeries(citas), acc = {};
+  Object.keys(atrib).forEach(function (dni) {
+    var p = primeras[dni], a = atrib[dni];
+    var s = series[claveSerie(dni, p.ESPECIALIDAD)];
+    var r = s.realizadas, volvio = r.length >= 2;
+    var maduro = volvio || sumarDias(r[0].FECHA, plazoDe(reglas, s.especialidad).vence) <= hoy;
+    var medico = p.MEDICO || 'SIN MÉDICO';
+    var k = [mesDe(p.FECHA), medico, a.CANAL, a.CAMPANA].join('|');
+    if (!acc[k]) acc[k] = { MES: mesDe(p.FECHA), MEDICO: medico, CANAL: a.CANAL, CAMPANA: a.CAMPANA, NUEVOS: 0, EN_CURSO: 0, VOLVIERON: 0 };
+    acc[k].NUEVOS++;
+    if (!maduro) acc[k].EN_CURSO++;
+    else if (volvio) acc[k].VOLVIERON++;
+  });
+  return Object.keys(acc).map(function (k) { return acc[k]; })
+    .sort(compararCampos_(['MES', 'CANAL', 'CAMPANA', 'MEDICO']));
+}
+
+function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy, contactos) {
   return {
     cohortes: kpiCohortes(citas, reglas, hoy),
     indicaciones: kpiIndicaciones(indicaciones, citas),
     recuperacion: kpiRecuperacion(seguimientos, citas, hoy),
     motivos: kpiMotivos(seguimientos),
+    campanas: kpiCampanas(citas, contactos, reglas, hoy),
     sinCandidato: (indicaciones || []).filter(function (i) { return normTexto(i.EMPAREJAMIENTO) === 'SIN CANDIDATO'; })
       .map(function (i) { return { ID: i.ID, FECHA: i.FECHA, TIPO: i.TIPO, NOMBRE: i.NOMBRE, TELEFONO: i.TELEFONO }; })
   };

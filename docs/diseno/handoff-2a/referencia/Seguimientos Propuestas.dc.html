@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E6DDD3;font-family:'Barlow',sans-serif;color:#2A1715}
+a{color:#A8352C}a:hover{color:#6F1713}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #A8352C;outline-offset:2px}
+</style>
+</helmet>
+<section style="padding:64px 64px 0;display:flex;flex-direction:column;gap:24px">
+<div style="font-family:'Barlow Condensed';font-size:44px;font-weight:700;color:#6F1713;line-height:1">Turno 2 · 1b con panel lateral</div>
+<div id="2a" style="display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;gap:16px;align-items:baseline">
+<span style="font-family:'Barlow Condensed';font-size:22px;font-weight:700;background:#6F1713;color:#FAF6F1;padding:4px 12px;border-radius:6px">2a</span>
+<span style="font-family:'Barlow Condensed';font-size:34px;font-weight:700">Editorial + panel</span>
+<span style="font-size:16px;color:#5A4440">Al hacer clic en una fila (o Enter) se abre el paciente a la derecha. Con el panel abierto la lista se compacta. Al marcar Hecho pasa al siguiente. Esc cierra.</span>
+</div>
+<div style="width:1280px;height:820px;background:#FAF6F1;padding:32px 0 0 64px;box-sizing:border-box;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(60,20,15,.18);border-radius:8px;overflow:hidden">
+<div style="display:flex;align-items:baseline;gap:40px;padding-right:64px">
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'Barlow Condensed';font-size:24px;font-weight:700;color:#6F1713">Seguimientos</span><span style="font-size:12px;color:#7A6460;letter-spacing:.08em">CENTRO HEMATOLÓGICO DEL PERÚ</span></div>
+<div style="display:flex;gap:28px;font-size:15px"><span style="color:#5A4440">Resumen</span><span style="font-weight:600;color:#6F1713;border-bottom:2px solid #6F1713;padding-bottom:4px">Bandeja</span><span style="color:#5A4440">Buscar paciente</span><span style="color:#5A4440">Detalle</span></div>
+<div style="margin-left:auto;display:flex;gap:8px;align-items:baseline;font-size:14px;color:#7A6460">¿Quién es usted?<select style="border:none;border-bottom:1px solid #2A1715;background:transparent;font:600 15px Barlow;color:#2A1715;padding:2px 0"><option>Magaly</option><option>Ana</option><option>Rachel</option></select></div>
+</div>
+<div style="flex:1;min-height:0;display:flex">
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;padding-right:40px">
+<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:36px;gap:24px">
+<div><div style="font-family:'Barlow Condensed';font-size:68px;font-weight:600;line-height:.9">Bandeja del día</div><div style="font-size:16px;color:#7A6460;margin-top:10px">Jueves 01/10/2026</div></div>
+<div style="display:flex;gap:40px">
+<div><div style="font-family:'Barlow Condensed';font-size:64px;font-weight:600;line-height:.85;color:#A8352C">{{ dCount }}</div><div style="font-size:13px;color:#5A4440;margin-top:6px">por atender</div></div>
+<div><div style="font-family:'Barlow Condensed';font-size:64px;font-weight:600;line-height:.85">{{ dHoy }}</div><div style="font-size:13px;color:#5A4440;margin-top:6px">hechos hoy</div></div>
+<div><div style="font-family:'Barlow Condensed';font-size:64px;font-weight:600;line-height:.85;color:#2F6B45">3</div><div style="font-size:13px;color:#5A4440;margin-top:6px">recuperados</div></div>
+</div>
+</div>
+<div style="display:flex;gap:24px;align-items:center;margin-top:28px;padding-bottom:12px;border-bottom:1px solid #2A1715;font-size:14px;flex-wrap:wrap">
+<span style="color:#7A6460">Especialidad <select style="border:none;background:transparent;font:600 14px Barlow;color:#2A1715"><option>Todas</option></select></span>
+<span style="color:#7A6460">Médico <select style="border:none;background:transparent;font:600 14px Barlow;color:#2A1715"><option>Todos</option></select></span>
+<label style="display:flex;gap:6px;align-items:center;color:#2A1715"><input type="checkbox" style="accent-color:#6F1713;margin:0">Solo sin teléfono</label>
+<span style="margin-left:auto;color:#7A6460">↑ ↓ · <b style="color:#2A1715">Enter</b> abrir · <b style="color:#2A1715">C</b> copiar · <b style="color:#2A1715">H</b> hecho · <b style="color:#2A1715">D</b> descartar</span>
+</div>
+<div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px 32px;margin:0 -12px">
+<sc-for list="{{ dGroups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;align-items:baseline;gap:12px;padding:24px 0 8px;border-bottom:1px solid #E3D8CF"><span style="font-family:'Barlow Condensed';font-size:22px;font-weight:700;color:#6F1713;text-transform:uppercase;letter-spacing:.04em">{{ g.title }}</span><span style="font-size:14px;color:#7A6460">{{ g.sub }} · {{ g.count }}</span></div>
+<sc-for list="{{ g.items }}" as="p">
+<div onClick="{{ p.onSelect }}" style="display:flex;gap:16px;align-items:center;padding:14px 12px;margin:0 -12px;border-bottom:1px solid #E3D8CF;background:{{ p.rowBg }};cursor:pointer" style-hover="background:#F6EEE7">
+<div style="display:flex;flex-direction:column;gap:5px;align-items:center;width:14px;flex:none">
+<sc-if value="{{ p.isNuevo }}"><span style="width:10px;height:10px;border-radius:50%;background:#1F5A8C"></span></sc-if>
+<sc-if value="{{ p.isControl }}"><span style="width:10px;height:10px;background:#6A3D8F"></span></sc-if>
+<sc-if value="{{ p.hasProc }}"><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #B26B00"></span></sc-if>
+</div>
+<div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div><div style="font-size:13px;color:#7A6460;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.typeShort }} · {{ p.medShort }} · Debía volver el {{ p.debia }} · <span style="color:#A8352C">hace {{ p.dias }} días</span></div></div>
+<sc-if value="{{ dClosed }}">
+<div style="width:170px;flex:none"><sc-if value="{{ p.hasPhone }}"><button onClick="{{ p.onCopy1 }}" style="border:none;background:transparent;padding:2px 0;font:500 16px Barlow;color:#2A1715;font-variant-numeric:tabular-nums;display:flex;gap:10px;align-items:baseline" style-hover="color:#A8352C">{{ p.phone1 }}<span style="font-size:12px;color:#A8352C;font-weight:600">{{ p.copyLabel1 }}</span></button></sc-if><sc-if value="{{ p.noPhone }}"><span style="font-size:14px;color:#A8352C;font-weight:600">Sin teléfono</span></sc-if></div>
+</sc-if>
+<button onClick="{{ p.onDone }}" style="flex:none;border:1px solid #6F1713;background:#6F1713;color:#FAF6F1;padding:7px 14px;font-size:14px;font-weight:600;border-radius:2px" style-hover="background:#A8352C">Hecho</button>
+<span style="flex:none;color:#7A6460;font-size:18px">›</span>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ dEmpty }}"><div style="padding:80px 0;display:flex;flex-direction:column;gap:14px"><div style="font-family:'Barlow Condensed';font-size:48px;font-weight:600">Bandeja vacía.</div><div style="font-size:16px;color:#5A4440">No queda nadie a quien escribir hoy.</div><button onClick="{{ resetD }}" style="align-self:flex-start;border:1px solid #2A1715;background:transparent;padding:8px 14px;font-size:14px">Restaurar ejemplo</button></div></sc-if>
+</div>
+</div>
+<sc-if value="{{ dOpen }}" hint-placeholder-val="{{ false }}">
+<div style="width:460px;flex:none;border-left:1px solid #2A1715;background:#FFFCF8;padding:28px 40px 28px 36px;box-sizing:border-box;overflow-y:auto;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;letter-spacing:.1em;color:#7A6460">PACIENTE</span><button onClick="{{ closeD }}" style="border:none;background:transparent;font-size:14px;color:#5A4440;padding:4px 0" style-hover="color:#A8352C">Cerrar  Esc</button></div>
+<div><div style="font-family:'Barlow Condensed';font-size:38px;font-weight:600;line-height:1;color:#2A1715">{{ dP.name }}</div><div style="font-size:14px;color:#7A6460;margin-top:8px">DNI {{ dP.dni }} · {{ dP.esp }}<br>{{ dP.med }}</div></div>
+<div style="display:flex;gap:10px;align-items:center;font-size:15px">
+<sc-if value="{{ dP.isNuevo }}"><span style="width:10px;height:10px;border-radius:50%;background:#1F5A8C;flex:none"></span></sc-if>
+<sc-if value="{{ dP.isControl }}"><span style="width:10px;height:10px;background:#6A3D8F;flex:none"></span></sc-if>
+<span>{{ dP.typeText }}</span></div>
+<div style="border-top:1px solid #E3D8CF;padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div><div style="font-size:12px;color:#7A6460">Última consulta</div><div style="font-size:17px">{{ dP.ultima }}</div></div>
+<div><div style="font-size:12px;color:#7A6460">Debía volver el</div><div style="font-size:17px;font-weight:600">{{ dP.debia }}</div></div>
+<div style="grid-column:span 2;font-family:'Barlow Condensed';font-size:28px;font-weight:600;color:#A8352C">{{ dP.diasText }}</div>
+</div>
+<sc-if value="{{ dP.hasProc }}"><div style="display:flex;gap:10px;align-items:baseline;font-size:15px;color:#8A5300;border-top:1px solid #E3D8CF;padding-top:14px"><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #B26B00;flex:none"></span><span><b>Procedimiento pendiente.</b> {{ dP.procText }}</span></div></sc-if>
+<div style="border-top:1px solid #E3D8CF;padding-top:14px;display:flex;flex-direction:column;gap:6px">
+<span style="font-size:12px;color:#7A6460">Teléfonos</span>
+<sc-for list="{{ dP.phoneList }}" as="ph"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:'Barlow Condensed';font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em">{{ ph.num }}</span><button onClick="{{ ph.onCopy }}" style="border:1px solid #CDBFB5;background:transparent;padding:6px 12px;font-size:14px;font-weight:600;color:#A8352C;border-radius:2px" style-hover="border-color:#A8352C">{{ ph.label }}</button></div></sc-for>
+<sc-if value="{{ dP.noPhone }}"><div style="font-size:15px;color:#6F1713"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</div></sc-if>
+</div>
+<sc-if value="{{ dP.hasPrev }}"><div style="font-size:14px;color:#7A6460;font-style:italic">{{ dP.prevText }}</div></sc-if>
+<textarea placeholder="Nota (opcional)" style="border:none;border-bottom:1px solid #2A1715;background:transparent;padding:8px 0;font:15px Barlow;min-height:44px;resize:vertical;color:#2A1715"></textarea>
+<div style="display:flex;gap:10px"><button onClick="{{ dP.onDone }}" style="flex:1;border:1px solid #6F1713;background:#6F1713;color:#FAF6F1;padding:13px;font-size:16px;font-weight:600;border-radius:2px" style-hover="background:#A8352C">Seguimiento hecho <span style="opacity:.6;margin-left:4px">H</span></button><button onClick="{{ dP.onDiscard }}" style="border:1px solid #CDBFB5;background:transparent;color:#2A1715;padding:13px 16px;font-size:15px;border-radius:2px;white-space:nowrap" style-hover="border-color:#2A1715">Descartar <span style="opacity:.5">D</span></button></div>
+<sc-if value="{{ dP.isDiscarding }}"><div style="display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;color:#7A6460">Motivo (obligatorio)</span><sc-for list="{{ dP.reasons }}" as="r"><button onClick="{{ r.onPick }}" style="border:none;border-bottom:1px solid #E3D8CF;background:transparent;font-size:15px;color:#2A1715;padding:8px 0;text-align:left" style-hover="color:#A8352C">{{ r.label }}</button></sc-for></div></sc-if>
+<a href="#" style="font-size:14px;margin-top:auto">Ver ficha completa →</a>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+</section>
+<section style="padding:64px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:12px;max-width:1100px">
+<div style="font-family:'Barlow Condensed';font-size:44px;font-weight:700;color:#6F1713;line-height:1">Seguimientos CHP · tres propuestas de interfaz</div>
+<div style="font-size:17px;line-height:1.5;color:#4A3431;text-wrap:pretty">Cada propuesta muestra la Bandeja de una asesora (computadora, modo claro) y el Resumen del Dr. Eli (celular, modo oscuro). Las bandejas funcionan: Copiar, Hecho y Descartar. En <a href="#1b">1b</a> también se puede usar el teclado: ↑ ↓ para moverse, C copiar, H hecho, D descartar.</div>
+<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:15px;color:#2A1715;align-items:center">
+<span style="font-weight:600">Código común en las tres:</span>
+<span style="display:flex;gap:8px;align-items:center"><span style="width:12px;height:12px;border-radius:50%;background:#1F5A8C;display:inline-block"></span>Círculo azul: paciente nuevo</span>
+<span style="display:flex;gap:8px;align-items:center"><span style="width:12px;height:12px;background:#6A3D8F;display:inline-block"></span>Cuadrado morado: en control</span>
+<span style="display:flex;gap:8px;align-items:center"><span style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #B26B00;display:inline-block"></span>Triángulo ámbar: procedimiento pendiente</span>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:96px;align-items:flex-start">
+
+<!-- ================= 1a BENTO ================= -->
+<div id="1a" style="display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;gap:16px;align-items:baseline">
+<span style="font-family:'Barlow Condensed';font-size:22px;font-weight:700;background:#6F1713;color:#FAF6F1;padding:4px 12px;border-radius:6px">1a</span>
+<span style="font-family:'Barlow Condensed';font-size:34px;font-weight:700">Bento · lista + panel</span>
+<span style="font-size:16px;color:#5A4440">Bloques redondeados. La lista compacta a la izquierda; el paciente elegido, completo a la derecha. Copiar y Hecho están en la misma fila: dos clics.</span>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="width:1280px;height:820px;background:#EFE7DE;padding:16px;box-sizing:border-box;display:grid;grid-template-rows:132px minmax(0,1fr);gap:16px;box-shadow:0 20px 60px rgba(60,20,15,.18);border-radius:8px;overflow:hidden">
+<div style="display:grid;grid-template-columns:270px 1fr 1fr 1fr 380px;gap:16px">
+<div style="background:#6F1713;border-radius:22px;padding:18px 20px;color:#FAF6F1;display:flex;flex-direction:column;justify-content:space-between">
+<div><div style="font-family:'Barlow Condensed';font-size:26px;font-weight:700;line-height:1">Seguimientos</div><div style="font-size:10px;letter-spacing:.12em;font-weight:600;opacity:.8;margin-top:4px">CENTRO HEMATOLÓGICO DEL PERÚ</div></div>
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:12px;opacity:.85">¿Quién es usted?</span><select style="flex:1;background:#8A2620;color:#FAF6F1;border:none;border-radius:12px;padding:8px 10px;font:600 14px Barlow"><option>Magaly</option><option>Ana</option><option>Rachel</option><option>Dr. Eli Cabanillas</option></select></div>
+</div>
+<div style="background:#FAF6F1;border-radius:22px;padding:18px 20px;box-shadow:0 8px 24px rgba(111,23,19,.08);display:flex;flex-direction:column;justify-content:space-between"><span style="font-size:14px;color:#6B5550">Por atender</span><span style="font-family:'Barlow Condensed';font-size:60px;font-weight:700;line-height:.9;color:#A8352C">{{ aCount }}</span></div>
+<div style="background:#FAF6F1;border-radius:22px;padding:18px 20px;box-shadow:0 8px 24px rgba(111,23,19,.08);display:flex;flex-direction:column;justify-content:space-between"><span style="font-size:14px;color:#6B5550">Seguimientos hechos hoy</span><span style="font-family:'Barlow Condensed';font-size:60px;font-weight:700;line-height:.9">{{ aHoy }}</span></div>
+<div style="background:#FAF6F1;border-radius:22px;padding:18px 20px;box-shadow:0 8px 24px rgba(111,23,19,.08);display:flex;flex-direction:column;justify-content:space-between"><span style="font-size:14px;color:#6B5550">Recuperados este mes</span><span style="font-family:'Barlow Condensed';font-size:60px;font-weight:700;line-height:.9;color:#2F6B45">3</span></div>
+<div style="background:#FAF6F1;border-radius:22px;padding:12px;box-shadow:0 8px 24px rgba(111,23,19,.08);display:grid;grid-template-columns:1fr 1fr;gap:8px">
+<button style="border:none;border-radius:14px;background:#F1E8E0;font-size:15px;font-weight:500;color:#2A1715" style-hover="background:#E8DAD0">Resumen</button>
+<button style="border:none;border-radius:14px;background:#A8352C;font-size:15px;font-weight:600;color:#FFF">Bandeja</button>
+<button style="border:none;border-radius:14px;background:#F1E8E0;font-size:15px;font-weight:500;color:#2A1715" style-hover="background:#E8DAD0">Buscar paciente</button>
+<button style="border:none;border-radius:14px;background:#F1E8E0;font-size:15px;font-weight:500;color:#2A1715" style-hover="background:#E8DAD0">Detalle</button>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:16px;min-height:0">
+<div style="background:#FAF6F1;border-radius:22px;box-shadow:0 8px 24px rgba(111,23,19,.08);display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px;padding:18px 20px 12px;flex-wrap:wrap">
+<span style="font-family:'Barlow Condensed';font-size:28px;font-weight:700;margin-right:auto">Bandeja del día</span>
+<select style="border:none;background:#F1E8E0;border-radius:12px;padding:8px 12px;font:500 14px Barlow;color:#2A1715"><option>Todas las especialidades</option></select>
+<select style="border:none;background:#F1E8E0;border-radius:12px;padding:8px 12px;font:500 14px Barlow;color:#2A1715"><option>Todos los médicos</option></select>
+<label style="display:flex;gap:6px;align-items:center;font-size:14px;background:#F1E8E0;border-radius:12px;padding:8px 12px"><input type="checkbox" style="accent-color:#A8352C;margin:0">Solo sin teléfono</label>
+</div>
+<div style="flex:1;overflow:auto;padding:0 12px 12px;display:flex;flex-direction:column;gap:4px">
+<sc-for list="{{ aList }}" as="p" hint-placeholder-count="6">
+<div onClick="{{ p.onSelect }}" style="display:grid;grid-template-columns:44px minmax(0,1fr) 190px 170px 96px;gap:12px;align-items:center;padding:10px 10px;border-radius:16px;background:{{ p.rowBg }};cursor:pointer" style-hover="background:#F3E9E2">
+<div style="display:flex;gap:5px;align-items:center;justify-content:center">
+<sc-if value="{{ p.isNuevo }}"><span title="Paciente nuevo" style="width:11px;height:11px;border-radius:50%;background:#1F5A8C;display:inline-block"></span></sc-if>
+<sc-if value="{{ p.isControl }}"><span title="En control" style="width:11px;height:11px;background:#6A3D8F;display:inline-block"></span></sc-if>
+<sc-if value="{{ p.hasProc }}"><span title="Procedimiento pendiente" style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid #B26B00;display:inline-block"></span></sc-if>
+</div>
+<div style="min-width:0"><div style="font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.name }}</div><div style="font-size:13px;color:#6B5550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.typeShort }} · {{ p.esp }} · {{ p.medShort }}</div></div>
+<div style="font-size:13px;line-height:1.3"><div>Debía volver el <b>{{ p.debia }}</b></div><div style="color:#6B5550">hace {{ p.dias }} días</div></div>
+<div>
+<sc-if value="{{ p.hasPhone }}"><button onClick="{{ p.onCopy1 }}" style="display:flex;align-items:center;gap:8px;border:none;background:#F1E8E0;border-radius:12px;padding:8px 10px;font:500 14px Barlow;color:#2A1715" style-hover="background:#E8DAD0"><span style="font-variant-numeric:tabular-nums">{{ p.phone1 }}</span><span style="font-size:12px;color:#A8352C;font-weight:600">{{ p.copyLabel1 }}</span></button></sc-if>
+<sc-if value="{{ p.multiPhone }}"><span style="font-size:12px;color:#6B5550;padding-left:10px">y {{ p.moreCount }} número más</span></sc-if>
+<sc-if value="{{ p.noPhone }}"><span style="font-size:13px;font-weight:600;color:#8A2620;background:#F6DCD7;border-radius:10px;padding:6px 10px">Sin teléfono</span></sc-if>
+</div>
+<button onClick="{{ p.onDone }}" style="border:none;background:#A8352C;color:#FFF;border-radius:12px;padding:9px 0;font-size:14px;font-weight:600" style-hover="background:#8A2620">✓ Hecho</button>
+</div>
+</sc-for>
+<sc-if value="{{ aEmpty }}"><div style="padding:60px 20px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center"><div style="font-family:'Barlow Condensed';font-size:28px;font-weight:700">No queda nadie por atender hoy</div><div style="color:#6B5550">Los pacientes a los que se escribió vuelven a aparecer en 15 días si no sacan cita.</div><button onClick="{{ resetA }}" style="border:none;background:#F1E8E0;border-radius:12px;padding:10px 16px;font-size:14px">Restaurar ejemplo</button></div></sc-if>
+</div>
+</div>
+<div style="background:#FAF6F1;border-radius:22px;box-shadow:0 8px 24px rgba(111,23,19,.08);padding:22px 24px;display:flex;flex-direction:column;gap:14px;overflow:auto">
+<sc-if value="{{ aHasSel }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<div><div style="font-family:'Barlow Condensed';font-size:30px;font-weight:700;line-height:1.05;color:#A8352C">{{ aSel.name }}</div><div style="font-size:14px;color:#6B5550;margin-top:6px">DNI {{ aSel.dni }} · {{ aSel.esp }} · {{ aSel.med }}</div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<sc-if value="{{ aSel.isNuevo }}"><span style="display:flex;gap:8px;align-items:center;background:#DDE8F3;color:#1F5A8C;border-radius:12px;padding:6px 12px;font-size:13px;font-weight:600"><span style="width:10px;height:10px;border-radius:50%;background:#1F5A8C"></span>{{ aSel.typeText }}</span></sc-if>
+<sc-if value="{{ aSel.isControl }}"><span style="display:flex;gap:8px;align-items:center;background:#EAE0F2;color:#6A3D8F;border-radius:12px;padding:6px 12px;font-size:13px;font-weight:600"><span style="width:10px;height:10px;background:#6A3D8F"></span>{{ aSel.typeText }}</span></sc-if>
+</div>
+<div style="background:#F1E8E0;border-radius:16px;padding:14px 16px;font-size:14px;line-height:1.5">Última consulta {{ aSel.ultima }}<br><b style="font-size:16px">Debía volver el {{ aSel.debia }}</b><br><span style="color:#A8352C;font-weight:600">{{ aSel.diasText }}</span></div>
+<sc-if value="{{ aSel.hasProc }}"><div style="background:#F7E6CC;border-radius:16px;padding:12px 16px;font-size:14px;color:#5A3A00;display:flex;gap:10px;align-items:center"><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:11px solid #B26B00;flex:none"></span><span><b>Procedimiento pendiente:</b> {{ aSel.procText }}</span></div></sc-if>
+<div style="display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{ aSel.phoneList }}" as="ph"><div style="display:flex;align-items:center;justify-content:space-between;background:#F1E8E0;border-radius:14px;padding:8px 8px 8px 16px"><span style="font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.02em">{{ ph.num }}</span><button onClick="{{ ph.onCopy }}" style="border:none;background:#FAF6F1;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:600;color:#A8352C">{{ ph.label }}</button></div></sc-for>
+<sc-if value="{{ aSel.noPhone }}"><div style="background:#F6DCD7;border-radius:14px;padding:12px 16px;font-size:14px;color:#6F1713"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base. Se puede descartar o dejar una nota.</div></sc-if>
+</div>
+<sc-if value="{{ aSel.hasPrev }}"><div style="font-size:14px;color:#6B5550">{{ aSel.prevText }}</div></sc-if>
+<textarea placeholder="Nota (opcional)" style="border:none;background:#F1E8E0;border-radius:14px;padding:12px 14px;font:14px Barlow;min-height:56px;resize:vertical"></textarea>
+<div style="display:flex;gap:10px"><button onClick="{{ aSel.onDone }}" style="flex:1;border:none;background:#A8352C;color:#FFF;border-radius:14px;padding:14px;font-size:16px;font-weight:600" style-hover="background:#8A2620">Seguimiento hecho</button><button onClick="{{ aSel.onDiscard }}" style="border:none;background:#F1E8E0;border-radius:14px;padding:14px 18px;font-size:15px;color:#2A1715" style-hover="background:#E8DAD0">Descartar</button></div>
+<sc-if value="{{ aSel.isDiscarding }}"><div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:13px;font-weight:600">¿Por qué se descarta? (obligatorio)</span><div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ aSel.reasons }}" as="r"><button onClick="{{ r.onPick }}" style="border:none;background:#F1E8E0;border-radius:10px;padding:7px 12px;font-size:13px" style-hover="background:#E8DAD0">{{ r.label }}</button></sc-for></div></div></sc-if>
+</div>
+</sc-if>
+</div>
+</div>
+</div>
+<!-- mobile A dark -->
+<div style="width:390px;height:820px;background:#150A0A;border-radius:44px;padding:22px 16px 14px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px;color:#F3E9E4;box-shadow:0 20px 60px rgba(60,20,15,.3);overflow:hidden">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 6px"><div><div style="font-size:13px;color:#BFA9A3">Dr. Eli Cabanillas · sus pacientes</div><div style="font-family:'Barlow Condensed';font-size:30px;font-weight:700">Resumen</div></div><span style="background:#24100F;border-radius:14px;padding:9px 14px;font-size:14px;font-weight:600">agosto 2026 ▾</span></div>
+<div style="background:#24100F;border-radius:24px;padding:16px 18px;display:flex;flex-direction:column;gap:4px">
+<span style="font-size:14px;color:#BFA9A3">No volvieron a su reevaluación</span>
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'Barlow Condensed';font-size:68px;font-weight:700;line-height:.95;color:#E0736B">47%</span><span style="font-size:15px;font-weight:600">59 de 125</span></div>
+<div style="display:flex;gap:14px;font-size:13px;color:#D8C6C0"><span style="display:flex;gap:6px;align-items:center"><span style="width:9px;height:9px;border-radius:50%;background:#7FB0E0"></span>Nuevos 44 de 75</span><span style="display:flex;gap:6px;align-items:center"><span style="width:9px;height:9px;background:#B48BD6"></span>En control 15 de 50</span></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div style="background:#24100F;border-radius:24px;padding:14px 16px"><div style="font-size:13px;color:#BFA9A3;line-height:1.25">No siguieron el hierro</div><div style="font-family:'Barlow Condensed';font-size:44px;font-weight:700;color:#E0A84A;line-height:1">44%</div><div style="font-size:13px">11 de 25</div></div>
+<div style="background:#24100F;border-radius:24px;padding:14px 16px"><div style="font-size:13px;color:#BFA9A3;line-height:1.25">No siguieron otros procedimientos</div><div style="font-family:'Barlow Condensed';font-size:44px;font-weight:700;color:#E0A84A;line-height:1">83%</div><div style="font-size:13px">5 de 6</div></div>
+</div>
+<div style="background:#16301F;border-radius:24px;padding:12px 18px;display:flex;align-items:center;gap:14px"><span style="font-family:'Barlow Condensed';font-size:40px;font-weight:700;color:#7CCB98">38%</span><span style="font-size:14px;line-height:1.3">volvieron después del seguimiento<br><span style="color:#B8D9C3">5 de 13 pacientes</span></span></div>
+<div style="background:#24100F;border-radius:24px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+<span style="font-size:14px;font-weight:600">Mes a mes · % que no volvió</span>
+<svg viewBox="0 0 320 120" style="width:100%;height:120px">
+<path d="{{ linePath }}" fill="none" stroke="#E0736B" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"></path>
+<path d="{{ lineCurso }}" fill="none" stroke="#E0736B" stroke-width="3" stroke-dasharray="4 6" stroke-linecap="round" opacity=".7"></path>
+<sc-for list="{{ months }}" as="mo"><circle cx="{{ mo.cx }}" cy="{{ mo.cy }}" r="4" fill="#24100F" stroke="#E0736B" stroke-width="2.5"></circle><text x="{{ mo.cx }}" y="{{ mo.ty }}" text-anchor="middle" fill="#F3E9E4" font-size="12" font-family="Barlow" font-weight="600">{{ mo.label }}</text><text x="{{ mo.cx }}" y="116" text-anchor="middle" fill="#BFA9A3" font-size="11" font-family="Barlow">{{ mo.s }}</text></sc-for>
+</svg>
+<span style="font-size:12px;color:#BFA9A3">Línea punteada: setiembre en curso, a 35 pacientes aún no les toca volver.</span>
+</div>
+<div style="margin-top:auto;background:#24100F;border-radius:22px;padding:6px;display:grid;grid-template-columns:repeat(4,1fr);gap:4px;font-size:12px;text-align:center"><span style="background:#E0736B;color:#150A0A;border-radius:16px;padding:12px 0;font-weight:700">Resumen</span><span style="padding:12px 0">Bandeja</span><span style="padding:12px 0">Buscar</span><span style="padding:12px 0">Detalle</span></div>
+</div>
+</div>
+</div>
+
+<!-- ================= 1b EDITORIAL ================= -->
+<div id="1b" style="display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;gap:16px;align-items:baseline">
+<span style="font-family:'Barlow Condensed';font-size:22px;font-weight:700;background:#6F1713;color:#FAF6F1;padding:4px 12px;border-radius:6px">1b</span>
+<span style="font-family:'Barlow Condensed';font-size:34px;font-weight:700">Editorial · por urgencia</span>
+<span style="font-size:16px;color:#5A4440">Sin tarjetas ni sombras: tipografía grande, aire y líneas finas. La bandeja se agrupa por urgencia y se maneja con el teclado.</span>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="width:1280px;height:820px;background:#FAF6F1;padding:32px 64px 0;box-sizing:border-box;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(60,20,15,.18);border-radius:8px;overflow:hidden">
+<div style="display:flex;align-items:baseline;gap:40px">
+<div style="display:flex;align-items:baseline;gap:10px"><span style="font-family:'Barlow Condensed';font-size:24px;font-weight:700;color:#6F1713">Seguimientos</span><span style="font-size:12px;color:#7A6460;letter-spacing:.08em">CENTRO HEMATOLÓGICO DEL PERÚ</span></div>
+<div style="display:flex;gap:28px;font-size:15px"><span style="color:#5A4440">Resumen</span><span style="font-weight:600;color:#6F1713;border-bottom:2px solid #6F1713;padding-bottom:4px">Bandeja</span><span style="color:#5A4440">Buscar paciente</span><span style="color:#5A4440">Detalle</span></div>
+<div style="margin-left:auto;display:flex;gap:8px;align-items:baseline;font-size:14px;color:#7A6460">¿Quién es usted?<select style="border:none;border-bottom:1px solid #2A1715;background:transparent;font:600 15px Barlow;color:#2A1715;padding:2px 0"><option>Magaly</option><option>Ana</option><option>Rachel</option></select></div>
+</div>
+<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-top:40px">
+<div><div style="font-family:'Barlow Condensed';font-size:76px;font-weight:600;line-height:.9;letter-spacing:-.01em">Bandeja del día</div><div style="font-size:16px;color:#7A6460;margin-top:10px">Jueves 01/10/2026</div></div>
+<div style="display:flex;gap:56px">
+<div><div style="font-family:'Barlow Condensed';font-size:76px;font-weight:600;line-height:.85;color:#A8352C">{{ bCount }}</div><div style="font-size:14px;color:#5A4440;margin-top:6px">por atender</div></div>
+<div><div style="font-family:'Barlow Condensed';font-size:76px;font-weight:600;line-height:.85">{{ bHoy }}</div><div style="font-size:14px;color:#5A4440;margin-top:6px">seguimientos hoy</div></div>
+<div><div style="font-family:'Barlow Condensed';font-size:76px;font-weight:600;line-height:.85;color:#2F6B45">3</div><div style="font-size:14px;color:#5A4440;margin-top:6px">recuperados este mes</div></div>
+</div>
+</div>
+<div style="display:flex;gap:32px;align-items:center;margin-top:32px;padding-bottom:12px;border-bottom:1px solid #2A1715;font-size:14px">
+<span style="color:#7A6460">Especialidad <select style="border:none;background:transparent;font:600 14px Barlow;color:#2A1715"><option>Todas</option></select></span>
+<span style="color:#7A6460">Médico <select style="border:none;background:transparent;font:600 14px Barlow;color:#2A1715"><option>Todos</option></select></span>
+<label style="display:flex;gap:6px;align-items:center;color:#2A1715"><input type="checkbox" style="accent-color:#6F1713;margin:0">Solo sin teléfono</label>
+<span style="margin-left:auto;color:#7A6460">↑ ↓ moverse · <b style="color:#2A1715">C</b> copiar · <b style="color:#2A1715">H</b> hecho · <b style="color:#2A1715">D</b> descartar</span>
+</div>
+<div style="flex:1;overflow-y:auto;overflow-x:hidden;padding:0 12px 32px;margin:0 -12px">
+<sc-for list="{{ bGroups }}" as="g" hint-placeholder-count="3">
+<div style="display:flex;align-items:baseline;gap:12px;padding:26px 0 8px;border-bottom:1px solid #E3D8CF"><span style="font-family:'Barlow Condensed';font-size:22px;font-weight:700;color:#6F1713;text-transform:uppercase;letter-spacing:.04em">{{ g.title }}</span><span style="font-size:14px;color:#7A6460">{{ g.sub }} · {{ g.count }}</span></div>
+<sc-for list="{{ g.items }}" as="p">
+<div onClick="{{ p.onSelect }}" style="display:grid;grid-template-columns:28px minmax(0,1.5fr) minmax(0,1fr) 170px 250px;gap:20px;align-items:start;padding:16px 12px;margin:0 -12px;border-bottom:1px solid #E3D8CF;background:{{ p.rowBg }};cursor:pointer">
+<div style="display:flex;flex-direction:column;gap:5px;align-items:center;padding-top:6px">
+<sc-if value="{{ p.isNuevo }}"><span style="width:10px;height:10px;border-radius:50%;background:#1F5A8C"></span></sc-if>
+<sc-if value="{{ p.isControl }}"><span style="width:10px;height:10px;background:#6A3D8F"></span></sc-if>
+<sc-if value="{{ p.hasProc }}"><span style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #B26B00"></span></sc-if>
+</div>
+<div style="min-width:0"><div style="font-size:17px;font-weight:600">{{ p.name }}</div><div style="font-size:14px;color:#5A4440;margin-top:2px">{{ p.typeText }}</div><div style="font-size:13px;color:#7A6460;margin-top:2px">DNI {{ p.dni }} · {{ p.esp }} · {{ p.medShort }}</div><sc-if value="{{ p.hasProc }}"><div style="font-size:14px;color:#8A5300;margin-top:4px;font-weight:500">{{ p.procText }}</div></sc-if><sc-if value="{{ p.hasPrev }}"><div style="font-size:13px;color:#7A6460;margin-top:4px;font-style:italic">{{ p.prevText }}</div></sc-if></div>
+<div style="font-size:14px;line-height:1.45"><div style="color:#7A6460">Última consulta {{ p.ultima }}</div><div>Debía volver el <b>{{ p.debia }}</b></div><div style="color:#A8352C">{{ p.diasText }}</div></div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ p.phoneList }}" as="ph"><button onClick="{{ ph.onCopy }}" style="border:none;background:transparent;padding:2px 0;text-align:left;font:500 16px Barlow;color:#2A1715;font-variant-numeric:tabular-nums;display:flex;gap:10px;align-items:baseline" style-hover="color:#A8352C">{{ ph.num }}<span style="font-size:12px;color:#A8352C;font-weight:600">{{ ph.label }}</span></button></sc-for>
+<sc-if value="{{ p.noPhone }}"><span style="font-size:14px;color:#A8352C;font-weight:600">Sin teléfono</span></sc-if>
+</div>
+<div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+<button onClick="{{ p.onDone }}" style="border:1px solid #6F1713;background:#6F1713;color:#FAF6F1;padding:8px 14px;font-size:14px;font-weight:600;border-radius:2px" style-hover="background:#A8352C">Hecho <span style="opacity:.6;margin-left:4px">H</span></button>
+<button onClick="{{ p.onDiscard }}" style="border:1px solid #CDBFB5;background:transparent;color:#2A1715;padding:8px 12px;font-size:14px;border-radius:2px" style-hover="border-color:#2A1715">Descartar <span style="opacity:.5;margin-left:4px">D</span></button>
+<sc-if value="{{ p.isDiscarding }}"><div style="width:100%;display:flex;flex-direction:column;gap:4px;align-items:flex-end;margin-top:8px"><span style="font-size:12px;color:#7A6460">Motivo (obligatorio)</span><sc-for list="{{ p.reasons }}" as="r"><button onClick="{{ r.onPick }}" style="border:none;background:transparent;font-size:14px;color:#2A1715;padding:2px 0;text-decoration:underline;text-underline-offset:3px" style-hover="color:#A8352C">{{ r.label }}</button></sc-for></div></sc-if>
+</div>
+</div>
+</sc-for>
+</sc-for>
+<sc-if value="{{ bEmpty }}"><div style="padding:80px 0;display:flex;flex-direction:column;gap:14px"><div style="font-family:'Barlow Condensed';font-size:48px;font-weight:600">Bandeja vacía.</div><div style="font-size:16px;color:#5A4440">No queda nadie a quien escribir hoy.</div><button onClick="{{ resetB }}" style="align-self:flex-start;border:1px solid #2A1715;background:transparent;padding:8px 14px;font-size:14px">Restaurar ejemplo</button></div></sc-if>
+</div>
+</div>
+<!-- mobile B dark -->
+<div style="width:390px;height:820px;background:#150A0A;border-radius:44px;padding:30px 28px 20px;box-sizing:border-box;display:flex;flex-direction:column;color:#F3E9E4;box-shadow:0 20px 60px rgba(60,20,15,.3);overflow:hidden">
+<div style="display:flex;justify-content:space-between;font-size:13px;color:#BFA9A3;letter-spacing:.06em"><span>SEGUIMIENTOS</span><span>Dr. Eli Cabanillas</span></div>
+<div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:22px;padding-bottom:10px;border-bottom:1px solid #4A2A27"><span style="font-size:15px;color:#BFA9A3">‹ julio</span><span style="font-family:'Barlow Condensed';font-size:24px;font-weight:600">agosto 2026</span><span style="font-size:15px;color:#BFA9A3">setiembre ›</span></div>
+<div style="font-family:'Barlow Condensed';font-size:128px;font-weight:600;line-height:.85;color:#E0736B;margin-top:16px;letter-spacing:-.02em">47%</div>
+<div style="font-size:19px;line-height:1.35;margin-top:8px;text-wrap:pretty">de sus pacientes de agosto no volvieron a su reevaluación.</div>
+<div style="font-size:14px;color:#BFA9A3;margin-top:6px">59 de 125 · nuevos 44 de 75 · en control 15 de 50</div>
+<div style="margin-top:16px;border-top:1px solid #4A2A27">
+<div style="display:flex;align-items:baseline;gap:16px;padding:10px 0;border-bottom:1px solid #4A2A27"><span style="font-family:'Barlow Condensed';font-size:40px;font-weight:600;width:82px;color:#E0A84A">44%</span><span style="font-size:15px;line-height:1.3">no siguieron el hierro<br><span style="color:#BFA9A3;font-size:13px">11 de 25</span></span></div>
+<div style="display:flex;align-items:baseline;gap:16px;padding:10px 0;border-bottom:1px solid #4A2A27"><span style="font-family:'Barlow Condensed';font-size:40px;font-weight:600;width:82px;color:#E0A84A">83%</span><span style="font-size:15px;line-height:1.3">no siguieron otros procedimientos<br><span style="color:#BFA9A3;font-size:13px">5 de 6</span></span></div>
+<div style="display:flex;align-items:baseline;gap:16px;padding:10px 0;border-bottom:1px solid #4A2A27"><span style="font-family:'Barlow Condensed';font-size:40px;font-weight:600;width:82px;color:#7CCB98">38%</span><span style="font-size:15px;line-height:1.3">volvieron tras el seguimiento<br><span style="color:#BFA9A3;font-size:13px">5 de 13</span></span></div>
+</div>
+<div style="font-size:12px;letter-spacing:.08em;color:#BFA9A3;margin-top:14px">MES A MES · NO VOLVIERON</div>
+<div style="display:flex;flex-direction:column;gap:7px;margin-top:10px">
+<sc-for list="{{ months }}" as="mo">
+<div style="display:grid;grid-template-columns:76px 1fr 40px;gap:10px;align-items:center;font-size:14px">
+<span style="color:#D8C6C0">{{ mo.m }}</span>
+<div style="height:2px;background:#3A1E1C;position:relative"><sc-if value="{{ mo.done }}"><div style="position:absolute;left:0;top:-1px;height:4px;width:{{ mo.w }}%;background:#E0736B"></div></sc-if><sc-if value="{{ mo.curso }}"><div style="position:absolute;left:0;top:-1px;height:4px;width:{{ mo.w }}%;background:repeating-linear-gradient(90deg,#E0736B 0 4px,transparent 4px 8px)"></div></sc-if></div>
+<span style="text-align:right;font-weight:600">{{ mo.label }}</span>
+</div>
+</sc-for>
+<span style="font-size:13px;color:#BFA9A3;font-style:italic">setiembre está en curso: a 35 pacientes aún no les toca volver.</span>
+</div>
+</div>
+</div>
+</div>
+
+<!-- ================= 1c NEUBRUTALISTA ================= -->
+<div id="1c" style="display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;gap:16px;align-items:baseline">
+<span style="font-family:'Barlow Condensed';font-size:22px;font-weight:700;background:#6F1713;color:#FAF6F1;padding:4px 12px;border-radius:6px">1c</span>
+<span style="font-family:'Barlow Condensed';font-size:34px;font-weight:700">Neubrutalista suave · por tipo de caso</span>
+<span style="font-size:16px;color:#5A4440">Líneas de tinta, fondos pastel planos, sombras sin difuminar. Tres columnas, una por tipo de caso.</span>
+</div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="width:1280px;height:820px;background:#F4ECE0;box-sizing:border-box;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(60,20,15,.18);border-radius:8px;overflow:hidden">
+<div style="background:#6F1713;border-bottom:1.5px solid #2A0E0C;padding:14px 24px;display:flex;align-items:center;gap:28px;color:#FAF6F1">
+<div><div style="font-family:'Barlow Condensed';font-size:24px;font-weight:700;line-height:1">Seguimientos</div><div style="font-size:10px;letter-spacing:.12em;opacity:.8">CENTRO HEMATOLÓGICO DEL PERÚ</div></div>
+<div style="display:flex;gap:8px">
+<span style="border:1.5px solid #FAF6F1;padding:7px 14px;font-size:14px;border-radius:6px">Resumen</span>
+<span style="border:1.5px solid #2A0E0C;background:#FAF6F1;color:#2A0E0C;padding:7px 14px;font-size:14px;font-weight:700;border-radius:6px;box-shadow:3px 3px 0 #2A0E0C">Bandeja</span>
+<span style="border:1.5px solid #FAF6F1;padding:7px 14px;font-size:14px;border-radius:6px">Buscar paciente</span>
+<span style="border:1.5px solid #FAF6F1;padding:7px 14px;font-size:14px;border-radius:6px">Detalle</span>
+</div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px">¿Quién es usted?<select style="border:1.5px solid #2A0E0C;background:#FAF6F1;border-radius:6px;padding:6px 8px;font:600 14px Barlow;color:#2A0E0C"><option>Magaly</option><option>Ana</option><option>Rachel</option></select></div>
+</div>
+<div style="padding:20px 24px 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+<span style="font-family:'Barlow Condensed';font-size:40px;font-weight:700;color:#2A0E0C;margin-right:12px">Bandeja del día</span>
+<span style="border:1.5px solid #2A0E0C;background:#FAF6F1;border-radius:6px;padding:6px 14px;box-shadow:3px 3px 0 #2A0E0C;display:flex;align-items:baseline;gap:8px"><b style="font-family:'Barlow Condensed';font-size:28px;color:#A8352C">{{ cCount }}</b><span style="font-size:13px">por atender</span></span>
+<span style="border:1.5px solid #2A0E0C;background:#FAF6F1;border-radius:6px;padding:6px 14px;box-shadow:3px 3px 0 #2A0E0C;display:flex;align-items:baseline;gap:8px"><b style="font-family:'Barlow Condensed';font-size:28px">{{ cHoy }}</b><span style="font-size:13px">hechos hoy</span></span>
+<span style="border:1.5px solid #2A0E0C;background:#DCEBDF;border-radius:6px;padding:6px 14px;box-shadow:3px 3px 0 #2A0E0C;display:flex;align-items:baseline;gap:8px"><b style="font-family:'Barlow Condensed';font-size:28px;color:#2F6B45">3</b><span style="font-size:13px">recuperados este mes</span></span>
+<div style="margin-left:auto;display:flex;gap:8px">
+<select style="border:1.5px solid #2A0E0C;background:#FFFDF9;border-radius:6px;padding:7px 10px;font:500 14px Barlow"><option>Todas las especialidades</option></select>
+<select style="border:1.5px solid #2A0E0C;background:#FFFDF9;border-radius:6px;padding:7px 10px;font:500 14px Barlow"><option>Todos los médicos</option></select>
+<label style="border:1.5px solid #2A0E0C;background:#FFFDF9;border-radius:6px;padding:7px 10px;font-size:14px;display:flex;gap:6px;align-items:center"><input type="checkbox" style="accent-color:#2A0E0C;margin:0">Solo sin teléfono</label>
+</div>
+</div>
+<div style="flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:18px 24px 24px">
+<sc-for list="{{ cCols }}" as="col" hint-placeholder-count="3">
+<div style="border:1.5px solid #2A0E0C;border-radius:8px;background:{{ col.bg }};display:flex;flex-direction:column;min-height:0;overflow:hidden">
+<div style="border-bottom:1.5px solid #2A0E0C;padding:10px 14px;display:flex;align-items:center;gap:10px;background:#FFFDF9">
+<sc-if value="{{ col.isProc }}"><span style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #B26B00"></span></sc-if>
+<sc-if value="{{ col.isNuevo }}"><span style="width:12px;height:12px;border-radius:50%;background:#1F5A8C"></span></sc-if>
+<sc-if value="{{ col.isControl }}"><span style="width:12px;height:12px;background:#6A3D8F"></span></sc-if>
+<span style="font-family:'Barlow Condensed';font-size:21px;font-weight:700">{{ col.title }}</span>
+<span style="margin-left:auto;border:1.5px solid #2A0E0C;border-radius:20px;padding:0 10px;font-weight:700;font-size:14px">{{ col.count }}</span>
+</div>
+<div style="flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:14px">
+<sc-for list="{{ col.items }}" as="p">
+<div style="background:#FFFDF9;border:1.5px solid #2A0E0C;border-radius:8px;box-shadow:4px 4px 0 #2A0E0C;padding:12px 14px;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;gap:8px;align-items:center"><span style="font-family:'Barlow Condensed';font-size:19px;font-weight:700;line-height:1.1;flex:1">{{ p.name }}</span>
+<sc-if value="{{ p.hasProc }}"><sc-if value="{{ p.isNuevo }}"><span title="Paciente nuevo" style="width:10px;height:10px;border-radius:50%;background:#1F5A8C;flex:none"></span></sc-if><sc-if value="{{ p.isControl }}"><span title="En control" style="width:10px;height:10px;background:#6A3D8F;flex:none"></span></sc-if></sc-if></div>
+<div style="font-size:13px;color:#5A4440;line-height:1.35">{{ p.typeText }}<br>{{ p.esp }} · {{ p.medShort }}</div>
+<sc-if value="{{ p.hasProc }}"><div style="font-size:13px;background:#F6E3C4;border:1.5px solid #2A0E0C;border-radius:6px;padding:5px 8px"><b>Pendiente:</b> {{ p.procText }}</div></sc-if>
+<div style="font-size:13px">Debía volver el <b>{{ p.debia }}</b> · <span style="color:#A8352C;font-weight:600">hace {{ p.dias }} días</span></div>
+<sc-if value="{{ p.hasPrev }}"><div style="font-size:12px;color:#5A4440">{{ p.prevText }}</div></sc-if>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<sc-for list="{{ p.phoneList }}" as="ph"><button onClick="{{ ph.onCopy }}" style="border:1.5px solid #2A0E0C;background:#FFFDF9;border-radius:6px;padding:5px 8px;font:500 14px Barlow;color:#2A0E0C;display:flex;gap:8px" style-hover="background:#F4ECE0">{{ ph.num }}<b style="font-size:12px;color:#A8352C">{{ ph.label }}</b></button></sc-for>
+<sc-if value="{{ p.noPhone }}"><span style="border:1.5px dashed #2A0E0C;border-radius:6px;padding:5px 8px;font-size:13px;font-weight:600;background:#F6DCD7">Sin teléfono</span></sc-if>
+</div>
+<div style="display:flex;gap:8px;margin-top:2px">
+<button onClick="{{ p.onDone }}" style="flex:1;border:1.5px solid #2A0E0C;background:#A8352C;color:#FFF;border-radius:6px;padding:8px;font-size:14px;font-weight:700;box-shadow:3px 3px 0 #2A0E0C" style-active="transform:translate(3px,3px);box-shadow:none">Seguimiento hecho</button>
+<button onClick="{{ p.onDiscard }}" style="border:1.5px solid #2A0E0C;background:#FFFDF9;border-radius:6px;padding:8px 12px;font-size:14px;box-shadow:3px 3px 0 #2A0E0C" style-active="transform:translate(3px,3px);box-shadow:none">Descartar</button>
+</div>
+<sc-if value="{{ p.isDiscarding }}"><div style="display:flex;gap:6px;flex-wrap:wrap;border-top:1.5px dashed #2A0E0C;padding-top:8px"><span style="width:100%;font-size:12px;font-weight:600">Motivo (obligatorio):</span><sc-for list="{{ p.reasons }}" as="r"><button onClick="{{ r.onPick }}" style="border:1.5px solid #2A0E0C;background:#F4ECE0;border-radius:20px;padding:3px 10px;font-size:12px" style-hover="background:#FFFDF9">{{ r.label }}</button></sc-for></div></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{ col.empty }}"><div style="border:1.5px dashed #2A0E0C;border-radius:8px;padding:24px;text-align:center;font-size:14px;background:#FFFDF9">Nadie en esta columna.</div></sc-if>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<!-- mobile C dark -->
+<div style="width:390px;height:820px;background:#1C0D0C;border-radius:44px;padding:24px 18px 16px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px;color:#F3E9E4;box-shadow:0 20px 60px rgba(60,20,15,.3);overflow:hidden">
+<div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;color:#BFA9A3">Dr. Eli Cabanillas</div><div style="font-family:'Barlow Condensed';font-size:30px;font-weight:700">Resumen</div></div><span style="border:1.5px solid #F3D9D2;border-radius:6px;padding:8px 12px;font-weight:600;font-size:14px;box-shadow:3px 3px 0 #E0736B">agosto 2026 ▾</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+<div style="grid-column:span 2;border:1.5px solid #F3D9D2;border-radius:8px;background:#3A1613;padding:12px 14px;box-shadow:4px 4px 0 #E0736B;display:flex;align-items:center;gap:14px"><span style="font-family:'Barlow Condensed';font-size:60px;font-weight:700;line-height:1;color:#FF9E95">47%</span><span style="font-size:14px;line-height:1.3">no volvieron a su reevaluación<br><b>59 de 125</b> <span style="color:#BFA9A3">· nuevos 44 · control 15</span></span></div>
+<div style="border:1.5px solid #F3D9D2;border-radius:8px;background:#3A2610;padding:10px 12px;box-shadow:4px 4px 0 #E0A84A"><div style="font-family:'Barlow Condensed';font-size:40px;font-weight:700;color:#F0BE68;line-height:1">44%</div><div style="font-size:13px;line-height:1.3">no siguieron el hierro · 11 de 25</div></div>
+<div style="border:1.5px solid #F3D9D2;border-radius:8px;background:#3A2610;padding:10px 12px;box-shadow:4px 4px 0 #E0A84A"><div style="font-family:'Barlow Condensed';font-size:40px;font-weight:700;color:#F0BE68;line-height:1">83%</div><div style="font-size:13px;line-height:1.3">no siguieron otros procedimientos · 5 de 6</div></div>
+<div style="grid-column:span 2;border:1.5px solid #F3D9D2;border-radius:8px;background:#163020;padding:10px 14px;box-shadow:4px 4px 0 #7CCB98;display:flex;align-items:center;gap:14px"><span style="font-family:'Barlow Condensed';font-size:40px;font-weight:700;color:#8FDCA9">38%</span><span style="font-size:14px">volvieron tras el seguimiento · 5 de 13</span></div>
+</div>
+<div style="border:1.5px solid #F3D9D2;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;background:#24100F">
+<span style="font-size:14px;font-weight:700">Mes a mes · % que no volvió</span>
+<div style="height:150px;display:grid;grid-template-columns:repeat(6,1fr);gap:8px;align-items:end;border-bottom:1.5px solid #F3D9D2">
+<sc-for list="{{ months }}" as="mo">
+<div style="display:flex;flex-direction:column;align-items:center;gap:4px"><span style="font-size:12px;font-weight:700">{{ mo.label }}</span>
+<sc-if value="{{ mo.done }}"><div style="width:100%;height:{{ mo.h }}px;background:#E0736B;border:1.5px solid #F3D9D2;border-bottom:none;border-radius:4px 4px 0 0"></div></sc-if>
+<sc-if value="{{ mo.curso }}"><div style="width:100%;height:{{ mo.h }}px;background:repeating-linear-gradient(45deg,#E0736B 0 3px,transparent 3px 8px);border:1.5px dashed #F3D9D2;border-bottom:none;border-radius:4px 4px 0 0"></div></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;font-size:11px;color:#BFA9A3;text-align:center"><sc-for list="{{ months }}" as="mo"><span>{{ mo.s }}</span></sc-for></div>
+<span style="font-size:12px;color:#BFA9A3">Rayado: setiembre en curso, a 35 pacientes aún no les toca volver.</span>
+</div>
+<div style="margin-top:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:12px;text-align:center"><span style="border:1.5px solid #F3D9D2;background:#F3D9D2;color:#1C0D0C;border-radius:6px;padding:11px 0;font-weight:700">Resumen</span><span style="border:1.5px solid #F3D9D2;border-radius:6px;padding:11px 0">Bandeja</span><span style="border:1.5px solid #F3D9D2;border-radius:6px;padding:11px 0">Buscar</span><span style="border:1.5px solid #F3D9D2;border-radius:6px;padding:11px 0">Detalle</span></div>
+</div>
+</div>
+</div>
+
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const PAC=[
+{id:1,name:'LUIS ALBERTO RAMOS VEGA',dni:'40444555',esp:'HEMATOLOGÍA',med:'Dra. ALEJANDRA LA TORRE MATUK',medShort:'Dra. La Torre',phones:['923456789'],type:'nuevo',proc:'AMO + BIOPSIA',ultima:'12/08/2026',debia:'11/09/2026',dias:20,prev:0},
+{id:2,name:'ROSA ELENA QUISPE HUAMÁN',dni:'40111222',esp:'HEMATOLOGÍA',med:'Dr. ELÍ FABRIZIO CABANILLAS HUALPA',medShort:'Dr. Cabanillas',phones:['987654321'],type:'control',reev:2,proc:'Hierro (Ferinject) ×2',ultima:'05/08/2026',debia:'04/09/2026',dias:27,prev:0},
+{id:3,name:'JORGE LUIS MENDOZA PAREDES',dni:'40222333',esp:'HEMATOLOGÍA',med:'Dra. KAREN DIANA MATOS PEÑA',medShort:'Dra. Matos',phones:[],type:'nuevo',ultima:'18/07/2026',debia:'17/08/2026',dias:45,prev:0},
+{id:4,name:'CARMEN SOFÍA TORRES DÍAZ',dni:'40333444',esp:'REUMATOLOGÍA',med:'Dr. JUVENAL HANAMPA ROQUE',medShort:'Dr. Hanampa',phones:['912345678','998877665'],type:'control',reev:2,ultima:'23/06/2026',debia:'23/07/2026',dias:70,prev:0},
+{id:5,name:'MARÍA FERNANDA SALAS CCORI',dni:'40555666',esp:'HEMATOLOGÍA',med:'Dr. ELÍ FABRIZIO CABANILLAS HUALPA',medShort:'Dr. Cabanillas',phones:['945112233'],type:'nuevo',ultima:'10/08/2026',debia:'09/09/2026',dias:22,prev:1,prevDate:'16/09/2026'},
+{id:6,name:'PEDRO ANTONIO HUAMANÍ LEÓN',dni:'40666777',esp:'HEMATOLOGÍA',med:'Dra. KAREN DIANA MATOS PEÑA',medShort:'Dra. Matos',phones:['956789012'],type:'nuevo',proc:'Hierro (Ferinject) ×1',ultima:'27/08/2026',debia:'26/09/2026',dias:5,prev:0},
+{id:7,name:'ELENA BEATRIZ CHÁVEZ RÍOS',dni:'40777888',esp:'ENDOCRINOLOGÍA',med:'Dra. ROCÍO VALDIVIA PINTO',medShort:'Dra. Valdivia',phones:[],type:'control',reev:3,ultima:'01/06/2026',debia:'01/07/2026',dias:92,prev:0},
+{id:8,name:'ANA LUCÍA PAREDES ROJAS',dni:'40888999',esp:'HEMATOLOGÍA',med:'Dr. ELÍ FABRIZIO CABANILLAS HUALPA',medShort:'Dr. Cabanillas',phones:['976543210'],type:'nuevo',ultima:'29/08/2026',debia:'28/09/2026',dias:3,prev:0}
+];
+const REASONS=['Se atiende en otro lugar','Número equivocado','Ya no lo necesita','Falleció','Otro'];
+const MONTHS=[['abril','abr',52],['mayo','may',50],['junio','jun',51],['julio','jul',55],['agosto','ago',47],['setiembre','set',25,true]];
+const sortP=(a,b)=>((a.prev>0)-(b.prev>0))||((!!b.proc)-(!!a.proc))||(a.dias-b.dias);
+const SORTED=[...PAC].sort(sortP);
+const grpOf=d=>d<=7?0:d<=30?1:2;
+const GROUPS=[['Esta semana','debían volver hace 7 días o menos'],['Este mes','hace 8 a 30 días'],['Más antiguos','hace más de 30 días']];
+
+class Component extends DCLogic {
+  state={done:{a:[],b:[],c:[],d:[]},hoy:{a:0,b:0,c:0,d:0},sel:{a:null,b:null,d:null},open:null,kbOpt:'b',copied:null,discard:null};
+  componentDidMount(){
+    this.onKey=e=>{
+      const t=e.target.tagName;if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT'||e.metaKey||e.ctrlKey)return;
+      const o=this.state.kbOpt,list=this.flat(o);if(!list.length)return;
+      let i=list.findIndex(p=>p.id===this.state.sel[o]);if(i<0)i=0;
+      const k=e.key.toLowerCase(),p=list[i];
+      if(k==='arrowdown'||k==='j'){e.preventDefault();this.select(o,list[Math.min(i+1,list.length-1)].id);}
+      else if(k==='arrowup'||k==='k'){e.preventDefault();this.select(o,list[Math.max(i-1,0)].id);}
+      else if(k==='enter'&&o==='d')this.setState({open:p.id});
+      else if(k==='escape'&&o==='d')this.setState({open:null});
+      else if(k==='c'&&p.phones[0])this.copy(o,p.phones[0]);
+      else if(k==='h')this.done(o,p.id,true);
+      else if(k==='d')this.setState({discard:{opt:o,id:p.id}});
+    };
+    window.addEventListener('keydown',this.onKey);
+  }
+  componentWillUnmount(){window.removeEventListener('keydown',this.onKey);clearTimeout(this.ct);}
+  live(opt){return SORTED.filter(p=>!this.state.done[opt].includes(p.id));}
+  flat(o){const l=this.live(o);return [0,1,2].flatMap(g=>l.filter(p=>grpOf(p.dias)===g));}
+  select(opt,id){this.setState(s=>({sel:{...s.sel,[opt]:id},kbOpt:opt==='a'||opt==='c'?s.kbOpt:opt,open:opt==='d'&&s.open?id:s.open}));}
+  copy(opt,n){try{navigator.clipboard&&navigator.clipboard.writeText(n).catch(()=>{});}catch(e){}
+    this.setState({copied:opt+n});clearTimeout(this.ct);this.ct=setTimeout(()=>this.setState({copied:null}),1500);}
+  done(opt,id,count){
+    if(opt==='d'){const l=this.flat('d'),i=l.findIndex(p=>p.id===id),nx=l[i+1]||l[i-1];const nid=nx?nx.id:null;
+      this.setState(s=>({sel:{...s.sel,d:nid},open:s.open?nid:null}));}
+    this.setState(s=>({done:{...s.done,[opt]:[...s.done[opt],id]},hoy:{...s.hoy,[opt]:s.hoy[opt]+(count?1:0)},discard:null}));}
+  reset(opt){this.setState(s=>({done:{...s.done,[opt]:[]},hoy:{...s.hoy,[opt]:0}}));}
+  mk(p,opt,selId){
+    const s=this.state,cp=n=>s.copied===opt+n,sel=selId===p.id;
+    const disc=s.discard&&s.discard.opt===opt&&s.discard.id===p.id;
+    return {...p,isNuevo:p.type==='nuevo',isControl:p.type==='control',hasProc:!!p.proc,
+      typeText:p.type==='nuevo'?'Paciente nuevo · no volvió a su 1.ª reevaluación':`En control · faltó a su ${p.reev}.ª reevaluación`,
+      typeShort:p.type==='nuevo'?'Nuevo':'En control',
+      procText:p.proc?p.proc+': cotizó y no lo hizo':'',
+      noPhone:!p.phones.length,hasPhone:p.phones.length>0,multiPhone:p.phones.length>1,moreCount:p.phones.length-1,
+      phone1:p.phones[0]||'',copyLabel1:cp(p.phones[0])?'Copiado ✓':'Copiar',
+      onCopy1:e=>{e&&e.stopPropagation();this.copy(opt,p.phones[0]);},
+      phoneList:p.phones.map(n=>({num:n,label:cp(n)?'Copiado ✓':'Copiar',onCopy:e=>{e&&e.stopPropagation();this.copy(opt,n);}})),
+      diasText:`hace ${p.dias} días que no vuelve`,
+      hasPrev:p.prev>0,prevText:p.prev?`Ya se le escribió ${p.prev} vez · la última el ${p.prevDate}`:'',
+      rowBg:sel?(opt==='a'?'#F1E3DA':'#F3E8E0'):'transparent',
+      onSelect:()=>{this.select(opt,p.id);if(opt==='d')this.setState({open:p.id});},
+      onDone:e=>{e&&e.stopPropagation();this.done(opt,p.id,true);},
+      onDiscard:e=>{e&&e.stopPropagation();this.setState({discard:disc?null:{opt,id:p.id}});},
+      isDiscarding:!!disc,
+      reasons:REASONS.map(r=>({label:r,onPick:e=>{e&&e.stopPropagation();this.done(opt,p.id,false);}}))};
+  }
+  renderVals(){
+    const s=this.state;
+    const la=this.live('a');const aSelId=la.some(p=>p.id===s.sel.a)?s.sel.a:(la[0]&&la[0].id);
+    const aList=la.map(p=>this.mk(p,'a',aSelId));
+    const bf=this.flat('b');const bSelId=bf.some(p=>p.id===s.sel.b)?s.sel.b:(bf[0]&&bf[0].id);
+    const bGroups=[0,1,2].map(g=>{const it=bf.filter(p=>grpOf(p.dias)===g).map(p=>this.mk(p,'b',bSelId));return {title:GROUPS[g][0],sub:GROUPS[g][1],count:it.length===1?'1 paciente':it.length+' pacientes',items:it};}).filter(g=>g.items.length);
+    const lc=this.live('c');
+    const cCols=[
+      {title:'Procedimiento pendiente',bg:'#F6E3C4',isProc:true,f:p=>!!p.proc},
+      {title:'Pacientes nuevos',bg:'#DCE7F2',isNuevo:true,f:p=>!p.proc&&p.type==='nuevo'},
+      {title:'En control',bg:'#E7DDF0',isControl:true,f:p=>!p.proc&&p.type==='control'}
+    ].map(c=>{const it=lc.filter(c.f).map(p=>this.mk(p,'c'));return {...c,items:it,count:it.length,empty:!it.length};});
+    const xs=i=>20+i*56,ys=v=>18+(60-v)/40*76;
+    const months=MONTHS.map(([m,sh,v,cur],i)=>({m,s:sh,label:v+'%',w:Math.round(v*1.6),h:Math.round(v*2.1),done:!cur,curso:!!cur,cx:xs(i),cy:ys(v),ty:ys(v)-10}));
+    const pts=months.map(o=>`${o.cx},${o.cy}`);
+    return {
+      aList,aCount:la.length,aHoy:s.hoy.a,aEmpty:!la.length,aHasSel:!!aSelId,aSel:aList.find(p=>p.id===aSelId)||{},resetA:()=>this.reset('a'),
+      bGroups,bCount:bf.length,bHoy:s.hoy.b,bEmpty:!bf.length,resetB:()=>this.reset('b'),
+      cCols,cCount:lc.length,cHoy:s.hoy.c,
+      ...(()=>{const df=this.flat('d');const dSelId=df.some(p=>p.id===s.sel.d)?s.sel.d:(df[0]&&df[0].id);const openId=df.some(p=>p.id===s.open)?s.open:null;
+        const dGroups=[0,1,2].map(g=>{const it=df.filter(p=>grpOf(p.dias)===g).map(p=>this.mk(p,'d',openId||dSelId));return {title:GROUPS[g][0],sub:GROUPS[g][1],count:it.length===1?'1 paciente':it.length+' pacientes',items:it};}).filter(g=>g.items.length);
+        const dp=openId?this.mk(df.find(p=>p.id===openId),'d',openId):{};
+        return {dGroups,dCount:df.length,dHoy:s.hoy.d,dEmpty:!df.length,resetD:()=>this.reset('d'),dOpen:!!openId,dClosed:!openId,dP:dp,closeD:()=>this.setState({open:null})};})(),
+      months,linePath:'M'+pts.slice(0,5).join(' L'),lineCurso:'M'+pts.slice(4).join(' L')
+    };
+  }
+}
+</script>
+</body>
+</html>

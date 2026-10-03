@@ -7,160 +7,295 @@
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ==========================================================================
-   PALETA — los --chp-* son la ÚNICA fuente de color. Fuera de estos dos
-   bloques no se escribe un color a mano: un #fff olvidado es un foco de luz
-   en mitad del modo oscuro (lo comprueba test/ui.test.js).
+   PALETA — estilo «editorial» (propuesta 2a de Claude Design, octubre 2026).
+   Los --chp-* son la ÚNICA fuente de color: fuera de estos dos bloques no se
+   escribe un color a mano (lo comprueba test/ui.test.js).
    ========================================================================== */
 :root{
-  --chp-bg:#EFE7DE;--chp-panel:#FAF6F1;--chp-panel-alt:#FFFDFA;--chp-border:#DBCCBF;--chp-border-soft:#E7DBD0;
-  --chp-text:#2A1B18;--chp-soft:#4C3A34;--chp-muted:#7C6A62;--chp-accent:#A8352C;--chp-on-accent:#FFFFFF;
-  --chp-brand:#6F1713;--chp-on-brand:#FAF6F1;--chp-green:#2F6B45;--chp-green-bg:#DEE9E0;--chp-red-bg:#F6E2DF;
-  --chp-amber:#B26B00;--chp-amber-bg:#F7E9CF;--chp-track:#E3D6C9;--chp-field:#FFFFFF;--chp-field-border:#C6B3A4;
-  --chp-blue:#1F5A8C;--chp-blue-bg:#DCE8F3;--chp-purple:#6A3D8F;--chp-purple-bg:#EBE0F3;
-  --chp-backdrop:rgba(42,27,24,.45);
-  --sombra:0 1px 2px rgba(42,27,24,.05), 0 10px 30px -20px rgba(42,27,24,.45);
+  --chp-bg:#FAF6F1;--chp-panel:#FFFCF8;--chp-ink:#2A1715;--chp-soft:#5A4440;--chp-muted:#7A6460;
+  --chp-rule:#E3D8CF;--chp-row-hover:#F6EEE7;--chp-row-sel:#F3E8E0;--chp-line:#CDBFB5;
+  --chp-brand:#6F1713;--chp-on-brand:#FAF6F1;--chp-accent:#A8352C;--chp-good:#2F6B45;
+  --chp-pending:#B26B00;--chp-pending-text:#8A5300;--chp-new:#1F5A8C;--chp-control:#6A3D8F;
+  --chp-track:#E8DED5;--chp-toast:#2A1715;--chp-on-toast:#FAF6F1;
 }
 html[data-modo="oscuro"]{
-  --chp-bg:#150A0A;--chp-panel:#24100F;--chp-panel-alt:#1B0C0C;--chp-border:#3A1C1C;--chp-border-soft:#33191A;
-  --chp-text:#F3E7E1;--chp-soft:#C9AAA3;--chp-muted:#B99A93;--chp-accent:#E0736B;--chp-on-accent:#FFF3F0;
-  --chp-brand:#6F1713;--chp-on-brand:#F3E7E1;--chp-green:#6FBF8B;--chp-green-bg:#1D3A28;--chp-red-bg:#2E1212;
-  --chp-amber:#E0A96B;--chp-amber-bg:#3A2614;--chp-track:#33191A;--chp-field:#3A1D1C;--chp-field-border:#6B3533;
-  --chp-blue:#8DB8E0;--chp-blue-bg:#16283A;--chp-purple:#C5A3E0;--chp-purple-bg:#2A1A38;
-  --chp-backdrop:rgba(0,0,0,.6);
-  --sombra:0 1px 2px rgba(0,0,0,.3), 0 10px 30px -18px rgba(0,0,0,.75);
+  --chp-bg:#150A0A;--chp-panel:#1E0E0D;--chp-ink:#F3E9E4;--chp-soft:#D6C3BD;--chp-muted:#BFA9A3;
+  --chp-rule:#4A2A27;--chp-row-hover:#221110;--chp-row-sel:#2A1513;--chp-line:#5A3632;
+  --chp-brand:#E0736B;--chp-on-brand:#150A0A;--chp-accent:#E0736B;--chp-good:#7CCB98;
+  --chp-pending:#E0A84A;--chp-pending-text:#E0A84A;--chp-new:#7FB0E0;--chp-control:#B48BD6;
+  --chp-track:#3A201E;--chp-toast:#F3E9E4;--chp-on-toast:#150A0A;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
-body{background:var(--chp-bg);color:var(--chp-text);font-family:'Barlow',system-ui,sans-serif;font-size:14px;line-height:1.45}
-h1,h2,h3{font-family:'Barlow Condensed','Barlow',sans-serif;font-weight:600;margin:0;line-height:1.15}
+body{background:var(--chp-bg);color:var(--chp-ink);font-family:'Barlow',system-ui,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:'Barlow Condensed','Barlow',sans-serif;font-weight:600;margin:0;line-height:1}
 button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
 :focus-visible{outline:2px solid var(--chp-accent);outline-offset:2px}
-.marco{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100vh}
-.lateral{background:var(--chp-brand);color:var(--chp-on-brand);padding:22px 16px;display:flex;flex-direction:column;gap:22px;position:sticky;top:0;height:100vh}
-.marca{font-family:'Barlow Condensed',sans-serif;font-size:20px;font-weight:600;line-height:1.1}
-.marca small{display:block;font-family:'Barlow',sans-serif;font-size:10px;letter-spacing:.1em;opacity:.75}
-.nav{display:flex;flex-direction:column;gap:4px}
-.nav button{background:transparent;border:0;color:inherit;text-align:left;padding:9px 12px;border-radius:10px;cursor:pointer;opacity:.85}
-.nav button[aria-current="page"]{background:var(--chp-on-brand);color:var(--chp-brand);opacity:1;font-weight:600}
-.lateral label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
-.lateral select{display:block;width:100%;margin-top:6px;padding:8px;border-radius:8px;border:1px solid var(--chp-field-border);background:var(--chp-field);color:var(--chp-text)}
-.modo{margin-top:auto;background:transparent;border:1px solid var(--chp-on-brand);color:var(--chp-on-brand);border-radius:8px;padding:8px;cursor:pointer}
-main{padding:24px clamp(16px,3vw,36px);min-width:0}
-.vista[hidden]{display:none}
-.cabecera{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
-.cabecera h1{font-size:28px}
-.contador{display:flex;gap:10px;flex-wrap:wrap}
-.cifra{background:var(--chp-panel);border:1px solid var(--chp-border);border-radius:12px;padding:8px 14px;min-width:110px}
-.cifra b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:24px}
-.cifra span{font-size:12px;color:var(--chp-muted)}
-.filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
-.campo{padding:8px 10px;border-radius:8px;border:1px solid var(--chp-field-border);background:var(--chp-field);color:var(--chp-text)}
-.rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.tarjeta{background:var(--chp-panel);border:1px solid var(--chp-border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--sombra)}
-.tarjeta h3{font-size:19px;cursor:pointer;color:var(--chp-accent)}
-.dato{font-size:13px;color:var(--chp-soft)}
-.etiqueta{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--chp-amber-bg);color:var(--chp-amber)}
-.etiqueta.roja{background:var(--chp-red-bg);color:var(--chp-accent)}
-.etiqueta.verde{background:var(--chp-green-bg);color:var(--chp-green)}
-.etiqueta.nuevo{background:var(--chp-blue-bg);color:var(--chp-blue)}
-.etiqueta.control{background:var(--chp-purple-bg);color:var(--chp-purple)}
-.etiquetas{display:flex;flex-wrap:wrap;gap:6px}
-.pendiente{font-size:13px;background:var(--chp-amber-bg);color:var(--chp-text);border-radius:8px;padding:6px 10px}
-.resumen-rejilla{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:16px}
-.resumen-tarjeta{background:var(--chp-panel);border:1px solid var(--chp-border);border-radius:16px;padding:16px;box-shadow:var(--sombra);display:flex;flex-direction:column;gap:6px}
-.resumen-tarjeta h3{font-size:16px;color:var(--chp-soft)}
-.resumen-tarjeta .grande{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:700;line-height:1;color:var(--chp-accent)}
-.resumen-tarjeta.buena .grande{color:var(--chp-green)}
-.tel{display:flex;gap:8px;align-items:center;font-family:ui-monospace,monospace;font-size:15px}
-.acciones{display:flex;gap:8px;margin-top:auto;flex-wrap:wrap}
-.btn{border:1px solid var(--chp-border);background:var(--chp-panel-alt);border-radius:10px;padding:8px 12px;cursor:pointer}
-.btn.primario{background:var(--chp-accent);color:var(--chp-on-accent);border-color:var(--chp-accent);font-weight:600}
-.btn.chico{padding:2px 8px;font-size:12px}
-.btn:disabled{opacity:.5;cursor:wait}
-.nota{width:100%;min-height:54px;resize:vertical}
-.vacio{padding:40px;text-align:center;color:var(--chp-muted)}
-.aviso{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--chp-text);color:var(--chp-bg);padding:10px 16px;border-radius:10px;z-index:10;max-width:calc(100% - 32px)}
-.aviso[hidden]{display:none}
-.panel{background:var(--chp-panel);border:1px solid var(--chp-border);border-radius:16px;padding:16px;margin-bottom:16px;overflow-x:auto}
-.panel h2{font-size:20px;margin-bottom:10px}
-.sub{font-size:16px;margin:14px 0 6px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--chp-border-soft);vertical-align:top}
-th{color:var(--chp-muted);font-weight:600}
-.num{text-align:right;font-variant-numeric:tabular-nums}
-.linea{list-style:none;padding:0;margin:0;border-left:2px solid var(--chp-border)}
-.linea li{padding:2px 0 10px 14px;position:relative}
-.linea li::before{content:'';position:absolute;left:-6px;top:6px;width:10px;height:10px;border-radius:50%;background:var(--chp-accent)}
-.linea li.esperada::before{background:var(--chp-panel);border:2px dashed var(--chp-accent)}
-.barra{height:8px;border-radius:4px;background:var(--chp-track);overflow:hidden;min-width:80px;margin-top:4px}
-.barra i{display:block;height:100%;background:var(--chp-accent)}
-dialog{border:1px solid var(--chp-border);border-radius:16px;background:var(--chp-panel);color:var(--chp-text);max-width:420px;width:calc(100% - 32px)}
-dialog::backdrop{background:var(--chp-backdrop)}
-dialog form{display:flex;flex-direction:column;gap:12px}
-dialog label{display:flex;flex-direction:column;gap:4px}
-@media (max-width:760px){
-  .marco{grid-template-columns:1fr}
-  .lateral{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center}
-  .nav{flex-direction:row;flex-wrap:wrap}
-  .modo{margin-top:0}
+[hidden]{display:none!important}
+.muted{color:var(--chp-muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* Botones: radio 2 px, sin sombras. */
+.btn-marca{background:var(--chp-brand);border:1px solid var(--chp-brand);color:var(--chp-on-brand);font-weight:600;border-radius:2px;padding:7px 14px}
+.btn-marca:hover{background:var(--chp-accent);border-color:var(--chp-accent)}
+.btn-linea{background:transparent;border:1px solid var(--chp-line);border-radius:2px;padding:7px 14px;font-weight:600}
+.btn-texto{background:none;border:0;padding:0;color:var(--chp-muted)}
+.sel{background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-weight:600;padding:2px 2px 3px;border-radius:0}
+.sel option{background:var(--chp-panel);color:var(--chp-ink)}
+
+/* ---------- Barra superior ---------- */
+.app{padding:32px 64px 0}
+.barra{display:flex;align-items:baseline;gap:32px;flex-wrap:wrap}
+.marca{display:flex;align-items:baseline;gap:12px}
+.marca b{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;color:var(--chp-brand)}
+.marca span{font-size:12px;letter-spacing:.08em;color:var(--chp-muted);text-transform:uppercase}
+.nav{display:flex;gap:28px}
+.nav button{background:none;border:0;padding:0 0 4px;font-size:15px;color:var(--chp-soft);border-bottom:2px solid transparent}
+.nav button[aria-current="page"]{font-weight:600;color:var(--chp-brand);border-bottom-color:var(--chp-brand)}
+.quien{margin-left:auto;display:flex;align-items:baseline;gap:10px;font-size:14px}
+.quien .sel{font-size:15px;max-width:210px}
+.modo{font-size:13px}
+
+/* ---------- Encabezado de cada vista ---------- */
+.cabeza{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap;margin-top:36px}
+.titulo{font-size:68px;line-height:.9}
+.fecha{font-size:16px;color:var(--chp-muted);margin-top:10px}
+.contadores{display:flex;gap:40px}
+.contador b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:64px;font-weight:600;line-height:.85}
+.contador span{font-size:13px;color:var(--chp-soft)}
+.contador.atender b{color:var(--chp-accent)}
+.contador.recuperados b{color:var(--chp-good)}
+.filtros{display:flex;flex-wrap:wrap;gap:24px;align-items:baseline;margin-top:28px;padding-bottom:12px;border-bottom:1px solid var(--chp-ink);font-size:14px}
+.filtros label{display:flex;gap:8px;align-items:baseline;color:var(--chp-muted)}
+.filtros input[type=checkbox]{accent-color:var(--chp-brand)}
+.filtros .sel{color:var(--chp-ink);max-width:100%;min-width:0;text-overflow:ellipsis}
+.filtros label{min-width:0;max-width:100%}
+.sel{max-width:100%}
+.atajos{margin-left:auto;color:var(--chp-muted)}
+.atajos b{color:var(--chp-ink)}
+
+/* ---------- Bandeja: lista + panel ---------- */
+.cuerpo{display:flex;align-items:stretch}
+#lista{flex:1;min-width:0;padding-right:40px;overflow-x:hidden}
+.grupo{display:flex;align-items:baseline;gap:16px;padding:24px 0 8px;border-bottom:1px solid var(--chp-rule)}
+.grupo h2{font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--chp-brand)}
+.grupo span{font-size:14px;color:var(--chp-muted)}
+.fila{display:flex;align-items:center;gap:16px;padding:14px 12px;border-bottom:1px solid var(--chp-rule);cursor:pointer}
+.fila:hover{background:var(--chp-row-hover)}
+.fila.sel-fila,.fila.abierta{background:var(--chp-row-sel)}
+.marcas{width:14px;flex:0 0 14px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.m{display:block}
+.m.nuevo{width:10px;height:10px;border-radius:50%;background:var(--chp-new)}
+.m.control{width:10px;height:10px;background:var(--chp-control)}
+.m.pend{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--chp-pending)}
+.texto{flex:1;min-width:0}
+.nombre{display:block;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.linea{display:block;font-size:13px;color:var(--chp-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hace{color:var(--chp-accent)}
+.tel{width:170px;flex:0 0 170px}
+.cuerpo.con-panel .tel{display:none}
+.copiar-fila{background:none;border:0;padding:0;text-align:left}
+.copiar-fila .n{font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.copiar-fila small{display:block;font-size:12px;font-weight:600;color:var(--chp-accent)}
+.sin-tel{font-size:14px;font-weight:600;color:var(--chp-accent)}
+.chev{color:var(--chp-muted);font-size:18px}
+.vacio-grande{padding:60px 0}
+.vacio-grande b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:600}
+.fantasma{height:72px;border-bottom:1px solid var(--chp-rule);background:linear-gradient(90deg,var(--chp-row-hover),var(--chp-bg),var(--chp-row-hover));background-size:200% 100%;animation:brillo 1.4s linear infinite}
+@keyframes brillo{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.fantasma{animation:none}}
+
+#panel{width:460px;flex:0 0 460px;border-left:1px solid var(--chp-ink);background:var(--chp-panel);padding:28px 40px 28px 36px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;max-height:calc(100vh - 40px);position:sticky;top:0}
+.p-cab{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;letter-spacing:.1em;color:var(--chp-muted)}
+.p-cab .cerrar{font-size:14px;letter-spacing:0}
+#panel h2{font-size:38px;margin-bottom:8px}
+.p-tipo{display:flex;gap:10px;align-items:center;font-size:15px}
+.p-fechas{border-top:1px solid var(--chp-rule);padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}
+.p-fechas small{display:block;font-size:12px;color:var(--chp-muted)}
+.p-fechas .v{font-size:17px}
+.p-hace{grid-column:1/-1;font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:600;color:var(--chp-accent);margin-top:6px}
+.p-pend{display:flex;gap:10px;align-items:baseline;font-size:15px;color:var(--chp-pending-text)}
+.p-tels{border-top:1px solid var(--chp-rule);padding-top:16px}
+.p-tels>small{font-size:12px;color:var(--chp-muted)}
+.p-tel{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.p-tel .n{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}
+.p-tel .btn-linea{color:var(--chp-accent)}
+.p-sintel{color:var(--chp-brand)}
+.p-prev{font-size:14px;font-style:italic;color:var(--chp-muted)}
+#nota{width:100%;min-height:64px;background:transparent;border:0;border-bottom:1px solid var(--chp-ink);resize:vertical;padding:6px 0}
+.p-acciones{display:flex;gap:10px}
+.p-acciones .btn-marca{flex:1;font-size:16px;padding:13px}
+.p-acciones .btn-linea{font-weight:500;padding:13px 18px}
+.p-acciones kbd,.btn-marca kbd{font-family:inherit;opacity:.6;margin-left:6px}
+.motivos{display:flex;flex-direction:column}
+.motivos>small{font-size:12px;color:var(--chp-muted);margin-bottom:4px}
+.motivos button{background:none;border:0;border-bottom:1px solid var(--chp-rule);text-align:left;padding:10px 0;font-size:15px}
+.motivos button:hover{color:var(--chp-accent)}
+.p-ficha{margin-top:auto;color:var(--chp-accent);text-decoration:underline;background:none;border:0;padding:0;text-align:left}
+
+/* ---------- Resumen (propuesta 1b) ---------- */
+.resumen{max-width:760px;margin-top:28px}
+.r-nav{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid var(--chp-rule)}
+.r-nav button{background:none;border:0;padding:0;color:var(--chp-muted);font-size:16px;min-width:80px}
+.r-nav button:last-child{text-align:right}
+.r-nav button:disabled{visibility:hidden}
+#r-mes-actual{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:600}
+.r-medico{margin-top:14px;font-size:14px;color:var(--chp-muted);display:flex;gap:10px;align-items:baseline}
+.r-medico .sel{color:var(--chp-ink);min-width:0;flex:0 1 auto;text-overflow:ellipsis}
+.r-grande{font-family:'Barlow Condensed',sans-serif;font-size:128px;font-weight:600;line-height:.9;color:var(--chp-accent);margin-top:24px}
+.r-frase{font-size:22px;margin:10px 0 6px;max-width:560px}
+.r-desglose{color:var(--chp-muted);margin:0}
+.r-nota{font-style:italic;color:var(--chp-muted);margin:6px 0 0}
+.r-filas{margin-top:22px;border-top:1px solid var(--chp-rule)}
+.r-fila{display:flex;gap:28px;align-items:center;padding:16px 0;border-bottom:1px solid var(--chp-rule)}
+.r-num{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:600;width:120px;flex:0 0 120px}
+.r-num.pend{color:var(--chp-pending)}
+.r-num.buena{color:var(--chp-good)}
+.r-etq{display:block;font-size:17px}
+.r-sub{display:block;color:var(--chp-muted)}
+.mm{margin-top:28px}
+.mm>small{display:block;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--chp-muted);margin-bottom:10px}
+.mm-fila{display:grid;grid-template-columns:110px 1fr 56px;gap:16px;align-items:center;padding:5px 0}
+.mm-barra{height:4px;background:var(--chp-track);position:relative}
+.mm-barra i{position:absolute;left:0;top:0;bottom:0;background:var(--chp-accent)}
+.mm-barra.curso i{background:repeating-linear-gradient(90deg,var(--chp-accent) 0 6px,transparent 6px 11px)}
+.mm-pct{text-align:right;font-weight:600}
+.mm-nota{font-style:italic;color:var(--chp-muted);margin:8px 0 0}
+
+/* ---------- Ficha y Detalle ---------- */
+.vista-sub{margin-top:28px}
+.buscador{width:100%;max-width:520px;background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-size:20px;padding:6px 0}
+.resultados{display:flex;flex-direction:column;margin-top:12px;max-width:620px}
+.resultados button{background:none;border:0;border-bottom:1px solid var(--chp-rule);text-align:left;padding:12px 0;font-size:16px}
+.resultados button:hover{color:var(--chp-accent)}
+.seccion{border-top:1px solid var(--chp-ink);padding:18px 0 24px;overflow-x:auto}
+.seccion h2{font-size:24px;margin-bottom:8px}
+.seccion h3{font-size:18px;margin:16px 0 6px}
+.seccion p{margin:4px 0 10px}
+.ficha-cab{margin:28px 0 18px}
+.ficha-cab h1{font-size:48px}
+.estado{font-size:13px;font-weight:600;margin-left:10px;font-family:'Barlow',sans-serif}
+.estado.mal{color:var(--chp-accent)}
+.estado.bien{color:var(--chp-good)}
+.tipo-caso{display:flex;gap:10px;align-items:center;margin:4px 0}
+.confirmar{border-top:2px solid var(--chp-accent)}
+.confirmar .opciones{display:flex;flex-wrap:wrap;gap:10px}
+.linea-tiempo{list-style:none;padding:0;margin:10px 0 0 6px;border-left:1px solid var(--chp-ink)}
+.linea-tiempo li{padding:2px 0 10px 16px;position:relative}
+.linea-tiempo li::before{content:'';position:absolute;left:-5px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--chp-ink)}
+.linea-tiempo li.esperada::before{background:var(--chp-bg);border:1px dashed var(--chp-accent)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--chp-rule);vertical-align:top}
+th{color:var(--chp-muted);font-weight:500;font-size:13px}
+td.n,th.n{text-align:right}
+.barra-p{height:4px;background:var(--chp-track);margin-top:5px;min-width:70px}
+.barra-p i{display:block;height:100%;background:var(--chp-accent)}
+
+.aviso{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--chp-toast);color:var(--chp-on-toast);padding:10px 18px;border-radius:2px;z-index:30;max-width:calc(100% - 32px)}
+
+/* ---------- Laptops: la barra superior en una sola línea ---------- */
+@media (max-width:1439px){
+  .marca span{display:none}
+  .barra{gap:24px}
+  .nav{gap:20px}
+}
+@media (max-width:1180px){
+  .app{padding:24px 32px 0}
+  #lista{padding-right:24px}
+  #panel{width:400px;flex-basis:400px;padding:24px 24px 24px 28px}
+}
+
+/* ---------- Celular ---------- */
+@media (max-width:767px){
+  .app{padding:16px 16px 0}
+  .barra{gap:12px 20px}
+  .marca span{display:none}
+  .nav{gap:16px;overflow-x:auto;width:100%;font-size:14px}
+  .nav button{white-space:nowrap;font-size:14px}
+  .quien{margin-left:0;width:100%;justify-content:space-between;flex-wrap:nowrap}
+  .quien label{white-space:nowrap}
+  .quien .sel{min-width:0;flex:1 1 auto}
+  .modo{white-space:nowrap}
+  .titulo{font-size:44px}
+  .cabeza{margin-top:20px;gap:16px}
+  .contadores{gap:24px;width:100%}
+  .contador b{font-size:44px}
+  .atajos{display:none}
+  #lista{padding-right:0}
+  .tel,.chev{display:none}
+  .fila{padding:12px 4px}
+  .nombre,.linea{white-space:normal}
+  kbd{display:none}
+  .fila .hecho{min-height:44px}
+  #panel{position:fixed;inset:0;width:auto;max-height:none;border-left:0;z-index:20;padding:20px 16px 28px}
+  .p-acciones .btn-marca,.p-acciones .btn-linea,.motivos button,.p-tel .btn-linea{min-height:44px}
+  .r-grande{font-size:96px}
+  .r-fila{gap:16px}
+  .r-num{font-size:36px;width:90px;flex-basis:90px}
+  .mm-fila{grid-template-columns:84px 1fr 44px;gap:10px}
+  .ficha-cab h1{font-size:34px}
 }
 </style>
 </head>
 <body>
-<div class="marco">
-  <aside class="lateral">
-    <div class="marca">Seguimientos<small>CENTRO HEMATOLÓGICO DEL PERÚ</small></div>
+<div class="app">
+  <header class="barra">
+    <div class="marca"><b>Seguimientos</b><span>Centro Hematológico del Perú</span></div>
     <nav class="nav">
       <button type="button" data-vista="resumen">Resumen</button>
       <button type="button" data-vista="bandeja" aria-current="page">Bandeja</button>
       <button type="button" data-vista="ficha">Buscar paciente</button>
       <button type="button" data-vista="tablero">Detalle</button>
     </nav>
-    <div>
-      <label for="usuario">¿Quién es usted?</label>
-      <select id="usuario"><option value="">— Elija —</option></select>
+    <div class="quien">
+      <label for="usuario" class="muted">¿Quién es usted?</label>
+      <select id="usuario" class="sel"><option value="">— Elija —</option></select>
+      <button type="button" id="modo" class="btn-texto modo">Modo oscuro</button>
     </div>
-    <button class="modo" id="modo" type="button">Modo oscuro</button>
-  </aside>
+  </header>
+
   <main>
     <section class="vista" id="v-resumen" hidden>
-      <div class="cabecera"><h1>Resumen del mes</h1></div>
-      <div id="resumen"></div>
+      <div class="resumen" id="resumen"></div>
     </section>
+
     <section class="vista" id="v-bandeja">
-      <div class="cabecera"><h1>Bandeja del día</h1><div class="contador" id="contador"></div></div>
-      <div class="filtros">
-        <select id="f-esp" class="campo"><option value="">Todas las especialidades</option></select>
-        <select id="f-med" class="campo"><option value="">Todos los médicos</option></select>
-        <label><input type="checkbox" id="f-sintel"> Solo sin teléfono</label>
+      <div class="cabeza">
+        <div><h1 class="titulo">Bandeja del día</h1><div class="fecha" id="fecha"></div></div>
+        <div class="contadores">
+          <div class="contador atender"><b id="c-atender" class="num">–</b><span>por atender</span></div>
+          <div class="contador"><b id="c-hechos" class="num">–</b><span>hechos hoy</span></div>
+          <div class="contador recuperados"><b id="c-recuperados" class="num">–</b><span>recuperados</span></div>
+        </div>
       </div>
-      <div class="rejilla" id="tarjetas"></div>
+      <div class="filtros">
+        <label>Especialidad <select id="f-esp" class="sel"><option value="">Todas</option></select></label>
+        <label>Médico <select id="f-med" class="sel"><option value="">Todos</option></select></label>
+        <label><input type="checkbox" id="f-sintel"> Solo sin teléfono</label>
+        <span class="atajos">↑ ↓ · <b>Enter</b> abrir · <b>C</b> copiar · <b>H</b> hecho · <b>D</b> descartar</span>
+      </div>
+      <div class="cuerpo" id="cuerpo">
+        <div id="lista" aria-live="polite"></div>
+        <aside id="panel" hidden></aside>
+      </div>
     </section>
+
     <section class="vista" id="v-ficha" hidden>
-      <div class="cabecera"><h1>Buscar paciente</h1></div>
-      <div class="filtros"><input id="q" class="campo" placeholder="DNI o nombre (mínimo 3 letras)" autocomplete="off"></div>
-      <div id="resultados"></div>
-      <div id="ficha"></div>
+      <div class="cabeza"><h1 class="titulo">Buscar paciente</h1></div>
+      <div class="vista-sub">
+        <input id="q" class="buscador" placeholder="DNI o nombre (mínimo 3 letras)" autocomplete="off">
+        <div id="resultados" class="resultados"></div>
+        <div id="ficha"></div>
+      </div>
     </section>
+
     <section class="vista" id="v-tablero" hidden>
-      <div class="cabecera"><h1>Detalle de conversión</h1></div>
-      <div id="tablero"></div>
+      <div class="cabeza"><h1 class="titulo">Detalle</h1></div>
+      <div class="vista-sub" id="tablero"></div>
     </section>
   </main>
 </div>
-
-<dialog id="dlg-descartar">
-  <form method="dialog">
-    <h2>Descartar paciente</h2>
-    <p id="dlg-nombre" class="dato"></p>
-    <label>Motivo <select id="dlg-motivo" class="campo" required><option value="">— Elija —</option></select></label>
-    <label>Nota <textarea id="dlg-nota" class="campo nota"></textarea></label>
-    <div class="acciones">
-      <button class="btn" value="cancelar" formnovalidate>Cancelar</button>
-      <button class="btn primario" value="ok">Descartar</button>
-    </div>
-  </form>
-</dialog>
 <div class="aviso" id="aviso" role="status" hidden></div>
 
 <script>
@@ -179,7 +314,10 @@ function llamar(fn, ...args) {
   return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(x)));
 }
 
-const E = { boot: null, bandeja: null, fichaDni: '', kpi: null, resumen: null, rMed: null, rMes: '' };
+const E = {
+  boot: null, bandeja: null, error: '', fichaDni: '', kpi: null, resumen: null, rMed: null, rMes: '',
+  sel: '', abierto: '', descartando: false
+};
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
@@ -191,6 +329,8 @@ function fechaCorta(iso) {
 }
 
 const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+const DIAS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+function mesSolo(ym) { return MESES_ES[Number(String(ym).split('-')[1]) - 1] || String(ym || ''); }
 function nombreMes(ym) {
   const [a, m] = String(ym || '').split('-');
   return MESES_ES[Number(m) - 1] ? MESES_ES[Number(m) - 1] + ' ' + a : String(ym || '');
@@ -200,6 +340,11 @@ function diasDesde(desde, hasta) {
   return Math.round((d(hasta) - d(desde)) / 86400000);
 }
 const hoy = () => (E.boot && E.boot.hoy) || new Date().toISOString().slice(0, 10);
+function fechaLarga(iso) {
+  const [a, m, d] = iso.split('-').map(Number);
+  return DIAS_ES[new Date(Date.UTC(a, m - 1, d)).getUTCDay()] + ' ' + fechaCorta(iso);
+}
+const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
 
 /** «DR. ELI CABANILLAS» -> el médico de la lista cuyo nombre contiene ELI y CABANILLAS. '' si el usuario no es médico. */
 function medicoDeUsuario(u, medicos) {
@@ -207,6 +352,19 @@ function medicoDeUsuario(u, medicos) {
   if (!t.length || (t[0] !== 'DR' && t[0] !== 'DRA')) return '';
   const resto = t.slice(1);
   return (medicos || []).find(m => { const n = norm(m); return resto.every(x => n.includes(x)); }) || '';
+}
+
+/** 'Dra. ALEJANDRA LA TORRE MATUK' -> 'Dra. La Torre'; 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA' -> 'Dr. Cabanillas'. */
+function medicoCorto(m) {
+  const p = String(m || '').trim().split(/\s+/);
+  if (p.length < 3) return String(m || '');
+  const titulo = /^dra?\.?$/i.test(p[0]) ? p[0] : '';
+  const nombres = titulo ? p.slice(1) : p;
+  let i = Math.max(0, nombres.length - 2);
+  const apellido = [nombres[i]];
+  while (i > 0 && /^(LA|DE|DEL|LOS|LAS)$/i.test(nombres[i - 1])) apellido.unshift(nombres[--i]);
+  const bonito = apellido.map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+  return (titulo ? titulo + ' ' : '') + bonito;
 }
 
 function avisar(texto) {
@@ -228,7 +386,7 @@ function usuario() { return $('#usuario').value; }
 
 function exigirUsuario() {
   if (usuario()) return true;
-  avisar('Elija quién es usted en el selector de la izquierda.');
+  avisar('Elija quién es usted en el selector de arriba.');
   $('#usuario').focus();
   return false;
 }
@@ -247,116 +405,263 @@ function irA(vista) {
   if (vista === 'resumen') cargarResumen();
 }
 
+/**
+ * Copia al portapapeles. En la app de Apps Script la página vive dentro de un
+ * iframe que a veces bloquea navigator.clipboard: por eso el plan B.
+ */
+async function copiarTexto(texto) {
+  try {
+    if (navigator.clipboard) { await navigator.clipboard.writeText(texto); return true; }
+  } catch (e) { /* se intenta el plan B */ }
+  const t = document.createElement('textarea');
+  t.value = texto;
+  t.setAttribute('readonly', '');
+  t.style.position = 'fixed';
+  t.style.opacity = '0';
+  document.body.appendChild(t);
+  t.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  t.remove();
+  return ok;
+}
+
+async function copiarDesde(boton, numero) {
+  const ok = await copiarTexto(numero);
+  if (!ok) { avisar('No se pudo copiar. El número es ' + numero); return; }
+  const destino = boton.querySelector('small') || boton;
+  const antes = destino.textContent;
+  destino.textContent = 'Copiado ✓';
+  setTimeout(() => { destino.textContent = antes; }, 1500);
+}
+
 /* ==========================================================================
-   BANDEJA
+   BANDEJA — lista agrupada por urgencia + panel lateral.
+   El orden viene del servidor: primeros intentos, con procedimiento pendiente,
+   menos días sin volver. Dentro de cada grupo se respeta.
    ========================================================================== */
+const GRUPOS = [
+  { titulo: 'Recientes', sub: 'debían volver hace 30 días o menos', hasta: 30 },
+  { titulo: 'Hace 1 a 2 meses', sub: 'debían volver hace 31 a 60 días', hasta: 60 },
+  { titulo: 'Más antiguos', sub: 'debían volver hace más de 60 días', hasta: Infinity }
+];
+const clave = t => t.DNI + '|' + t.ESPECIALIDAD;
+const diasSinVolver = t => Math.max(0, diasDesde(t.PROXIMA_ESPERADA, hoy()));
+const esNuevo = t => (Number(t.N_REALIZADAS) || 1) <= 1;
+
+function marcas(t) {
+  return (esNuevo(t) ? '<i class="m nuevo" title="Paciente nuevo"></i>' : '<i class="m control" title="En control"></i>') +
+    (t.PENDIENTE ? '<i class="m pend" title="Procedimiento pendiente"></i>' : '');
+}
+
+function textoTipo(t) {
+  const n = Number(t.N_REALIZADAS) || 1;
+  return n <= 1 ? 'Paciente nuevo · no volvió a su 1.ª reevaluación' : `En control · faltó a su ${n}.ª reevaluación`;
+}
+
+function visibles() {
+  if (!E.bandeja) return [];
+  const fe = $('#f-esp').value, fm = $('#f-med').value, sinTel = $('#f-sintel').checked;
+  return E.bandeja.tarjetas.filter(t =>
+    (!fe || t.ESPECIALIDAD === fe) && (!fm || t.MEDICO_ULTIMO === fm) && (!sinTel || !t.TELEFONOS));
+}
+
 async function cargarBandeja() {
-  $('#tarjetas').innerHTML = '<div class="vacio">Cargando…</div>';
+  E.error = '';
+  $('#lista').innerHTML = '<div class="fantasma"></div>'.repeat(6);
   try {
     E.bandeja = await llamar('getBandeja');
-    pintarBandeja();
   } catch (e) {
-    $('#tarjetas').innerHTML = `<div class="vacio">No se pudo cargar la bandeja: ${esc(e.message)}</div>`;
+    E.bandeja = null;
+    E.error = e.message;
   }
-}
-
-function pintarBandeja() {
-  if (!E.bandeja) return;
-  const c = E.bandeja.contador;
-  $('#contador').innerHTML = [['Por atender', c.porAtender], ['Seguimientos hoy', c.hechosHoy], ['Recuperados este mes', c.recuperadosMes]]
-    .map(([t, n]) => `<div class="cifra"><b>${n}</b><span>${t}</span></div>`).join('');
-  const fe = $('#f-esp').value, fm = $('#f-med').value, sinTel = $('#f-sintel').checked;
-  const lista = E.bandeja.tarjetas.filter(t =>
-    (!fe || t.ESPECIALIDAD === fe) && (!fm || t.MEDICO_ULTIMO === fm) && (!sinTel || !t.TELEFONOS));
-  $('#tarjetas').innerHTML = lista.length
-    ? lista.map(tarjetaHtml).join('')
-    : '<div class="vacio">No hay pacientes por atender con estos filtros.</div>';
-}
-
-/** Qué se perdió: la 1.ª reevaluación de un paciente nuevo, o la siguiente de uno en control. */
-function etiquetaTipo(t) {
-  const n = Number(t.N_REALIZADAS) || 1;
-  return n <= 1
-    ? '<span class="etiqueta nuevo">Paciente nuevo · no volvió a su 1.ª reevaluación</span>'
-    : `<span class="etiqueta control">En control · faltó a su ${n}.ª reevaluación</span>`;
-}
-
-function tarjetaHtml(t) {
-  const tels = String(t.TELEFONOS || '').split(' / ').filter(Boolean);
-  return `<article class="tarjeta" data-dni="${esc(t.DNI)}" data-esp="${esc(t.ESPECIALIDAD)}">
-    <h3 data-abrir="${esc(t.DNI)}">${esc(t.NOMBRE)}</h3>
-    <div class="etiquetas">${etiquetaTipo(t)}${t.PENDIENTE ? '<span class="etiqueta">Procedimiento pendiente</span>' : ''}</div>
-    <div class="dato">DNI ${esc(t.DNI)} · ${esc(t.ESPECIALIDAD)} · ${esc(t.MEDICO_ULTIMO)}</div>
-    <div>${tels.length
-      ? tels.map(n => `<div class="tel">${esc(n)} <button type="button" class="btn chico" data-copiar="${esc(n)}">Copiar</button></div>`).join('')
-      : '<span class="etiqueta roja">Sin teléfono</span>'}</div>
-    <div class="dato">Última consulta ${fechaCorta(t.ULTIMA_CITA)} · <b>Debía volver el ${fechaCorta(t.PROXIMA_ESPERADA)}</b> · hace ${Math.max(0, diasDesde(t.PROXIMA_ESPERADA, hoy()))} días que no vuelve</div>
-    ${t.PENDIENTE ? `<div class="pendiente"><b>Procedimiento pendiente:</b> ${esc(t.PENDIENTE)}</div>` : ''}
-    ${t.N_SEGUIMIENTOS ? `<div class="dato">Ya se le escribió ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
-    <textarea class="campo nota" placeholder="Nota (opcional)"></textarea>
-    <div class="acciones">
-      <button type="button" class="btn primario hecho">Seguimiento hecho</button>
-      <button type="button" class="btn descartar">Descartar</button>
-    </div>
-  </article>`;
-}
-
-function quitarTarjeta(t, hecho) {
-  E.bandeja.tarjetas = E.bandeja.tarjetas.filter(x => x !== t);
-  E.bandeja.contador.porAtender--;
-  if (hecho) E.bandeja.contador.hechosHoy++;
-  E.resumen = null;
-  E.kpi = null;
   pintarBandeja();
 }
 
-function copiar(numero) {
-  const hecho = () => avisar('Copiado: ' + numero);
-  if (navigator.clipboard) navigator.clipboard.writeText(numero).then(hecho, () => avisar(numero));
-  else avisar(numero);
+function filaHtml(t) {
+  const k = clave(t);
+  const tel = String(t.TELEFONOS || '').split(' / ').filter(Boolean)[0];
+  const clases = ['fila', k === E.sel ? 'sel-fila' : '', k === E.abierto ? 'abierta' : ''].join(' ');
+  return `<div class="${clases}" data-k="${esc(k)}">
+    <span class="marcas">${marcas(t)}</span>
+    <span class="texto">
+      <span class="nombre">${esc(t.NOMBRE)}</span>
+      <span class="linea">${esNuevo(t) ? 'Nuevo' : 'En control'} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Debía volver el ${fechaCorta(t.PROXIMA_ESPERADA)} · <span class="hace">hace ${diasSinVolver(t)} días</span></span>
+    </span>
+    <span class="tel">${tel
+      ? `<button type="button" class="copiar-fila" data-copiar="${esc(tel)}"><span class="n">${esc(tel)}</span><small>Copiar</small></button>`
+      : '<span class="sin-tel">Sin teléfono</span>'}</span>
+    <button type="button" class="btn-marca hecho">Hecho</button>
+    <span class="chev" aria-hidden="true">›</span>
+  </div>`;
 }
 
-$('#tarjetas').addEventListener('click', async ev => {
-  const b = ev.target.closest('button, [data-abrir]');
-  if (!b) return;
-  if (b.dataset.copiar) { copiar(b.dataset.copiar); return; }
-  if (b.dataset.abrir) { abrirFicha(b.dataset.abrir); return; }
-  const card = b.closest('.tarjeta');
-  const t = E.bandeja.tarjetas.find(x => x.DNI === card.dataset.dni && x.ESPECIALIDAD === card.dataset.esp);
-  if (!t || !exigirUsuario()) return;
-  if (b.classList.contains('hecho')) {
-    b.disabled = true;
-    try {
-      await llamar('marcarSeguimiento', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, nota: card.querySelector('textarea').value });
-      quitarTarjeta(t, true);
-      avisar('Seguimiento registrado: ' + t.NOMBRE);
-    } catch (e) {
-      b.disabled = false;
-      avisar(e.message);
-    }
+function pintarBandeja() {
+  $('#fecha').textContent = fechaLarga(hoy());
+  if (E.error) {
+    $('#lista').innerHTML = `<p class="hace">No se pudo cargar la bandeja. ${esc(E.error)}</p><button type="button" class="btn-texto" id="reintentar">Reintentar</button>`;
+    $('#panel').hidden = true;
+    return;
   }
-  if (b.classList.contains('descartar')) abrirDescarte(t);
+  if (!E.bandeja) return;
+  const c = E.bandeja.contador;
+  $('#c-atender').textContent = c.porAtender;
+  $('#c-hechos').textContent = c.hechosHoy;
+  $('#c-recuperados').textContent = c.recuperadosMes;
+
+  const lista = visibles();
+  const claves = lista.map(clave);
+  if (!claves.includes(E.sel)) E.sel = claves[0] || '';
+  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.descartando = false; }
+
+  if (!lista.length) {
+    $('#lista').innerHTML = '<div class="vacio-grande"><b>Bandeja vacía.</b>No queda nadie a quien escribir hoy.</div>';
+  } else {
+    let desde = -1;
+    $('#lista').innerHTML = GRUPOS.map(g => {
+      const del = lista.filter(t => { const d = diasSinVolver(t); return d > desde && d <= g.hasta; });
+      desde = g.hasta;
+      if (!del.length) return '';
+      return `<div class="grupo"><h2>${g.titulo}</h2><span>${g.sub} · ${del.length} ${del.length === 1 ? 'paciente' : 'pacientes'}</span></div>` +
+        del.map(filaHtml).join('');
+    }).join('');
+  }
+  $('#cuerpo').classList.toggle('con-panel', !!E.abierto);
+  pintarPanel();
+}
+
+function pacienteDe(k) { return E.bandeja && E.bandeja.tarjetas.find(t => clave(t) === k); }
+
+function pintarPanel() {
+  const t = E.abierto && pacienteDe(E.abierto);
+  const panel = $('#panel');
+  if (!t) { panel.hidden = true; panel.innerHTML = ''; return; }
+  const tels = String(t.TELEFONOS || '').split(' / ').filter(Boolean);
+  const celular = matchMedia('(max-width:767px)').matches;
+  const motivos = (E.boot ? E.boot.motivos : []);
+  panel.innerHTML = `
+    <div class="p-cab"><span>PACIENTE</span><button type="button" class="btn-texto cerrar">${celular ? '‹ Volver' : 'Cerrar  Esc'}</button></div>
+    <div>
+      <h2>${esc(t.NOMBRE)}</h2>
+      <div class="muted">DNI ${esc(t.DNI)} · ${esc(t.ESPECIALIDAD)}</div>
+      <div class="muted">${esc(t.MEDICO_ULTIMO)}</div>
+    </div>
+    <div class="p-tipo"><span class="marcas">${esNuevo(t) ? '<i class="m nuevo"></i>' : '<i class="m control"></i>'}</span>${textoTipo(t)}</div>
+    <div class="p-fechas">
+      <div><small>Última consulta</small><span class="v">${fechaCorta(t.ULTIMA_CITA)}</span></div>
+      <div><small>Debía volver el</small><span class="v"><b>${fechaCorta(t.PROXIMA_ESPERADA)}</b></span></div>
+      <div class="p-hace">hace ${diasSinVolver(t)} días que no vuelve</div>
+    </div>
+    ${t.PENDIENTE ? `<div class="p-pend"><span class="marcas"><i class="m pend"></i></span><span><b>Procedimiento pendiente.</b> ${esc(t.PENDIENTE)}</span></div>` : ''}
+    <div class="p-tels"><small>Teléfonos</small>
+      ${tels.length
+        ? tels.map(n => `<div class="p-tel"><span class="n">${esc(n)}</span><button type="button" class="btn-linea" data-copiar="${esc(n)}">Copiar</button></div>`).join('')
+        : '<p class="p-sintel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}
+    </div>
+    ${t.N_SEGUIMIENTOS ? `<div class="p-prev">Ya se le escribió ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
+    <textarea id="nota" placeholder="Nota (opcional)"></textarea>
+    <div class="p-acciones">
+      <button type="button" class="btn-marca" id="p-hecho">Seguimiento hecho<kbd>H</kbd></button>
+      <button type="button" class="btn-linea" id="p-descartar">Descartar<kbd>D</kbd></button>
+    </div>
+    ${E.descartando ? `<div class="motivos"><small>Motivo (obligatorio)</small>${motivos.map(m => `<button type="button" data-motivo="${esc(m)}">${esc(m.charAt(0) + m.slice(1).toLowerCase())}</button>`).join('')}</div>` : ''}
+    <button type="button" class="p-ficha" id="p-ficha">Ver ficha completa →</button>`;
+  panel.hidden = false;
+}
+
+function abrir(k) { E.sel = k; E.abierto = k; E.descartando = false; pintarBandeja(); }
+function cerrar() { E.abierto = ''; E.descartando = false; pintarBandeja(); }
+
+function mover(paso) {
+  const claves = visibles().map(clave);
+  if (!claves.length) return;
+  const i = Math.max(0, claves.indexOf(E.sel));
+  E.sel = claves[Math.min(claves.length - 1, Math.max(0, i + paso))];
+  if (E.abierto) { E.abierto = E.sel; E.descartando = false; }
+  pintarBandeja();
+  const f = document.querySelector(`.fila[data-k="${CSS.escape(E.sel)}"]`);
+  if (f) f.scrollIntoView({ block: 'nearest' });
+}
+
+/**
+ * Hecho o descartado: el paciente sale de la lista al instante y la selección
+ * pasa al siguiente. Si el servidor falla, vuelve a su sitio con un aviso.
+ */
+async function resolver(k, accion, motivo) {
+  if (!exigirUsuario()) return;
+  const t = pacienteDe(k);
+  if (!t) return;
+  const nota = E.abierto === k && $('#nota') ? $('#nota').value : '';
+  const claves = visibles().map(clave);
+  const i = claves.indexOf(k);
+  const siguiente = claves[i + 1] || claves[i - 1] || '';
+  const pos = E.bandeja.tarjetas.indexOf(t);
+  const c = E.bandeja.contador;
+  const estabaAbierto = E.abierto === k;
+
+  E.bandeja.tarjetas.splice(pos, 1);
+  c.porAtender--;
+  if (accion === 'HECHO') c.hechosHoy++;
+  if (E.sel === k) E.sel = siguiente;
+  if (estabaAbierto) E.abierto = siguiente;
+  E.descartando = false;
+  E.kpi = null;
+  E.resumen = null;
+  pintarBandeja();
+
+  try {
+    const datos = { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, nota };
+    if (accion === 'HECHO') await llamar('marcarSeguimiento', datos);
+    else await llamar('descartar', Object.assign(datos, { motivo }));
+    avisar((accion === 'HECHO' ? 'Seguimiento registrado: ' : 'Descartado: ') + t.NOMBRE);
+  } catch (e) {
+    E.bandeja.tarjetas.splice(pos, 0, t);
+    c.porAtender++;
+    if (accion === 'HECHO') c.hechosHoy--;
+    avisar('No se guardó: ' + e.message);
+    pintarBandeja();
+  }
+}
+
+$('#lista').addEventListener('click', ev => {
+  if (ev.target.closest('#reintentar')) { cargarBandeja(); return; }
+  const fila = ev.target.closest('.fila');
+  if (!fila) return;
+  const copiar = ev.target.closest('[data-copiar]');
+  if (copiar) { ev.stopPropagation(); copiarDesde(copiar, copiar.dataset.copiar); return; }
+  if (ev.target.closest('.hecho')) { ev.stopPropagation(); E.sel = fila.dataset.k; resolver(fila.dataset.k, 'HECHO'); return; }
+  abrir(fila.dataset.k);
 });
 
-let aDescartar = null;
-function abrirDescarte(t) {
-  aDescartar = t;
-  $('#dlg-nombre').textContent = t.NOMBRE + ' · ' + t.ESPECIALIDAD;
-  $('#dlg-motivo').value = '';
-  $('#dlg-nota').value = '';
-  $('#dlg-descartar').showModal();
-}
+$('#panel').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.classList.contains('cerrar')) { cerrar(); return; }
+  if (b.dataset.copiar) { copiarDesde(b, b.dataset.copiar); return; }
+  if (b.id === 'p-hecho') { resolver(E.abierto, 'HECHO'); return; }
+  if (b.id === 'p-descartar') { E.descartando = !E.descartando; pintarPanel(); return; }
+  if (b.dataset.motivo) { resolver(E.abierto, 'DESCARTADO', b.dataset.motivo); return; }
+  if (b.id === 'p-ficha') { const t = pacienteDe(E.abierto); if (t) abrirFicha(t.DNI); }
+});
 
-$('#dlg-descartar').addEventListener('close', async () => {
-  const t = aDescartar;
-  aDescartar = null;
-  if ($('#dlg-descartar').returnValue !== 'ok' || !t) return;
-  try {
-    await llamar('descartar', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, motivo: $('#dlg-motivo').value, nota: $('#dlg-nota').value });
-    quitarTarjeta(t, false);
-    avisar('Descartado: ' + t.NOMBRE);
-  } catch (e) {
-    avisar(e.message);
+/* Atajos de teclado de la bandeja. No actúan mientras se escribe en un campo. */
+document.addEventListener('keydown', ev => {
+  if ($('#v-bandeja').hidden || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (ev.target.closest && ev.target.closest('input, textarea, select')) return;
+  const tecla = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+  if (tecla === 'ArrowDown' || tecla === 'j') { ev.preventDefault(); mover(1); return; }
+  if (tecla === 'ArrowUp' || tecla === 'k') { ev.preventDefault(); mover(-1); return; }
+  if (tecla === 'Escape') { if (E.abierto) cerrar(); return; }
+  if (!E.sel) return;
+  if (tecla === 'Enter') { if (!ev.target.closest || !ev.target.closest('button')) { ev.preventDefault(); abrir(E.sel); } return; }
+  if (tecla === 'h') { resolver(E.sel, 'HECHO'); return; }
+  if (tecla === 'd') { E.abierto = E.sel; E.descartando = true; pintarBandeja(); return; }
+  if (tecla === 'c') {
+    const t = pacienteDe(E.sel);
+    const tel = t && String(t.TELEFONOS || '').split(' / ').filter(Boolean)[0];
+    if (!tel) { avisar('Este paciente no tiene teléfono.'); return; }
+    const boton = document.querySelector(`.fila[data-k="${CSS.escape(E.sel)}"] [data-copiar]`) || document.querySelector('#panel [data-copiar]');
+    if (boton) copiarDesde(boton, tel); else copiarTexto(tel).then(ok => avisar(ok ? 'Copiado: ' + tel : tel));
   }
 });
 
@@ -372,8 +677,8 @@ async function buscarAhora() {
   let r = [];
   try { r = await llamar('buscar', q); } catch (e) { avisar(e.message); }
   $('#resultados').innerHTML = r.length
-    ? '<div class="filtros">' + r.map(p => `<button type="button" class="btn" data-abrir="${esc(p.DNI)}">${esc(p.NOMBRE)} · ${esc(p.DNI)}</button>`).join('') + '</div>'
-    : '<p class="dato">Sin resultados.</p>';
+    ? r.map(p => `<button type="button" data-abrir="${esc(p.DNI)}">${esc(p.NOMBRE)} <span class="muted">· DNI ${esc(p.DNI)}</span></button>`).join('')
+    : '<p class="muted">Sin resultados.</p>';
 }
 
 $('#resultados').addEventListener('click', ev => {
@@ -384,15 +689,15 @@ $('#resultados').addEventListener('click', ev => {
 async function abrirFicha(dni) {
   irA('ficha');
   E.fichaDni = dni;
-  $('#ficha').innerHTML = '<div class="vacio">Cargando…</div>';
+  $('#ficha').innerHTML = '<p class="muted">Cargando…</p>';
   try {
     pintarFicha(await llamar('getPaciente', dni));
   } catch (e) {
-    $('#ficha').innerHTML = `<div class="vacio">${esc(e.message)}</div>`;
+    $('#ficha').innerHTML = `<p class="hace">${esc(e.message)}</p>`;
   }
 }
 
-const COLOR_ESTADO = { 'VENCIDO': 'roja', 'DESCARTADO': 'roja', 'ANTIGUO': 'roja', 'AL DÍA': 'verde', 'RECUPERADO': 'verde', 'AGENDADO': 'verde' };
+const ESTADO_BUENO = { 'AL DÍA': 1, 'RECUPERADO': 1, 'AGENDADO': 1 };
 const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más de 6 meses', 'POR VENCER': 'Le toca volver pronto',
   'AL DÍA': 'Al día', 'CONTACTADO': 'Se le escribió, esperando respuesta', 'RECUPERADO': 'Volvió tras el seguimiento',
   'AGENDADO': 'Ya tiene cita', 'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas' };
@@ -407,20 +712,20 @@ function lineaDeTiempo(citas) {
 }
 
 function pintarFicha(p) {
-  const confirmar = p.porConfirmar.map(i => `<div class="panel confirmar">
+  const confirmar = p.porConfirmar.map(i => `<div class="seccion confirmar">
       <h2>¿Es esta la misma persona?</h2>
-      <p class="dato">${esc(i.TIPO)} del ${fechaCorta(i.FECHA)} a nombre de <b>${esc(i.NOMBRE)}</b> · teléfono ${esc(i.TELEFONO)}</p>
-      <div class="acciones">${i.candidatos.map(c => `<button type="button" class="btn${c.dni === p.dni ? ' primario' : ''}" data-confirmar="${esc(i.ID)}" data-dni="${esc(c.dni)}">${esc(c.nombre)} · ${esc(c.dni)}</button>`).join('')}</div>
+      <p class="muted">${esc(i.TIPO)} del ${fechaCorta(i.FECHA)} a nombre de <b>${esc(i.NOMBRE)}</b> · teléfono ${esc(i.TELEFONO)}</p>
+      <div class="opciones">${i.candidatos.map(c => `<button type="button" class="${c.dni === p.dni ? 'btn-marca' : 'btn-linea'}" data-confirmar="${esc(i.ID)}" data-dni="${esc(c.dni)}">${esc(c.nombre)} · ${esc(c.dni)}</button>`).join('')}</div>
     </div>`).join('');
 
   const series = p.series.map(s => {
     const citas = p.citas.filter(c => norm(c.ESPECIALIDAD) === norm(s.ESPECIALIDAD));
-    return `<div class="panel">
-      <h2>${esc(s.ESPECIALIDAD)} <span class="etiqueta ${COLOR_ESTADO[s.ESTADO] || ''}">${esc(NOMBRE_ESTADO[s.ESTADO] || s.ESTADO)}</span></h2>
-      <div class="etiquetas">${etiquetaTipo(s)}</div>
-      <p class="dato">Teléfonos: ${esc(s.TELEFONOS) || '—'}</p>
-      ${s.PENDIENTE ? `<div class="pendiente"><b>Procedimiento pendiente:</b> ${esc(s.PENDIENTE)}</div>` : ''}
-      <ul class="linea">${lineaDeTiempo(citas)}
+    return `<div class="seccion">
+      <h2>${esc(s.ESPECIALIDAD)}<span class="estado ${ESTADO_BUENO[s.ESTADO] ? 'bien' : 'mal'}">${esc(NOMBRE_ESTADO[s.ESTADO] || s.ESTADO)}</span></h2>
+      <div class="tipo-caso"><span class="marcas">${marcas({ N_REALIZADAS: s.N_REALIZADAS })}</span>${textoTipo(s)}</div>
+      <p class="muted">Teléfonos: ${esc(s.TELEFONOS) || '—'}</p>
+      ${s.PENDIENTE ? `<div class="p-pend"><span class="marcas"><i class="m pend"></i></span><span><b>Procedimiento pendiente.</b> ${esc(s.PENDIENTE)}</span></div>` : ''}
+      <ul class="linea-tiempo">${lineaDeTiempo(citas)}
         <li class="esperada">Debía volver el ${fechaCorta(s.PROXIMA_ESPERADA)} (plazo máximo ${fechaCorta(s.VENCE)})</li>
       </ul>
     </div>`;
@@ -429,17 +734,17 @@ function pintarFicha(p) {
   const indicaciones = p.indicaciones.length
     ? `<table><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Estado</th><th>Teléfono</th><th>Observaciones</th></tr>${p.indicaciones.map(i =>
         `<tr><td>${fechaCorta(i.FECHA)}</td><td>${esc(i.TIPO)}</td><td>${esc(i.DETALLE)}${Number(i.CANTIDAD) > 1 ? ' ×' + esc(i.CANTIDAD) : ''}</td><td>${i.ESTADO === 'COTIZÓ' ? 'Cotizó, no lo hizo' : i.ESTADO === 'ACEPTÓ' ? 'Lo hizo' : esc(i.ESTADO)}</td><td>${esc(i.TELEFONO)}</td><td>${esc(i.OBSERVACIONES)}</td></tr>`).join('')}</table>`
-    : '<p class="dato">Sin procedimientos indicados.</p>';
+    : '<p class="muted">Sin procedimientos indicados.</p>';
 
   const seguimientos = p.seguimientos.length
     ? `<table><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Especialidad</th><th>Motivo</th><th>Nota</th></tr>${p.seguimientos.map(s =>
         `<tr><td>${esc(s.FECHA_HORA)}</td><td>${esc(s.RESPONSABLE)}</td><td>${esc(s.ACCION)}</td><td>${esc(s.ESPECIALIDAD)}</td><td>${esc(s.MOTIVO)}</td><td>${esc(s.NOTA)}</td></tr>`).join('')}</table>`
-    : '<p class="dato">Todavía no hay seguimientos.</p>';
+    : '<p class="muted">Todavía no hay seguimientos.</p>';
 
-  $('#ficha').innerHTML = `<div class="cabecera"><h1>${esc(p.nombre)}</h1><span class="dato">DNI ${esc(p.dni)}</span></div>
+  $('#ficha').innerHTML = `<div class="ficha-cab"><h1>${esc(p.nombre)}</h1><div class="muted">DNI ${esc(p.dni)}</div></div>
     ${confirmar}${series}
-    <div class="panel"><h2>Procedimientos indicados (hierro y otros)</h2>${indicaciones}</div>
-    <div class="panel"><h2>Seguimientos</h2>${seguimientos}</div>`;
+    <div class="seccion"><h2>Procedimientos indicados (hierro y otros)</h2>${indicaciones}</div>
+    <div class="seccion"><h2>Seguimientos</h2>${seguimientos}</div>`;
 }
 
 $('#ficha').addEventListener('click', async ev => {
@@ -449,7 +754,6 @@ $('#ficha').addEventListener('click', async ev => {
   try {
     await llamar('confirmarEmparejamiento', { usuario: usuario(), id: b.dataset.confirmar, dni: b.dataset.dni });
     avisar('Emparejamiento confirmado.');
-    E.bandeja = null;
     abrirFicha(E.fichaDni);
     cargarBandeja();
   } catch (e) {
@@ -459,21 +763,20 @@ $('#ficha').addEventListener('click', async ev => {
 });
 
 /* ==========================================================================
-   TABLERO
+   DETALLE (antes «Tablero»)
    ========================================================================== */
 async function cargarTablero() {
   if (E.kpi) { pintarTablero(); return; }
-  $('#tablero').innerHTML = '<div class="vacio">Calculando…</div>';
+  $('#tablero').innerHTML = '<p class="muted">Calculando…</p>';
   try {
     E.kpi = await llamar('getKpi');
     pintarTablero();
   } catch (e) {
-    $('#tablero').innerHTML = `<div class="vacio">No se pudo calcular el tablero: ${esc(e.message)}</div>`;
+    $('#tablero').innerHTML = `<p class="hace">No se pudo calcular el detalle: ${esc(e.message)}</p>`;
   }
 }
 
-const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
-const barra = (a, b) => `<div class="barra"><i style="width:${b ? Math.round(100 * a / b) : 0}%"></i></div>`;
+const barra = (a, b) => `<div class="barra-p"><i style="width:${b ? Math.round(100 * a / b) : 0}%"></i></div>`;
 
 function mediana(lista) {
   if (!lista.length) return '—';
@@ -483,21 +786,21 @@ function mediana(lista) {
 
 /** cab: [{t, num}]; filas: arrays de HTML ya escapado. */
 function tabla(cab, filas) {
-  if (!filas.length) return '<p class="dato">Sin datos con estos filtros.</p>';
-  const td = (v, i) => `<td${cab[i].num ? ' class="num"' : ''}>${v}</td>`;
-  return `<table><tr>${cab.map(c => `<th${c.num ? ' class="num"' : ''}>${esc(c.t)}</th>`).join('')}</tr>` +
+  if (!filas.length) return '<p class="muted">Sin datos con estos filtros.</p>';
+  const td = (v, i) => `<td${cab[i].num ? ' class="n"' : ''}>${v}</td>`;
+  return `<table><tr>${cab.map(c => `<th${c.num ? ' class="n"' : ''}>${esc(c.t)}</th>`).join('')}</tr>` +
     filas.map(f => `<tr>${f.map(td).join('')}</tr>`).join('') + '</table>';
 }
 
-function agrupar(filas, clave, nuevo, sumar) {
+function agrupar(filas, claveDe, nuevo, sumar) {
   const m = new Map();
-  filas.forEach(f => { const k = clave(f); if (!m.has(k)) m.set(k, nuevo()); sumar(m.get(k), f); });
+  filas.forEach(f => { const k = claveDe(f); if (!m.has(k)) m.set(k, nuevo()); sumar(m.get(k), f); });
   return [...m.entries()].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
 }
 
-function opciones(id, etiqueta, valores, actual) {
-  return `<select id="${id}" class="campo"><option value="">${esc(etiqueta)}</option>` +
-    valores.map(v => `<option value="${esc(v)}"${v === actual ? ' selected' : ''}>${esc(v)}</option>`).join('') + '</select>';
+function opciones(id, etiqueta, valores, actual, nombre) {
+  return `<select id="${id}" class="sel"><option value="">${esc(etiqueta)}</option>` +
+    valores.map(v => `<option value="${esc(v)}"${v === actual ? ' selected' : ''}>${esc(nombre ? nombre(v) : v)}</option>`).join('') + '</select>';
 }
 
 function pintarTablero() {
@@ -515,7 +818,7 @@ function pintarTablero() {
     r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0] }),
     (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); });
   const filasCoh = coh.map(([c, o]) => [esc(nombreMes(c))].concat([1, 2, 3].map(e =>
-    `${pct(o[e][0], o[e][1])} <span class="dato">(${o[e][0]}/${o[e][1]})</span>${barra(o[e][0], o[e][1])}`)));
+    `${pct(o[e][0], o[e][1])} <span class="muted">(${o[e][0]}/${o[e][1]})</span>${barra(o[e][0], o[e][1])}`)));
 
   const ind = k.indicaciones.filter(r => okMes(r.MES) && okMed(r.MEDICO));
   const sumaInd = (o, r) => { o.n += Number(r.INDICADAS); o.a += Number(r.ACEPTADAS); };
@@ -527,34 +830,39 @@ function pintarTablero() {
   const sumaRec = (o, r) => { o.n++; if (Number(r.VOLVIO)) { o.v++; o.d.push(Number(r.DIAS)); } };
   const filaRec = ([c, o]) => [esc(c), o.n, o.v, pct(o.v, o.n) + barra(o.v, o.n), mediana(o.d)];
   const recResp = agrupar(rec, r => r.RESPONSABLE, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec);
-  const recMes = agrupar(rec, r => r.MES, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec);
+  const recMes = agrupar(rec, r => r.MES, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec)
+    .map(f => [esc(nombreMes(f[0]))].concat(f.slice(1)));
 
   $('#tablero').innerHTML = `
-    <div class="filtros">${opciones('t-mes', 'Todos los meses', meses, fMes)}${opciones('t-esp', 'Todas las especialidades', esps, fEsp)}${opciones('t-med', 'Todos los médicos', meds, fMed)}</div>
-    <div class="panel"><h2>¿Vuelven los pacientes nuevos?</h2>
-      <p class="dato">Pacientes agrupados por el mes de su primera consulta. Solo cuentan los que ya debían haber vuelto.</p>
+    <div class="filtros">
+      <label>Mes ${opciones('t-mes', 'Todos', meses, fMes, nombreMes)}</label>
+      <label>Especialidad ${opciones('t-esp', 'Todas', esps, fEsp)}</label>
+      <label>Médico ${opciones('t-med', 'Todos', meds, fMed)}</label>
+    </div>
+    <div class="seccion"><h2>¿Vuelven los pacientes nuevos?</h2>
+      <p class="muted">Pacientes agrupados por el mes de su primera consulta. Solo cuentan los que ya debían haber vuelto.</p>
       ${tabla([T('Pacientes nuevos de'), N('Volvieron a su 1.ª reevaluación'), N('A su 2.ª reevaluación'), N('A su 3.ª reevaluación')], filasCoh)}</div>
-    <div class="panel"><h2>Procedimientos (hierro y otros)</h2>
-      <p class="dato">De lo cotizado, cuánto se hizo. Los procedimientos no tienen especialidad: ese filtro no los cambia.</p>
+    <div class="seccion"><h2>Procedimientos (hierro y otros)</h2>
+      <p class="muted">De lo cotizado, cuánto se hizo. Los procedimientos no tienen especialidad: ese filtro no los cambia.</p>
       ${tabla([T('Procedimiento'), N('Cotizados'), N('Se hicieron'), N('Porcentaje')], indTipo)}
-      <h3 class="sub">Por médico</h3>
+      <h3>Por médico</h3>
       ${tabla([T('Médico'), N('Cotizados'), N('Se hicieron'), N('Porcentaje')], indMed)}</div>
-    <div class="panel"><h2>Recuperación</h2>
-      <p class="dato">De los seguimientos hechos, cuántos pacientes volvieron y en cuántos días (mediana).</p>
-      ${tabla([T('Responsable'), N('Seguimientos'), N('Volvieron'), N('Tasa'), N('Días')], recResp)}
-      <h3 class="sub">Por mes</h3>
-      ${tabla([T('Mes'), N('Seguimientos'), N('Volvieron'), N('Tasa'), N('Días')], recMes.map(f => [esc(nombreMes(f[0]))].concat(f.slice(1))))}</div>
-    <div class="panel"><h2>Motivos de descarte</h2>
+    <div class="seccion"><h2>Recuperación</h2>
+      <p class="muted">De los seguimientos hechos, cuántos pacientes volvieron y en cuántos días (mediana).</p>
+      ${tabla([T('Responsable'), N('Seguimientos'), N('Volvieron'), N('Porcentaje'), N('Días')], recResp)}
+      <h3>Por mes</h3>
+      ${tabla([T('Mes'), N('Seguimientos'), N('Volvieron'), N('Porcentaje'), N('Días')], recMes)}</div>
+    <div class="seccion"><h2>Motivos de descarte</h2>
       ${tabla([T('Motivo'), N('Pacientes')], k.motivos.map(m => [esc(m.MOTIVO), m.N]))}</div>
-    <div class="panel"><h2>Procedimientos sin paciente</h2>
-      <p class="dato">No se encontró a nadie con ese nombre en SOFDOC. Revíselos a mano en la pestaña INDICACIONES.</p>
+    <div class="seccion"><h2>Procedimientos sin paciente</h2>
+      <p class="muted">No se encontró a nadie con ese nombre en SOFDOC. Revíselos a mano en la pestaña INDICACIONES.</p>
       ${tabla([T('ID'), T('Fecha'), T('Tipo'), T('Nombre'), T('Teléfono')],
         k.sinCandidato.map(i => [esc(i.ID), fechaCorta(i.FECHA), esc(i.TIPO), esc(i.NOMBRE), esc(i.TELEFONO)]))}</div>`;
   ['#t-mes', '#t-esp', '#t-med'].forEach(s => $(s).addEventListener('change', pintarTablero));
 }
 
 /* ==========================================================================
-   RESUMEN — cantidades y porcentajes del mes, por médico.
+   RESUMEN (propuesta 1b) — una cifra grande, tres secundarias y el mes a mes.
    Un paciente que no volvió cuenta en el mes de su última consulta.
    ========================================================================== */
 const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO',
@@ -562,12 +870,12 @@ const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'CONTROL', 'CONTR
 
 async function cargarResumen() {
   if (E.resumen) { pintarResumen(); return; }
-  $('#resumen').innerHTML = '<div class="vacio">Calculando…</div>';
+  $('#resumen').innerHTML = '<p class="muted">Calculando…</p>';
   try {
     E.resumen = await llamar('getResumen');
     pintarResumen();
   } catch (e) {
-    $('#resumen').innerHTML = `<div class="vacio">No se pudo calcular el resumen: ${esc(e.message)}</div>`;
+    $('#resumen').innerHTML = `<p class="hace">No se pudo calcular el resumen: ${esc(e.message)}</p>`;
   }
 }
 
@@ -581,54 +889,56 @@ function sumarMes(filas, mes) {
   return o;
 }
 
-function cifra(a, b) {
-  return b ? `${pct(a, b)} <span class="dato">(${a} de ${b})</span>` : '—';
-}
-
 function pintarResumen() {
   const R = E.resumen;
   if (E.rMed === null) E.rMed = medicoDeUsuario(usuario(), R.medicos);
   const filas = R.filas.filter(f => !E.rMed || f.MEDICO === E.rMed);
   const meses = [...new Set(R.filas.map(f => f.MES))].sort().reverse();
   if (!meses.includes(E.rMes)) E.rMes = meses[0] || '';
+  const i = meses.indexOf(E.rMes);
+  const anterior = meses[i + 1], siguiente = meses[i - 1];
   const m = sumarMes(filas, E.rMes);
-  const tarjeta = (titulo, a, b, explicacion, buena) => `<div class="resumen-tarjeta${buena ? ' buena' : ''}">
-      <h3>${titulo}</h3>
-      <div class="grande">${b ? pct(a, b) : '—'}</div>
-      <div><b>${a} de ${b} pacientes</b></div>
-      <div class="dato">${explicacion}</div>
+  const quien = E.rMed ? 'sus' : 'los';
+  const fila = (a, b, clase, texto) => `<div class="r-fila">
+      <span class="r-num num ${clase}">${pct(a, b)}</span>
+      <span><span class="r-etq">${texto}</span><span class="r-sub">${a} de ${b}</span></span>
     </div>`;
-  const ultimos = meses.slice(0, 6).map(mes => {
-    const x = sumarMes(filas, mes);
-    return [esc(nombreMes(mes)) + (x.CURSO ? ` <span class="dato">· en curso: ${x.CURSO}</span>` : ''),
-      cifra(x.REEVAL_NO, x.REEVAL), cifra(x.HIERRO_NO, x.HIERRO), cifra(x.PROC_NO, x.PROC), cifra(x.RECUPERADOS, x.SEGUIMIENTOS)];
-  });
-  const T = t => ({ t }), N = t => ({ t, num: true });
+  const ultimos = meses.slice(0, 6).reverse().map(mes => ({ mes, x: sumarMes(filas, mes) }));
+  const enCurso = ultimos.filter(u => u.x.CURSO);
+
   $('#resumen').innerHTML = `
-    <div class="filtros">
-      <select id="r-mes" class="campo">${meses.map(v => `<option value="${esc(v)}"${v === E.rMes ? ' selected' : ''}>${esc(nombreMes(v))}</option>`).join('')}</select>
-      ${opciones('r-med', 'Todos los médicos', R.medicos, E.rMed)}
+    <div class="r-nav">
+      <button type="button" id="r-ant"${anterior ? '' : ' disabled'}>‹ ${anterior ? esc(mesSolo(anterior)) : ''}</button>
+      <span id="r-mes-actual">${esc(nombreMes(E.rMes))}</span>
+      <button type="button" id="r-sig"${siguiente ? '' : ' disabled'}>${siguiente ? esc(mesSolo(siguiente)) : ''} ›</button>
     </div>
-    <div class="resumen-rejilla">
-      ${tarjeta('No volvieron a su reevaluación', m.REEVAL_NO, m.REEVAL,
-        `Atendidos en ${esc(nombreMes(E.rMes))} que no regresaron. Nuevos: ${m.NUEVOS_NO} de ${m.NUEVOS - m.NUEVOS_CURSO} · En control: ${m.CONTROL_NO} de ${m.CONTROL - m.CONTROL_CURSO}.` +
-        (m.CURSO ? ` A ${m.CURSO} más aún no les toca volver: no cuentan todavía.` : ''))}
-      ${tarjeta('No siguieron el hierro (Ferinject)', m.HIERRO_NO, m.HIERRO, 'Cotizaron el hierro en el mes y no se lo pusieron.')}
-      ${tarjeta('No siguieron otros procedimientos', m.PROC_NO, m.PROC, 'AMO, biopsia, citometría… cotizados en el mes y no realizados.')}
-      ${tarjeta('Volvieron después del seguimiento', m.RECUPERADOS, m.SEGUIMIENTOS, 'De los pacientes a los que se les escribió en el mes.', true)}
+    <div class="r-medico">Médico ${opciones('r-med', 'Todos los médicos', R.medicos, E.rMed)}</div>
+    <div class="r-grande num">${pct(m.REEVAL_NO, m.REEVAL)}</div>
+    <p class="r-frase">de ${quien} pacientes de ${esc(mesSolo(E.rMes))} no volvieron a su reevaluación.</p>
+    <p class="r-desglose">${m.REEVAL_NO} de ${m.REEVAL} · nuevos ${m.NUEVOS_NO} de ${m.NUEVOS - m.NUEVOS_CURSO} · en control ${m.CONTROL_NO} de ${m.CONTROL - m.CONTROL_CURSO}</p>
+    ${m.CURSO ? `<p class="r-nota">A ${m.CURSO} pacientes de este mes aún no les toca volver: no cuentan todavía.</p>` : ''}
+    <div class="r-filas">
+      ${fila(m.HIERRO_NO, m.HIERRO, 'pend', 'no siguieron el hierro (Ferinject)')}
+      ${fila(m.PROC_NO, m.PROC, 'pend', 'no siguieron otros procedimientos')}
+      ${fila(m.RECUPERADOS, m.SEGUIMIENTOS, 'buena', 'volvieron tras el seguimiento')}
     </div>
-    <div class="panel"><h2>Mes a mes</h2>
-      <p class="dato">Porcentaje de pacientes que se perdieron, en los últimos meses. «En curso»: pacientes a los que aún no les toca volver.</p>
-      ${tabla([T('Mes'), N('No volvieron a reevaluación'), N('No siguieron el hierro'), N('No siguieron otros procedimientos'), N('Volvieron tras seguimiento')], ultimos)}</div>`;
-  $('#r-mes').addEventListener('change', () => { E.rMes = $('#r-mes').value; pintarResumen(); });
+    <div class="mm"><small>Mes a mes · no volvieron</small>
+      ${ultimos.map(u => `<div class="mm-fila">
+        <span>${esc(mesSolo(u.mes))}</span>
+        <span class="mm-barra${u.x.CURSO ? ' curso' : ''}"><i style="width:${u.x.REEVAL ? Math.round(100 * u.x.REEVAL_NO / u.x.REEVAL) : 0}%"></i></span>
+        <span class="mm-pct num">${pct(u.x.REEVAL_NO, u.x.REEVAL)}</span>
+      </div>`).join('')}
+      ${enCurso.map(u => `<p class="mm-nota">${esc(mesSolo(u.mes))} está en curso: a ${u.x.CURSO} pacientes aún no les toca volver.</p>`).join('')}
+    </div>`;
+  $('#r-ant').addEventListener('click', () => { if (anterior) { E.rMes = anterior; pintarResumen(); } });
+  $('#r-sig').addEventListener('click', () => { if (siguiente) { E.rMes = siguiente; pintarResumen(); } });
   $('#r-med').addEventListener('change', () => { E.rMed = $('#r-med').value; pintarResumen(); });
 }
 
 /** Al elegir usuario: un médico ve directamente sus pacientes (puede cambiar a «Todos»). */
 function aplicarUsuario() {
   guardarPref('usuario', usuario());
-  const medico = medicoDeUsuario(usuario(), E.boot ? E.boot.medicos : []);
-  $('#f-med').value = medico;
+  $('#f-med').value = medicoDeUsuario(usuario(), E.boot ? E.boot.medicos : []);
   E.rMed = null;
   pintarBandeja();
   if (E.resumen && !$('#v-resumen').hidden) pintarResumen();
@@ -643,16 +953,17 @@ async function iniciar() {
   document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => irA(b.dataset.vista)));
   ['#f-esp', '#f-med', '#f-sintel'].forEach(s => $(s).addEventListener('change', pintarBandeja));
   $('#usuario').addEventListener('change', aplicarUsuario);
+  addEventListener('resize', () => { if (E.abierto) pintarPanel(); });
+  $('#fecha').textContent = fechaLarga(hoy());
   try {
     E.boot = await llamar('bootstrap');
   } catch (e) {
-    $('#tarjetas').innerHTML = `<div class="vacio">No se pudo iniciar: ${esc(e.message)}</div>`;
+    $('#lista').innerHTML = `<p class="hace">No se pudo iniciar: ${esc(e.message)}</p>`;
     return;
   }
   llenarSelect($('#usuario'), E.boot.usuarios);
   llenarSelect($('#f-esp'), E.boot.especialidades);
   llenarSelect($('#f-med'), E.boot.medicos);
-  llenarSelect($('#dlg-motivo'), E.boot.motivos);
   const recordado = leerPref('usuario');
   if (E.boot.usuarios.includes(recordado)) $('#usuario').value = recordado;
   $('#f-med').value = medicoDeUsuario(usuario(), E.boot.medicos);

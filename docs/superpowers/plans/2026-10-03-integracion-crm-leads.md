@@ -75,7 +75,7 @@ const { cita, reglas, MEDICO } = require('./fixtures');
 const L = cargar();
 
 const ENC = ['ID', 'FECHA', 'ASESORA', 'APELLIDOS', 'NOMBRES', 'DNI', 'TELEFONO', 'CANAL', 'CANAL_ESPECIFICO', 'CAMPANA', 'ESTATUS'];
-const lead = o => [o.id, o.fecha || '2026-07-10 10:00', 'MAGALY', o.apellidos || '', o.nombres || '', o.dni || '', o.tel || '', o.canal || 'MENSAJE',
+const lead = o => [o.id, o.fecha || '2026-07-10 10:00', 'MAGALY', o.apellidos || '', o.nombres || '', o.dni || '', o.tel || '', o.canal === undefined ? 'MENSAJE' : o.canal,
   o.esp === undefined ? 'FACEBOOK ADS' : o.esp, o.campana === undefined ? 'LAB-001' : o.campana, 'ACEPTÓ'];
 
 test('contactosDesdeCrm lee por encabezado, normaliza y descarta leads sin DNI ni nombre', () => {

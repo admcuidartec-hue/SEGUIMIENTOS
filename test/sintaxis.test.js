@@ -19,5 +19,6 @@ test('Menu.gs carga con los otros y expone las funciones del menú', () => {
     assert.equal(typeof ctx[f], 'function', f);
   }
   const base = ctx.hojasBase_();
-  assert.deepEqual(Object.keys(base), ['CITAS', 'PACIENTES', 'INDICACIONES', 'SEGUIMIENTOS', 'BITACORA', 'KPI']);
+  assert.deepEqual(Object.keys(base), ['CITAS', 'PACIENTES', 'INDICACIONES', 'SEGUIMIENTOS', 'BITACORA', 'CONTACTOS_CRM', 'KPI']);
+  for (const f of ['actualizacionDiaria', 'activarDiaria']) assert.equal(typeof ctx[f], 'function', f);
 });

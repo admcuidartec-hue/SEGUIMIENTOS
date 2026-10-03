@@ -12,6 +12,7 @@ function onOpen() {
   SpreadsheetApp.getUi().createMenu('Seguimientos')
     .addItem('Actualizar', 'actualizar')
     .addItem('Verificar', 'verificar')
+    .addItem('Activar actualización diaria (7:00)', 'activarDiaria')
     .addSeparator()
     .addItem('Preparar hojas', 'prepararHojas')
     .addItem('Importar hierro y procedimientos (una vez)', 'importarIndicaciones')
@@ -26,6 +27,7 @@ function hojasBase_() {
     INDICACIONES: COLUMNAS_INDICACIONES,
     SEGUIMIENTOS: COLUMNAS_SEGUIMIENTOS,
     BITACORA: COLUMNAS_BITACORA,
+    CONTACTOS_CRM: COLUMNAS_CONTACTOS,
     KPI: ['RETORNO POR COHORTE']
   };
 }
@@ -83,7 +85,8 @@ function actualizar() {
 }
 
 /** Hoja 1 -> CITAS -> emparejamientos -> PACIENTES -> KPI. Si algo no cuadra, no escribe nada. */
-function actualizar_() {
+function actualizar_(quien) {
+  quien = quien || 'MENÚ';
   var datos = hoja_(CONFIG.HOJA_SOFDOC).getDataRange().getValues();
   if (datos.length < 2) return { ok: false, mensaje: 'La "Hoja 1" está vacía. Pegue primero el export de SOFDOC.' };
   var filas = datos.slice(1).map(function (f) {
@@ -100,17 +103,74 @@ function actualizar_() {
   var fusion = fusionarCitas(leerCitas_(), limpio.citas);
   escribirObjetos_('CITAS', COLUMNAS_CITAS, fusion.citas);
   var emparejadas = emparejarIndicacionesEnHoja_(fusion.citas);
+  var crm = traerCrm_(fusion.citas);
 
   MEMO.datos = null;
   var d = datos_();
   escribirObjetos_('PACIENTES', COLUMNAS_PACIENTES, d.pacientes);
-  escribirKpi_(filasHojaKpi(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy)));
+  escribirKpi_(filasHojaKpi(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos)));
 
   var detalle = filas.length + ' filas leídas, ' + fusion.nuevas + ' citas nuevas, ' + fusion.cambiadas + ' cambiadas, ' +
-    limpio.invalidas + ' inválidas, ' + emparejadas + ' emparejamientos nuevos';
-  bitacora_('MENÚ', 'ACTUALIZAR', detalle);
+    limpio.invalidas + ' inválidas, ' + emparejadas + ' emparejamientos nuevos. ' + crm.mensaje;
+  bitacora_(quien, 'ACTUALIZAR', detalle);
   var vencidos = d.pacientes.filter(function (p) { return p.ESTADO === 'VENCIDO'; }).length;
   return { ok: true, mensaje: 'Listo. ' + detalle + '. En la bandeja: ' + vencidos + ' pacientes.' };
+}
+
+/**
+ * Lee la hoja LEADS del CRM (solo lectura) y reescribe CONTACTOS_CRM.
+ * Si el CRM no se puede leer, la CONTACTOS_CRM anterior se conserva.
+ */
+function traerCrm_(citas) {
+  var valores;
+  try {
+    var hoja = SpreadsheetApp.openById(CONFIG.CRM_ID).getSheetByName(CONFIG.HOJA_CRM);
+    if (!hoja) throw new Error('no existe la hoja ' + CONFIG.HOJA_CRM);
+    valores = hoja.getDataRange().getValues().map(function (f) {
+      return f.map(function (x) { return x instanceof Date ? fechaHoraTexto_(x) : x; });
+    });
+  } catch (e) {
+    return { ok: false, mensaje: 'CRM no leído: ' + e.message + '. Se conservan los datos anteriores.' };
+  }
+  var r = contactosDesdeCrm(valores[0] || [], valores.slice(1));
+  if (r.faltantes.length) {
+    return { ok: false, mensaje: 'CRM no leído: faltan las columnas ' + r.faltantes.join(', ') + ' en ' + CONFIG.HOJA_CRM + '. Se conservan los datos anteriores.' };
+  }
+  var unidos = emparejarContactos(r.contactos, citas);
+  if (!ss_().getSheetByName('CONTACTOS_CRM')) ss_().insertSheet('CONTACTOS_CRM');
+  escribirObjetos_('CONTACTOS_CRM', COLUMNAS_CONTACTOS, r.contactos);
+  return { ok: true, mensaje: 'CRM: ' + r.contactos.length + ' leads con nombre o DNI, ' + unidos + ' unidos a un paciente.' };
+}
+
+/** La llama el activador diario. Sin ventanas: todo queda en BITACORA. */
+function actualizacionDiaria() {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(CONFIG.ESPERA_LOCK_MS)) {
+    bitacora_('AUTOMÁTICO', 'ACTUALIZAR', 'No se hizo: otra persona estaba guardando. Se intentará mañana.');
+    return;
+  }
+  try {
+    var r = actualizar_('AUTOMÁTICO');
+    if (!r.ok) bitacora_('AUTOMÁTICO', 'ACTUALIZAR', r.mensaje);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Deja un único activador diario a las 7:00 (Lima). Devuelve cuántos anteriores reemplazó. */
+function programarDiaria_() {
+  var reemplazados = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'actualizacionDiaria') { ScriptApp.deleteTrigger(t); reemplazados++; }
+  });
+  ScriptApp.newTrigger('actualizacionDiaria').timeBased().everyDays(1).atHour(7).inTimezone('America/Lima').create();
+  return reemplazados;
+}
+
+function activarDiaria() {
+  var n = programarDiaria_();
+  SpreadsheetApp.getUi().alert('Listo: la plataforma se actualizará sola cada día a las 7:00, leyendo SOFDOC y el CRM.' +
+    (n ? ' Se reemplazó el activador anterior.' : ''));
 }
 
 /**

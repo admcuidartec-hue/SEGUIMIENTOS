@@ -10,6 +10,8 @@ var CONFIG = {
   SS_ID: '1L8fY-NXWE1agakIPEdqoLnLry0-lvYr0Z-9JfsfGxRM',
   HIERRO_ID: '1FrJ9oXyeHLLABqLcSA2VyXry-x_ZeFow6LsSACeJw8o',
   HOJA_SOFDOC: 'Hoja 1',
+  CRM_ID: '1dofPqkj644Y0kfYYpX2WG9g8JlHYFai8nk--CzFtbsM',
+  HOJA_CRM: 'LEADS',
   ESPERA_LOCK_MS: 30000
 };
 
@@ -181,6 +183,14 @@ function leerSeguimientos_() {
   return segs;
 }
 
+/** CONTACTOS_CRM puede no existir todavía (antes de la primera actualización con CRM). */
+function leerContactos_() {
+  if (!ss_().getSheetByName('CONTACTOS_CRM')) return [];
+  var cs = leerObjetos_('CONTACTOS_CRM');
+  cs.forEach(function (c) { c.DNI = normDni(c.DNI); c.DNI_PACIENTE = normDni(c.DNI_PACIENTE); });
+  return cs;
+}
+
 /** Todo lo que necesita la app, leído una vez por petición. */
 function datos_() {
   if (MEMO.datos) return MEMO.datos;
@@ -190,9 +200,10 @@ function datos_() {
     catalogos: catalogos_(),
     citas: leerCitas_(),
     indicaciones: leerIndicaciones_(),
-    seguimientos: leerSeguimientos_()
+    seguimientos: leerSeguimientos_(),
+    contactos: leerContactos_()
   };
-  d.pacientes = armarPacientes(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy);
+  d.pacientes = armarPacientes(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos);
   MEMO.datos = d;
   return d;
 }
@@ -333,7 +344,7 @@ function confirmarEmparejamiento(p) {
 
 function getKpi() {
   var d = datos_();
-  return limpiarParaEnvio(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy));
+  return limpiarParaEnvio(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos));
 }
 
 /** Pantalla «Resumen»: filas por mes y médico; la app suma según el filtro elegido. */

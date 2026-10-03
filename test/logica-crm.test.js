@@ -123,3 +123,9 @@ test('contactosDesdeCrm exige también DNI, nombres, apellidos, canal específic
     assert.deepEqual(r.faltantes, [col], col);
   }
 });
+
+test('unirFrases une con un solo punto aunque una frase ya lo traiga', () => {
+  assert.equal(L.unirFrases(['2128 filas leídas', 'CRM: 490 leads, 451 unidos a un paciente.', '', 'En la bandeja: 801 pacientes']),
+    '2128 filas leídas. CRM: 490 leads, 451 unidos a un paciente. En la bandeja: 801 pacientes.');
+  assert.equal(L.unirFrases(['Listo..']), 'Listo.');
+});

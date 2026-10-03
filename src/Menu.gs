@@ -110,11 +110,11 @@ function actualizar_(quien) {
   escribirObjetos_('PACIENTES', COLUMNAS_PACIENTES, d.pacientes);
   escribirKpi_(filasHojaKpi(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos)));
 
-  var detalle = filas.length + ' filas leídas, ' + fusion.nuevas + ' citas nuevas, ' + fusion.cambiadas + ' cambiadas, ' +
-    limpio.invalidas + ' inválidas, ' + emparejadas + ' emparejamientos nuevos. ' + crm.mensaje;
+  var detalle = unirFrases([filas.length + ' filas leídas, ' + fusion.nuevas + ' citas nuevas, ' + fusion.cambiadas + ' cambiadas, ' +
+    limpio.invalidas + ' inválidas, ' + emparejadas + ' emparejamientos nuevos', crm.mensaje]);
   bitacora_(quien, 'ACTUALIZAR', detalle);
   var vencidos = d.pacientes.filter(function (p) { return p.ESTADO === 'VENCIDO'; }).length;
-  return { ok: true, mensaje: 'Listo. ' + detalle + '. En la bandeja: ' + vencidos + ' pacientes.' };
+  return { ok: true, mensaje: unirFrases(['Listo', detalle, 'En la bandeja: ' + vencidos + ' pacientes']) };
 }
 
 /**
@@ -273,5 +273,29 @@ function verificar() {
   } catch (e) {
     lineas.push('✗ No se puede abrir la base de hierro: ' + e.message);
   }
+  verificarCrm_().forEach(function (l) { lineas.push(l); });
   SpreadsheetApp.getUi().alert(lineas.join('\n'));
+}
+
+/** Dos líneas para «Verificar»: si el CRM se puede leer y si la actualización diaria está activada. No escribe nada. */
+function verificarCrm_() {
+  var lineas = [];
+  try {
+    var hoja = SpreadsheetApp.openById(CONFIG.CRM_ID).getSheetByName(CONFIG.HOJA_CRM);
+    if (!hoja) {
+      lineas.push('✗ El CRM no tiene la hoja ' + CONFIG.HOJA_CRM + '.');
+    } else {
+      var v = hoja.getDataRange().getValues();
+      var faltan = contactosDesdeCrm(v[0] || [], []).faltantes;
+      lineas.push(faltan.length
+        ? '✗ A la hoja ' + CONFIG.HOJA_CRM + ' del CRM le faltan: ' + faltan.join(', ') + '.'
+        : '✓ CRM: la hoja ' + CONFIG.HOJA_CRM + ' se puede leer, con las columnas necesarias y ' + Math.max(0, v.length - 1) + ' leads.');
+    }
+  } catch (e) {
+    lineas.push('✗ No se puede abrir el CRM: ' + e.message);
+  }
+  var activa = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'actualizacionDiaria'; });
+  lineas.push(activa ? '✓ Actualización diaria activada (7:00).'
+    : '✗ La actualización diaria no está activada. Use «Activar actualización diaria (7:00)».');
+  return lineas;
 }

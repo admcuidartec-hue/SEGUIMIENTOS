@@ -593,6 +593,12 @@ function textoSeguro(v) {
   return (typeof v === 'string' && /^[=+\-@]/.test(v)) ? "'" + v : v;
 }
 
+/** Une frases para un mensaje con un solo punto entre ellas, aunque alguna ya traiga el suyo. */
+function unirFrases(partes) {
+  var limpias = (partes || []).map(function (p) { return String(p || '').trim().replace(/\.+$/, ''); }).filter(Boolean);
+  return limpias.length ? limpias.join('. ') + '.' : '';
+}
+
 function validarAccion(p, catalogos, accion, pacientes) {
   if (!p || !normTexto(p.usuario)) return 'Elija quién es usted en el selector de arriba.';
   if (catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {

@@ -136,3 +136,29 @@ test('si la actualización diaria falla, queda en BITACORA, suelta el candado y 
   assert.deepEqual(notas, [['AUTOMÁTICO', 'ACTUALIZAR', 'Error: falta la hoja KPI']]);
   assert.equal(estado.tomado, false);
 });
+
+function conActivadores(ctx, nombres) {
+  ctx.ScriptApp = { getProjectTriggers: () => nombres.map(n => ({ getHandlerFunction: () => n })) };
+}
+
+test('verificarCrm_: CRM abierto con sus columnas y actualización diaria activada', () => {
+  const { ctx } = contexto();
+  ctx.SpreadsheetApp = libroCrm([
+    ['ID', 'FECHA', 'NOMBRES', 'APELLIDOS', 'DNI', 'TELEFONO', 'CANAL_ESPECIFICO', 'CAMPANA'],
+    ['L-1', '2026-07-10', 'A', 'B', '1', '9', 'X', 'Y'], ['L-2', '2026-07-11', 'A', 'B', '2', '9', 'X', 'Y']
+  ]);
+  conActivadores(ctx, ['actualizacionDiaria']);
+  assert.deepEqual([...ctx.verificarCrm_()], ['✓ CRM: la hoja LEADS se puede leer, con las columnas necesarias y 2 leads.',
+    '✓ Actualización diaria activada (7:00).']);
+});
+
+test('verificarCrm_: avisa si faltan columnas, si no se abre y si no hay actualización diaria', () => {
+  const { ctx } = contexto();
+  ctx.SpreadsheetApp = libroCrm([['ID', 'FECHA', 'DNI']]);
+  conActivadores(ctx, ['otraCosa']);
+  const a = [...ctx.verificarCrm_()];
+  assert.match(a[0], /^✗ A la hoja LEADS del CRM le faltan: NOMBRES, APELLIDOS, TELEFONO, CANAL_ESPECIFICO, CAMPANA\.$/);
+  assert.equal(a[1], '✗ La actualización diaria no está activada. Use «Activar actualización diaria (7:00)».');
+  ctx.SpreadsheetApp = { openById: () => { throw new Error('sin acceso'); } };
+  assert.equal(ctx.verificarCrm_()[0], '✗ No se puede abrir el CRM: sin acceso');
+});

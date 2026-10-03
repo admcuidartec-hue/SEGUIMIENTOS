@@ -66,7 +66,12 @@ button{cursor:pointer}
 .contador span{font-size:13px;color:var(--chp-soft)}
 .contador.atender b{color:var(--chp-accent)}
 .contador.recuperados b{color:var(--chp-good)}
-.filtros{display:flex;flex-wrap:wrap;gap:24px;align-items:baseline;margin-top:28px;padding-bottom:12px;border-bottom:1px solid var(--chp-ink);font-size:14px}
+.tipos{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:28px;font-size:16px}
+.tipos button{background:none;border:0;border-bottom:2px solid transparent;padding:0 0 5px;color:var(--chp-soft)}
+.tipos button b{font-weight:600;color:var(--chp-muted);margin-left:4px}
+.tipos button[aria-pressed="true"]{color:var(--chp-brand);font-weight:600;border-bottom-color:var(--chp-brand)}
+.tipos button[aria-pressed="true"] b{color:var(--chp-brand)}
+.filtros{display:flex;flex-wrap:wrap;gap:24px;align-items:baseline;margin-top:18px;padding-bottom:12px;border-bottom:1px solid var(--chp-ink);font-size:14px}
 .filtros label{display:flex;gap:8px;align-items:baseline;color:var(--chp-muted)}
 .filtros input[type=checkbox]{accent-color:var(--chp-brand)}
 .filtros .sel{color:var(--chp-ink);max-width:100%;min-width:0;text-overflow:ellipsis}
@@ -134,34 +139,49 @@ button{cursor:pointer}
 .motivos button:hover{color:var(--chp-accent)}
 .p-ficha{margin-top:auto;color:var(--chp-accent);text-decoration:underline;background:none;border:0;padding:0;text-align:left}
 
-/* ---------- Resumen (propuesta 1b) ---------- */
-.resumen{max-width:760px;margin-top:28px}
-.r-nav{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:14px;border-bottom:1px solid var(--chp-rule)}
-.r-nav button{background:none;border:0;padding:0;color:var(--chp-muted);font-size:16px;min-width:80px}
-.r-nav button:last-child{text-align:right}
-.r-nav button:disabled{visibility:hidden}
-#r-mes-actual{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:600}
-.r-medico{margin-top:14px;font-size:14px;color:var(--chp-muted);display:flex;gap:10px;align-items:baseline}
-.r-medico .sel{color:var(--chp-ink);min-width:0;flex:0 1 auto;text-overflow:ellipsis}
-.r-grande{font-family:'Barlow Condensed',sans-serif;font-size:128px;font-weight:600;line-height:.9;color:var(--chp-accent);margin-top:24px}
-.r-frase{font-size:22px;margin:10px 0 6px;max-width:560px}
-.r-desglose{color:var(--chp-muted);margin:0}
-.r-nota{font-style:italic;color:var(--chp-muted);margin:6px 0 0}
-.r-filas{margin-top:22px;border-top:1px solid var(--chp-rule)}
-.r-fila{display:flex;gap:28px;align-items:center;padding:16px 0;border-bottom:1px solid var(--chp-rule)}
-.r-num{font-family:'Barlow Condensed',sans-serif;font-size:44px;font-weight:600;width:120px;flex:0 0 120px}
+/* ---------- Resumen (propuesta 3a en computadora; en celular se apila) ---------- */
+.r-cab{display:flex;flex-wrap:wrap;align-items:center;gap:16px 28px;margin-top:28px;padding-bottom:18px;border-bottom:1px solid var(--chp-ink)}
+.r-mes{font-family:'Barlow Condensed',sans-serif;font-size:60px;font-weight:600;line-height:1;margin:0}
+.r-pasos{display:flex;gap:10px}
+.r-pasos button{background:transparent;border:1px solid var(--chp-line);border-radius:2px;padding:6px 14px;font-size:15px;color:var(--chp-ink)}
+.r-pasos button:disabled{visibility:hidden}
+.r-medico{margin-left:auto;font-size:15px;color:var(--chp-muted);display:flex;gap:10px;align-items:baseline;min-width:0}
+.r-medico .sel{color:var(--chp-ink);min-width:0;flex:0 1 auto;max-width:100%;text-overflow:ellipsis}
+.r-principal{display:grid;grid-template-columns:5fr 7fr;gap:40px;padding:36px 0 32px;border-bottom:1px solid var(--chp-rule);align-items:end}
+.r-grande{font-family:'Barlow Condensed',sans-serif;font-size:128px;font-weight:600;line-height:.9;color:var(--chp-accent)}
+.r-frase{font-size:20px;margin:16px 0 8px;max-width:440px}
+.r-cuenta{margin:0;color:var(--chp-muted)}
+.r-cuenta b{color:var(--chp-ink)}
+.r-desglose{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:10px 0 0}
+.r-desglose span{display:inline-flex;align-items:center;gap:8px}
+.r-nota{font-style:italic;color:var(--chp-muted);margin:10px 0 0;font-size:14px}
+.r-meta{margin:12px 0 0;font-size:14px;color:var(--chp-soft)}
+.r-metricas{display:grid;grid-template-columns:repeat(3,1fr)}
+.r-metrica{border-left:1px solid var(--chp-rule);padding:0 24px 4px 28px;display:flex;flex-direction:column;gap:4px}
+.r-num{font-family:'Barlow Condensed',sans-serif;font-size:72px;font-weight:600;line-height:1}
 .r-num.pend{color:var(--chp-pending)}
 .r-num.buena{color:var(--chp-good)}
-.r-etq{display:block;font-size:17px}
-.r-sub{display:block;color:var(--chp-muted)}
+.r-etq{font-size:16px}
+.r-sub{font-size:14px;color:var(--chp-muted)}
 .mm{margin-top:28px}
-.mm>small{display:block;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--chp-muted);margin-bottom:10px}
-.mm-fila{display:grid;grid-template-columns:110px 1fr 56px;gap:16px;align-items:center;padding:5px 0}
-.mm-barra{height:4px;background:var(--chp-track);position:relative}
-.mm-barra i{position:absolute;left:0;top:0;bottom:0;background:var(--chp-accent)}
-.mm-barra.curso i{background:repeating-linear-gradient(90deg,var(--chp-accent) 0 6px,transparent 6px 11px)}
-.mm-pct{text-align:right;font-weight:600}
-.mm-nota{font-style:italic;color:var(--chp-muted);margin:8px 0 0}
+.mm-cab{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 20px;align-items:baseline}
+.mm-cab small{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--chp-muted)}
+.mm-ley{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--chp-soft)}
+.mm-ley span{display:inline-flex;align-items:center;gap:6px}
+.mm-ley i{display:inline-block;width:16px;height:11px;background:var(--chp-accent)}
+.mm-ley i.rayado,.mm-barra.curso{background:repeating-linear-gradient(135deg,var(--chp-accent) 0 2px,transparent 2px 7px);border:1px solid var(--chp-accent)}
+.mm-ley i.meta{height:0;border-top:1px dashed var(--chp-ink);background:none}
+.mm-cols{display:grid;grid-template-columns:repeat(6,1fr);margin-top:14px}
+.mm-col{background:none;border:0;padding:0;text-align:left;color:var(--chp-ink);display:flex;flex-direction:column;min-width:0}
+.mm-area{position:relative;height:190px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 28px;border-bottom:1px solid var(--chp-ink)}
+.mm-pct{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:600;line-height:1.1}
+.mm-pct.vacio{color:var(--chp-line)}
+.mm-barra{display:block;background:var(--chp-accent);width:100%}
+.mm-meta{position:absolute;left:0;right:0;border-top:1px dashed var(--chp-ink)}
+.mm-mes{padding:10px 28px 0;font-size:17px}
+.mm-nota{padding:2px 28px 0;font-size:13px;color:var(--chp-muted)}
+.mm-col.actual .mm-mes{font-weight:700;color:var(--chp-brand)}
+.mm-col:hover .mm-mes{text-decoration:underline}
 
 /* ---------- Ficha y Detalle ---------- */
 .vista-sub{margin-top:28px}
@@ -200,6 +220,10 @@ td.n,th.n{text-align:right}
   .barra{gap:24px}
   .nav{gap:20px}
 }
+@media (max-width:1023px){
+  .r-principal{grid-template-columns:1fr}
+  .mm-area,.mm-mes,.mm-nota{padding-left:10px;padding-right:10px}
+}
 @media (max-width:1180px){
   .app{padding:24px 32px 0}
   #lista{padding-right:24px}
@@ -230,10 +254,17 @@ td.n,th.n{text-align:right}
   .fila .hecho{min-height:44px}
   #panel{position:fixed;inset:0;width:auto;max-height:none;border-left:0;z-index:20;padding:20px 16px 28px}
   .p-acciones .btn-marca,.p-acciones .btn-linea,.motivos button,.p-tel .btn-linea{min-height:44px}
+  .r-mes{font-size:40px}
+  .r-medico{margin-left:0;width:100%}
+  .r-principal{padding-top:24px}
   .r-grande{font-size:96px}
-  .r-fila{gap:16px}
-  .r-num{font-size:36px;width:90px;flex-basis:90px}
-  .mm-fila{grid-template-columns:84px 1fr 44px;gap:10px}
+  .r-metricas{grid-template-columns:1fr}
+  .r-metrica{border-left:0;border-top:1px solid var(--chp-rule);padding:12px 0;display:grid;grid-template-columns:96px 1fr;column-gap:14px;align-items:center}
+  .r-num{font-size:40px;grid-row:span 2}
+  .mm-area{height:120px;padding:0 4px}
+  .mm-pct{font-size:16px}
+  .mm-mes{padding:6px 4px 0;font-size:13px}
+  .mm-nota{display:none}
   .ficha-cab h1{font-size:34px}
 }
 </style>
@@ -268,6 +299,12 @@ td.n,th.n{text-align:right}
           <div class="contador"><b id="c-hechos" class="num">–</b><span>hechos hoy</span></div>
           <div class="contador recuperados"><b id="c-recuperados" class="num">–</b><span>recuperados</span></div>
         </div>
+      </div>
+      <div class="tipos" id="tipos" role="group" aria-label="Tipo de seguimiento">
+        <button type="button" data-tipo="" aria-pressed="true">Todos <b class="num">–</b></button>
+        <button type="button" data-tipo="REEVALUACION" aria-pressed="false">Reevaluaciones <b class="num">–</b></button>
+        <button type="button" data-tipo="HIERRO" aria-pressed="false">Hierro (Ferinject) <b class="num">–</b></button>
+        <button type="button" data-tipo="PROCEDIMIENTO" aria-pressed="false">Procedimientos <b class="num">–</b></button>
       </div>
       <div class="filtros">
         <label>Especialidad <select id="f-esp" class="sel"><option value="">Todas</option></select></label>
@@ -316,7 +353,7 @@ function llamar(fn, ...args) {
 
 const E = {
   boot: null, bandeja: null, error: '', fichaDni: '', kpi: null, resumen: null, rMed: null, rMes: '',
-  sel: '', abierto: '', descartando: false
+  sel: '', abierto: '', descartando: false, tipo: ''
 };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -441,15 +478,23 @@ async function copiarDesde(boton, numero) {
    menos días sin volver. Dentro de cada grupo se respeta.
    ========================================================================== */
 const GRUPOS = [
-  { titulo: 'Recientes', sub: 'debían volver hace 30 días o menos', hasta: 30 },
-  { titulo: 'Hace 1 a 2 meses', sub: 'debían volver hace 31 a 60 días', hasta: 60 },
-  { titulo: 'Más antiguos', sub: 'debían volver hace más de 60 días', hasta: Infinity }
+  { titulo: 'Recientes', sub: 'hace 30 días o menos', hasta: 30 },
+  { titulo: 'Hace 1 a 2 meses', sub: 'hace 31 a 60 días', hasta: 60 },
+  { titulo: 'Más antiguos', sub: 'hace más de 60 días', hasta: Infinity }
 ];
+const PREFIJO_GRUPO = { '': '', REEVALUACION: 'debían volver ', HIERRO: 'cotizado ', PROCEDIMIENTO: 'cotizado ' };
 const clave = t => t.DNI + '|' + t.ESPECIALIDAD;
-const diasSinVolver = t => Math.max(0, diasDesde(t.PROXIMA_ESPERADA, hoy()));
+/** Reevaluación, hierro o procedimiento. Una fila sin tipo es una reevaluación. */
+const tipoDe = t => t.TIPO_SEGUIMIENTO || 'REEVALUACION';
+const esIndicacion = t => tipoDe(t) !== 'REEVALUACION';
+/** Días desde que debía volver o, en hierro y procedimientos, desde que cotizó. */
+const diasSinVolver = t => esIndicacion(t) ? Number(t.DIAS) || 0 : Math.max(0, diasDesde(t.PROXIMA_ESPERADA, hoy()));
+const especialidadDe = t => esIndicacion(t) ? t.ESPECIALIDAD_CONSULTA : t.ESPECIALIDAD;
 const esNuevo = t => (Number(t.N_REALIZADAS) || 1) <= 1;
+const queCotizo = t => tipoDe(t) === 'HIERRO' ? t.DETALLE : 'Procedimiento: ' + t.DETALLE;
 
 function marcas(t) {
+  if (esIndicacion(t)) return `<i class="m pend" title="${tipoDe(t) === 'HIERRO' ? 'Hierro pendiente' : 'Procedimiento pendiente'}"></i>`;
   return (esNuevo(t) ? '<i class="m nuevo" title="Paciente nuevo"></i>' : '<i class="m control" title="En control"></i>') +
     (t.PENDIENTE ? '<i class="m pend" title="Procedimiento pendiente"></i>' : '');
 }
@@ -459,11 +504,24 @@ function textoTipo(t) {
   return n <= 1 ? 'Paciente nuevo · no volvió a su 1.ª reevaluación' : `En control · faltó a su ${n}.ª reevaluación`;
 }
 
-function visibles() {
+/** Filtros de especialidad, médico y teléfono; el tipo se aplica aparte para poder contar cada botón. */
+function filtradas() {
   if (!E.bandeja) return [];
   const fe = $('#f-esp').value, fm = $('#f-med').value, sinTel = $('#f-sintel').checked;
   return E.bandeja.tarjetas.filter(t =>
-    (!fe || t.ESPECIALIDAD === fe) && (!fm || t.MEDICO_ULTIMO === fm) && (!sinTel || !t.TELEFONOS));
+    (!fe || especialidadDe(t) === fe) && (!fm || t.MEDICO_ULTIMO === fm) && (!sinTel || !t.TELEFONOS));
+}
+
+function visibles() {
+  return filtradas().filter(t => !E.tipo || tipoDe(t) === E.tipo);
+}
+
+function pintarTipos() {
+  const todas = filtradas();
+  document.querySelectorAll('#tipos button').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.tipo === E.tipo));
+    b.querySelector('b').textContent = E.bandeja ? todas.filter(t => !b.dataset.tipo || tipoDe(t) === b.dataset.tipo).length : '–';
+  });
 }
 
 async function cargarBandeja() {
@@ -482,11 +540,14 @@ function filaHtml(t) {
   const k = clave(t);
   const tel = String(t.TELEFONOS || '').split(' / ').filter(Boolean)[0];
   const clases = ['fila', k === E.sel ? 'sel-fila' : '', k === E.abierto ? 'abierta' : ''].join(' ');
+  const linea = esIndicacion(t)
+    ? `${esc(queCotizo(t))} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Cotizó el ${fechaCorta(t.FECHA_COTIZACION)}`
+    : `${esNuevo(t) ? 'Nuevo' : 'En control'} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Debía volver el ${fechaCorta(t.PROXIMA_ESPERADA)}`;
   return `<div class="${clases}" data-k="${esc(k)}">
     <span class="marcas">${marcas(t)}</span>
     <span class="texto">
       <span class="nombre">${esc(t.NOMBRE)}</span>
-      <span class="linea">${esNuevo(t) ? 'Nuevo' : 'En control'} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Debía volver el ${fechaCorta(t.PROXIMA_ESPERADA)} · <span class="hace">hace ${diasSinVolver(t)} días</span></span>
+      <span class="linea">${linea} · <span class="hace">hace ${diasSinVolver(t)} días</span></span>
     </span>
     <span class="tel">${tel
       ? `<button type="button" class="copiar-fila" data-copiar="${esc(tel)}"><span class="n">${esc(tel)}</span><small>Copiar</small></button>`
@@ -508,6 +569,7 @@ function pintarBandeja() {
   $('#c-atender').textContent = c.porAtender;
   $('#c-hechos').textContent = c.hechosHoy;
   $('#c-recuperados').textContent = c.recuperadosMes;
+  pintarTipos();
 
   const lista = visibles();
   const claves = lista.map(clave);
@@ -515,14 +577,16 @@ function pintarBandeja() {
   if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.descartando = false; }
 
   if (!lista.length) {
-    $('#lista').innerHTML = '<div class="vacio-grande"><b>Bandeja vacía.</b>No queda nadie a quien escribir hoy.</div>';
+    $('#lista').innerHTML = E.tipo
+      ? '<div class="vacio-grande"><b>Nada en esta lista.</b>Pruebe con «Todos» o quite algún filtro.</div>'
+      : '<div class="vacio-grande"><b>Bandeja vacía.</b>No queda nadie a quien escribir hoy.</div>';
   } else {
     let desde = -1;
     $('#lista').innerHTML = GRUPOS.map(g => {
       const del = lista.filter(t => { const d = diasSinVolver(t); return d > desde && d <= g.hasta; });
       desde = g.hasta;
       if (!del.length) return '';
-      return `<div class="grupo"><h2>${g.titulo}</h2><span>${g.sub} · ${del.length} ${del.length === 1 ? 'paciente' : 'pacientes'}</span></div>` +
+      return `<div class="grupo"><h2>${g.titulo}</h2><span>${PREFIJO_GRUPO[E.tipo]}${g.sub} · ${del.length} ${del.length === 1 ? 'paciente' : 'pacientes'}</span></div>` +
         del.map(filaHtml).join('');
     }).join('');
   }
@@ -543,22 +607,27 @@ function pintarPanel() {
     <div class="p-cab"><span>PACIENTE</span><button type="button" class="btn-texto cerrar">${celular ? '‹ Volver' : 'Cerrar  Esc'}</button></div>
     <div>
       <h2>${esc(t.NOMBRE)}</h2>
-      <div class="muted">DNI ${esc(t.DNI)} · ${esc(t.ESPECIALIDAD)}</div>
+      <div class="muted">DNI ${esc(t.DNI)}${especialidadDe(t) ? ' · ' + esc(especialidadDe(t)) : ''}</div>
       <div class="muted">${esc(t.MEDICO_ULTIMO)}</div>
     </div>
-    <div class="p-tipo"><span class="marcas">${esNuevo(t) ? '<i class="m nuevo"></i>' : '<i class="m control"></i>'}</span>${textoTipo(t)}</div>
+    ${esIndicacion(t) ? `<div class="p-tipo"><span class="marcas">${marcas(t)}</span>${esc(queCotizo(t))} · cotizó y no lo hizo</div>
+    <div class="p-fechas">
+      <div><small>Cotizó el</small><span class="v"><b>${fechaCorta(t.FECHA_COTIZACION)}</b></span></div>
+      <div><small>Última consulta</small><span class="v">${fechaCorta(t.ULTIMA_CITA)}</span></div>
+      <div class="p-hace">hace ${diasSinVolver(t)} días que cotizó</div>
+    </div>` : `<div class="p-tipo"><span class="marcas">${esNuevo(t) ? '<i class="m nuevo"></i>' : '<i class="m control"></i>'}</span>${textoTipo(t)}</div>
     <div class="p-fechas">
       <div><small>Última consulta</small><span class="v">${fechaCorta(t.ULTIMA_CITA)}</span></div>
       <div><small>Debía volver el</small><span class="v"><b>${fechaCorta(t.PROXIMA_ESPERADA)}</b></span></div>
       <div class="p-hace">hace ${diasSinVolver(t)} días que no vuelve</div>
-    </div>
-    ${t.PENDIENTE ? `<div class="p-pend"><span class="marcas"><i class="m pend"></i></span><span><b>Procedimiento pendiente.</b> ${esc(t.PENDIENTE)}</span></div>` : ''}
+    </div>`}
+    ${t.PENDIENTE && !esIndicacion(t) ? `<div class="p-pend"><span class="marcas"><i class="m pend"></i></span><span><b>Procedimiento pendiente.</b> ${esc(t.PENDIENTE)}</span></div>` : ''}
     <div class="p-tels"><small>Teléfonos</small>
       ${tels.length
         ? tels.map(n => `<div class="p-tel"><span class="n">${esc(n)}</span><button type="button" class="btn-linea" data-copiar="${esc(n)}">Copiar</button></div>`).join('')
         : '<p class="p-sintel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}
     </div>
-    ${t.N_SEGUIMIENTOS ? `<div class="p-prev">Ya se le escribió ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
+    ${t.N_SEGUIMIENTOS ? `<div class="p-prev">Ya se le escribió${esIndicacion(t) ? ' por esto' : ''} ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
     <textarea id="nota" placeholder="Nota (opcional)"></textarea>
     <div class="p-acciones">
       <button type="button" class="btn-marca" id="p-hecho">Seguimiento hecho<kbd>H</kbd></button>
@@ -711,6 +780,8 @@ function lineaDeTiempo(citas) {
   }).join('');
 }
 
+const PARA = { HIERRO: 'Hierro (Ferinject)', PROCEDIMIENTO: 'Procedimiento' };
+
 function pintarFicha(p) {
   const confirmar = p.porConfirmar.map(i => `<div class="seccion confirmar">
       <h2>¿Es esta la misma persona?</h2>
@@ -737,8 +808,8 @@ function pintarFicha(p) {
     : '<p class="muted">Sin procedimientos indicados.</p>';
 
   const seguimientos = p.seguimientos.length
-    ? `<table><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Especialidad</th><th>Motivo</th><th>Nota</th></tr>${p.seguimientos.map(s =>
-        `<tr><td>${esc(s.FECHA_HORA)}</td><td>${esc(s.RESPONSABLE)}</td><td>${esc(s.ACCION)}</td><td>${esc(s.ESPECIALIDAD)}</td><td>${esc(s.MOTIVO)}</td><td>${esc(s.NOTA)}</td></tr>`).join('')}</table>`
+    ? `<table><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Para</th><th>Motivo</th><th>Nota</th></tr>${p.seguimientos.map(s =>
+        `<tr><td>${esc(s.FECHA_HORA)}</td><td>${esc(s.RESPONSABLE)}</td><td>${esc(s.ACCION)}</td><td>${esc(PARA[norm(s.ESPECIALIDAD)] || 'Reevaluación · ' + s.ESPECIALIDAD)}</td><td>${esc(s.MOTIVO)}</td><td>${esc(s.NOTA)}</td></tr>`).join('')}</table>`
     : '<p class="muted">Todavía no hay seguimientos.</p>';
 
   $('#ficha').innerHTML = `<div class="ficha-cab"><h1>${esc(p.nombre)}</h1><div class="muted">DNI ${esc(p.dni)}</div></div>
@@ -874,7 +945,7 @@ function pintarTablero() {
 }
 
 /* ==========================================================================
-   RESUMEN (propuesta 1b) — una cifra grande, tres secundarias y el mes a mes.
+   RESUMEN (propuesta 3a) — una cifra grande, tres secundarias y el mes a mes.
    Un paciente que no volvió cuenta en el mes de su última consulta.
    ========================================================================== */
 const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO',
@@ -901,6 +972,12 @@ function sumarMes(filas, mes) {
   return o;
 }
 
+/** Nota bajo cada columna del mes a mes. */
+function notaMes(x) {
+  if (!x.REEVAL) return x.CURSO ? `a ${x.CURSO} aún no les toca volver` : 'sin pacientes con plazo vencido';
+  return x.CURSO ? `en curso · a ${x.CURSO} aún no les toca volver` : 'cerrado';
+}
+
 function pintarResumen() {
   const R = E.resumen;
   if (E.rMed === null) E.rMed = medicoDeUsuario(usuario(), R.medicos);
@@ -911,40 +988,60 @@ function pintarResumen() {
   const anterior = meses[i + 1], siguiente = meses[i - 1];
   const m = sumarMes(filas, E.rMes);
   const quien = E.rMed ? 'sus' : 'los';
-  const fila = (a, b, clase, texto) => `<div class="r-fila">
+  const meta = Number(R.meta) || 0;
+  const metrica = (a, b, clase, texto, vacio) => `<div class="r-metrica">
       <span class="r-num num ${clase}">${pct(a, b)}</span>
-      <span><span class="r-etq">${texto}</span><span class="r-sub">${a} de ${b}</span></span>
+      <span class="r-etq">${texto}</span>
+      <span class="r-sub">${a} de ${b}${!b && vacio ? ' · ' + vacio : ''}</span>
     </div>`;
-  const ultimos = meses.slice(0, 6).reverse().map(mes => ({ mes, x: sumarMes(filas, mes) }));
-  const enCurso = ultimos.filter(u => u.x.CURSO);
+  const ALTO = matchMedia('(max-width:767px)').matches ? 95 : 150;
+  const columnas = meses.slice(0, 6).reverse().map(mes => {
+    const x = sumarMes(filas, mes), p = x.REEVAL ? x.REEVAL_NO / x.REEVAL : 0;
+    return `<button type="button" class="mm-col${mes === E.rMes ? ' actual' : ''}" data-mes="${esc(mes)}">
+      <span class="mm-area">
+        ${meta ? `<i class="mm-meta" style="bottom:${Math.round(ALTO * (100 - meta) / 100)}px"></i>` : ''}
+        <span class="mm-pct num${x.REEVAL ? '' : ' vacio'}">${pct(x.REEVAL_NO, x.REEVAL)}</span>
+        ${x.REEVAL ? `<i class="mm-barra${x.CURSO ? ' curso' : ''}" style="height:${Math.max(2, Math.round(ALTO * p))}px"></i>` : ''}
+      </span>
+      <span class="mm-mes">${esc(mesSolo(mes))}</span>
+      <span class="mm-nota">${notaMes(x)}</span>
+    </button>`;
+  }).join('');
 
   $('#resumen').innerHTML = `
-    <div class="r-nav">
-      <button type="button" id="r-ant"${anterior ? '' : ' disabled'}>‹ ${anterior ? esc(mesSolo(anterior)) : ''}</button>
-      <span id="r-mes-actual">${esc(nombreMes(E.rMes))}</span>
-      <button type="button" id="r-sig"${siguiente ? '' : ' disabled'}>${siguiente ? esc(mesSolo(siguiente)) : ''} ›</button>
+    <div class="r-cab">
+      <h1 class="r-mes" id="r-mes-actual">${esc(nombreMes(E.rMes))}</h1>
+      <div class="r-pasos">
+        <button type="button" id="r-ant"${anterior ? '' : ' disabled'}>‹ ${anterior ? esc(mesSolo(anterior)) : ''}</button>
+        <button type="button" id="r-sig"${siguiente ? '' : ' disabled'}>${siguiente ? esc(mesSolo(siguiente)) : ''} ›</button>
+      </div>
+      <label class="r-medico">Médico ${opciones('r-med', 'Todos los médicos', R.medicos, E.rMed)}</label>
     </div>
-    <div class="r-medico">Médico ${opciones('r-med', 'Todos los médicos', R.medicos, E.rMed)}</div>
-    <div class="r-grande num">${pct(m.REEVAL_NO, m.REEVAL)}</div>
-    <p class="r-frase">de ${quien} pacientes de ${esc(mesSolo(E.rMes))} no volvieron a su reevaluación.</p>
-    <p class="r-desglose">${m.REEVAL_NO} de ${m.REEVAL} · nuevos ${m.NUEVOS_NO} de ${m.NUEVOS - m.NUEVOS_CURSO} · en control ${m.CONTROL_NO} de ${m.CONTROL - m.CONTROL_CURSO}</p>
-    ${m.CURSO ? `<p class="r-nota">A ${m.CURSO} pacientes de este mes aún no les toca volver: no cuentan todavía.</p>` : ''}
-    <div class="r-filas">
-      ${fila(m.HIERRO_NO, m.HIERRO, 'pend', 'no siguieron el hierro (Ferinject)')}
-      ${fila(m.PROC_NO, m.PROC, 'pend', 'no siguieron otros procedimientos')}
-      ${fila(m.RECUPERADOS, m.SEGUIMIENTOS, 'buena', 'volvieron tras el seguimiento')}
+    <div class="r-principal">
+      <div>
+        <div class="r-grande num">${pct(m.REEVAL_NO, m.REEVAL)}</div>
+        <p class="r-frase">de ${quien} pacientes de ${esc(mesSolo(E.rMes))} no volvieron a su reevaluación.</p>
+        <p class="r-cuenta"><b class="num">${m.REEVAL_NO} de ${m.REEVAL}</b> pacientes</p>
+        <p class="r-desglose"><span><i class="m nuevo"></i>Nuevos ${m.NUEVOS_NO} de ${m.NUEVOS - m.NUEVOS_CURSO}</span><span><i class="m control"></i>En control ${m.CONTROL_NO} de ${m.CONTROL - m.CONTROL_CURSO}</span></p>
+        ${m.CURSO ? `<p class="r-nota">A ${m.CURSO} pacientes de este mes aún no les toca volver: no cuentan todavía.</p>` : ''}
+        ${meta ? `<p class="r-meta">Meta: que vuelva el ${meta} % (que no vuelva como máximo el ${100 - meta} %).</p>` : ''}
+      </div>
+      <div class="r-metricas">
+        ${metrica(m.HIERRO_NO, m.HIERRO, 'pend', 'no siguieron el hierro (Ferinject)')}
+        ${metrica(m.PROC_NO, m.PROC, 'pend', 'no siguieron otros procedimientos')}
+        ${metrica(m.RECUPERADOS, m.SEGUIMIENTOS, 'buena', 'volvieron tras el seguimiento', 'aún sin seguimientos este mes')}
+      </div>
     </div>
-    <div class="mm"><small>Mes a mes · no volvieron</small>
-      ${ultimos.map(u => `<div class="mm-fila">
-        <span>${esc(mesSolo(u.mes))}</span>
-        <span class="mm-barra${u.x.CURSO ? ' curso' : ''}"><i style="width:${u.x.REEVAL ? Math.round(100 * u.x.REEVAL_NO / u.x.REEVAL) : 0}%"></i></span>
-        <span class="mm-pct num">${pct(u.x.REEVAL_NO, u.x.REEVAL)}</span>
-      </div>`).join('')}
-      ${enCurso.map(u => `<p class="mm-nota">${esc(mesSolo(u.mes))} está en curso: a ${u.x.CURSO} pacientes aún no les toca volver.</p>`).join('')}
+    <div class="mm">
+      <div class="mm-cab"><small>Mes a mes · % que no volvió</small>
+        <span class="mm-ley"><span><i></i>Mes cerrado</span><span><i class="rayado"></i>En curso</span>${meta ? '<span><i class="meta"></i>Meta</span>' : ''}</span>
+      </div>
+      <div class="mm-cols">${columnas}</div>
     </div>`;
   $('#r-ant').addEventListener('click', () => { if (anterior) { E.rMes = anterior; pintarResumen(); } });
   $('#r-sig').addEventListener('click', () => { if (siguiente) { E.rMes = siguiente; pintarResumen(); } });
   $('#r-med').addEventListener('change', () => { E.rMed = $('#r-med').value; pintarResumen(); });
+  document.querySelectorAll('.mm-col').forEach(b => b.addEventListener('click', () => { E.rMes = b.dataset.mes; pintarResumen(); }));
 }
 
 /** Al elegir usuario: un médico ve directamente sus pacientes (puede cambiar a «Todos»). */
@@ -964,8 +1061,16 @@ async function iniciar() {
   $('#modo').addEventListener('click', () => ponerModo(document.documentElement.dataset.modo === 'oscuro' ? 'claro' : 'oscuro'));
   document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => irA(b.dataset.vista)));
   ['#f-esp', '#f-med', '#f-sintel'].forEach(s => $(s).addEventListener('change', pintarBandeja));
+  E.tipo = ['', 'REEVALUACION', 'HIERRO', 'PROCEDIMIENTO'].includes(leerPref('tipo')) ? leerPref('tipo') : '';
+  $('#tipos').addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-tipo]');
+    if (!b) return;
+    E.tipo = b.dataset.tipo;
+    guardarPref('tipo', E.tipo);
+    pintarBandeja();
+  });
   $('#usuario').addEventListener('change', aplicarUsuario);
-  addEventListener('resize', () => { if (E.abierto) pintarPanel(); });
+  addEventListener('resize', () => { if (E.abierto) pintarPanel(); if (E.resumen && !$('#v-resumen').hidden) pintarResumen(); });
   $('#fecha').textContent = fechaLarga(hoy());
   try {
     E.boot = await llamar('bootstrap');
@@ -990,7 +1095,7 @@ async function iniciar() {
 const DEMO = (() => {
   const hoy = '2026-10-01';
   const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS'];
-  const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
+  const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'ALTA MÉDICA', 'OTRO'];
   const ELI = 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA', KAREN = 'Dra. KAREN DIANA MATOS PEÑA';
   function mas(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
   const p = (DNI, ESPECIALIDAD, NOMBRE, TELEFONOS, MEDICO_ULTIMO, PRIMERA_CITA, ULTIMA_CITA, N_REALIZADAS, ESTADO, DIAS_ATRASO, N_SEGUIMIENTOS, ULTIMO_SEGUIMIENTO, PENDIENTE) =>
@@ -1008,6 +1113,14 @@ const DEMO = (() => {
     { ID: 'IND-0001', FECHA: '2026-08-05', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 2, ESTADO: 'COTIZÓ', TELEFONO: '987654321', OBSERVACIONES: 'VA A COORDINAR', DNI: '40111222' },
     { ID: 'IND-0002', FECHA: '2026-08-12', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', CANTIDAD: '', ESTADO: 'COTIZÓ', TELEFONO: '923456789', OBSERVACIONES: '', DNI: '40444555' }
   ];
+  const q = (DNI, TIPO, NOMBRE, TELEFONOS, MEDICO_ULTIMO, FECHA_COTIZACION, DETALLE, ULTIMA_CITA) => ({ DNI, ESPECIALIDAD: TIPO,
+    TIPO_SEGUIMIENTO: TIPO, NOMBRE, TELEFONOS, MEDICO_ULTIMO, ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', FECHA_COTIZACION, DETALLE,
+    DIAS: Math.round((Date.parse(hoy) - Date.parse(FECHA_COTIZACION)) / 86400000), ULTIMA_CITA, N_SEGUIMIENTOS: 0, ULTIMO_SEGUIMIENTO: '', ESTADO: 'PENDIENTE' });
+  const pendientes = [
+    q('40111222', 'HIERRO', 'ROSA ELENA QUISPE HUAMÁN', '987654321', ELI, '2026-08-05', 'Hierro (Ferinject) ×2', '2026-08-05'),
+    q('40555666', 'HIERRO', 'ANA MARÍA FLORES RÍOS', '934567890', ELI, '2026-09-15', 'Hierro (Ferinject)', '2026-09-20'),
+    q('40444555', 'PROCEDIMIENTO', 'LUIS ALBERTO RAMOS VEGA', '923456789', 'Dra. ALEJANDRA LA TORRE MATUK', '2026-08-12', 'AMO + BIOPSIA', '2026-08-12')
+  ];
   let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
     candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
   const seguimientos = [{ ID: 'SEG-1', FECHA_HORA: '2026-09-10 11:20', DNI: '40333444', ESPECIALIDAD: 'REUMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: 'Dijo que llamará' }];
@@ -1020,8 +1133,9 @@ const DEMO = (() => {
     exigir(x, accion === 'DESCARTADO');
     seguimientos.push({ ID: 'SEG-' + (seguimientos.length + 1), FECHA_HORA: hoy + ' 10:00', DNI: x.dni, ESPECIALIDAD: x.especialidad,
       RESPONSABLE: x.usuario, ACCION: accion, MOTIVO: x.motivo || '', NOTA: x.nota || '' });
-    const pac = pacientes.find(q => q.DNI === x.dni && q.ESPECIALIDAD === x.especialidad);
-    if (pac) pac.ESTADO = accion === 'HECHO' ? 'CONTACTADO' : 'DESCARTADO';
+    const pac = pacientes.concat(pendientes).find(y => y.DNI === x.dni && y.ESPECIALIDAD === x.especialidad);
+    if (!pac) throw new Error('Ese paciente no está en la lista. Recargue la página.');
+    pac.ESTADO = accion === 'HECHO' ? 'CONTACTADO' : 'DESCARTADO';
     return { ok: true };
   }
   return {
@@ -1031,8 +1145,13 @@ const DEMO = (() => {
       medicos: [...new Set(pacientes.map(x => x.MEDICO_ULTIMO))].sort()
     }),
     getBandeja: () => {
-      const tarjetas = pacientes.filter(x => x.ESTADO === 'VENCIDO').sort((a, b) =>
-        (a.N_SEGUIMIENTOS - b.N_SEGUIMIENTOS) || ((a.PENDIENTE ? 0 : 1) - (b.PENDIENTE ? 0 : 1)) || (a.DIAS_ATRASO - b.DIAS_ATRASO));
+      const reeval = pacientes.filter(x => x.ESTADO === 'VENCIDO').map(x => Object.assign({ TIPO_SEGUIMIENTO: 'REEVALUACION' }, x));
+      const otros = pendientes.filter(x => x.ESTADO === 'PENDIENTE');
+      const conPend = t => t.TIPO_SEGUIMIENTO !== 'REEVALUACION' || t.PENDIENTE ? 0 : 1;
+      const dias = t => t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.DIAS_ATRASO : t.DIAS;
+      const tarjetas = reeval.concat(otros).sort((a, b) =>
+        (a.N_SEGUIMIENTOS - b.N_SEGUIMIENTOS) || (conPend(a) - conPend(b)) || (dias(a) - dias(b)) ||
+        a.DNI.localeCompare(b.DNI) || a.TIPO_SEGUIMIENTO.localeCompare(b.TIPO_SEGUIMIENTO));
       return { tarjetas, contador: { porAtender: tarjetas.length,
         hechosHoy: seguimientos.filter(s => s.FECHA_HORA.startsWith(hoy) && s.ACCION === 'HECHO').length, recuperadosMes: 3 } };
     },
@@ -1088,7 +1207,7 @@ const DEMO = (() => {
     getResumen: () => {
       const r = (MES, MEDICO, v) => ({ MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], CONTROL: v[3], CONTROL_NO: v[4],
         CONTROL_CURSO: v[5], HIERRO: v[6], HIERRO_NO: v[7], PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11] });
-      return { hoy, medicos: [ELI, KAREN], filas: [
+      return { hoy, meta: 60, medicos: [ELI, KAREN], filas: [
         r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4]),
         r('2026-08', ELI, [40, 24, 0, 30, 9, 0, 15, 6, 4, 3, 0, 0]),
         r('2026-08', KAREN, [35, 20, 0, 20, 6, 0, 10, 5, 2, 2, 0, 0]),

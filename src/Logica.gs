@@ -186,7 +186,7 @@ function entero_(v, porDefecto, minimo) {
  */
 function reglasDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
-  var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180 };
+  var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60 };
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   (filas || []).forEach(function (f) {
     var esp = normTexto(celda(f, 'ESPECIALIDAD'));
@@ -196,6 +196,8 @@ function reglasDesdeFilas(encabezado, filas) {
     if (par === 'ESPERA_TRAS_SEGUIMIENTO_DIAS') r.espera = entero_(val, 15);
     if (par === 'MAX_SEGUIMIENTOS') r.maxSeguimientos = entero_(val, 3, 1);
     if (par === 'CORTE_BANDEJA_DIAS') r.corte = entero_(val, 180);
+    if (par === 'CORTE_INDICACIONES_DIAS') r.corteIndicaciones = entero_(val, 180);
+    if (par === 'META_RETORNO_PCT') r.metaRetorno = Math.min(100, entero_(val, 60));
   });
   Object.keys(r.plazos).forEach(function (k) {
     if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;
@@ -578,13 +580,88 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
   return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });
 }
 
-/** Diseño §7.1: primer intento antes; con indicación pendiente antes; menos atraso antes. */
-function ordenarBandeja(pacientes) {
-  return (pacientes || []).filter(function (p) { return p.ESTADO === 'VENCIDO'; }).sort(function (a, b) {
+var TIPOS_INDICACION = { HIERRO: 1, PROCEDIMIENTO: 1 };
+
+/**
+ * Hierro y procedimientos cotizados y no hechos, como seguimientos propios:
+ * una fila por DNI y tipo, estén o no al día con su reevaluación. En
+ * SEGUIMIENTOS se registran con ESPECIALIDAD = HIERRO o PROCEDIMIENTO.
+ */
+function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, contactos) {
+  var aceptado = {}, grupos = {};
+  (indicaciones || []).forEach(function (i) {
+    if (!i.DNI || i.ESTADO !== 'ACEPTÓ') return;
+    var k = i.DNI + '|' + i.TIPO;
+    if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
+  });
+  (indicaciones || []).forEach(function (i) {
+    if (!i.DNI || !i.FECHA || i.ESTADO !== 'COTIZÓ' || !TIPOS_INDICACION[i.TIPO]) return;
+    var k = i.DNI + '|' + i.TIPO;
+    if (aceptado[k] && aceptado[k] >= i.FECHA) return;
+    var g = grupos[k] = grupos[k] || { dni: i.DNI, tipo: i.TIPO, fecha: '', detalles: [], nombre: i.NOMBRE, solicitante: '' };
+    if (i.FECHA >= g.fecha) { g.fecha = i.FECHA; if (i.MEDICO_SOLICITANTE) g.solicitante = i.MEDICO_SOLICITANTE; }
+    var cantidad = Number(i.CANTIDAD);
+    var texto = (i.TIPO === 'HIERRO' ? 'Hierro (Ferinject)' : (i.DETALLE || 'Procedimiento')) + (cantidad > 1 ? ' ×' + cantidad : '');
+    if (g.detalles.indexOf(texto) < 0) g.detalles.push(texto);
+  });
+  var porDni = realizadasPorDni_(citas), tel = telefonosPorDni(indicaciones, contactos), segs = {};
+  (seguimientos || []).forEach(function (s) {
+    var t = normTexto(s.ESPECIALIDAD);
+    if (TIPOS_INDICACION[t]) (segs[s.DNI + '|' + t] = segs[s.DNI + '|' + t] || []).push(s);
+  });
+  return Object.keys(grupos).sort().map(function (k) {
+    var g = grupos[k], realizadas = porDni[g.dni] || [];
+    var previa = ultimaAntesDe_(realizadas, g.fecha) || realizadas[realizadas.length - 1];
+    var ultima = realizadas[realizadas.length - 1];
+    var lista = (segs[k] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= g.fecha; })
+      .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; });
+    var hechos = lista.filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; });
+    var ultimoHecho = hechos[hechos.length - 1];
+    var diasDesdeHecho = ultimoHecho ? diasEntre(fechaIso(ultimoHecho.FECHA_HORA), hoy) : null;
+    var dias = Math.max(0, diasEntre(g.fecha, hoy)), estado = 'PENDIENTE';
+    if (lista.length && normTexto(lista[lista.length - 1].ACCION) === 'DESCARTADO') estado = 'DESCARTADO';
+    else if (hechos.length >= reglas.maxSeguimientos && diasDesdeHecho >= reglas.espera) estado = 'DESCARTADO';
+    else if (ultimoHecho && diasDesdeHecho < reglas.espera) estado = 'CONTACTADO';
+    else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
+    return {
+      DNI: g.dni,
+      ESPECIALIDAD: g.tipo,
+      TIPO_SEGUIMIENTO: g.tipo,
+      NOMBRE: ultima ? ultima.NOMBRE : g.nombre,
+      TELEFONOS: (tel[g.dni] || []).join(' / '),
+      MEDICO_ULTIMO: g.solicitante || (previa ? previa.MEDICO : ''),
+      ESPECIALIDAD_CONSULTA: previa ? previa.ESPECIALIDAD : '',
+      FECHA_COTIZACION: g.fecha,
+      DETALLE: g.detalles.join(' · '),
+      DIAS: dias,
+      ULTIMA_CITA: ultima ? ultima.FECHA : '',
+      N_SEGUIMIENTOS: hechos.length,
+      ULTIMO_SEGUIMIENTO: lista.length ? fechaIso(lista[lista.length - 1].FECHA_HORA) : '',
+      ESTADO: estado
+    };
+  });
+}
+
+/**
+ * Diseño §7.1: primer intento antes; con algo pendiente antes; menos días antes.
+ * Une las reevaluaciones vencidas con el hierro y los procedimientos pendientes.
+ */
+function ordenarBandeja(pacientes, pendientes) {
+  var reeval = (pacientes || []).filter(function (p) { return p.ESTADO === 'VENCIDO'; }).map(function (p) {
+    var t = {};
+    Object.keys(p).forEach(function (k) { t[k] = p[k]; });
+    t.TIPO_SEGUIMIENTO = 'REEVALUACION';
+    return t;
+  });
+  var otros = (pendientes || []).filter(function (p) { return p.ESTADO === 'PENDIENTE'; });
+  var conPendiente = function (t) { return t.TIPO_SEGUIMIENTO !== 'REEVALUACION' || t.PENDIENTE ? 0 : 1; };
+  var dias = function (t) { return t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.DIAS_ATRASO : t.DIAS; };
+  return reeval.concat(otros).sort(function (a, b) {
     return (a.N_SEGUIMIENTOS - b.N_SEGUIMIENTOS) ||
-      ((a.PENDIENTE ? 0 : 1) - (b.PENDIENTE ? 0 : 1)) ||
-      (a.DIAS_ATRASO - b.DIAS_ATRASO) ||
-      (a.DNI < b.DNI ? -1 : a.DNI > b.DNI ? 1 : 0);
+      (conPendiente(a) - conPendiente(b)) ||
+      (dias(a) - dias(b)) ||
+      (a.DNI < b.DNI ? -1 : a.DNI > b.DNI ? 1 : 0) ||
+      (a.TIPO_SEGUIMIENTO < b.TIPO_SEGUIMIENTO ? -1 : a.TIPO_SEGUIMIENTO > b.TIPO_SEGUIMIENTO ? 1 : 0);
   });
 }
 
@@ -707,7 +784,7 @@ function kpiIndicaciones(indicaciones, citas) {
  */
 function kpiRecuperacion(seguimientos, citas, hoy) {
   var series = armarSeries(citas), vistos = {}, out = [];
-  (seguimientos || []).filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; })
+  (seguimientos || []).filter(function (s) { return normTexto(s.ACCION) === 'HECHO' && !TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)]; })
     .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; })
     .forEach(function (s) {
       var f = fechaIso(s.FECHA_HORA);
@@ -734,7 +811,7 @@ function kpiRecuperacion(seguimientos, citas, hoy) {
 function kpiMotivos(seguimientos) {
   var acc = {};
   (seguimientos || []).forEach(function (s) {
-    if (normTexto(s.ACCION) !== 'DESCARTADO') return;
+    if (normTexto(s.ACCION) !== 'DESCARTADO' || TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)]) return;
     var m = s.MOTIVO || 'SIN MOTIVO';
     acc[m] = (acc[m] || 0) + 1;
   });

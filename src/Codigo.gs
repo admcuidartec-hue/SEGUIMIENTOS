@@ -204,6 +204,7 @@ function datos_() {
     contactos: leerContactos_()
   };
   d.pacientes = armarPacientes(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos);
+  d.pendientes = pendientesIndicacion(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos);
   MEMO.datos = d;
   return d;
 }
@@ -225,6 +226,10 @@ function bootstrap() {
     if (p.ESPECIALIDAD) esp[p.ESPECIALIDAD] = 1;
     if (p.MEDICO_ULTIMO) med[p.MEDICO_ULTIMO] = 1;
   });
+  d.pendientes.forEach(function (p) {
+    if (p.ESPECIALIDAD_CONSULTA) esp[p.ESPECIALIDAD_CONSULTA] = 1;
+    if (p.MEDICO_ULTIMO) med[p.MEDICO_ULTIMO] = 1;
+  });
   return limpiarParaEnvio({
     hoy: d.hoy,
     usuarios: d.catalogos.usuarios,
@@ -236,7 +241,7 @@ function bootstrap() {
 
 function getBandeja() {
   var d = datos_();
-  var tarjetas = ordenarBandeja(d.pacientes);
+  var tarjetas = ordenarBandeja(d.pacientes, d.pendientes);
   var mes = mesDe(d.hoy);
   var hechosHoy = d.seguimientos.filter(function (s) {
     return fechaIso(s.FECHA_HORA) === d.hoy && normTexto(s.ACCION) === 'HECHO';
@@ -292,7 +297,7 @@ function buscar(texto) {
 
 function registrar_(p, accion) {
   var d = datos_();
-  var error = validarAccion(p, d.catalogos, accion, d.pacientes);
+  var error = validarAccion(p, d.catalogos, accion, d.pacientes.concat(d.pendientes));
   if (error) throw new Error(error);
   var lock = bloquear_();
   try {
@@ -353,5 +358,5 @@ function getResumen() {
   var filas = resumenPorMes(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy);
   var medicos = {};
   filas.forEach(function (f) { if (f.MEDICO !== 'SIN MÉDICO') medicos[f.MEDICO] = 1; });
-  return limpiarParaEnvio({ hoy: d.hoy, filas: filas, medicos: Object.keys(medicos).sort() });
+  return limpiarParaEnvio({ hoy: d.hoy, filas: filas, medicos: Object.keys(medicos).sort(), meta: d.reglas.metaRetorno });
 }

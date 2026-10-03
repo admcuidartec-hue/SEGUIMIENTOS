@@ -18,9 +18,12 @@ async function abrir(opciones = {}) {
 }
 const filas = p => p.locator('#lista .fila .nombre').allTextContents();
 
+const tipo = (p, t) => p.locator(`.tipos button[data-tipo="${t}"]`).click();
+
 test('bandeja: filas en el orden del diseño y agrupadas por urgencia', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
+    await tipo(pagina, 'REEVALUACION');
     assert.deepEqual(await filas(pagina), ['LUIS ALBERTO RAMOS VEGA', 'ROSA ELENA QUISPE HUAMÁN', 'JORGE LUIS MENDOZA PAREDES', 'CARMEN SOFÍA TORRES DÍAZ']);
     assert.deepEqual(await pagina.locator('#lista .grupo h2').allTextContents(), ['Recientes', 'Hace 1 a 2 meses', 'Más antiguos']);
     const luis = await pagina.locator('.fila', { hasText: 'LUIS ALBERTO' }).textContent();
@@ -37,7 +40,7 @@ test('sin elegir usuario no se puede marcar Hecho', async () => {
     await pagina.locator('.fila button.hecho').first().click();
     await pagina.waitForSelector('#aviso:not([hidden])');
     assert.match(await pagina.locator('#aviso').textContent(), /Elija quién es usted/);
-    assert.equal((await filas(pagina)).length, 4);
+    assert.equal((await filas(pagina)).length, 7);
   } finally { await navegador.close(); }
 });
 
@@ -46,9 +49,9 @@ test('Hecho quita la fila, suma en «hechos hoy» y no abre el panel', async () 
   try {
     await pagina.selectOption('#usuario', 'MAGALY');
     await pagina.locator('.fila button.hecho').first().click();
-    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 3);
+    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 6);
     assert.equal(await pagina.locator('#c-hechos').textContent(), '1');
-    assert.equal(await pagina.locator('#c-atender').textContent(), '3');
+    assert.equal(await pagina.locator('#c-atender').textContent(), '6');
     assert.equal(await pagina.locator('#panel').isVisible(), false);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -57,7 +60,7 @@ test('Hecho quita la fila, suma en «hechos hoy» y no abre el panel', async () 
 test('panel: clic en la fila lo abre con el detalle; oculta los teléfonos de la lista; Esc lo cierra', async () => {
   const { navegador, pagina } = await abrir();
   try {
-    await pagina.locator('.fila', { hasText: 'LUIS ALBERTO' }).click();
+    await pagina.locator('.fila', { hasText: 'LUIS ALBERTO' }).first().click();
     await pagina.waitForSelector('#panel:not([hidden])');
     const p = await pagina.locator('#panel').innerText();
     assert.match(p, /LUIS ALBERTO RAMOS VEGA/);
@@ -82,8 +85,8 @@ test('atajos: Enter abre, ↓ cambia de paciente, H marca hecho y pasa al siguie
     await pagina.keyboard.press('ArrowDown');
     assert.match(await pagina.locator('#panel h2').textContent(), /ROSA ELENA/);
     await pagina.keyboard.press('h');
-    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 3);
-    assert.match(await pagina.locator('#panel h2').textContent(), /JORGE LUIS/);
+    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 6);
+    assert.match(await pagina.locator('#panel h2').textContent(), /ANA MARÍA/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -95,7 +98,7 @@ test('descartar desde el panel pide motivo y no suma en «hechos hoy»', async (
     await pagina.locator('.fila', { hasText: 'JORGE LUIS' }).click();
     await pagina.locator('#p-descartar').click();
     await pagina.locator('[data-motivo="NÚMERO EQUIVOCADO"]').click();
-    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 3);
+    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 6);
     assert.equal(await pagina.locator('#c-hechos').textContent(), '0');
   } finally { await navegador.close(); }
 });
@@ -103,7 +106,7 @@ test('descartar desde el panel pide motivo y no suma en «hechos hoy»', async (
 test('copiar el teléfono muestra «Copiado ✓» y no abre el panel', async () => {
   const { navegador, pagina } = await abrir();
   try {
-    await pagina.locator('.fila', { hasText: 'LUIS ALBERTO' }).locator('[data-copiar]').click();
+    await pagina.locator('.fila', { hasText: 'LUIS ALBERTO' }).first().locator('[data-copiar]').click();
     await pagina.waitForFunction(() => /Copiado ✓/.test(document.querySelector('#lista [data-copiar]').textContent));
     assert.equal(await pagina.locator('#panel').isVisible(), false);
   } finally { await navegador.close(); }
@@ -139,7 +142,7 @@ test('resumen: el Dr. Eli ve sus pacientes; navega por mes; el mes en curso se a
   const { navegador, pagina, errores } = await abrir();
   try {
     await pagina.selectOption('#usuario', 'DR. ELI CABANILLAS');
-    assert.equal((await filas(pagina)).length, 1, 'la bandeja queda en sus pacientes');
+    assert.deepEqual(await filas(pagina), ['ROSA ELENA QUISPE HUAMÁN', 'ANA MARÍA FLORES RÍOS', 'ROSA ELENA QUISPE HUAMÁN'], 'la bandeja queda en sus pacientes');
     await pagina.locator('.nav button[data-vista="resumen"]').click();
     await pagina.waitForSelector('#r-mes-actual');
     assert.equal(await pagina.locator('#r-med').inputValue(), 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
@@ -149,12 +152,17 @@ test('resumen: el Dr. Eli ve sus pacientes; navega por mes; el mes en curso se a
     const t = await pagina.locator('#resumen').textContent();
     assert.match(t, /47%/);
     assert.match(t, /de sus pacientes de agosto no volvieron a su reevaluación/);
-    assert.match(t, /33 de 70 · nuevos 24 de 40 · en control 9 de 30/);
+    assert.match(t, /33 de 70 pacientes/);
+    assert.match(t, /Nuevos 24 de 40\s*En control 9 de 30/);
     assert.match(t, /mes a mes/i);
-    assert.match(t, /setiembre está en curso: a 35 pacientes aún no les toca volver/);
-    assert.equal(await pagina.locator('.r-fila').count(), 3);
+    assert.match(t, /Meta: que vuelva el 60 %/);
+    assert.match(await pagina.locator('.mm-col[data-mes="2026-09"]').textContent(), /en curso · a 35 aún no les toca volver/);
+    assert.match(await pagina.locator('.mm-col[data-mes="2026-08"]').textContent(), /47%\s*agosto\s*cerrado/);
+    assert.equal(await pagina.locator('.r-metrica').count(), 3);
     await pagina.selectOption('#r-med', '');
     assert.match(await pagina.locator('#resumen').textContent(), /59 de 125/);
+    await pagina.locator('.mm-col[data-mes="2026-07"]').click();
+    assert.equal(await pagina.locator('#r-mes-actual').textContent(), 'julio 2026');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -192,7 +200,7 @@ test('celular: el panel ocupa la pantalla con «‹ Volver» y no hay scroll hor
   const { navegador, pagina, errores } = await abrir({ viewport: { width: 390, height: 844 } });
   try {
     assert.ok(await pagina.evaluate(() => document.documentElement.scrollWidth <= 390));
-    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).click();
+    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).first().click();
     await pagina.waitForSelector('#panel:not([hidden])');
     const caja = await pagina.locator('#panel').boundingBox();
     assert.ok(caja.width >= 389 && caja.x <= 1, 'panel a pantalla completa');
@@ -229,6 +237,60 @@ test('detalle: campañas y canales que traen pacientes que vuelven, con filtro d
     await pagina.selectOption('#t-med', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
     t = await pagina.locator('.seccion', { hasText: '¿Qué campañas traen pacientes que vuelven?' }).textContent();
     assert.match(t, /FACEBOOK ADS\s*20\s*45%/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('bandeja: botones por tipo con su número; hierro y procedimientos son listas propias', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    const textos = await pagina.locator('.tipos button').allTextContents();
+    assert.deepEqual(textos.map(t => t.replace(/\s+/g, ' ').trim()),
+      ['Todos 7', 'Reevaluaciones 4', 'Hierro (Ferinject) 2', 'Procedimientos 1']);
+    await tipo(pagina, 'HIERRO');
+    assert.deepEqual(await filas(pagina), ['ANA MARÍA FLORES RÍOS', 'ROSA ELENA QUISPE HUAMÁN']);
+    assert.match(await pagina.locator('.fila', { hasText: 'ANA MARÍA' }).textContent(),
+      /Hierro \(Ferinject\) · Dr\. Cabanillas · Cotizó el 15\/09\/2026 · hace 16 días/);
+    assert.deepEqual(await pagina.locator('#lista .grupo span').allTextContents(),
+      ['cotizado hace 30 días o menos · 1 paciente', 'cotizado hace 31 a 60 días · 1 paciente']);
+    await tipo(pagina, 'PROCEDIMIENTO');
+    assert.deepEqual(await filas(pagina), ['LUIS ALBERTO RAMOS VEGA']);
+    await pagina.locator('.fila').click();
+    const p = await pagina.locator('#panel').innerText();
+    assert.match(p, /Procedimiento: AMO \+ BIOPSIA · cotizó y no lo hizo/);
+    assert.match(p, /hace 50 días que cotizó/);
+    assert.doesNotMatch(p, /no volvió a su/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('bandeja: «Hecho» en una fila de hierro la quita solo de la lista de hierro', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'HIERRO');
+    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).locator('button.hecho').click();
+    await pagina.waitForSelector('#aviso:not([hidden])');
+    assert.match(await pagina.locator('#aviso').textContent(), /Seguimiento registrado: ROSA ELENA/);
+    assert.deepEqual(await filas(pagina), ['ANA MARÍA FLORES RÍOS']);
+    assert.match(await pagina.locator('.tipos button[data-tipo="HIERRO"]').textContent(), /1/);
+    await tipo(pagina, 'REEVALUACION');
+    assert.ok((await filas(pagina)).includes('ROSA ELENA QUISPE HUAMÁN'), 'su reevaluación sigue pendiente');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('resumen en computadora (3a): cifra grande a la izquierda y tres métricas en columnas', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.locator('.nav button[data-vista="resumen"]').click();
+    await pagina.waitForSelector('.r-metrica');
+    const grande = await pagina.locator('.r-grande').boundingBox();
+    const m = await Promise.all([0, 1, 2].map(i => pagina.locator('.r-metrica').nth(i).boundingBox()));
+    assert.ok(m.every(b => b.x > grande.x + grande.width), 'las métricas van a la derecha');
+    assert.ok(m[0].y === m[1].y && m[1].y === m[2].y && m[0].x < m[1].x && m[1].x < m[2].x, 'en una fila');
+    const col = await pagina.locator('.mm-col[data-mes="2026-08"] .mm-barra').boundingBox();
+    assert.ok(col.height > col.width / 4 && col.height > 40, 'barra vertical');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

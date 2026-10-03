@@ -33,6 +33,11 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - **Ningún dato real de pacientes en el repositorio.**
 - **Nunca `npm audit fix --force`**: sube clasp a la v3 y rompe los scripts.
 - Sin conexión a WhatsApp: la app muestra los datos y se marca «Seguimiento hecho».
+- La bandeja tiene tres tipos de seguimiento: reevaluación (series `VENCIDO`), hierro y
+  procedimiento (cotizado y no hecho, `pendientesIndicacion`). Los de hierro y procedimiento
+  se guardan en `SEGUIMIENTOS` con `ESPECIALIDAD` = `HIERRO` o `PROCEDIMIENTO` y no cuentan
+  en «volvieron tras el seguimiento». Parámetros en `REGLAS`: `CORTE_INDICACIONES_DIAS` (180)
+  y `META_RETORNO_PCT` (60).
 
 ## Publicar
 

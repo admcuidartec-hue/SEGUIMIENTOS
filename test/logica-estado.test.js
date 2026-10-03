@@ -17,7 +17,7 @@ test('reglas: especialidad con o sin tilde es la misma', () => {
 
 test('reglas: sin filas se usan los valores por defecto', () => {
   const r = L.reglasDesdeFilas(['ESPECIALIDAD'], []);
-  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180 });
+  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60 });
 });
 
 test('reglas: VENCE nunca queda antes que ESPERADO', () => {

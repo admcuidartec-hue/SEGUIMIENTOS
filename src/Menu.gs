@@ -43,11 +43,13 @@ function prepararHojas() {
   });
   if (!ss.getSheetByName('REGLAS')) {
     var r = ss.insertSheet('REGLAS');
-    r.getRange(1, 1, 4, 6).setValues([
+    r.getRange(1, 1, 6, 6).setValues([
       ['ESPECIALIDAD', 'ESPERADO_DIAS', 'VENCE_DIAS', '', 'PARAMETRO', 'VALOR'],
       ['*', 30, 45, '', 'ESPERA_TRAS_SEGUIMIENTO_DIAS', 15],
-      ['HEMATOLOGÍA', 30, 45, '', 'MAX_SEGUIMIENTOS', 3],
-      ['', '', '', '', 'CORTE_BANDEJA_DIAS', 180]
+      ['HEMATOLOGÍA', 30, 45, '', 'MAX_SEGUIMIENTOS', 2],
+      ['', '', '', '', 'CORTE_BANDEJA_DIAS', 180],
+      ['', '', '', '', 'CORTE_INDICACIONES_DIAS', 180],
+      ['', '', '', '', 'META_RETORNO_PCT', 60]
     ]);
     r.getRange(1, 1, 1, 6).setFontWeight('bold');
     r.setFrozenRows(1);
@@ -55,12 +57,13 @@ function prepararHojas() {
   }
   if (!ss.getSheetByName('CATALOGOS')) {
     var c = ss.insertSheet('CATALOGOS');
-    c.getRange(1, 1, 6, 4).setValues([
+    c.getRange(1, 1, 7, 4).setValues([
       ['USUARIOS', 'MOTIVOS_DESCARTE', 'MEDICO_ALIAS', 'MEDICO_NOMBRE'],
       ['MAGALY', 'SE ATIENDE EN OTRO LUGAR', 'Dr. ELI FABRIZIO CABANILLAS HUALPA', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA'],
       ['ANA', 'NÚMERO EQUIVOCADO', '', ''],
       ['RACHEL', 'YA NO LO NECESITA', '', ''],
       ['DR. ELI CABANILLAS', 'FALLECIÓ', '', ''],
+      ['', 'ALTA MÉDICA', '', ''],
       ['', 'OTRO', '', '']
     ]);
     c.getRange(1, 1, 1, 4).setFontWeight('bold');
@@ -113,8 +116,10 @@ function actualizar_(quien) {
   var detalle = unirFrases([filas.length + ' filas leídas, ' + fusion.nuevas + ' citas nuevas, ' + fusion.cambiadas + ' cambiadas, ' +
     limpio.invalidas + ' inválidas, ' + emparejadas + ' emparejamientos nuevos', crm.mensaje]);
   bitacora_(quien, 'ACTUALIZAR', detalle);
-  var vencidos = d.pacientes.filter(function (p) { return p.ESTADO === 'VENCIDO'; }).length;
-  return { ok: true, mensaje: unirFrases(['Listo', detalle, 'En la bandeja: ' + vencidos + ' pacientes']) };
+  var t = ordenarBandeja(d.pacientes, d.pendientes), n = { REEVALUACION: 0, HIERRO: 0, PROCEDIMIENTO: 0 };
+  t.forEach(function (x) { n[x.TIPO_SEGUIMIENTO]++; });
+  return { ok: true, mensaje: unirFrases(['Listo', detalle, 'En la bandeja: ' + n.REEVALUACION + ' reevaluaciones, ' +
+    n.HIERRO + ' de hierro y ' + n.PROCEDIMIENTO + ' de procedimientos']) };
 }
 
 /**

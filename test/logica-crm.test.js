@@ -44,9 +44,9 @@ test('emparejarContactos: por DNI si el paciente existe; si no, por nombre con u
     { ID_LEAD: 'L-3', NOMBRE: 'Jorge Mendoza', DNI: '' },
     { ID_LEAD: 'L-4', NOMBRE: 'Pedro Castillo', DNI: '' }
   ];
-  assert.equal(L.emparejarContactos(contactos, citas), 2);
+  assert.equal(L.emparejarContactos(contactos, citas), 1);
   assert.deepEqual(plano(contactos.map(c => [c.DNI_PACIENTE, c.EMPAREJAMIENTO])),
-    [['40111222', 'POR DNI'], ['40111222', 'AUTOMÁTICO'], ['', 'POR CONFIRMAR'], ['', 'SIN CANDIDATO']]);
+    [['40111222', 'POR DNI'], ['', 'DNI SIN PACIENTE'], ['', 'POR CONFIRMAR'], ['', 'SIN CANDIDATO']]);
 });
 
 const C = o => Object.assign({ ID_LEAD: 'L', FECHA: '2026-07-01', NOMBRE: '', DNI: '', TELEFONO: '', CANAL: 'FACEBOOK ADS',
@@ -108,4 +108,18 @@ test('calcularKpi incluye campanas', () => {
     [C({ DNI_PACIENTE: '1' })]));
   assert.equal(k.campanas.length, 1);
   assert.deepEqual(plano(L.calcularKpi([], [], [], reglas(L), '2026-10-02')).campanas, []);
+});
+
+test('un lead con DNI de otra persona no se une por nombre a un paciente', () => {
+  const citas = [cita({ dni: '7654321', nombre: 'MARIA ELENA QUISPE MAMANI', fecha: '2026-07-20' })];
+  const contactos = [{ ID_LEAD: 'L-1', NOMBRE: 'Maria Quispe', DNI: '41234567' }, { ID_LEAD: 'L-2', NOMBRE: 'Maria Quispe', DNI: '' }];
+  assert.equal(L.emparejarContactos(contactos, citas), 1);
+  assert.deepEqual(plano(contactos.map(c => c.DNI_PACIENTE)), ['', '7654321']);
+});
+
+test('contactosDesdeCrm exige también DNI, nombres, apellidos, canal específico y campaña', () => {
+  for (const col of ['DNI', 'NOMBRES', 'APELLIDOS', 'CANAL_ESPECIFICO', 'CAMPANA']) {
+    const r = plano(L.contactosDesdeCrm(ENC.filter(c => c !== col), [lead({ id: 'L-1', dni: '1' })]));
+    assert.deepEqual(r.faltantes, [col], col);
+  }
 });

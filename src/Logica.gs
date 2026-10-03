@@ -445,7 +445,8 @@ function buscarFilaParaConfirmar(encabezado, filas, id, dni, indice) {
    ========================================================================== */
 
 var COLUMNAS_CONTACTOS = ['ID_LEAD', 'FECHA', 'NOMBRE', 'DNI', 'TELEFONO', 'CANAL', 'CAMPANA', 'DNI_PACIENTE', 'EMPAREJAMIENTO'];
-var CRM_OBLIGATORIAS = ['ID', 'FECHA', 'TELEFONO'];
+/* Sin DNI, nombres, canal o campaña la copia saldría degradada sin avisar: mejor no tocarla. */
+var CRM_OBLIGATORIAS = ['ID', 'FECHA', 'NOMBRES', 'APELLIDOS', 'DNI', 'TELEFONO', 'CANAL_ESPECIFICO', 'CAMPANA'];
 
 function campanaLimpia_(v) {
   var t = textoLimpio_(v), n = normTexto(t);
@@ -480,13 +481,15 @@ function contactosDesdeCrm(encabezado, filas) {
   return { contactos: out, faltantes: [] };
 }
 
-/** Une cada lead con su paciente: por DNI si existe en CITAS; si no, por nombre (un solo candidato). */
+/** Une cada lead con su paciente: por DNI si existe en CITAS; si el lead no trae DNI, por nombre (un solo candidato). */
 function emparejarContactos(contactos, citas) {
   var conCitas = {}, n = 0;
   (citas || []).forEach(function (c) { conCitas[c.DNI] = 1; });
   var indice = construirIndiceNombres(citas);
   (contactos || []).forEach(function (c) {
     if (c.DNI && conCitas[c.DNI]) { c.DNI_PACIENTE = c.DNI; c.EMPAREJAMIENTO = 'POR DNI'; n++; return; }
+    // Un DNI que no es de ningún paciente es otra persona (o alguien que nunca vino): no se une por nombre.
+    if (c.DNI) { c.DNI_PACIENTE = ''; c.EMPAREJAMIENTO = 'DNI SIN PACIENTE'; return; }
     var r = c.NOMBRE ? emparejar(c.NOMBRE, indice) : { estado: 'SIN CANDIDATO', dni: '' };
     c.DNI_PACIENTE = r.estado === 'AUTOMÁTICO' ? r.dni : '';
     c.EMPAREJAMIENTO = r.estado;

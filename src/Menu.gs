@@ -136,6 +136,9 @@ function traerCrm_(citas) {
   if (r.faltantes.length) {
     return { ok: false, mensaje: 'CRM no leído: faltan las columnas ' + r.faltantes.join(', ') + ' en ' + CONFIG.HOJA_CRM + '. Se conservan los datos anteriores.' };
   }
+  if (valores.length > 1 && !r.contactos.length) {
+    return { ok: false, mensaje: 'CRM no leído: ' + CONFIG.HOJA_CRM + ' no tiene ningún lead con nombre o DNI. Se conservan los datos anteriores.' };
+  }
   var unidos = emparejarContactos(r.contactos, citas);
   if (!ss_().getSheetByName('CONTACTOS_CRM')) ss_().insertSheet('CONTACTOS_CRM');
   escribirObjetos_('CONTACTOS_CRM', COLUMNAS_CONTACTOS, r.contactos);
@@ -152,6 +155,9 @@ function actualizacionDiaria() {
   try {
     var r = actualizar_('AUTOMÁTICO');
     if (!r.ok) bitacora_('AUTOMÁTICO', 'ACTUALIZAR', r.mensaje);
+  } catch (e) {
+    try { bitacora_('AUTOMÁTICO', 'ACTUALIZAR', 'Error: ' + e.message); } catch (e2) { /* la bitácora tampoco: queda el correo de Google */ }
+    throw e;
   } finally {
     lock.releaseLock();
   }

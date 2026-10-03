@@ -56,7 +56,7 @@ test('traerCrm_ no reescribe CONTACTOS_CRM si al CRM le falta una columna', () =
   ctx.escribirObjetos_ = h => escritos.push(h);
   const r = ctx.traerCrm_([]);
   assert.equal(r.ok, false);
-  assert.match(r.mensaje, /CRM no leído: faltan las columnas TELEFONO/);
+  assert.match(r.mensaje, /CRM no leído: faltan las columnas .*TELEFONO/);
   assert.deepEqual(escritos, []);
 });
 
@@ -110,5 +110,29 @@ test('actualizacionDiaria usa el usuario AUTOMÁTICO y suelta el candado', () =>
   ctx.actualizar_ = q => { quien = q; return { ok: true, mensaje: 'Listo.' }; };
   ctx.actualizacionDiaria();
   assert.equal(quien, 'AUTOMÁTICO');
+  assert.equal(estado.tomado, false);
+});
+
+test('traerCrm_ no borra CONTACTOS_CRM si LEADS tiene filas pero ningún lead útil', () => {
+  const { ctx } = contexto();
+  const escritos = [];
+  ctx.SpreadsheetApp = libroCrm([
+    ['ID', 'FECHA', 'NOMBRES', 'APELLIDOS', 'DNI', 'TELEFONO', 'CANAL_ESPECIFICO', 'CAMPANA'],
+    ['L-1', '2026-07-10 10:00', '', '', '', '912345678', 'GOOGLE', '']
+  ]);
+  ctx.escribirObjetos_ = h => escritos.push(h);
+  const r = ctx.traerCrm_([]);
+  assert.equal(r.ok, false);
+  assert.match(r.mensaje, /ningún lead con nombre o DNI/);
+  assert.deepEqual(escritos, []);
+});
+
+test('si la actualización diaria falla, queda en BITACORA, suelta el candado y avisa a Google', () => {
+  const { ctx, estado } = contexto();
+  const notas = [];
+  ctx.bitacora_ = (u, a, d) => notas.push([u, a, d]);
+  ctx.actualizar_ = () => { throw new Error('falta la hoja KPI'); };
+  assert.throws(() => ctx.actualizacionDiaria(), /falta la hoja KPI/);
+  assert.deepEqual(notas, [['AUTOMÁTICO', 'ACTUALIZAR', 'Error: falta la hoja KPI']]);
   assert.equal(estado.tomado, false);
 });

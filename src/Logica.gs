@@ -438,6 +438,64 @@ function buscarFilaParaConfirmar(encabezado, filas, id, dni, indice) {
   return { fila: -1, error: 'No encontré la indicación ' + id + '.' };
 }
 /* ==========================================================================
+   CRM DE LEADS (solo lectura)
+
+   Se traen solo los leads con DNI o nombre (sin ellos no se pueden unir con
+   ningún paciente) y solo las columnas que hacen falta.
+   ========================================================================== */
+
+var COLUMNAS_CONTACTOS = ['ID_LEAD', 'FECHA', 'NOMBRE', 'DNI', 'TELEFONO', 'CANAL', 'CAMPANA', 'DNI_PACIENTE', 'EMPAREJAMIENTO'];
+var CRM_OBLIGATORIAS = ['ID', 'FECHA', 'TELEFONO'];
+
+function campanaLimpia_(v) {
+  var t = textoLimpio_(v), n = normTexto(t);
+  if (!n || n === 'NINGUNA CAMPANA' || n === 'NO SE VISUALIZA CAMPANA') return 'Sin campaña';
+  return t;
+}
+
+function contactosDesdeCrm(encabezado, filas) {
+  var idx = indiceDeEncabezado(encabezado);
+  var faltantes = CRM_OBLIGATORIAS.filter(function (c) { return idx[c] === undefined; });
+  if (faltantes.length) return { contactos: [], faltantes: faltantes };
+  function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
+  var out = [];
+  (filas || []).forEach(function (f) {
+    var id = textoLimpio_(celda(f, 'ID'));
+    var nombre = textoLimpio_(textoLimpio_(celda(f, 'NOMBRES')) + ' ' + textoLimpio_(celda(f, 'APELLIDOS')));
+    var dni = normDni(celda(f, 'DNI'));
+    var fecha = fechaIso(celda(f, 'FECHA'));
+    if (!id || !fecha || (!dni && !nombre)) return;
+    out.push({
+      ID_LEAD: id,
+      FECHA: fecha,
+      NOMBRE: nombre,
+      DNI: dni,
+      TELEFONO: normTelefono(celda(f, 'TELEFONO')),
+      CANAL: textoLimpio_(celda(f, 'CANAL_ESPECIFICO')) || textoLimpio_(celda(f, 'CANAL')) || 'Sin canal',
+      CAMPANA: campanaLimpia_(celda(f, 'CAMPANA')),
+      DNI_PACIENTE: '',
+      EMPAREJAMIENTO: ''
+    });
+  });
+  return { contactos: out, faltantes: [] };
+}
+
+/** Une cada lead con su paciente: por DNI si existe en CITAS; si no, por nombre (un solo candidato). */
+function emparejarContactos(contactos, citas) {
+  var conCitas = {}, n = 0;
+  (citas || []).forEach(function (c) { conCitas[c.DNI] = 1; });
+  var indice = construirIndiceNombres(citas);
+  (contactos || []).forEach(function (c) {
+    if (c.DNI && conCitas[c.DNI]) { c.DNI_PACIENTE = c.DNI; c.EMPAREJAMIENTO = 'POR DNI'; n++; return; }
+    var r = c.NOMBRE ? emparejar(c.NOMBRE, indice) : { estado: 'SIN CANDIDATO', dni: '' };
+    c.DNI_PACIENTE = r.estado === 'AUTOMÁTICO' ? r.dni : '';
+    c.EMPAREJAMIENTO = r.estado;
+    if (c.DNI_PACIENTE) n++;
+  });
+  return n;
+}
+
+/* ==========================================================================
    PACIENTES Y BANDEJA
    ========================================================================== */
 

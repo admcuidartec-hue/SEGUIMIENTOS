@@ -215,3 +215,20 @@ test('no hay colores escritos a mano fuera de la paleta', () => {
     .replace(/:root\{[^}]*\}/, '').replace(/html\[data-modo="oscuro"\]\{[^}]*\}/, '');
   assert.equal(resto.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(/g), null);
 });
+
+test('detalle: campañas y canales que traen pacientes que vuelven, con filtro de médico', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.locator('.nav button[data-vista="tablero"]').click();
+    await pagina.waitForSelector('#tablero table');
+    const seccion = pagina.locator('.seccion', { hasText: '¿Qué campañas traen pacientes que vuelven?' });
+    let t = await seccion.textContent();
+    assert.match(t, /FACEBOOK ADS\s*35\s*37%/);
+    assert.match(t, /Sin lead en el CRM/);
+    assert.match(t, /Por campaña/);
+    await pagina.selectOption('#t-med', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
+    t = await pagina.locator('.seccion', { hasText: '¿Qué campañas traen pacientes que vuelven?' }).textContent();
+    assert.match(t, /FACEBOOK ADS\s*20\s*45%/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

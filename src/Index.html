@@ -808,9 +808,10 @@ function pintarTablero() {
   const valor = id => ($(id) ? $(id).value : '');
   const fMes = valor('#t-mes'), fEsp = valor('#t-esp'), fMed = valor('#t-med');
   const unicos = a => [...new Set(a.filter(Boolean))].sort();
-  const meses = unicos(k.cohortes.map(r => r.COHORTE).concat(k.indicaciones.map(r => r.MES), k.recuperacion.map(r => r.MES)));
+  const cam = k.campanas || [];
+  const meses = unicos(k.cohortes.map(r => r.COHORTE).concat(k.indicaciones.map(r => r.MES), k.recuperacion.map(r => r.MES), cam.map(r => r.MES)));
   const esps = unicos(k.cohortes.map(r => r.ESPECIALIDAD).concat(k.recuperacion.map(r => r.ESPECIALIDAD)));
-  const meds = unicos(k.cohortes.map(r => r.MEDICO).concat(k.indicaciones.map(r => r.MEDICO), k.recuperacion.map(r => r.MEDICO)));
+  const meds = unicos(k.cohortes.map(r => r.MEDICO).concat(k.indicaciones.map(r => r.MEDICO), k.recuperacion.map(r => r.MEDICO), cam.map(r => r.MEDICO)));
   const okMes = m => !fMes || m === fMes, okEsp = e => !fEsp || e === fEsp, okMed = m => !fMed || m === fMed;
   const T = t => ({ t }), N = t => ({ t, num: true });
 
@@ -833,6 +834,12 @@ function pintarTablero() {
   const recMes = agrupar(rec, r => r.MES, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec)
     .map(f => [esc(nombreMes(f[0]))].concat(f.slice(1)));
 
+  const camF = cam.filter(r => okMes(r.MES) && okMed(r.MEDICO));
+  const sumaCam = (o, r) => { o.n += Number(r.NUEVOS); o.c += Number(r.EN_CURSO); o.v += Number(r.VOLVIERON); };
+  const filasCam = claveDe => agrupar(camF, claveDe, () => ({ n: 0, c: 0, v: 0 }), sumaCam)
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(([c, o]) => [esc(c), o.n, `${pct(o.v, o.n - o.c)} <span class="muted">(${o.v}/${o.n - o.c})</span>${barra(o.v, o.n - o.c)}`, o.c]);
+
   $('#tablero').innerHTML = `
     <div class="filtros">
       <label>Mes ${opciones('t-mes', 'Todos', meses, fMes, nombreMes)}</label>
@@ -842,6 +849,11 @@ function pintarTablero() {
     <div class="seccion"><h2>¿Vuelven los pacientes nuevos?</h2>
       <p class="muted">Pacientes agrupados por el mes de su primera consulta. Solo cuentan los que ya debían haber vuelto.</p>
       ${tabla([T('Pacientes nuevos de'), N('Volvieron a su 1.ª reevaluación'), N('A su 2.ª reevaluación'), N('A su 3.ª reevaluación')], filasCoh)}</div>
+    <div class="seccion"><h2>¿Qué campañas traen pacientes que vuelven?</h2>
+      <p class="muted">Pacientes nuevos desde que existe el CRM, según el último anuncio o canal por el que escribieron antes de su primera consulta. El filtro de especialidad no cambia esta sección.</p>
+      ${tabla([T('Canal'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CANAL))}
+      <h3>Por campaña</h3>
+      ${tabla([T('Campaña'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CAMPANA))}</div>
     <div class="seccion"><h2>Procedimientos (hierro y otros)</h2>
       <p class="muted">De lo cotizado, cuánto se hizo. Los procedimientos no tienen especialidad: ese filtro no los cambia.</p>
       ${tabla([T('Procedimiento'), N('Cotizados'), N('Se hicieron'), N('Porcentaje')], indTipo)}
@@ -1062,6 +1074,13 @@ const DEMO = (() => {
         { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, VOLVIO: 0, DIAS: '' },
         { MES: '2026-09', RESPONSABLE: 'RACHEL', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: 'Dr. JUVENAL HANAMPA ROQUE', VOLVIO: 1, DIAS: 12 },
         { MES: '2026-09', RESPONSABLE: 'DR. ELI CABANILLAS', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 9 }
+      ],
+      campanas: [
+        { MES: '2026-08', MEDICO: ELI, CANAL: 'FACEBOOK ADS', CAMPANA: 'LAB-001', NUEVOS: 20, EN_CURSO: 0, VOLVIERON: 9 },
+        { MES: '2026-08', MEDICO: KAREN, CANAL: 'FACEBOOK ADS', CAMPANA: 'Sin campaña', NUEVOS: 15, EN_CURSO: 0, VOLVIERON: 4 },
+        { MES: '2026-08', MEDICO: ELI, CANAL: 'WSSP DIRECTO', CAMPANA: 'Sin campaña', NUEVOS: 10, EN_CURSO: 0, VOLVIERON: 6 },
+        { MES: '2026-09', MEDICO: ELI, CANAL: 'GOOGLE', CAMPANA: 'Sin campaña', NUEVOS: 8, EN_CURSO: 5, VOLVIERON: 1 },
+        { MES: '2026-08', MEDICO: KAREN, CANAL: 'Sin lead en el CRM', CAMPANA: 'Sin lead en el CRM', NUEVOS: 6, EN_CURSO: 0, VOLVIERON: 2 }
       ],
       motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }],
       sinCandidato: [{ ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' }]

@@ -92,6 +92,12 @@ function textoLimpio_(v) {
   return String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
 }
 
+/** 'HIERRO CARBOXIMALTOSA' -> 'Hierro carboximaltosa'. */
+function frase_(s) {
+  var t = textoLimpio_(s).toLowerCase();
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 /** Solo las marcas 'yyyy-…' se pueden comparar como texto; lo demás no desempata. */
 function claveRegistro(v) {
   var s = String(v == null ? '' : v);
@@ -186,7 +192,8 @@ function entero_(v, porDefecto, minimo) {
  */
 function reglasDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
-  var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60 };
+  var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60,
+    esperaCotizacion: 7, diasEntreSesiones: 7 };
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   (filas || []).forEach(function (f) {
     var esp = normTexto(celda(f, 'ESPECIALIDAD'));
@@ -198,6 +205,8 @@ function reglasDesdeFilas(encabezado, filas) {
     if (par === 'CORTE_BANDEJA_DIAS') r.corte = entero_(val, 180);
     if (par === 'CORTE_INDICACIONES_DIAS') r.corteIndicaciones = entero_(val, 180);
     if (par === 'META_RETORNO_PCT') r.metaRetorno = Math.min(100, entero_(val, 60));
+    if (par === 'ESPERA_COTIZACION_DIAS') r.esperaCotizacion = entero_(val, 7);
+    if (par === 'DIAS_ENTRE_SESIONES') r.diasEntreSesiones = entero_(val, 7);
   });
   Object.keys(r.plazos).forEach(function (k) {
     if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;
@@ -209,10 +218,13 @@ function plazoDe(reglas, especialidad) {
   return reglas.plazos[normTexto(especialidad)] || reglas.plazos['*'];
 }
 
-/** CATALOGOS: una columna por lista. USUARIOS | MOTIVOS_DESCARTE | MEDICO_ALIAS | MEDICO_NOMBRE */
+/**
+ * CATALOGOS: una columna por lista. USUARIOS | MOTIVOS_DESCARTE | MEDICO_ALIAS | MEDICO_NOMBRE |
+ * DOCTOR | DOCTOR_SOFDOC | PROCEDIMIENTOS | TRATAMIENTOS | MARCAS («TRATAMIENTO | MARCA»).
+ */
 function catalogosDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
-  var out = { usuarios: [], motivos: [], alias: {} };
+  var out = { usuarios: [], motivos: [], alias: {}, doctores: [], procedimientos: [], tratamientos: [], marcas: {} };
   function celda(f, k) { return idx[k] === undefined ? '' : textoLimpio_(f[idx[k]]); }
   (filas || []).forEach(function (f) {
     var u = celda(f, 'USUARIOS'), m = celda(f, 'MOTIVOS_DESCARTE');
@@ -220,6 +232,14 @@ function catalogosDesdeFilas(encabezado, filas) {
     if (u) out.usuarios.push(u);
     if (m) out.motivos.push(m);
     if (a && n) out.alias[normTexto(a)] = n;
+    if (celda(f, 'DOCTOR')) out.doctores.push({ doctor: celda(f, 'DOCTOR'), sofdoc: celda(f, 'DOCTOR_SOFDOC') });
+    if (celda(f, 'PROCEDIMIENTOS')) out.procedimientos.push(celda(f, 'PROCEDIMIENTOS'));
+    if (celda(f, 'TRATAMIENTOS')) out.tratamientos.push(celda(f, 'TRATAMIENTOS'));
+    var par = celda(f, 'MARCAS').split('|');
+    if (par.length === 2 && textoLimpio_(par[0]) && textoLimpio_(par[1])) {
+      var t = normTexto(par[0]);
+      (out.marcas[t] = out.marcas[t] || []).push(textoLimpio_(par[1]));
+    }
   });
   return out;
 }

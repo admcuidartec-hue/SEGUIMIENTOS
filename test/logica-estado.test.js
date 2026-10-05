@@ -17,7 +17,7 @@ test('reglas: especialidad con o sin tilde es la misma', () => {
 
 test('reglas: sin filas se usan los valores por defecto', () => {
   const r = L.reglasDesdeFilas(['ESPECIALIDAD'], []);
-  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60 });
+  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60, esperaCotizacion: 7, diasEntreSesiones: 7 });
 });
 
 test('reglas: VENCE nunca queda antes que ESPERADO', () => {
@@ -33,7 +33,8 @@ test('catalogosDesdeFilas lee usuarios, motivos y alias', () => {
   assert.deepEqual(c, {
     usuarios: ['MAGALY', 'ANA'],
     motivos: ['OTRO'],
-    alias: { 'DR. ELI FABRIZIO CABANILLAS HUALPA': 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA' }
+    alias: { 'DR. ELI FABRIZIO CABANILLAS HUALPA': 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA' },
+    doctores: [], procedimientos: [], tratamientos: [], marcas: {}
   });
 });
 

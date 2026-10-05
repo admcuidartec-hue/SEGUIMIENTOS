@@ -15,11 +15,11 @@ test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', ()
 });
 
 test('Menu.gs carga con los otros y expone las funciones del menú', () => {
-  const ctx = cargar(['Logica.gs', 'Codigo.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs', 'Menu.gs']);
   for (const f of ['onOpen', 'actualizar', 'verificar', 'prepararHojas', 'importarIndicaciones']) {
     assert.equal(typeof ctx[f], 'function', f);
   }
   const base = ctx.hojasBase_();
-  assert.deepEqual(Object.keys(base), ['CITAS', 'PACIENTES', 'INDICACIONES', 'SEGUIMIENTOS', 'BITACORA', 'CONTACTOS_CRM', 'KPI']);
+  assert.deepEqual(Object.keys(base), ['CITAS', 'PACIENTES', 'INDICACIONES', 'SEGUIMIENTOS', 'BITACORA', 'CONTACTOS_CRM', 'KPI', 'REGISTROS', 'SESIONES', 'ALTAS']);
   for (const f of ['actualizacionDiaria', 'activarDiaria']) assert.equal(typeof ctx[f], 'function', f);
 });

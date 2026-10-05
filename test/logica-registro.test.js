@@ -274,3 +274,13 @@ test('el texto de pendiente de una reevaluación nombra el hierro registrado, no
   const p = L.pendientesPorDni([{ DNI: '1', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', ESTADO: 'COTIZÓ', FECHA: '2026-09-01', CANTIDAD: 2 }]);
   assert.equal(p['1'][0], 'Hierro sacarato ×2: cotizó y no lo hizo');
 });
+
+test('revisarCatalogos: marcas sin su tratamiento, sin doctores y el motivo ALTA MÉDICA', () => {
+  assert.deepEqual(plano(L.revisarCatalogos(CAT)), ['✓ Catálogos de Registro: 3 doctores, 2 procedimientos, 3 tratamientos.']);
+  const malo = L.catalogosDesdeFilas(['USUARIOS', 'MOTIVOS_DESCARTE', 'TRATAMIENTOS', 'MARCAS'],
+    [['MAGALY', 'ALTA MÉDICA', 'HIERRO SACARATO', 'HIERRO OTRO | MARCA X']]);
+  assert.deepEqual(plano(L.revisarCatalogos(malo)), [
+    '✗ CATALOGOS no tiene doctores (columnas DOCTOR y DOCTOR_SOFDOC). Use «Preparar hojas».',
+    '✗ La marca «MARCA X» apunta a «HIERRO OTRO», que no está en TRATAMIENTOS.',
+    '✗ «ALTA MÉDICA» sigue en MOTIVOS_DESCARTE: ahora el alta se registra con «Dar de alta». Use «Preparar hojas».']);
+});

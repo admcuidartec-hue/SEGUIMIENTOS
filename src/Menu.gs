@@ -4,8 +4,9 @@
    Orden la primera vez:
      1. Preparar hojas
      2. Actualizar            (carga CITAS desde la "Hoja 1")
-     3. Importar hierro y procedimientos (una vez)
-     4. Actualizar            (empareja y recalcula con las indicaciones)
+
+   Desde octubre de 2026 los procedimientos y tratamientos se registran en la
+   pestaña Registro de la app; INDICACIONES queda como historial.
    ========================================================================== */
 
 function onOpen() {
@@ -15,7 +16,6 @@ function onOpen() {
     .addItem('Activar actualización diaria (7:00)', 'activarDiaria')
     .addSeparator()
     .addItem('Preparar hojas', 'prepararHojas')
-    .addItem('Importar hierro y procedimientos (una vez)', 'importarIndicaciones')
     .addToUi();
 }
 
@@ -28,8 +28,100 @@ function hojasBase_() {
     SEGUIMIENTOS: COLUMNAS_SEGUIMIENTOS,
     BITACORA: COLUMNAS_BITACORA,
     CONTACTOS_CRM: COLUMNAS_CONTACTOS,
-    KPI: ['RETORNO POR COHORTE']
+    KPI: ['RETORNO POR COHORTE'],
+    REGISTROS: COLUMNAS_REGISTROS,
+    SESIONES: COLUMNAS_SESIONES,
+    ALTAS: COLUMNAS_ALTAS
   };
+}
+
+/** Listas iniciales de la pestaña Registro (diseño §3.4). DOCTOR y DOCTOR_SOFDOC van fila a fila. */
+var CATALOGO_REGISTRO_INICIAL = {
+  DOCTOR: ['Dr. Elí Cabanillas', 'Dra. Alejandra La Torre', 'Dr. Víctor Seminario', 'Dr. Álvaro Villanueva', 'Dra. Karen Matos',
+    'Dra. Karen Matos – Particular', 'Dr. Iván Pacheco'],
+  DOCTOR_SOFDOC: ['Dr. ELÍ FABRIZIO CABANILLAS HUALPA', 'Dra. ALEJANDRA LA TORRE MATUK', 'Dr. VICTOR ERNESTO SEMINARIO MARCELO',
+    'Dr. ALVARO MARTIN VILLANUEVA GARCIA', 'Dra. KAREN DIANA MATOS PEÑA', '', 'Dr. IVAN PAOLO PACHECO MODESTO'],
+  PROCEDIMIENTOS: ['SANGRÍA', 'AMO', 'BIOPSIA', 'CITOMETRÍA DE FLUJO', 'CARIOTIPO', 'TRANSFUSIÓN DE SANGRE'],
+  TRATAMIENTOS: ['HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA'],
+  MARCAS: ['HIERRO CARBOXIMALTOSA | FERINJECT', 'HIERRO CARBOXIMALTOSA | LIKFER', 'HIERRO DERISOMALTOSA | MONOFER']
+};
+
+var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7]];
+
+/** Encabezado de la fila 1 sin las celdas vacías del final. */
+function encabezado_(sh) {
+  var cab = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (c) { return String(c).trim(); });
+  while (cab.length && !cab[cab.length - 1]) cab.pop();
+  return cab;
+}
+
+/** Una hoja que se escribe por posición solo se amplía al final, y solo si lo que ya tiene coincide. */
+function encabezadoAmpliable(cab, columnas) {
+  for (var i = 0; i < cab.length; i++) {
+    if (cab[i] !== columnas[i]) {
+      return { error: 'el encabezado no coincide en la columna ' + (i + 1) + ' («' + cab[i] + '», se esperaba «' + (columnas[i] || '') + '»).', agregar: [] };
+    }
+  }
+  return { error: '', agregar: columnas.slice(cab.length) };
+}
+
+/** Lo que la pestaña Registro necesita en hojas que ya existen. No borra ni mueve nada. Devuelve qué cambió. */
+function ampliarHojas_() {
+  var ss = ss_(), cambios = [];
+
+  var sg = ss.getSheetByName('SEGUIMIENTOS');
+  if (sg) {
+    var cabS = encabezado_(sg), plan = encabezadoAmpliable(cabS, COLUMNAS_SEGUIMIENTOS);
+    if (plan.error) cambios.push('✗ SEGUIMIENTOS: ' + plan.error);
+    else if (plan.agregar.length) {
+      sg.getRange(1, cabS.length + 1, 1, plan.agregar.length).setValues([plan.agregar]).setFontWeight('bold');
+      cambios.push('SEGUIMIENTOS: columna ' + plan.agregar.join(', ') + '.');
+    }
+  }
+
+  var ct = ss.getSheetByName('CATALOGOS');
+  if (ct) {
+    var cabC = encabezado_(ct), faltan = Object.keys(CATALOGO_REGISTRO_INICIAL).filter(function (c) { return cabC.indexOf(c) < 0; });
+    var parDoctor = faltan.indexOf('DOCTOR') >= 0, parSofdoc = faltan.indexOf('DOCTOR_SOFDOC') >= 0;
+    if (parDoctor !== parSofdoc) {
+      cambios.push('✗ CATALOGOS: DOCTOR y DOCTOR_SOFDOC van juntas; agregue a mano la que falta.');
+      faltan = faltan.filter(function (c) { return c !== 'DOCTOR' && c !== 'DOCTOR_SOFDOC'; });
+    }
+    faltan.forEach(function (c) {
+      var col = encabezado_(ct).length + 1, valores = CATALOGO_REGISTRO_INICIAL[c];
+      ct.getRange(1, col, 1, 1).setValues([[c]]).setFontWeight('bold');
+      ct.getRange(2, col, valores.length, 1).setValues(valores.map(function (x) { return [x]; }));
+    });
+    if (faltan.length) cambios.push('CATALOGOS: columnas ' + faltan.join(', ') + '.');
+    var cM = encabezado_(ct).indexOf('MOTIVOS_DESCARTE');
+    if (cM >= 0) {
+      var motivos = ct.getRange(1, cM + 1, Math.max(1, ct.getLastRow()), 1).getValues();
+      motivos.forEach(function (f, i) {
+        if (i > 0 && normTexto(f[0]) === 'ALTA MEDICA') {
+          ct.getRange(i + 1, cM + 1).setValue('');
+          cambios.push('CATALOGOS: se quitó «ALTA MÉDICA» de los motivos de descarte.');
+        }
+      });
+    }
+  }
+
+  var rg = ss.getSheetByName('REGLAS');
+  if (rg) {
+    var cabR = encabezado_(rg), cP = cabR.indexOf('PARAMETRO'), cV = cabR.indexOf('VALOR');
+    if (cP >= 0 && cV >= 0) {
+      var col = rg.getRange(1, cP + 1, Math.max(1, rg.getLastRow()), 1).getValues().map(function (f) { return normTexto(f[0]); });
+      PARAMETROS_REGISTRO.forEach(function (par) {
+        if (col.indexOf(par[0]) >= 0) return;
+        var fila = col.length + 1;
+        for (var i = 1; i < col.length; i++) if (!col[i]) { fila = i + 1; break; }
+        rg.getRange(fila, cP + 1).setValue(par[0]);
+        rg.getRange(fila, cV + 1).setValue(par[1]);
+        col[fila - 1] = par[0];
+        cambios.push('REGLAS: ' + par[0] + ' = ' + par[1] + '.');
+      });
+    }
+  }
+  return cambios;
 }
 
 function prepararHojas() {
@@ -57,22 +149,21 @@ function prepararHojas() {
   }
   if (!ss.getSheetByName('CATALOGOS')) {
     var c = ss.insertSheet('CATALOGOS');
-    c.getRange(1, 1, 7, 4).setValues([
+    c.getRange(1, 1, 6, 4).setValues([
       ['USUARIOS', 'MOTIVOS_DESCARTE', 'MEDICO_ALIAS', 'MEDICO_NOMBRE'],
       ['MAGALY', 'SE ATIENDE EN OTRO LUGAR', 'Dr. ELI FABRIZIO CABANILLAS HUALPA', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA'],
       ['ANA', 'NÚMERO EQUIVOCADO', '', ''],
       ['RACHEL', 'YA NO LO NECESITA', '', ''],
       ['DR. ELI CABANILLAS', 'FALLECIÓ', '', ''],
-      ['', 'ALTA MÉDICA', '', ''],
       ['', 'OTRO', '', '']
     ]);
     c.getRange(1, 1, 1, 4).setFontWeight('bold');
     c.setFrozenRows(1);
     creadas.push('CATALOGOS');
   }
-  SpreadsheetApp.getUi().alert(creadas.length
-    ? 'Hojas creadas: ' + creadas.join(', ') + '.'
-    : 'Todas las hojas ya existían. No se cambió nada.');
+  var ampliadas = ampliarHojas_();
+  SpreadsheetApp.getUi().alert((creadas.length ? 'Hojas creadas: ' + creadas.join(', ') + '.' : 'No faltaba ninguna hoja.') +
+    (ampliadas.length ? '\n' + ampliadas.join('\n') : '\nNo hubo que ampliar ninguna hoja.'));
 }
 
 /** El aviso se muestra con el candado ya suelto: mientras está abierto, nadie más podría guardar. */
@@ -111,7 +202,7 @@ function actualizar_(quien) {
   MEMO.datos = null;
   var d = datos_();
   escribirObjetos_('PACIENTES', COLUMNAS_PACIENTES, d.pacientes);
-  escribirKpi_(filasHojaKpi(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos)));
+  escribirKpi_(filasHojaKpi(calcularKpi(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes)));
 
   var detalle = unirFrases([filas.length + ' filas leídas, ' + fusion.nuevas + ' citas nuevas, ' + fusion.cambiadas + ' cambiadas, ' +
     limpio.invalidas + ' inválidas, ' + emparejadas + ' emparejamientos nuevos', crm.mensaje]);
@@ -272,6 +363,14 @@ function verificar() {
     var s = ss.getSheetByName(n);
     lineas.push(s ? '✓ ' + n + ': ' + Math.max(0, s.getLastRow() - 1) + ' filas.' : '✗ Falta la hoja ' + n + '. Use «Preparar hojas».');
   });
+  var sgV = ss.getSheetByName('SEGUIMIENTOS');
+  if (sgV) {
+    var planV = encabezadoAmpliable(encabezado_(sgV), COLUMNAS_SEGUIMIENTOS);
+    lineas.push(planV.error ? '✗ SEGUIMIENTOS: ' + planV.error
+      : planV.agregar.length ? '✗ A SEGUIMIENTOS le falta la columna ' + planV.agregar.join(', ') + '. Use «Preparar hojas».'
+      : '✓ SEGUIMIENTOS tiene la columna REFERENCIA.');
+  }
+  if (ss.getSheetByName('CATALOGOS')) revisarCatalogos(catalogos_()).forEach(function (l) { lineas.push(l); });
   try {
     SpreadsheetApp.openById(CONFIG.HIERRO_ID);
     lineas.push('✓ La base de hierro se puede abrir.');

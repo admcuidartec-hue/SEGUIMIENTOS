@@ -280,3 +280,17 @@ function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {
     };
   }).filter(Boolean);
 }
+
+/** Líneas para «Verificar»: lo que la pestaña Registro necesita de CATALOGOS. */
+function revisarCatalogos(c) {
+  var lineas = [];
+  if (!c.doctores.length) lineas.push('✗ CATALOGOS no tiene doctores (columnas DOCTOR y DOCTOR_SOFDOC). Use «Preparar hojas».');
+  Object.keys(c.marcas).forEach(function (t) {
+    if (!enLista_(c.tratamientos, t)) c.marcas[t].forEach(function (m) {
+      lineas.push('✗ La marca «' + m + '» apunta a «' + t + '», que no está en TRATAMIENTOS.');
+    });
+  });
+  if (enLista_(c.motivos, 'ALTA MÉDICA')) lineas.push('✗ «ALTA MÉDICA» sigue en MOTIVOS_DESCARTE: ahora el alta se registra con «Dar de alta». Use «Preparar hojas».');
+  return lineas.length ? lineas : ['✓ Catálogos de Registro: ' + c.doctores.length + ' doctores, ' + c.procedimientos.length +
+    ' procedimientos, ' + c.tratamientos.length + ' tratamientos.'];
+}

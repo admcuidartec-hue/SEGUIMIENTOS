@@ -2,10 +2,10 @@
 // aviso está abierto, nadie más podría guardar.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cargar } = require('./cargar');
+const { cargar, plano } = require('./cargar');
 
 function contexto() {
-  const ctx = cargar(['Logica.gs', 'Codigo.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs', 'Menu.gs']);
   const estado = { tomado: false, avisos: [] };
   ctx.LockService = { getScriptLock: () => ({
     tryLock: () => { estado.tomado = true; return true; },
@@ -161,4 +161,60 @@ test('verificarCrm_: avisa si faltan columnas, si no se abre y si no hay actuali
   assert.equal(a[1], '✗ La actualización diaria no está activada. Use «Activar actualización diaria (7:00)».');
   ctx.SpreadsheetApp = { openById: () => { throw new Error('sin acceso'); } };
   assert.equal(ctx.verificarCrm_()[0], '✗ No se puede abrir el CRM: sin acceso');
+});
+
+/** Hoja falsa en memoria: solo lo que usan prepararHojas y ampliarHojas_. */
+function hojaFalsa(valores) {
+  const v = valores.map(f => f.slice());
+  const ancho = () => Math.max(0, ...v.map(f => f.length));
+  const celda = (r, c) => ((v[r - 1] || [])[c - 1] ?? '');
+  const poner = (r, c, x) => { while (v.length < r) v.push([]); v[r - 1][c - 1] = x; };
+  return {
+    v,
+    getLastRow: () => v.length,
+    getLastColumn: ancho,
+    getDataRange: () => ({ getValues: () => v.map(f => Array.from({ length: ancho() }, (_, j) => f[j] ?? '')) }),
+    getRange(r, c, h = 1, w = 1) {
+      const rango = {
+        getValues: () => Array.from({ length: h }, (_, i) => Array.from({ length: w }, (_, j) => celda(r + i, c + j))),
+        setValues: vals => { vals.forEach((f, i) => f.forEach((x, j) => poner(r + i, c + j, x))); return rango; },
+        setValue: x => { poner(r, c, x); return rango; },
+        setFontWeight: () => rango
+      };
+      return rango;
+    }
+  };
+}
+
+test('encabezadoAmpliable: solo agrega al final si lo anterior coincide', () => {
+  const { ctx } = contexto();
+  assert.deepEqual(plano(ctx.encabezadoAmpliable(['A', 'B'], ['A', 'B', 'C'])), { error: '', agregar: ['C'] });
+  assert.deepEqual(plano(ctx.encabezadoAmpliable(['A', 'B', 'C'], ['A', 'B', 'C'])), { error: '', agregar: [] });
+  assert.match(ctx.encabezadoAmpliable(['A', 'X'], ['A', 'B', 'C']).error, /columna 2 \(«X», se esperaba «B»\)/);
+});
+
+test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita ALTA MÉDICA y suma parámetros, sin borrar nada', () => {
+  const { ctx } = contexto();
+  const seg = hojaFalsa([['ID', 'FECHA_HORA', 'DNI', 'ESPECIALIDAD', 'RESPONSABLE', 'ACCION', 'MOTIVO', 'NOTA'], ['S-1', '', '1', 'H', 'M', 'HECHO', '', 'n']]);
+  const cat = hojaFalsa([['USUARIOS', 'MOTIVOS_DESCARTE'], ['MAGALY', 'OTRO'], ['ANA', 'ALTA MÉDICA']]);
+  const reg = hojaFalsa([['ESPECIALIDAD', 'ESPERADO_DIAS', 'VENCE_DIAS', '', 'PARAMETRO', 'VALOR'], ['*', 30, 45, '', 'MAX_SEGUIMIENTOS', 2]]);
+  ctx.ss_ = () => ({ getSheetByName: n => ({ SEGUIMIENTOS: seg, CATALOGOS: cat, REGLAS: reg })[n] || null });
+  const cambios = [...ctx.ampliarHojas_()];
+  assert.deepEqual(seg.v[0].slice(8), ['REFERENCIA']);
+  assert.deepEqual(seg.v[1].slice(0, 8), ['S-1', '', '1', 'H', 'M', 'HECHO', '', 'n'], 'no toca las filas');
+  assert.deepEqual(cat.v[0], ['USUARIOS', 'MOTIVOS_DESCARTE', 'DOCTOR', 'DOCTOR_SOFDOC', 'PROCEDIMIENTOS', 'TRATAMIENTOS', 'MARCAS']);
+  assert.equal(cat.v[1][2], 'Dr. Elí Cabanillas');
+  assert.equal(cat.v[6][3], '', 'el particular sin nombre SOFDOC');
+  assert.equal(cat.v[2][1], '', 'ALTA MÉDICA quitado');
+  assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7]]);
+  assert.equal(cambios.length, 5, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los dos parámetros');
+  assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
+});
+
+test('ampliarHojas_ no agrega REFERENCIA si el encabezado de SEGUIMIENTOS no es el esperado', () => {
+  const { ctx } = contexto();
+  const seg = hojaFalsa([['ID', 'FECHA', 'DNI']]);
+  ctx.ss_ = () => ({ getSheetByName: n => (n === 'SEGUIMIENTOS' ? seg : null) });
+  assert.match(ctx.ampliarHojas_()[0], /^✗ SEGUIMIENTOS: el encabezado no coincide/);
+  assert.deepEqual(seg.v[0], ['ID', 'FECHA', 'DNI']);
 });

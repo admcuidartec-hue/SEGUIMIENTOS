@@ -4,9 +4,10 @@ const assert = require('node:assert/strict');
 const { cargar } = require('./cargar');
 
 test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', () => {
-  const ctx = cargar(['Logica.gs', 'Codigo.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs']);
   for (const f of ['doGet', 'bootstrap', 'getBandeja', 'getPaciente', 'buscar', 'marcarSeguimiento',
-    'descartar', 'confirmarEmparejamiento', 'getKpi', 'getResumen']) {
+    'descartar', 'confirmarEmparejamiento', 'getKpi', 'getResumen',
+    'guardarRegistro', 'marcarSesion', 'anularRegistro', 'anularSesion', 'darDeAlta', 'anularAlta', 'getRegistrosHoy', 'buscarPacienteRegistro']) {
     assert.equal(typeof ctx[f], 'function', f);
   }
   assert.equal(ctx.CONFIG.SS_ID, '1L8fY-NXWE1agakIPEdqoLnLry0-lvYr0Z-9JfsfGxRM');

@@ -15,14 +15,14 @@ var CONFIG = {
   ESPERA_LOCK_MS: 30000
 };
 
-var COLUMNAS_SEGUIMIENTOS = ['ID', 'FECHA_HORA', 'DNI', 'ESPECIALIDAD', 'RESPONSABLE', 'ACCION', 'MOTIVO', 'NOTA'];
+var COLUMNAS_SEGUIMIENTOS = ['ID', 'FECHA_HORA', 'DNI', 'ESPECIALIDAD', 'RESPONSABLE', 'ACCION', 'MOTIVO', 'NOTA', 'REFERENCIA'];
 var COLUMNAS_BITACORA = ['FECHA_HORA', 'USUARIO', 'ACCION', 'DETALLE'];
 
 /** Columnas que se guardan como fecha (a mediodía) o fecha y hora. */
 var COLUMNAS_FECHA = { FECHA: 1, PRIMERA_CITA: 1, ULTIMA_CITA: 1, PROXIMA_ESPERADA: 1, VENCE: 1, PROXIMA_AGENDADA: 1, ULTIMO_SEGUIMIENTO: 1 };
 var COLUMNAS_FECHA_HORA = { FECHA_HORA: 1 };
 /** El resto se guarda como texto plano, para que Sheets no convierta '2026-07' ni DNI en otra cosa. */
-var COLUMNAS_NUMERICAS = { N_REALIZADAS: 1, DIAS_ATRASO: 1, N_SEGUIMIENTOS: 1, CANTIDAD: 1, PAGO: 1 };
+var COLUMNAS_NUMERICAS = { N_REALIZADAS: 1, DIAS_ATRASO: 1, N_SEGUIMIENTOS: 1, CANTIDAD: 1, PAGO: 1, SESIONES: 1, NUMERO: 1 };
 
 /* Vive lo que dura una petición: Apps Script arranca un proceso por llamada. */
 var MEMO = {};
@@ -191,6 +191,27 @@ function leerContactos_() {
   return cs;
 }
 
+/** Una hoja que puede no existir todavía (antes de «Preparar hojas»): vacía en vez de error. */
+function leerOpcional_(nombre) {
+  return ss_().getSheetByName(nombre) ? leerObjetos_(nombre) : [];
+}
+
+function leerRegistros_() {
+  var r = leerOpcional_('REGISTROS');
+  r.forEach(function (x) { x.DNI = normDni(x.DNI); x.TIPO = normTexto(x.TIPO); });
+  return r;
+}
+
+function leerSesiones_() {
+  return leerOpcional_('SESIONES');
+}
+
+function leerAltas_() {
+  var a = leerOpcional_('ALTAS');
+  a.forEach(function (x) { x.DNI = normDni(x.DNI); });
+  return a;
+}
+
 /** Todo lo que necesita la app, leído una vez por petición. */
 function datos_() {
   if (MEMO.datos) return MEMO.datos;
@@ -201,10 +222,18 @@ function datos_() {
     citas: leerCitas_(),
     indicaciones: leerIndicaciones_(),
     seguimientos: leerSeguimientos_(),
-    contactos: leerContactos_()
+    contactos: leerContactos_(),
+    registros: leerRegistros_(),
+    sesiones: leerSesiones_(),
+    altas: leerAltas_()
   };
-  d.pacientes = armarPacientes(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos);
-  d.pendientes = pendientesIndicacion(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos);
+  // Historial (INDICACIONES) + Registro: lo que cuenta en cifras, teléfonos y pendientes.
+  d.indicacionesTodas = d.indicaciones.concat(indicacionesDeRegistros(d.registros, d.sesiones, d.catalogos, d.reglas, d.hoy));
+  d.vigentes = altasVigentes(d.altas, d.seguimientos, d.citas);
+  d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes);
+  d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos)
+    .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
+      reglas: d.reglas, hoy: d.hoy, telefonos: telefonosPorDni(d.indicacionesTodas, d.contactos), catalogos: d.catalogos }));
   MEMO.datos = d;
   return d;
 }
@@ -235,7 +264,11 @@ function bootstrap() {
     usuarios: d.catalogos.usuarios,
     motivos: d.catalogos.motivos,
     especialidades: Object.keys(esp).sort(),
-    medicos: Object.keys(med).sort()
+    medicos: Object.keys(med).sort(),
+    doctores: d.catalogos.doctores,
+    procedimientos: d.catalogos.procedimientos,
+    tratamientos: d.catalogos.tratamientos,
+    marcas: d.catalogos.marcas
   });
 }
 
@@ -275,7 +308,20 @@ function getPaciente(dni) {
     citas: citas,
     indicaciones: d.indicaciones.filter(function (i) { return i.DNI === k; }),
     porConfirmar: porConfirmar,
-    seguimientos: d.seguimientos.filter(function (s) { return s.DNI === k; })
+    seguimientos: d.seguimientos.filter(function (s) { return s.DNI === k; }),
+    registros: d.registros.filter(function (r) { return r.DNI === k; }).map(function (r) {
+      var e = estadoRegistro(r, d.sesiones);
+      return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
+        SESIONES: e.total, ESTADO: e.estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '',
+        sesiones: sesionesDe_(r.ID, d.sesiones).map(function (s) {
+          return { ID: s.ID, NUMERO: Number(s.NUMERO), FECHA: fechaIso(s.FECHA), ASESORA: s.ASESORA };
+        }) };
+    }),
+    altas: d.altas.filter(function (a) { return a.DNI === k; }).map(function (a) {
+      var v = d.vigentes[claveSerie(k, a.ESPECIALIDAD)];
+      return { ID: a.ID, FECHA: fechaIso(a.FECHA), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR, REGISTRADO_POR: a.REGISTRADO_POR,
+        ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', VIGENTE: !!(v && v.ID === a.ID) };
+    })
   });
 }
 
@@ -310,10 +356,11 @@ function registrar_(p, accion) {
       RESPONSABLE: String(p.usuario).trim(),
       ACCION: accion,
       MOTIVO: accion === 'DESCARTADO' ? String(p.motivo).trim() : '',
-      NOTA: String(p.nota || '').trim()
+      NOTA: String(p.nota || '').trim(),
+      REFERENCIA: textoLimpio_(p.referencia)
     };
     anexarObjeto_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS, s);
-    bitacora_(s.RESPONSABLE, accion === 'HECHO' ? 'SEGUIMIENTO' : 'DESCARTE', s.DNI + ' · ' + s.ESPECIALIDAD);
+    bitacora_(s.RESPONSABLE, accion === 'HECHO' ? 'SEGUIMIENTO' : 'DESCARTE', s.DNI + ' · ' + s.ESPECIALIDAD + (s.REFERENCIA ? ' · ' + s.REFERENCIA : ''));
     return limpiarParaEnvio({ ok: true, seguimiento: s });
   } finally {
     lock.releaseLock();
@@ -349,7 +396,7 @@ function confirmarEmparejamiento(p) {
 
 function getKpi() {
   var d = datos_();
-  var kpi = calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos);
+  var kpi = calcularKpi(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes);
   kpi.meta = d.reglas.metaRetorno;
   return limpiarParaEnvio(kpi);
 }
@@ -357,7 +404,7 @@ function getKpi() {
 /** Pantalla «Resumen»: filas por mes y médico; la app suma según el filtro elegido. */
 function getResumen() {
   var d = datos_();
-  var filas = resumenPorMes(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy);
+  var filas = resumenPorMes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.vigentes);
   var medicos = {};
   filas.forEach(function (f) { if (f.MEDICO !== 'SIN MÉDICO') medicos[f.MEDICO] = 1; });
   return limpiarParaEnvio({ hoy: d.hoy, filas: filas, medicos: Object.keys(medicos).sort(), meta: d.reglas.metaRetorno });

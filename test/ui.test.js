@@ -425,3 +425,68 @@ test('registro: alta médica desde la pestaña; el paciente sale de la bandeja',
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('bandeja: «Lo hizo» en un tratamiento en curso lo quita de la lista y suma la sesión', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'HIERRO');
+    assert.match(await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).textContent(),
+      /Hierro carboximaltosa · Ferinject × 2 sesiones · sesión 2 de 2 pendiente · última el 05\/08\/2026 · hace 57 días/);
+    await pagina.locator('.fila', { hasText: 'ANA MARÍA' }).click();
+    assert.match(await pagina.locator('#panel').innerText(), /Usuario: @ana\.flores/);
+    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).click();
+    assert.equal(await pagina.locator('#p-lohizo').textContent(), 'Lo hizo · sesión 2 de 2');
+    await pagina.locator('#p-lohizo').click();
+    await pagina.waitForFunction(() => /Sesión 2 de 2 registrada/.test(document.querySelector('#aviso').textContent));
+    assert.equal(await pagina.locator('#aviso').textContent(), 'Sesión 2 de 2 registrada: ROSA ELENA QUISPE HUAMÁN');
+    assert.deepEqual(await filas(pagina), ['ANA MARÍA FLORES RÍOS']);
+    assert.equal(await pagina.locator('#c-hechos').textContent(), '0', '«Lo hizo» no es un seguimiento');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('bandeja: «Dar de alta» desde el panel propone el doctor y saca al paciente', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'ANA');
+    await tipo(pagina, 'REEVALUACION');
+    await pagina.locator('.fila', { hasText: 'JORGE LUIS' }).click();
+    assert.equal(await pagina.locator('#p-lohizo').count(), 0, 'las reevaluaciones no tienen «Lo hizo»');
+    await pagina.locator('#p-alta').click();
+    assert.equal(await pagina.inputValue('#p-alta-doctor'), 'Dra. Karen Matos');
+    await pagina.locator('#p-alta-ok').click();
+    await pagina.waitForFunction(() => /Alta registrada/.test(document.querySelector('#aviso').textContent));
+    assert.equal(await pagina.locator('#aviso').textContent(), 'Alta registrada: JORGE LUIS MENDOZA PAREDES');
+    assert.ok(!(await filas(pagina)).includes('JORGE LUIS MENDOZA PAREDES'));
+    assert.match(await pagina.locator('.tipos button[data-tipo="REEVALUACION"]').textContent(), /3/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('ficha: el tratamiento con sus sesiones, «Lo hizo», anular la última y «Dar de alta»', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await pagina.locator('.nav button[data-vista="ficha"]').click();
+    await pagina.fill('#q', 'quispe');
+    await pagina.locator('#resultados [data-abrir="40111222"]').click();
+    await pagina.waitForSelector('.reg-ficha');
+    let t = await pagina.locator('.reg-ficha').innerText();
+    assert.match(t, /Hierro carboximaltosa · Ferinject × 2 sesiones/);
+    assert.match(t, /Sesión 1 ✓ 05\/08\/2026/);
+    assert.match(t, /Sesión 2 pendiente/);
+    await pagina.locator('[data-lohizo="REG-000001"]').click();
+    await pagina.waitForFunction(() => /Sesión 2 ✓/.test(document.querySelector('.reg-ficha').textContent));
+    assert.match(await pagina.locator('.reg-ficha').innerText(), /Completo/);
+    await pagina.locator('[data-anular-ses="SES-000002"]').click();
+    await pagina.fill('#g-motivo', 'Fecha equivocada');
+    await pagina.locator('[data-confirmar-anular="SES-000002"]').click();
+    await pagina.waitForFunction(() => /Sesión 2 pendiente/.test(document.querySelector('.reg-ficha').textContent));
+    await pagina.locator('[data-alta-esp="HEMATOLOGÍA"]').click();
+    await pagina.locator('[data-alta-ok="HEMATOLOGÍA"]').click();
+    await pagina.waitForFunction(() => /Alta médica/.test(document.querySelector('#ficha').textContent));
+    assert.match(await pagina.locator('#ficha').innerText(), /HEMATOLOGÍA · 01\/10\/2026 · Dr\. Elí Cabanillas · registró MAGALY · vigente/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

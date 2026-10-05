@@ -203,6 +203,12 @@ button{cursor:pointer}
 .linea-g{font-size:14px;color:var(--chp-soft)}
 .g-motivo{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
 
+.p-sesion,.p-alta-form,.reg-acciones{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.p-usuario{margin:6px 0 0}
+.reg-ficha{padding:12px 0;border-bottom:1px solid var(--chp-rule)}
+.reg-ficha .sesiones{margin:8px 0;padding-left:20px}
+.lista-altas{list-style:none;padding:0;margin:0}
+.lista-altas li{padding:8px 0;border-bottom:1px solid var(--chp-rule)}
 /* ---------- Ficha y Detalle ---------- */
 .vista-sub{margin-top:28px}
 .buscador{width:100%;max-width:520px;background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-size:20px;padding:6px 0}
@@ -571,7 +577,9 @@ const GRUPOS = [
   { titulo: 'Más antiguos', sub: 'hace más de 60 días', hasta: Infinity }
 ];
 const PREFIJO_GRUPO = { '': '', REEVALUACION: 'debían volver ', HIERRO: 'cotizado ', PROCEDIMIENTO: 'cotizado ' };
-const clave = t => t.DNI + '|' + t.ESPECIALIDAD;
+/** Las filas de Registro se identifican por su ID: un paciente puede tener dos tratamientos abiertos. */
+const clave = t => t.ID_REGISTRO || (t.DNI + '|' + t.ESPECIALIDAD);
+const enCursoReg = t => !!t.ID_REGISTRO && t.ESTADO_REGISTRO === 'EN CURSO';
 /** Reevaluación, hierro o procedimiento. Una fila sin tipo es una reevaluación. */
 const tipoDe = t => t.TIPO_SEGUIMIENTO || 'REEVALUACION';
 const esIndicacion = t => tipoDe(t) !== 'REEVALUACION';
@@ -628,7 +636,9 @@ function filaHtml(t) {
   const k = clave(t);
   const tel = String(t.TELEFONOS || '').split(' / ').filter(Boolean)[0];
   const clases = ['fila', k === E.sel ? 'sel-fila' : '', k === E.abierto ? 'abierta' : ''].join(' ');
-  const linea = esIndicacion(t)
+  const linea = enCursoReg(t)
+    ? `${esc(t.DETALLE)} · sesión ${t.HECHAS + 1} de ${t.SESIONES} pendiente · última el ${fechaCorta(t.ULTIMA_SESION)}`
+    : esIndicacion(t)
     ? `${esc(queCotizo(t))} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Cotizó el ${fechaCorta(t.FECHA_COTIZACION)}`
     : `${esNuevo(t) ? 'Nuevo' : 'En control'} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Debía volver el ${fechaCorta(t.PROXIMA_ESPERADA)}`;
   return `<div class="${clases}" data-k="${esc(k)}">
@@ -662,7 +672,7 @@ function pintarBandeja() {
   const lista = visibles();
   const claves = lista.map(clave);
   if (!claves.includes(E.sel)) E.sel = claves[0] || '';
-  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.descartando = false; }
+  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.descartando = false; E.dandoAlta = false; }
 
   if (!lista.length) {
     $('#lista').innerHTML = E.tipo
@@ -698,11 +708,11 @@ function pintarPanel() {
       <div class="muted">DNI ${esc(t.DNI)}${especialidadDe(t) ? ' · ' + esc(especialidadDe(t)) : ''}</div>
       <div class="muted">${esc(t.MEDICO_ULTIMO)}</div>
     </div>
-    ${esIndicacion(t) ? `<div class="p-tipo"><span class="marcas">${marcas(t)}</span>${esc(queCotizo(t))} · cotizó y no lo hizo</div>
+    ${esIndicacion(t) ? `<div class="p-tipo"><span class="marcas">${marcas(t)}</span>${esc(queCotizo(t))} · ${enCursoReg(t) ? `sesión ${t.HECHAS + 1} de ${t.SESIONES} pendiente` : 'cotizó y no lo hizo'}</div>
     <div class="p-fechas">
       <div><small>Cotizó el</small><span class="v"><b>${fechaCorta(t.FECHA_COTIZACION)}</b></span></div>
-      <div><small>Última consulta</small><span class="v">${fechaCorta(t.ULTIMA_CITA)}</span></div>
-      <div class="p-hace">hace ${diasSinVolver(t)} días que cotizó</div>
+      <div><small>${enCursoReg(t) ? 'Última sesión' : 'Última consulta'}</small><span class="v">${fechaCorta(enCursoReg(t) ? t.ULTIMA_SESION : t.ULTIMA_CITA)}</span></div>
+      <div class="p-hace">hace ${diasSinVolver(t)} días ${enCursoReg(t) ? 'de la última sesión' : 'que cotizó'}</div>
     </div>` : `<div class="p-tipo"><span class="marcas">${esNuevo(t) ? '<i class="m nuevo"></i>' : '<i class="m control"></i>'}</span>${textoTipo(t)}</div>
     <div class="p-fechas">
       <div><small>Última consulta</small><span class="v">${fechaCorta(t.ULTIMA_CITA)}</span></div>
@@ -715,26 +725,35 @@ function pintarPanel() {
         ? tels.map(n => `<div class="p-tel"><span class="n">${esc(n)}</span><button type="button" class="btn-linea" data-copiar="${esc(n)}">Copiar</button></div>`).join('')
         : '<p class="p-sintel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}
     </div>
+    ${t.USUARIO ? `<p class="p-usuario">Usuario: <b>${esc(t.USUARIO)}</b></p>` : ''}
     ${t.N_SEGUIMIENTOS ? `<div class="p-prev">Ya se le escribió${esIndicacion(t) ? ' por esto' : ''} ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
+    ${t.ID_REGISTRO ? `<div class="p-sesion">
+      <input type="date" class="entrada" id="p-fecha-ses" value="${hoy()}" max="${hoy()}" aria-label="Fecha de la sesión">
+      <button type="button" class="btn-marca" id="p-lohizo">Lo hizo${t.SESIONES > 1 ? ` · sesión ${t.HECHAS + 1} de ${t.SESIONES}` : ''}</button>
+    </div>` : ''}
     <textarea id="nota" placeholder="Nota (opcional)"></textarea>
     <div class="p-acciones">
       <button type="button" class="btn-marca" id="p-hecho">Seguimiento hecho<kbd>H</kbd></button>
       <button type="button" class="btn-linea" id="p-descartar">Descartar<kbd>D</kbd></button>
     </div>
     ${E.descartando ? `<div class="motivos"><small>Motivo (obligatorio)</small>${motivos.map(m => `<button type="button" data-motivo="${esc(m)}">${esc(m.charAt(0) + m.slice(1).toLowerCase())}</button>`).join('')}</div>` : ''}
+    ${!esIndicacion(t) ? `<button type="button" class="btn-texto" id="p-alta">Dar de alta…</button>
+      ${E.dandoAlta ? `<div class="p-alta-form"><select id="p-alta-doctor" class="sel" aria-label="Doctor que da el alta">${opcionesDoctor(t.MEDICO_ULTIMO)}</select>
+        <input type="date" class="entrada" id="p-alta-fecha" value="${hoy()}" max="${hoy()}" aria-label="Fecha del alta">
+        <button type="button" class="btn-marca" id="p-alta-ok">Confirmar alta</button></div>` : ''}` : ''}
     <button type="button" class="p-ficha" id="p-ficha">Ver ficha completa →</button>`;
   panel.hidden = false;
 }
 
-function abrir(k) { E.sel = k; E.abierto = k; E.descartando = false; pintarBandeja(); }
-function cerrar() { E.abierto = ''; E.descartando = false; pintarBandeja(); }
+function abrir(k) { E.sel = k; E.abierto = k; E.descartando = false; E.dandoAlta = false; pintarBandeja(); }
+function cerrar() { E.abierto = ''; E.descartando = false; E.dandoAlta = false; pintarBandeja(); }
 
 function mover(paso) {
   const claves = visibles().map(clave);
   if (!claves.length) return;
   const i = Math.max(0, claves.indexOf(E.sel));
   E.sel = claves[Math.min(claves.length - 1, Math.max(0, i + paso))];
-  if (E.abierto) { E.abierto = E.sel; E.descartando = false; }
+  if (E.abierto) { E.abierto = E.sel; E.descartando = false; E.dandoAlta = false; }
   pintarBandeja();
   const f = document.querySelector(`.fila[data-k="${CSS.escape(E.sel)}"]`);
   if (f) f.scrollIntoView({ block: 'nearest' });
@@ -744,7 +763,7 @@ function mover(paso) {
  * Hecho o descartado: el paciente sale de la lista al instante y la selección
  * pasa al siguiente. Si el servidor falla, vuelve a su sitio con un aviso.
  */
-async function resolver(k, accion, motivo) {
+async function resolver(k, accion, motivo, extra = {}) {
   if (!exigirUsuario()) return;
   const t = pacienteDe(k);
   if (!t) return;
@@ -762,15 +781,19 @@ async function resolver(k, accion, motivo) {
   if (E.sel === k) E.sel = siguiente;
   if (estabaAbierto) E.abierto = siguiente;
   E.descartando = false;
+  E.dandoAlta = false;
   E.kpi = null;
   E.resumen = null;
   pintarBandeja();
 
   try {
-    const datos = { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, nota };
+    const datos = { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, referencia: t.ID_REGISTRO || '', nota };
     if (accion === 'HECHO') await llamar('marcarSeguimiento', datos);
-    else await llamar('descartar', Object.assign(datos, { motivo }));
-    avisar((accion === 'HECHO' ? 'Seguimiento registrado: ' : 'Descartado: ') + t.NOMBRE);
+    else if (accion === 'DESCARTADO') await llamar('descartar', Object.assign(datos, { motivo }));
+    else if (accion === 'SESION') await llamar('marcarSesion', { usuario: usuario(), id: t.ID_REGISTRO, fecha: extra.fecha, nota });
+    else await llamar('darDeAlta', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, doctor: extra.doctor, fecha: extra.fecha, nota });
+    avisar({ HECHO: 'Seguimiento registrado: ', DESCARTADO: 'Descartado: ', ALTA: 'Alta registrada: ',
+      SESION: `Sesión ${t.HECHAS + 1} de ${t.SESIONES} registrada: ` }[accion] + t.NOMBRE);
   } catch (e) {
     E.bandeja.tarjetas.splice(pos, 0, t);
     c.porAtender++;
@@ -798,6 +821,13 @@ $('#panel').addEventListener('click', ev => {
   if (b.id === 'p-hecho') { resolver(E.abierto, 'HECHO'); return; }
   if (b.id === 'p-descartar') { E.descartando = !E.descartando; pintarPanel(); return; }
   if (b.dataset.motivo) { resolver(E.abierto, 'DESCARTADO', b.dataset.motivo); return; }
+  if (b.id === 'p-lohizo') { resolver(E.abierto, 'SESION', '', { fecha: $('#p-fecha-ses').value }); return; }
+  if (b.id === 'p-alta') { E.dandoAlta = !E.dandoAlta; pintarPanel(); return; }
+  if (b.id === 'p-alta-ok') {
+    if (!$('#p-alta-doctor').value) { avisar('Elija el doctor que da el alta.'); return; }
+    resolver(E.abierto, 'ALTA', '', { doctor: $('#p-alta-doctor').value, fecha: $('#p-alta-fecha').value });
+    return;
+  }
   if (b.id === 'p-ficha') { const t = pacienteDe(E.abierto); if (t) abrirFicha(t.DNI); }
 });
 
@@ -1040,10 +1070,10 @@ async function abrirFicha(dni) {
   }
 }
 
-const ESTADO_BUENO = { 'AL DÍA': 1, 'RECUPERADO': 1, 'AGENDADO': 1 };
+const ESTADO_BUENO = { 'AL DÍA': 1, 'RECUPERADO': 1, 'AGENDADO': 1, 'ALTA': 1 };
 const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más de 6 meses', 'POR VENCER': 'Le toca volver pronto',
   'AL DÍA': 'Al día', 'CONTACTADO': 'Se le escribió, esperando respuesta', 'RECUPERADO': 'Volvió tras el seguimiento',
-  'AGENDADO': 'Ya tiene cita', 'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas' };
+  'AGENDADO': 'Ya tiene cita', 'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas', 'ALTA': 'Alta médica' };
 
 function lineaDeTiempo(citas) {
   let n = 0;
@@ -1056,6 +1086,21 @@ function lineaDeTiempo(citas) {
 
 const PARA = { HIERRO: 'Hierro (Ferinject)', PROCEDIMIENTO: 'Procedimiento' };
 
+const NOMBRE_REG = { COTIZADO: 'Cotizado', 'EN CURSO': 'En curso', COMPLETO: 'Completo', ANULADO: 'Anulado' };
+
+function sesionesHtml(r) {
+  if (r.ESTADO === 'ANULADO') return '';
+  const hechas = r.sesiones || [];
+  let html = '';
+  for (let i = 1; i <= Number(r.SESIONES); i++) {
+    const s = hechas[i - 1];
+    html += s
+      ? `<li>Sesión ${i} ✓ ${fechaCorta(s.FECHA)} · ${esc(s.ASESORA)}${i === hechas.length ? ` <button type="button" class="btn-texto" data-anular-ses="${esc(s.ID)}">Anular</button>` : ''}</li>`
+      : `<li class="muted">Sesión ${i} pendiente</li>`;
+  }
+  return html;
+}
+
 function pintarFicha(p) {
   const confirmar = p.porConfirmar.map(i => `<div class="seccion confirmar">
       <h2>¿Es esta la misma persona?</h2>
@@ -1066,7 +1111,8 @@ function pintarFicha(p) {
   const series = p.series.map(s => {
     const citas = p.citas.filter(c => norm(c.ESPECIALIDAD) === norm(s.ESPECIALIDAD));
     return `<div class="seccion">
-      <h2>${esc(s.ESPECIALIDAD)}<span class="estado ${ESTADO_BUENO[s.ESTADO] ? 'bien' : 'mal'}">${esc(NOMBRE_ESTADO[s.ESTADO] || s.ESTADO)}</span></h2>
+      <h2>${esc(s.ESPECIALIDAD)}<span class="estado ${ESTADO_BUENO[s.ESTADO] ? 'bien' : 'mal'}">${esc(NOMBRE_ESTADO[s.ESTADO] || s.ESTADO)}</span>
+        ${s.ESTADO !== 'ALTA' ? `<button type="button" class="btn-texto" data-alta-esp="${esc(s.ESPECIALIDAD)}" data-medico="${esc(s.MEDICO_ULTIMO)}">Dar de alta…</button>` : ''}</h2>
       <div class="tipo-caso"><span class="marcas">${marcas({ N_REALIZADAS: s.N_REALIZADAS })}</span>${textoTipo(s)}</div>
       <p class="muted">Teléfonos: ${esc(s.TELEFONOS) || '—'}</p>
       ${s.PENDIENTE ? `<div class="p-pend"><span class="marcas"><i class="m pend"></i></span><span><b>Procedimiento pendiente.</b> ${esc(s.PENDIENTE)}</span></div>` : ''}
@@ -1086,9 +1132,24 @@ function pintarFicha(p) {
         `<tr><td>${esc(s.FECHA_HORA)}</td><td>${esc(s.RESPONSABLE)}</td><td>${esc(s.ACCION)}</td><td>${esc(PARA[norm(s.ESPECIALIDAD)] || 'Reevaluación · ' + s.ESPECIALIDAD)}</td><td>${esc(s.MOTIVO)}</td><td>${esc(s.NOTA)}</td></tr>`).join('')}</table>`
     : '<p class="muted">Todavía no hay seguimientos.</p>';
 
+  const registros = (p.registros || []).length ? p.registros.map(r => `<div class="reg-ficha" data-reg="${esc(r.ID)}">
+      <div><b>${esc(r.TEXTO)}</b> <span class="estado ${r.ESTADO === 'COMPLETO' ? 'bien' : 'mal'}">${esc(NOMBRE_REG[r.ESTADO] || r.ESTADO)}</span></div>
+      <div class="muted">${esc(r.ID)} · ${fechaCorta(r.FECHA)} · ${esc(r.DOCTOR)} · registró ${esc(r.ASESORA)}${r.MOTIVO_ANULACION ? ' · anulado: ' + esc(r.MOTIVO_ANULACION) : ''}</div>
+      <ol class="sesiones">${sesionesHtml(r)}</ol>
+      ${r.ESTADO === 'COTIZADO' || r.ESTADO === 'EN CURSO' ? `<div class="reg-acciones">
+        <input type="date" class="entrada" data-fecha-ses value="${hoy()}" max="${hoy()}" aria-label="Fecha de la sesión">
+        <button type="button" class="btn-marca" data-lohizo="${esc(r.ID)}">Lo hizo</button>
+        <button type="button" class="btn-texto" data-anular-reg="${esc(r.ID)}">Anular registro</button></div>` : ''}
+    </div>`).join('') : '<p class="muted">Sin registros en la plataforma.</p>';
+  const altas = (p.altas || []).length ? `<div class="seccion"><h2>Altas médicas</h2><ul class="lista-altas">${p.altas.map(a => `<li>
+      ${esc(a.ESPECIALIDAD)} · ${fechaCorta(a.FECHA)} · ${esc(a.DOCTOR || 'sin doctor')} · registró ${esc(a.REGISTRADO_POR)}
+      ${a.ANULADO ? ` · <span class="muted">anulada: ${esc(a.MOTIVO_ANULACION)}</span>` : a.VIGENTE ? ' · <b>vigente</b>' : ' · <span class="muted">cerrada: volvió después</span>'}
+      ${!a.ANULADO && String(a.ID).startsWith('ALT-') ? ` <button type="button" class="btn-texto" data-anular-alta="${esc(a.ID)}">Anular</button>` : ''}</li>`).join('')}</ul></div>` : '';
   $('#ficha').innerHTML = `<div class="ficha-cab"><h1>${esc(p.nombre)}</h1><div class="muted">DNI ${esc(p.dni)}</div></div>
     ${confirmar}${series}
-    <div class="seccion"><h2>Procedimientos indicados (hierro y otros)</h2>${indicaciones}</div>
+    <div class="seccion"><h2>Registros (procedimientos y tratamientos)</h2>${registros}</div>
+    ${altas}
+    <div class="seccion"><h2>Procedimientos indicados antes de la plataforma</h2>${indicaciones}</div>
     <div class="seccion"><h2>Seguimientos</h2>${seguimientos}</div>`;
 }
 
@@ -1104,6 +1165,54 @@ $('#ficha').addEventListener('click', async ev => {
   } catch (e) {
     b.disabled = false;
     avisar(e.message);
+  }
+});
+
+function refrescarTrasFicha() { E.kpi = null; E.resumen = null; abrirFicha(E.fichaDni); cargarBandeja(); }
+
+$('#ficha').addEventListener('click', async ev => {
+  const t = ev.target;
+  const lo = t.closest('[data-lohizo]');
+  if (lo) {
+    if (!exigirUsuario()) return;
+    lo.disabled = true;
+    try {
+      await llamar('marcarSesion', { usuario: usuario(), id: lo.dataset.lohizo, fecha: lo.closest('.reg-ficha').querySelector('[data-fecha-ses]').value, nota: '' });
+      avisar('Sesión registrada: ' + lo.dataset.lohizo);
+      refrescarTrasFicha();
+    } catch (e) { lo.disabled = false; avisar('No se guardó: ' + e.message); }
+    return;
+  }
+  const ar = t.closest('[data-anular-reg]');
+  if (ar) { pedirMotivo(ar.closest('.reg-ficha'), 'registro', ar.dataset.anularReg); return; }
+  const as = t.closest('[data-anular-ses]');
+  if (as) { pedirMotivo(as.closest('li'), 'sesion', as.dataset.anularSes); return; }
+  const aa = t.closest('[data-anular-alta]');
+  if (aa) { pedirMotivo(aa.closest('li'), 'alta', aa.dataset.anularAlta); return; }
+  const ca = t.closest('[data-confirmar-anular]');
+  if (ca) { confirmarAnulacion(ca, refrescarTrasFicha); return; }
+  if (t.closest('[data-cancelar-anular]')) { t.closest('.g-motivo').remove(); return; }
+  const al = t.closest('[data-alta-esp]');
+  if (al) {
+    document.querySelectorAll('[data-alta-form]').forEach(x => x.remove());
+    al.insertAdjacentHTML('afterend', `<div class="p-alta-form" data-alta-form>
+      <select class="sel" data-alta-doctor aria-label="Doctor que da el alta">${opcionesDoctor(al.dataset.medico)}</select>
+      <input type="date" class="entrada" data-alta-fecha value="${hoy()}" max="${hoy()}" aria-label="Fecha del alta">
+      <button type="button" class="btn-marca" data-alta-ok="${esc(al.dataset.altaEsp)}">Confirmar alta</button></div>`);
+    return;
+  }
+  const ok = t.closest('[data-alta-ok]');
+  if (ok) {
+    if (!exigirUsuario()) return;
+    const f = ok.closest('[data-alta-form]');
+    if (!f.querySelector('[data-alta-doctor]').value) { avisar('Elija el doctor que da el alta.'); return; }
+    ok.disabled = true;
+    try {
+      await llamar('darDeAlta', { usuario: usuario(), dni: E.fichaDni, especialidad: ok.dataset.altaOk,
+        doctor: f.querySelector('[data-alta-doctor]').value, fecha: f.querySelector('[data-alta-fecha]').value, nota: '' });
+      avisar('Alta registrada: ' + ok.dataset.altaOk);
+      refrescarTrasFicha();
+    } catch (e) { ok.disabled = false; avisar('No se guardó: ' + e.message); }
   }
 });
 
@@ -1479,6 +1588,9 @@ const DEMO = (() => {
     q('40555666', 'HIERRO', 'ANA MARÍA FLORES RÍOS', '934567890', ELI, '2026-09-15', 'Hierro (Ferinject)', '2026-09-20'),
     q('40444555', 'PROCEDIMIENTO', 'LUIS ALBERTO RAMOS VEGA', '923456789', 'Dra. ALEJANDRA LA TORRE MATUK', '2026-08-12', 'AMO + BIOPSIA', '2026-08-12')
   ];
+  Object.assign(pendientes[0], { ID_REGISTRO: 'REG-000001', DETALLE: 'Hierro carboximaltosa · Ferinject × 2 sesiones', SESIONES: 2, HECHAS: 1,
+    ULTIMA_SESION: '2026-08-05', ESTADO_REGISTRO: 'EN CURSO', USUARIO: '' });
+  pendientes[1].USUARIO = '@ana.flores';
   let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
     candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
   const seguimientos = [{ ID: 'SEG-1', FECHA_HORA: '2026-09-10 11:20', DNI: '40333444', ESPECIALIDAD: 'REUMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: 'Dijo que llamará' }];
@@ -1491,7 +1603,8 @@ const DEMO = (() => {
     exigir(x, accion === 'DESCARTADO');
     seguimientos.push({ ID: 'SEG-' + (seguimientos.length + 1), FECHA_HORA: hoy + ' 10:00', DNI: x.dni, ESPECIALIDAD: x.especialidad,
       RESPONSABLE: x.usuario, ACCION: accion, MOTIVO: x.motivo || '', NOTA: x.nota || '' });
-    const pac = pacientes.concat(pendientes).find(y => y.DNI === x.dni && y.ESPECIALIDAD === x.especialidad);
+    const pac = pacientes.concat(pendientes).find(y => y.DNI === x.dni && y.ESPECIALIDAD === x.especialidad &&
+      (x.referencia ? y.ID_REGISTRO === x.referencia : !y.ID_REGISTRO));
     if (!pac) throw new Error('Ese paciente no está en la lista. Recargue la página.');
     pac.ESTADO = accion === 'HECHO' ? 'CONTACTADO' : 'DESCARTADO';
     return { ok: true };
@@ -1525,7 +1638,14 @@ const DEMO = (() => {
       return { dni, nombre: series.length ? series[0].NOMBRE : '', series, citas,
         indicaciones: indicaciones.filter(i => i.DNI === dni),
         porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === dni)),
-        seguimientos: seguimientos.filter(s => s.DNI === dni) };
+        seguimientos: seguimientos.filter(s => s.DNI === dni),
+        registros: registros.filter(r => r.DNI === dni).map(r => {
+          const ss = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO).sort((a, b) => a.NUMERO - b.NUMERO);
+          const estado = r.ANULADO ? 'ANULADO' : ss.length >= r.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO' : 'COTIZADO';
+          return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegDemo(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: r.SESIONES,
+            ESTADO: estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '', sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
+        }),
+        altas: altas.filter(a => a.DNI === dni).map(a => Object.assign({}, a, { ANULADO: !!a.ANULADO, VIGENTE: !a.ANULADO })) };
     },
     buscar: q => {
       const n = norm(q), d = q.trim();
@@ -1627,6 +1747,26 @@ const DEMO = (() => {
       a.ANULADO = 'SÍ'; a.MOTIVO_ANULACION = x.motivo;
       const pac = pacientes.find(p => p.DNI === a.DNI && p.ESPECIALIDAD === a.ESPECIALIDAD);
       if (pac) pac.ESTADO = 'VENCIDO';
+      return { ok: true };
+    },
+    marcarSesion: x => {
+      exigir(x, false);
+      const r = registros.find(y => y.ID === x.id);
+      const validas = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO);
+      if (validas.length >= r.SESIONES) throw new Error('Ese tratamiento ya tiene todas sus sesiones.');
+      sesiones.push({ ID: siguiente(sesiones, 'SES'), FECHA_HORA: hoy + ' 12:00', ID_REGISTRO: r.ID, NUMERO: validas.length + 1,
+        FECHA: x.fecha, ASESORA: x.usuario, ANULADO: '' });
+      const item = pendientes.find(p => p.ID_REGISTRO === r.ID);
+      const hechas = validas.length + 1;
+      if (item) Object.assign(item, { HECHAS: hechas, ULTIMA_SESION: x.fecha, ESTADO: hechas >= r.SESIONES ? 'COMPLETO' : 'EN ESPERA' });
+      return { ok: true, completo: hechas >= r.SESIONES };
+    },
+    anularSesion: x => {
+      exigir(x, false);
+      const s = sesiones.find(y => y.ID === x.id);
+      s.ANULADO = 'SÍ';
+      const item = pendientes.find(p => p.ID_REGISTRO === s.ID_REGISTRO);
+      if (item) Object.assign(item, { HECHAS: item.HECHAS - 1, ESTADO: 'PENDIENTE' });
       return { ok: true };
     },
     marcarSeguimiento: x => registrar(x, 'HECHO'),

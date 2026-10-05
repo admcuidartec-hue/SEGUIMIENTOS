@@ -615,6 +615,7 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
     if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
   });
   (indicaciones || []).forEach(function (i) {
+    if (i.ORIGEN === 'REGISTROS') return;
     if (!i.DNI || !i.FECHA || i.ESTADO !== 'COTIZÓ' || !TIPOS_INDICACION[i.TIPO]) return;
     var k = i.DNI + '|' + i.TIPO;
     if (aceptado[k] && aceptado[k] >= i.FECHA) return;
@@ -627,7 +628,8 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
   var porDni = realizadasPorDni_(citas), tel = telefonosPorDni(indicaciones, contactos), segs = {};
   (seguimientos || []).forEach(function (s) {
     var t = normTexto(s.ESPECIALIDAD);
-    if (TIPOS_INDICACION[t]) (segs[s.DNI + '|' + t] = segs[s.DNI + '|' + t] || []).push(s);
+    if (s.REFERENCIA || !TIPOS_INDICACION[t]) return;
+    (segs[s.DNI + '|' + t] = segs[s.DNI + '|' + t] || []).push(s);
   });
   return Object.keys(grupos).sort().map(function (k) {
     var g = grupos[k], realizadas = porDni[g.dni] || [];
@@ -707,7 +709,8 @@ function validarAccion(p, catalogos, accion, pacientes) {
     return 'Elija un motivo de descarte.';
   }
   if (pacientes && !pacientes.some(function (x) {
-    return x.DNI === normDni(p.dni) && normTexto(x.ESPECIALIDAD) === normTexto(p.especialidad);
+    return x.DNI === normDni(p.dni) && normTexto(x.ESPECIALIDAD) === normTexto(p.especialidad) &&
+      (p.referencia ? x.ID_REGISTRO === p.referencia : !x.ID_REGISTRO);
   })) {
     return 'Ese paciente no está en la lista. Recargue la página.';
   }

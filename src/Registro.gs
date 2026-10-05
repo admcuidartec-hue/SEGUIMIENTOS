@@ -118,3 +118,99 @@ function duplicadoReciente(registros, fila) {
   });
   return previos.length ? previos[previos.length - 1] : null;
 }
+
+/* ---------- Sesiones y estado de un registro ---------- */
+
+function sesionesDe_(id, sesiones) {
+  return (sesiones || []).filter(function (s) { return s.ID_REGISTRO === id && !anulado_(s); })
+    .sort(function (a, b) { return Number(a.NUMERO) - Number(b.NUMERO); });
+}
+
+/** El estado no se guarda en ninguna celda: se calcula con las sesiones válidas. */
+function estadoRegistro(r, sesiones) {
+  var propias = sesionesDe_(r.ID, sesiones);
+  var total = Math.max(1, Number(r.SESIONES) || 1);
+  var ultima = propias.length ? fechaIso(propias[propias.length - 1].FECHA) : '';
+  var estado = anulado_(r) ? 'ANULADO' : propias.length >= total ? 'COMPLETO' : propias.length ? 'EN CURSO' : 'COTIZADO';
+  return { estado: estado, hechas: propias.length, total: total, ultima: ultima };
+}
+
+function validarSesion(r, sesiones, fecha, hoy) {
+  if (!r) return 'No encontré ese registro. Recargue la página.';
+  var e = estadoRegistro(r, sesiones);
+  if (e.estado === 'ANULADO') return 'Ese registro está anulado.';
+  if (e.estado === 'COMPLETO') return 'Ese tratamiento ya tiene todas sus sesiones.';
+  var f = fechaIso(fecha);
+  if (!f) return 'Falta la fecha de la sesión.';
+  if (f > hoy) return 'La fecha no puede ser futura.';
+  if (f < fechaIso(r.FECHA)) return 'La sesión no puede ser anterior al registro (' + fechaDma_(fechaIso(r.FECHA)) + ').';
+  if (e.ultima && f < e.ultima) return 'La sesión no puede ser anterior a la sesión previa (' + fechaDma_(e.ultima) + ').';
+  return '';
+}
+
+/** Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. */
+function validarAnulacionSesion(id, sesiones) {
+  var s = (sesiones || []).filter(function (x) { return x.ID === id; })[0];
+  if (!s) return { error: 'No encontré la sesión ' + id + '.', sesion: null };
+  if (anulado_(s)) return { error: 'La sesión ' + id + ' ya estaba anulada.', sesion: null };
+  var propias = sesionesDe_(s.ID_REGISTRO, sesiones);
+  if (propias[propias.length - 1].ID !== id) return { error: 'Solo se puede anular la última sesión del tratamiento.', sesion: null };
+  return { error: '', sesion: s };
+}
+
+/* ---------- Filas de la bandeja ---------- */
+
+function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; }
+
+/**
+ * Una fila por registro cotizado o en curso. Entra en la bandeja (ESTADO PENDIENTE) cuando pasa la
+ * espera sin «Lo hizo»: ESPERA_COTIZACION_DIAS desde la FECHA del registro o DIAS_ENTRE_SESIONES
+ * desde la última sesión. Los seguimientos se reconocen por REFERENCIA = ID del registro.
+ */
+function pendientesRegistro(d) {
+  var porDni = realizadasPorDni_(d.citas), segs = {}, reglas = d.reglas, hoy = d.hoy;
+  (d.seguimientos || []).forEach(function (s) {
+    if (s.REFERENCIA) (segs[s.REFERENCIA] = segs[s.REFERENCIA] || []).push(s);
+  });
+  return (d.registros || []).map(function (r) {
+    var e = estadoRegistro(r, d.sesiones);
+    if (e.estado === 'ANULADO' || e.estado === 'COMPLETO') return null;
+    var enCurso = e.estado === 'EN CURSO';
+    var desde = enCurso ? e.ultima : fechaIso(r.FECHA);
+    var dias = Math.max(0, diasEntre(desde, hoy));
+    var lista = (segs[r.ID] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= desde; }).sort(porFechaHora_);
+    var hechos = lista.filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; });
+    var ultimoHecho = hechos[hechos.length - 1];
+    var diasDesdeHecho = ultimoHecho ? diasEntre(fechaIso(ultimoHecho.FECHA_HORA), hoy) : null;
+    var estado = 'PENDIENTE';
+    if (lista.length && normTexto(lista[lista.length - 1].ACCION) === 'DESCARTADO') estado = 'DESCARTADO';
+    else if (hechos.length >= reglas.maxSeguimientos && diasDesdeHecho >= reglas.espera) estado = 'DESCARTADO';
+    else if (ultimoHecho && diasDesdeHecho < reglas.espera) estado = 'CONTACTADO';
+    else if (dias < (enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion)) estado = 'EN ESPERA';
+    else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
+    var dni = normDni(r.DNI), realizadas = porDni[dni] || [], ultima = realizadas[realizadas.length - 1];
+    var tel = normTelefono(r.CONTACTO);
+    return {
+      ID_REGISTRO: r.ID,
+      DNI: dni,
+      ESPECIALIDAD: r.TIPO,
+      TIPO_SEGUIMIENTO: r.TIPO,
+      NOMBRE: ultima ? ultima.NOMBRE : r.NOMBRE,
+      TELEFONOS: ((d.telefonos || {})[dni] || []).join(' / '),
+      USUARIO: tel.length === 9 ? '' : textoLimpio_(r.CONTACTO),
+      MEDICO_ULTIMO: medicoDeRegistro(r, d.catalogos),
+      ESPECIALIDAD_CONSULTA: ultima ? ultima.ESPECIALIDAD : '',
+      FECHA_COTIZACION: fechaIso(r.FECHA),
+      DETALLE: textoRegistro(r),
+      SESIONES: e.total,
+      HECHAS: e.hechas,
+      ULTIMA_SESION: e.ultima,
+      DIAS: dias,
+      ULTIMA_CITA: ultima ? ultima.FECHA : '',
+      N_SEGUIMIENTOS: hechos.length,
+      ULTIMO_SEGUIMIENTO: lista.length ? fechaIso(lista[lista.length - 1].FECHA_HORA) : '',
+      ESTADO: estado,
+      ESTADO_REGISTRO: e.estado
+    };
+  }).filter(Boolean);
+}

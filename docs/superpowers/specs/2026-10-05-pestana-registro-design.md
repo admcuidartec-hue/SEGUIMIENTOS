@@ -26,6 +26,8 @@ trazabilidad completa:
 | Dónde se guarda | Dos hojas nuevas, `REGISTROS` y `SESIONES`, en el libro madre (camino 1). `INDICACIONES` se congela como historial |
 | Excel aparte | **Se deja de usar.** Solo se registra en la plataforma |
 | Cuándo entra un cotizado en la bandeja | A los **7 días** sin «Lo hizo» (`ESPERA_COTIZACION_DIAS`) |
+| Doctores | «Dra. Karen Matos» y «Dra. Karen Matos – Particular» son **médicos distintos** |
+| Alta médica | Se registra aparte, en la hoja `ALTAS`, y es **por especialidad** (opción A). Un paciente con alta sale de la bandeja y no cuenta como «no volvió» |
 
 ## 3. Arquitectura del libro madre
 
@@ -38,6 +40,7 @@ hechos registrados.
 | Entrada | `Hoja 1` | Usted, pegando la exportación de SOFDOC | Citas tal como salen de SOFDOC |
 | Entrada | `REGISTROS` *(nueva)* | La app: pestaña Registro | Una fila por indicación |
 | Entrada | `SESIONES` *(nueva)* | La app: botón «Lo hizo» | Una fila por sesión hecha |
+| Entrada | `ALTAS` *(nueva)* | La app: «Dar de alta» | Una fila por alta médica, por especialidad |
 | Entrada | `SEGUIMIENTOS` | La app: «Seguimiento hecho» y «Descartar» | Igual que hoy, con la columna nueva `REFERENCIA` |
 | Configuración | `REGLAS`, `CATALOGOS` | A mano | Plazos, parámetros y listas |
 | Copia del script | `CITAS`, `CONTACTOS_CRM`, `PACIENTES`, `KPI` | El script, al pulsar «Actualizar» | Igual que hoy. No se editan |
@@ -232,6 +235,61 @@ DNI + tipo).
 - **`CONTACTO`** se suma a `telefonosPorDni` cuando, al normalizarlo, queda un número de 9 dígitos.
 - **Si no es un número**, se muestra en el panel como «Usuario: …», sin botón de copiar.
 
+## 5bis. Alta médica
+
+### Hoja `ALTAS`
+
+`ID, FECHA_HORA, FECHA, DNI, ESPECIALIDAD, DOCTOR, REGISTRADO_POR, NOTA, ANULADO, MOTIVO_ANULACION`
+
+- **`ID`:** `ALT-000001`.
+- **`FECHA`:** la del alta. No puede ser futura.
+- **`DOCTOR`:** quien da el alta, elegido de la columna `DOCTOR` de `CATALOGOS`.
+- **`REGISTRADO_POR`:** la asesora del selector «¿Quién es usted?».
+- **`ESPECIALIDAD`:** una de las especialidades en las que el paciente tiene citas realizadas.
+- **Anulación:** como en `REGISTROS`, se anula y nunca se borra.
+
+### Dónde se da de alta
+
+- **En la pestaña Registro**, en la sección «Alta médica».
+  - Al escribir el DNI, ofrece solo las especialidades en las que el paciente tiene citas realizadas.
+- **En el panel de la bandeja**, en las filas de reevaluación, y **en la ficha del paciente**, con un
+  botón **«Dar de alta»**.
+  - Pide el doctor, la fecha (hoy por omisión) y una nota opcional.
+  - La especialidad es la de la fila.
+- **La revisión la hace `validarAlta(p, catalogos, series, hoy)`.** Rechaza:
+  - un DNI sin citas realizadas en esa especialidad;
+  - una fecha futura o anterior a la primera consulta;
+  - un doctor fuera del catálogo;
+  - un alta ya vigente para esa especialidad.
+- **Bitácora:** cada alta y cada anulación deja una línea en `BITACORA`.
+
+### Efecto
+
+**Cuándo está vigente.** Un alta está **vigente** si no está anulada y no hay ninguna cita realizada en esa
+especialidad con fecha posterior al alta. Si el paciente vuelve, por ejemplo por una recaída, el alta
+deja de estar vigente sola y la serie se sigue con normalidad.
+
+**Estado de la serie.** `estadoDeSerie` tiene un estado nuevo, **ALTA**:
+- Es la primera regla, antes de DESCARTADO.
+- Una serie en ALTA no entra en la bandeja y en la ficha se ve como «Alta médica (dd/mm/aaaa, Dr. X)».
+
+**Cifras.** Un paciente con alta vigente **no cuenta como «no volvió»**:
+- **«¿Hasta dónde llegan los pacientes nuevos?»** tiene una parte propia, **«Alta médica»**:
+  - El paciente cuenta ahí, según la reevaluación hasta la que llegó antes del alta.
+  - Sale del denominador de los porcentajes de retorno.
+  - El relato lo dice: «N recibieron el alta».
+  - `kpiCohortes` suma `ALTAS` por etapa: en la etapa k, una serie sin la cita k+1 y con alta vigente
+    cuenta en `ALTAS` y no en `ELEGIBLES`.
+- **Resumen:** `resumenPorMes` suma `NUEVOS_ALTA` y `CONTROL_ALTA`. Esas series quedan fuera del
+  porcentaje de «no volvieron a su reevaluación», y la frase de abajo dice cuántas fueron altas.
+
+**Lo que ya existe.**
+- **Descartes previos:** un seguimiento `DESCARTADO` con el motivo «ALTA MÉDICA» cuenta como un alta
+  con la fecha del seguimiento, el doctor vacío y quien lo registró como `REGISTRADO_POR`.
+- **El motivo «ALTA MÉDICA» se quita de `MOTIVOS_DESCARTE`**, para que haya un solo camino.
+  - Lo quita «Preparar hojas».
+  - «Verificar» avisa si todavía está.
+
 ## 6. Cifras
 
 Para medir, los registros se convierten a indicaciones con esta equivalencia:
@@ -268,6 +326,9 @@ Para medir, los registros se convierten a indicaciones con esta equivalencia:
 | `Logica.gs` | `pendientesRegistro(registros, sesiones, seguimientos, citas, reglas, hoy, contactos) → filas de bandeja`, con la misma forma que `pendientesIndicacion` más `ID_REGISTRO`, `SESIONES`, `HECHAS` y `ULTIMA_SESION` |
 | `Logica.gs` | `indicacionesDeRegistros(registros, sesiones) → indicaciones`, para las cifras |
 | `Logica.gs` | `reglasDesdeFilas`: añade `esperaCotizacion` y `diasEntreSesiones` |
+| `Logica.gs` | `COLUMNAS_ALTAS`, `validarAlta(p, catalogos, series, hoy)` y `altasVigentes(altas, seguimientos, citas) → { 'DNI|ESPECIALIDAD': alta }` |
+| `Logica.gs` | `estadoDeSerie(…, alta)`, con el estado ALTA; `kpiCohortes` y `resumenPorMes` cuentan las altas aparte |
+| `Codigo.gs` | `darDeAlta(p)` y `anularAlta(p)`. `datos_()` lee `ALTAS` |
 | `Codigo.gs` | `guardarRegistro(p)`, `marcarSesion(p)`, `anularRegistro(p)`, `anularSesion(p)` y `getRegistrosHoy()` |
 | `Codigo.gs` | `bootstrap` envía los catálogos nuevos; `buscarPacienteRegistro(dni)` devuelve nombre, teléfonos, último médico y última fecha |
 | `Codigo.gs` | `datos_()` lee `REGISTROS` y `SESIONES` (vacías si las hojas no existen todavía) |
@@ -280,7 +341,7 @@ Para medir, los registros se convierten a indicaciones con esta equivalencia:
 ## 8. Puesta en marcha
 
 1. Publicar (`npm run actualizar`).
-2. Menú **Preparar hojas.** Crea `REGISTROS` y `SESIONES`, agrega `REFERENCIA` a
+2. Menú **Preparar hojas.** Crea `REGISTROS`, `SESIONES` y `ALTAS`, quita «ALTA MÉDICA» de los motivos de descarte, agrega `REFERENCIA` a
    `SEGUIMIENTOS`, agrega las columnas de catálogo con sus listas y agrega los dos parámetros. No toca
    lo existente.
 3. Menú **Verificar.**
@@ -317,6 +378,14 @@ Siempre con datos inventados.
 - `indicacionesDeRegistros` y la métrica «completaron».
 - Mezcla con el historial: un DNI con una indicación histórica y un registro produce dos filas, que
   no se pisan.
+
+**Alta**
+- Validación.
+- Vigente y no vigente: cita posterior o anulada.
+- Estado ALTA antes que DESCARTADO.
+- Fuera de la bandeja.
+- Excluida de «no volvió» en cohortes y resumen.
+- Descarte histórico con el motivo «ALTA MÉDICA».
 
 **Menú**
 - `prepararHojas` agrega sin borrar.

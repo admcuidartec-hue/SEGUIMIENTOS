@@ -553,7 +553,8 @@ function pendientesPorDni(indicaciones) {
     if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
   });
   (indicaciones || []).forEach(function (i) {
-    if (!i.DNI || i.ESTADO !== 'COTIZÓ') return;
+    // Un registro dentro de su espera de 7 días todavía no es «cotizó y no lo hizo».
+    if (!i.DNI || i.ESTADO !== 'COTIZÓ' || i.EN_ESPERA === 'SÍ') return;
     var a = aceptado[i.DNI + '|' + i.TIPO];
     if (a && a >= i.FECHA) return;
     var cantidad = Number(i.CANTIDAD);

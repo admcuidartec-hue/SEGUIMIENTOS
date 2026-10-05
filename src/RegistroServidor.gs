@@ -42,7 +42,7 @@ function guardarRegistro(p) {
     });
     return limpiarParaEnvio({ ok: true, registros: v.filas });
   } finally {
-    lock.releaseLock();
+    soltar_(lock);
   }
 }
 
@@ -63,7 +63,7 @@ function marcarSesion(p) {
     bitacora_(asesora, 'SESIÓN', r.ID + ' · sesión ' + s.NUMERO + ' de ' + e.total);
     return limpiarParaEnvio({ ok: true, sesion: s, completo: s.NUMERO >= e.total });
   } finally {
-    lock.releaseLock();
+    soltar_(lock);
   }
 }
 
@@ -75,7 +75,7 @@ function anularRegistro(p) {
     bitacora_(quien, 'ANULAR REGISTRO', textoLimpio_(p.id) + ' · ' + motivo);
     return { ok: true };
   } finally {
-    lock.releaseLock();
+    soltar_(lock);
   }
 }
 
@@ -89,7 +89,7 @@ function anularSesion(p) {
     bitacora_(quien, 'ANULAR SESIÓN', v.sesion.ID + ' (' + v.sesion.ID_REGISTRO + ') · ' + motivo);
     return { ok: true };
   } finally {
-    lock.releaseLock();
+    soltar_(lock);
   }
 }
 
@@ -99,14 +99,18 @@ function darDeAlta(p) {
   if (v.error) throw new Error(v.error);
   var lock = bloquear_();
   try {
-    var a = v.alta;
-    a.ID = siguienteId(leerAltas_().map(function (x) { return x.ID; }), 'ALT');
+    var a = v.alta, altas = leerAltas_();
+    // Otra asesora pudo dar la misma alta mientras tanto: se revisa otra vez con la hoja releída dentro del candado.
+    if (altasVigentes(altas, d.seguimientos, d.citas)[claveSerie(a.DNI, a.ESPECIALIDAD)]) {
+      throw new Error('Ese paciente ya tiene un alta vigente en ' + a.ESPECIALIDAD + '.');
+    }
+    a.ID = siguienteId(altas.map(function (x) { return x.ID; }), 'ALT');
     a.FECHA_HORA = fechaHoraTexto_(new Date());
     anexarObjeto_('ALTAS', COLUMNAS_ALTAS, a);
     bitacora_(a.REGISTRADO_POR, 'ALTA', a.ID + ' · ' + a.DNI + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR);
     return limpiarParaEnvio({ ok: true, alta: a });
   } finally {
-    lock.releaseLock();
+    soltar_(lock);
   }
 }
 
@@ -119,7 +123,7 @@ function anularAlta(p) {
     bitacora_(quien, 'ANULAR ALTA', id + ' · ' + motivo);
     return { ok: true };
   } finally {
-    lock.releaseLock();
+    soltar_(lock);
   }
 }
 

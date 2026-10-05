@@ -284,3 +284,8 @@ test('revisarCatalogos: marcas sin su tratamiento, sin doctores y el motivo ALTA
     '✗ La marca «MARCA X» apunta a «HIERRO OTRO», que no está en TRATAMIENTOS.',
     '✗ «ALTA MÉDICA» sigue en MOTIVOS_DESCARTE: ahora el alta se registra con «Dar de alta». Use «Preparar hojas».']);
 });
+
+test('revisión final: un registro aún en su espera no marca «cotizó y no lo hizo» en la reevaluación', () => {
+  const p = L.pendientesPorDni([{ DNI: '1', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', ESTADO: 'COTIZÓ', FECHA: '2026-10-04', CANTIDAD: 2, EN_ESPERA: 'SÍ' }]);
+  assert.deepEqual(plano(p), {});
+});

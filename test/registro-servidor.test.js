@@ -22,6 +22,7 @@ function servidor(extra, hojas) {
   ctx.anexarObjeto_ = (n, cols, o) => { assert.equal(lock.tomado, 1, 'se escribe con el candado tomado'); escrito[n].push(plano(o)); };
   ctx.bitacora_ = (u, a, d) => escrito.BITACORA.push([u, a, d]);
   ctx.fechaHoraTexto_ = () => '2026-10-05 10:30';
+  ctx.SpreadsheetApp = { flush: () => {} };
   ctx.marcarAnulado_ = (n, id, motivo) => { assert.equal(lock.tomado, 1); escrito.anulados.push([n, id, motivo]); };
   return { ctx, escrito, lock };
 }
@@ -103,4 +104,26 @@ test('marcarAnulado_ escribe SÍ y el motivo en la fila de ese ID, y no anula do
   assert.deepEqual(v[2], ['REG-000002', 'SÍ', 'Error']);
   assert.throws(() => ctx.marcarAnulado_('REGISTROS', 'REG-000002', 'x'), /ya estaba anulado/);
   assert.throws(() => ctx.marcarAnulado_('REGISTROS', 'REG-000009', 'x'), /No encontré/);
+});
+
+test('revisión final: cada escritura se confirma (flush) antes de soltar el candado', () => {
+  const { ctx, lock } = servidor({}, { REGISTROS: [REG4] });
+  const orden = [];
+  ctx.SpreadsheetApp = { flush: () => orden.push('flush') };
+  ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { orden.push('suelta'); lock.tomado--; } }; };
+  ctx.guardarRegistro(datosReg({ confirmado: true }));
+  ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04' });
+  ctx.darDeAlta({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05' });
+  ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'x' });
+  ctx.anularAlta({ usuario: 'MAGALY', id: 'ALT-000001', motivo: 'x' });
+  assert.deepEqual(orden, Array(5).fill(['flush', 'suelta']).flat());
+});
+
+test('revisión final: dos altas simultáneas — la segunda se rechaza dentro del candado', () => {
+  const vigente = { ID: 'ALT-000001', FECHA_HORA: '2026-10-05 10:00', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA',
+    DOCTOR: 'Dra. Karen Matos', REGISTRADO_POR: 'ANA', ANULADO: '' };
+  const { ctx, escrito } = servidor({}, { ALTAS: [vigente] });
+  assert.throws(() => ctx.darDeAlta({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05' }),
+    /ya tiene un alta vigente/);
+  assert.equal(escrito.ALTAS.length, 0);
 });

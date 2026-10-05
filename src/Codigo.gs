@@ -138,6 +138,11 @@ function bitacora_(usuario, accion, detalle) {
   });
 }
 
+/** Confirma lo escrito y suelta el candado. Sin flush, la siguiente asesora podría leer los IDs antes de que se guarden. */
+function soltar_(lock) {
+  try { SpreadsheetApp.flush(); } finally { lock.releaseLock(); }
+}
+
 function bloquear_() {
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(CONFIG.ESPERA_LOCK_MS)) throw new Error('Otra persona está guardando. Intente de nuevo en unos segundos.');

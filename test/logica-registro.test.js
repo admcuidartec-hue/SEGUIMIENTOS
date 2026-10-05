@@ -228,3 +228,49 @@ test('estado ALTA: va antes que DESCARTADO y saca la serie de la bandeja', () =>
   assert.deepEqual(plano(L.ordenarBandeja(p)), []);
   assert.equal(plano(L.armarPacientes(citas, [], [], reglas(L), HOY))[0].ESTADO, 'VENCIDO', 'sin altas, como antes');
 });
+
+test('indicacionesDeRegistros: cotizado = COTIZÓ, en curso o completo = ACEPTÓ; anulado no cuenta', () => {
+  const r = [reg({ ID: 'REG-000001', FECHA: '2026-09-01' }), reg({ ID: 'REG-000002', FECHA: '2026-10-01' }),
+    reg({ ID: 'REG-000003', SESIONES: '1', CONTACTO: '@rosa.q', DOCTOR: 'Dra. Karen Matos – Particular' }), reg({ ID: 'REG-000004', ANULADO: 'SÍ' })];
+  const s = [ses(1, '2026-09-25', { ID_REGISTRO: 'REG-000003' })];
+  const i = plano(L.indicacionesDeRegistros(r, s, CAT, reglas(L), HOY));
+  assert.deepEqual(i.map(x => [x.ID, x.ESTADO, x.COMPLETO, x.EN_ESPERA]),
+    [['REG-000001', 'COTIZÓ', 'NO', ''], ['REG-000002', 'COTIZÓ', 'NO', 'SÍ'], ['REG-000003', 'ACEPTÓ', 'SÍ', '']]);
+  assert.deepEqual([i[0].TIPO, i[0].DETALLE, i[0].CANTIDAD, i[0].MEDICO_SOLICITANTE, i[0].TELEFONO, i[0].ORIGEN, i[0].DNI, i[0].FECHA],
+    ['HIERRO', 'HIERRO CARBOXIMALTOSA', 3, 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA', '987654321', 'REGISTROS', '40111222', '2026-09-01']);
+  assert.deepEqual([i[2].TELEFONO, i[2].MEDICO_SOLICITANTE], ['', 'Dra. Karen Matos – Particular']);
+});
+
+test('kpiIndicaciones: completadas; lo que está en espera no se mide todavía', () => {
+  const i = [
+    { FECHA: '2026-09-01', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MEDICO_SOLICITANTE: 'Dr. A', ESTADO: 'ACEPTÓ', COMPLETO: 'NO' },
+    { FECHA: '2026-09-02', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MEDICO_SOLICITANTE: 'Dr. A', ESTADO: 'ACEPTÓ', COMPLETO: 'SÍ' },
+    { FECHA: '2026-09-03', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MEDICO_SOLICITANTE: 'Dr. A', ESTADO: 'COTIZÓ', COMPLETO: 'NO', EN_ESPERA: 'SÍ' }];
+  assert.deepEqual(plano(L.kpiIndicaciones(i, [])), [{ MES: '2026-09', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MEDICO: 'Dr. A',
+    INDICADAS: 2, ACEPTADAS: 2, COMPLETADAS: 1 }]);
+});
+
+test('cohortes: un alta vigente no cuenta como «no volvió», en la etapa en que se dio', () => {
+  const citas = [cita({ dni: '1', fecha: '2026-06-01' }),
+    cita({ dni: '2', fecha: '2026-06-01' }), cita({ dni: '2', fecha: '2026-06-20' }), cita({ dni: '3', fecha: '2026-06-02' })];
+  const vig = L.altasVigentes([{ FECHA: '2026-06-01', DNI: '1', ESPECIALIDAD: 'HEMATOLOGÍA', ANULADO: '' },
+    { FECHA: '2026-06-20', DNI: '2', ESPECIALIDAD: 'HEMATOLOGÍA', ANULADO: '' }], [], citas);
+  const k = plano(L.kpiCohortes(citas, reglas(L), HOY, vig));
+  assert.deepEqual(k.map(r => [r.ETAPA, r.ELEGIBLES, r.VOLVIERON, r.ALTAS]), [[1, 2, 1, 1], [2, 0, 0, 1]]);
+});
+
+test('resumenPorMes: altas aparte y hierro completado', () => {
+  const citas = [cita({ dni: '1', fecha: '2026-07-01' }), cita({ dni: '2', fecha: '2026-07-02' })];
+  const vig = L.altasVigentes([{ FECHA: '2026-07-01', DNI: '1', ESPECIALIDAD: 'HEMATOLOGÍA', ANULADO: '' }], [], citas);
+  const ind = o => Object.assign({ TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MEDICO_SOLICITANTE: 'Dra. KAREN DIANA MATOS PEÑA' }, o);
+  const inds = [ind({ ID: 'R1', FECHA: '2026-07-03', DNI: '1', ESTADO: 'ACEPTÓ', COMPLETO: 'SÍ' }),
+    ind({ ID: 'R2', FECHA: '2026-07-04', DNI: '2', ESTADO: 'ACEPTÓ', COMPLETO: 'NO' }),
+    ind({ ID: 'R3', FECHA: '2026-07-05', DNI: '3', ESTADO: 'COTIZÓ', COMPLETO: 'NO', EN_ESPERA: 'SÍ' })];
+  const jul = plano(L.resumenPorMes(citas, inds, [], reglas(L), HOY, vig)).find(x => x.MES === '2026-07' && x.MEDICO === 'Dra. KAREN DIANA MATOS PEÑA');
+  assert.deepEqual([jul.NUEVOS, jul.NUEVOS_NO, jul.NUEVOS_ALTA, jul.HIERRO, jul.HIERRO_NO, jul.HIERRO_COMPLETO], [2, 1, 1, 2, 0, 1]);
+});
+
+test('el texto de pendiente de una reevaluación nombra el hierro registrado, no «Ferinject» a ciegas', () => {
+  const p = L.pendientesPorDni([{ DNI: '1', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', ESTADO: 'COTIZÓ', FECHA: '2026-09-01', CANTIDAD: 2 }]);
+  assert.equal(p['1'][0], 'Hierro sacarato ×2: cotizó y no lo hizo');
+});

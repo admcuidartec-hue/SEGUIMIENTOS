@@ -13,9 +13,9 @@ test('cohortes: solo cuentan los pacientes a quienes ya les tocaba volver', () =
   ];
   const k = plano(L.kpiCohortes(citas, reglas(L), '2026-10-01'));
   assert.deepEqual(k, [
-    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 1, ELEGIBLES: 2, VOLVIERON: 1, EN_CURSO: 0 },
-    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 2, ELEGIBLES: 1, VOLVIERON: 0, EN_CURSO: 0 },
-    { COHORTE: '2026-09', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 1, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 1 }
+    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 1, ELEGIBLES: 2, VOLVIERON: 1, EN_CURSO: 0, ALTAS: 0 },
+    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 2, ELEGIBLES: 1, VOLVIERON: 0, EN_CURSO: 0, ALTAS: 0 },
+    { COHORTE: '2026-09', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 1, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 1, ALTAS: 0 }
   ], 'el de setiembre solo vino a la primera, pero todavía está en plazo');
 });
 
@@ -28,8 +28,8 @@ test('indicaciones: sin médico solicitante se usa el de la última cita anterio
     Object.assign({ FECHA: '2026-07-20', ESTADO: 'COTIZÓ', DNI: '' }, base)
   ];
   assert.deepEqual(plano(L.kpiIndicaciones(inds, citas)), [
-    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: 'Dr. A', INDICADAS: 2, ACEPTADAS: 1 },
-    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: 'SIN MÉDICO', INDICADAS: 1, ACEPTADAS: 0 }
+    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: 'Dr. A', INDICADAS: 2, ACEPTADAS: 1, COMPLETADAS: 1 },
+    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: 'SIN MÉDICO', INDICADAS: 1, ACEPTADAS: 0, COMPLETADAS: 0 }
   ]);
 });
 

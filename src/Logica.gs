@@ -557,7 +557,8 @@ function pendientesPorDni(indicaciones) {
     var a = aceptado[i.DNI + '|' + i.TIPO];
     if (a && a >= i.FECHA) return;
     var cantidad = Number(i.CANTIDAD);
-    var texto = (i.TIPO === 'HIERRO' ? 'Hierro (Ferinject)' : (i.DETALLE || 'Procedimiento')) + (cantidad > 1 ? ' ×' + cantidad : '') + ': cotizó y no lo hizo';
+    var nombre = i.TIPO === 'HIERRO' ? (normTexto(i.DETALLE) === 'HIERRO' ? 'Hierro (Ferinject)' : frase_(i.DETALLE)) : (i.DETALLE || 'Procedimiento');
+    var texto = nombre + (cantidad > 1 ? ' ×' + cantidad : '') + ': cotizó y no lo hizo';
     (out[i.DNI] = out[i.DNI] || []).push(texto);
   });
   return out;
@@ -753,7 +754,7 @@ function compararCampos_(campos) {
  * plazo de esa etapa ya venció ("maduro"): así un mes reciente no aparece
  * con un retorno artificialmente bajo.
  */
-function kpiCohortes(citas, reglas, hoy) {
+function kpiCohortes(citas, reglas, hoy, altas) {
   var series = armarSeries(citas), acc = {};
   Object.keys(series).forEach(function (k) {
     var s = series[k], r = s.realizadas;
@@ -761,11 +762,14 @@ function kpiCohortes(citas, reglas, hoy) {
     var plazo = plazoDe(reglas, s.especialidad);
     for (var etapa = 1; etapa <= 3 && r.length >= etapa; etapa++) {
       var volvio = r.length >= etapa + 1;
-      var enCurso = !volvio && sumarDias(r[etapa - 1].FECHA, plazo.vence) > hoy;
+      var alta = !volvio && !!(altas && altas[k]);
+      var enCurso = !volvio && !alta && sumarDias(r[etapa - 1].FECHA, plazo.vence) > hoy;
       // En curso solo interesa en la 1.ª: «solo vino a su primera consulta, pero aún está en plazo».
       if (enCurso && etapa > 1) continue;
       var clave = [mesDe(r[0].FECHA), s.especialidad, r[0].MEDICO, etapa].join('|');
-      if (!acc[clave]) acc[clave] = { COHORTE: mesDe(r[0].FECHA), ESPECIALIDAD: s.especialidad, MEDICO: r[0].MEDICO, ETAPA: etapa, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 0 };
+      if (!acc[clave]) acc[clave] = { COHORTE: mesDe(r[0].FECHA), ESPECIALIDAD: s.especialidad, MEDICO: r[0].MEDICO, ETAPA: etapa, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 0, ALTAS: 0 };
+      // Con alta vigente no volvió porque el doctor lo dio de alta: no es una pérdida.
+      if (alta) { acc[clave].ALTAS++; continue; }
       if (enCurso) { acc[clave].EN_CURSO++; continue; }
       acc[clave].ELEGIBLES++;
       if (volvio) acc[clave].VOLVIERON++;
@@ -793,12 +797,14 @@ function ultimaAntesDe_(lista, fecha) {
 function kpiIndicaciones(indicaciones, citas) {
   var porDni = realizadasPorDni_(citas), acc = {};
   (indicaciones || []).forEach(function (i) {
+    if (i.EN_ESPERA === 'SÍ') return;
     var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
     var medico = i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO';
     var clave = [mesDe(i.FECHA), i.TIPO, i.DETALLE, medico].join('|');
-    if (!acc[clave]) acc[clave] = { MES: mesDe(i.FECHA), TIPO: i.TIPO, DETALLE: i.DETALLE, MEDICO: medico, INDICADAS: 0, ACEPTADAS: 0 };
+    if (!acc[clave]) acc[clave] = { MES: mesDe(i.FECHA), TIPO: i.TIPO, DETALLE: i.DETALLE, MEDICO: medico, INDICADAS: 0, ACEPTADAS: 0, COMPLETADAS: 0 };
     acc[clave].INDICADAS++;
     if (i.ESTADO === 'ACEPTÓ') acc[clave].ACEPTADAS++;
+    if (i.ESTADO === 'ACEPTÓ' && i.COMPLETO !== 'NO') acc[clave].COMPLETADAS++;
   });
   return Object.keys(acc).map(function (k) { return acc[k]; })
     .sort(compararCampos_(['MES', 'TIPO', 'DETALLE', 'MEDICO']));
@@ -903,9 +909,9 @@ function kpiCampanas(citas, contactos, reglas, hoy) {
     .sort(compararCampos_(['MES', 'CANAL', 'CAMPANA', 'MEDICO']));
 }
 
-function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy, contactos) {
+function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas) {
   return {
-    cohortes: kpiCohortes(citas, reglas, hoy),
+    cohortes: kpiCohortes(citas, reglas, hoy, altas),
     indicaciones: kpiIndicaciones(indicaciones, citas),
     recuperacion: kpiRecuperacion(seguimientos, citas, hoy),
     motivos: kpiMotivos(seguimientos),
@@ -924,10 +930,10 @@ function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy, contactos) 
    y no entra en el porcentaje.
    ========================================================================== */
 
-var CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO',
-  'HIERRO', 'HIERRO_NO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
+var CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
+  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
 
-function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy) {
+function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
   var acc = {};
   function fila(mes, medico) {
     var k = mes + '|' + medico;
@@ -949,37 +955,40 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy) {
       var f = fila(mesDe(c.FECHA), c.MEDICO || 'SIN MÉDICO');
       f[tipo]++;
       if (siguiente) return;
+      if (altas && altas[k]) { f[tipo + '_ALTA']++; return; }
       if (sumarDias(c.FECHA, plazo.vence) <= hoy) f[tipo + '_NO']++;
       else f[tipo + '_CURSO']++;
     });
   });
 
   // Hierro y procedimientos: una vez por paciente, tipo y mes.
-  var porDni = realizadasPorDni_(citas), grupos = {}, aceptado = {};
+  var porDni = realizadasPorDni_(citas), grupos = {}, aceptado = {}, completoDe = {};
   (indicaciones || []).forEach(function (i) {
     if (i.DNI && i.ESTADO === 'ACEPTÓ') {
       var a = i.DNI + '|' + i.TIPO;
-      if (!aceptado[a] || i.FECHA > aceptado[a]) aceptado[a] = i.FECHA;
+      if (!aceptado[a] || i.FECHA > aceptado[a]) { aceptado[a] = i.FECHA; completoDe[a] = i.COMPLETO !== 'NO'; }
     }
   });
   (indicaciones || []).forEach(function (i) {
-    if (!i.FECHA) return;
+    if (!i.FECHA || i.EN_ESPERA === 'SÍ') return;
     var g = [i.DNI || i.ID, i.TIPO, mesDe(i.FECHA)].join('|');
     if (!grupos[g]) {
       var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
       grupos[g] = { mes: mesDe(i.FECHA), tipo: i.TIPO, dni: i.DNI, primera: i.FECHA,
-        medico: i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO', acepto: false };
+        medico: i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO', acepto: false, completo: false };
     }
     if (i.FECHA < grupos[g].primera) grupos[g].primera = i.FECHA;
-    if (i.ESTADO === 'ACEPTÓ') grupos[g].acepto = true;
+    if (i.ESTADO === 'ACEPTÓ') { grupos[g].acepto = true; if (i.COMPLETO !== 'NO') grupos[g].completo = true; }
   });
   Object.keys(grupos).forEach(function (k) {
-    var g = grupos[k];
-    var siguio = g.acepto || (g.dni && aceptado[g.dni + '|' + g.tipo] >= g.primera);
+    var g = grupos[k], clave = g.dni + '|' + g.tipo;
+    var siguio = g.acepto || (g.dni && aceptado[clave] >= g.primera);
+    var completo = g.acepto ? g.completo : !!(siguio && completoDe[clave]);
     var campo = g.tipo === 'HIERRO' ? 'HIERRO' : 'PROC';
     var f = fila(g.mes, g.medico);
     f[campo]++;
     if (!siguio) f[campo + '_NO']++;
+    if (campo === 'HIERRO' && siguio && completo) f.HIERRO_COMPLETO++;
   });
 
   // Seguimientos hechos y cuántos volvieron.

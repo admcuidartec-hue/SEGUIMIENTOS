@@ -261,3 +261,22 @@ function altasVigentes(altas, seguimientos, citas) {
   });
   return out;
 }
+
+/* ---------- Registros como indicaciones (para las cifras y los teléfonos) ---------- */
+
+function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {
+  return (registros || []).map(function (r) {
+    var e = estadoRegistro(r, sesiones);
+    if (e.estado === 'ANULADO') return null;
+    var tel = normTelefono(r.CONTACTO), fecha = fechaIso(r.FECHA);
+    return {
+      ID: r.ID, FECHA: fecha, TIPO: normTexto(r.TIPO), DETALLE: r.DETALLE, CANTIDAD: e.total,
+      MEDICO_SOLICITANTE: medicoDeRegistro(r, catalogos), ASESORA: r.ASESORA, NOMBRE: r.NOMBRE,
+      TELEFONO: tel.length === 9 ? tel : '', ESTADO: e.estado === 'COTIZADO' ? 'COTIZÓ' : 'ACEPTÓ',
+      OBSERVACIONES: '', DNI: normDni(r.DNI), EMPAREJAMIENTO: 'REGISTRO', ORIGEN: 'REGISTROS',
+      COMPLETO: e.estado === 'COMPLETO' ? 'SÍ' : 'NO',
+      // Un cotizado dentro de su espera todavía no es «no siguió».
+      EN_ESPERA: e.estado === 'COTIZADO' && fecha && diasEntre(fecha, hoy) < reglas.esperaCotizacion ? 'SÍ' : ''
+    };
+  }).filter(Boolean);
+}

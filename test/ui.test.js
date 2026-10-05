@@ -173,12 +173,12 @@ test('detalle: pinta sus cinco secciones y filtra sin errores', async () => {
     await pagina.locator('.nav button[data-vista="tablero"]').click();
     await pagina.waitForSelector('#tablero table');
     const texto = await pagina.locator('#tablero').textContent();
-    for (const t of ['¿Vuelven los pacientes nuevos?', 'Procedimientos', 'Recuperación', 'Motivos de descarte', 'Procedimientos sin paciente']) {
+    for (const t of ['¿Hasta dónde llegan los pacientes nuevos?', 'Procedimientos', 'Recuperación', 'Motivos de descarte', 'Procedimientos sin paciente']) {
       assert.ok(texto.includes(t), t);
     }
-    assert.ok(texto.includes('38%'), 'pacientes nuevos de junio, 1.ª reevaluación: 15/40');
+    assert.ok(texto.includes('25 · 63%'), 'pacientes nuevos de junio que no volvieron nunca: 25/40');
     await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
-    assert.ok((await pagina.locator('#tablero').textContent()).includes('33%'), 'reumatología: 2/6');
+    assert.ok((await pagina.locator('#tablero').textContent()).includes('4 · 67%'), 'reumatología: 4/6');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -295,25 +295,28 @@ test('resumen en computadora (3a): cifra grande a la izquierda y tres métricas 
   } finally { await navegador.close(); }
 });
 
-test('detalle: cuántos no volvieron a ninguna reevaluación, por mes y en total', async () => {
+test('detalle: hasta dónde llegó cada paciente nuevo; las partes suman el total del mes', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
     await pagina.locator('.nav button[data-vista="tablero"]').click();
     await pagina.waitForSelector('#tablero table');
-    const seccion = pagina.locator('.seccion', { hasText: '¿Vuelven los pacientes nuevos?' });
-    assert.match(await seccion.locator('th').nth(1).textContent(), /Solo vinieron a la primera consulta/);
-    const fila = async texto => (await seccion.locator('tr', { hasText: texto }).innerText()).replace(/\s+/g, ' ');
-    assert.match(await fila('junio 2026'), /^junio 2026 63% \(25\/40\) 38% \(15\/40\)/);
-    assert.match(await fila('julio 2026'), /^julio 2026 67% \(39\/58\)/);
+    const seccion = pagina.locator('.seccion', { hasText: '¿Hasta dónde llegan los pacientes nuevos?' });
+    const cab = (await seccion.locator('th').allInnerTexts()).map(t => t.trim());
+    assert.deepEqual(cab, ['Mes de la primera consulta', 'Pacientes nuevos', 'Reparto', 'No volvió nunca', 'Volvió a 1 reevaluación',
+      'Volvió a 2 reevaluaciones', 'Volvió a 3 o más', 'Aún en plazo']);
+    const fila = async texto => (await seccion.locator('tr', { hasText: texto }).innerText()).replace(/\s+/g, ' ').trim();
+    assert.equal(await fila('junio 2026'), 'junio 2026 40 25 · 63% 7 · 18% 3 · 8% 5 · 13% 0');
+    assert.equal(await fila('julio 2026'), 'julio 2026 58 39 · 67% 8 · 14% 0 0 11 · 19%');
+    assert.equal(await fila('Total'), 'Total 146 100 · 68% 15 · 10% 3 · 2% 5 · 3% 23 · 16%');
     assert.equal(await seccion.locator('tr', { hasText: 'setiembre 2026' }).count(), 0, 'mes sin nadie con plazo vencido');
-    const total = await fila('Total');
-    assert.match(total, /^Total 68% \(100\/146\) 32% \(46\/146\) 53% \(17\/32\) 63% \(5\/8\)$/);
-    assert.equal(await seccion.locator('tr.total').count(), 1);
+    assert.equal(await seccion.locator('tr', { hasText: 'junio 2026' }).locator('.reparto i').count(), 4, 'sin segmentos vacíos');
+    assert.match(await seccion.locator('tr', { hasText: 'junio 2026' }).locator('.reparto i').first().getAttribute('title'),
+      /No volvió nunca: 25 \(63%\)/);
     const resumen = (await seccion.locator('.total-primera').innerText()).replace(/\s+/g, ' ');
-    assert.match(resumen, /100 de 146 pacientes nuevos \(68%\) solo vinieron a su primera consulta y no volvieron nunca/);
+    assert.match(resumen, /100 de 146 pacientes nuevos \(68%\) no volvieron nunca después de su primera consulta/);
     assert.match(resumen, /Otros 50 tampoco han vuelto, pero todavía están dentro de su plazo/);
     await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
-    assert.match(await fila('Total'), /^Total 67% \(4\/6\)/);
+    assert.equal(await fila('Total'), 'Total 6 4 · 67% 0 0 0 2 · 33%');
     assert.doesNotMatch(await seccion.locator('.total-primera').innerText(), /Otros/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }

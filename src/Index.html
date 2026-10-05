@@ -17,6 +17,8 @@
   --chp-brand:#6F1713;--chp-on-brand:#FAF6F1;--chp-accent:#A8352C;--chp-good:#2F6B45;
   --chp-pending:#B26B00;--chp-pending-text:#8A5300;--chp-new:#1F5A8C;--chp-control:#6A3D8F;
   --chp-track:#E8DED5;--chp-toast:#2A1715;--chp-on-toast:#FAF6F1;
+  /* Escala ordinal de un solo tono (validada con dataviz): de «no volvió nunca» a «volvió 3 o más». */
+  --chp-paso1:#7A1F18;--chp-paso2:#A8352C;--chp-paso3:#CF6B5F;--chp-paso4:#E39D93;
 }
 html[data-modo="oscuro"]{
   --chp-bg:#150A0A;--chp-panel:#1E0E0D;--chp-ink:#F3E9E4;--chp-soft:#D6C3BD;--chp-muted:#BFA9A3;
@@ -24,6 +26,7 @@ html[data-modo="oscuro"]{
   --chp-brand:#E0736B;--chp-on-brand:#150A0A;--chp-accent:#E0736B;--chp-good:#7CCB98;
   --chp-pending:#E0A84A;--chp-pending-text:#E0A84A;--chp-new:#7FB0E0;--chp-control:#B48BD6;
   --chp-track:#3A201E;--chp-toast:#F3E9E4;--chp-on-toast:#150A0A;
+  --chp-paso1:#F2B3AC;--chp-paso2:#E0736B;--chp-paso3:#B0544C;--chp-paso4:#86403A;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -206,6 +209,16 @@ button{cursor:pointer}
 .linea-tiempo li::before{content:'';position:absolute;left:-5px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--chp-ink)}
 .linea-tiempo li.esperada::before{background:var(--chp-bg);border:1px dashed var(--chp-accent)}
 table{width:100%;border-collapse:collapse;font-size:14px}
+.reparto{display:flex;gap:2px;height:14px;min-width:200px;margin-top:3px}
+td.n{white-space:nowrap}
+.reparto i{display:block;height:100%}
+.reparto i:first-child{border-radius:4px 0 0 4px}
+.reparto i:last-child{border-radius:0 4px 4px 0}
+.reparto i:only-child{border-radius:4px}
+.paso1{background:var(--chp-paso1)}.paso2{background:var(--chp-paso2)}.paso3{background:var(--chp-paso3)}.paso4{background:var(--chp-paso4)}
+.paso-plazo{background:repeating-linear-gradient(135deg,var(--chp-line) 0 2px,var(--chp-track) 2px 6px)}
+.ley-reparto{display:none;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--chp-soft);margin:6px 0 10px}
+.muestra{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .total-primera{font-size:18px;margin:14px 0 6px}
 .total-primera b{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:600;color:var(--chp-accent);margin-right:4px}
 tr.total td{font-weight:700;border-top:1px solid var(--chp-ink)}
@@ -269,6 +282,7 @@ td.n,th.n{text-align:right}
   .mm-mes{padding:6px 4px 0;font-size:13px}
   .mm-nota{display:none}
   .ficha-cab h1{font-size:34px}
+  .ley-reparto{display:flex}
 }
 </style>
 </head>
@@ -858,11 +872,11 @@ function mediana(lista) {
   return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
 }
 
-/** cab: [{t, num}]; filas y pie (fila de totales, opcional): arrays de HTML ya escapado. */
+/** cab: [{t, num, html?}]; filas y pie (fila de totales, opcional): arrays de HTML ya escapado. */
 function tabla(cab, filas, pie) {
   if (!filas.length) return '<p class="muted">Sin datos con estos filtros.</p>';
   const td = (v, i) => `<td${cab[i].num ? ' class="n"' : ''}>${v}</td>`;
-  return `<table><tr>${cab.map(c => `<th${c.num ? ' class="n"' : ''}>${esc(c.t)}</th>`).join('')}</tr>` +
+  return `<table><tr>${cab.map(c => `<th${c.num ? ' class="n"' : ''}>${c.html || esc(c.t)}</th>`).join('')}</tr>` +
     filas.map(f => `<tr>${f.map(td).join('')}</tr>`).join('') +
     (pie ? `<tr class="total">${pie.map(td).join('')}</tr>` : '') + '</table>';
 }
@@ -893,16 +907,32 @@ function pintarTablero() {
   const coh = agrupar(k.cohortes.filter(r => okMes(r.COHORTE) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO)),
     r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0 }),
     (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); o.curso += Number(r.EN_CURSO) || 0; });
-  // Volver = cualquier consulta posterior: quien no volvió a la 1.ª no volvió a ninguna.
-  const celdaCoh = (a, b) => `${pct(a, b)} <span class="muted">(${a}/${b})</span>${barra(a, b)}`;
-  const filaCoh = (nombre, o) => [nombre, celdaCoh(o[1][1] - o[1][0], o[1][1])].concat([1, 2, 3].map(e => celdaCoh(o[e][0], o[e][1])));
-  // Un mes en el que a nadie le venció aún el plazo no tiene nada que mostrar; sus pacientes en plazo van en la línea de arriba.
+  // Cada paciente nuevo cuenta UNA vez, según la última reevaluación a la que llegó (volver = cualquier
+  // consulta posterior). Las partes suman los pacientes del mes a quienes ya les venció el plazo.
+  const PASOS = [
+    { t: 'No volvió nunca', c: 'paso1' }, { t: 'Volvió a 1 reevaluación', c: 'paso2' },
+    { t: 'Volvió a 2 reevaluaciones', c: 'paso3' }, { t: 'Volvió a 3 o más', c: 'paso4' }, { t: 'Aún en plazo', c: 'paso-plazo' }
+  ];
+  const partes = o => {
+    const [v1, e1] = o[1], [v2, e2] = o[2], [v3, e3] = o[3];
+    return { total: e1, n: [e1 - v1, e2 - v2, e3 - v3, v3, (v1 - e2) + (v2 - e3)] };
+  };
+  const filaCoh = (nombre, o) => {
+    const p = partes(o);
+    const celdas = p.n.map(n => n ? `${n} · ${pct(n, p.total)}` : '0');
+    const reparto = '<div class="reparto">' + p.n.map((n, i) => n
+      ? `<i class="${PASOS[i].c}" style="flex:${n}" title="${esc(PASOS[i].t)}: ${n} (${pct(n, p.total)})"></i>` : '').join('') + '</div>';
+    return [nombre, p.total, reparto].concat(celdas);
+  };
+  // Un mes en el que a nadie le venció aún el plazo no tiene nada que repartir; sus pacientes en plazo van en la línea de arriba.
   const filasCoh = coh.filter(([, o]) => o[1][1]).map(([c, o]) => filaCoh(esc(nombreMes(c)), o));
   const totalCoh = { 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0 };
   coh.forEach(([, o]) => { totalCoh.curso += o.curso; [1, 2, 3].forEach(e => { totalCoh[e][0] += o[e][0]; totalCoh[e][1] += o[e][1]; }); });
   const soloPrimera = totalCoh[1][1] - totalCoh[1][0];
-  const lineaPrimera = `<p class="total-primera"><b class="num">${soloPrimera}</b> de ${totalCoh[1][1]} pacientes nuevos (${pct(soloPrimera, totalCoh[1][1])}) solo vinieron a su primera consulta y no volvieron nunca.` +
+  const lineaPrimera = `<p class="total-primera"><b class="num">${soloPrimera}</b> de ${totalCoh[1][1]} pacientes nuevos (${pct(soloPrimera, totalCoh[1][1])}) no volvieron nunca después de su primera consulta.` +
     (totalCoh.curso ? ` <span class="muted">Otros ${totalCoh.curso} tampoco han vuelto, pero todavía están dentro de su plazo: no se cuentan.</span>` : '') + '</p>';
+  const cabCoh = [T('Mes de la primera consulta'), N('Pacientes nuevos'), T('Reparto')].concat(
+    PASOS.map(x => ({ t: x.t, num: true, html: `<span class="muestra ${x.c}"></span>${esc(x.t)}` })));
 
   const ind = k.indicaciones.filter(r => okMes(r.MES) && okMed(r.MEDICO));
   const sumaInd = (o, r) => { o.n += Number(r.INDICADAS); o.a += Number(r.ACEPTADAS); };
@@ -929,11 +959,11 @@ function pintarTablero() {
       <label>Especialidad ${opciones('t-esp', 'Todas', esps, fEsp)}</label>
       <label>Médico ${opciones('t-med', 'Todos', meds, fMed)}</label>
     </div>
-    <div class="seccion"><h2>¿Vuelven los pacientes nuevos?</h2>
-      <p class="muted">Pacientes agrupados por el mes de su primera consulta. Solo cuentan los que ya debían haber vuelto. Un paciente atendido en dos especialidades cuenta en cada una.</p>
+    <div class="seccion"><h2>¿Hasta dónde llegan los pacientes nuevos?</h2>
+      <p class="muted">Pacientes nuevos de cada mes, según la última reevaluación a la que llegaron. Cada paciente cuenta una sola vez, así que las partes suman el total del mes. Solo cuentan aquellos a quienes ya les venció el plazo; un paciente atendido en dos especialidades cuenta en cada una.</p>
       ${coh.length ? lineaPrimera : ''}
-      ${tabla([T('Pacientes nuevos de'), N('Solo vinieron a la primera consulta'), N('Volvieron a su 1.ª reevaluación'), N('A su 2.ª reevaluación'),
-        N('A su 3.ª reevaluación')], filasCoh, filaCoh('Total', totalCoh))}</div>
+      <div class="ley-reparto">${PASOS.map(x => `<span><span class="muestra ${x.c}"></span>${esc(x.t)}</span>`).join('')}</div>
+      ${tabla(cabCoh, filasCoh, filaCoh('Total', totalCoh))}</div>
     <div class="seccion"><h2>¿Qué campañas traen pacientes que vuelven?</h2>
       <p class="muted">Pacientes nuevos desde que existe el CRM, según el último anuncio o canal por el que escribieron antes de su primera consulta. El filtro de especialidad no cambia esta sección.</p>
       ${tabla([T('Canal'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CANAL))}

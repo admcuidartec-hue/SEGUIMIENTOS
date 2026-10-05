@@ -96,13 +96,16 @@ Las listas iniciales salen de la imagen del flujo:
   | Dr. Elí Cabanillas | Dr. ELÍ FABRIZIO CABANILLAS HUALPA |
   | Dra. Alejandra La Torre | Dra. ALEJANDRA LA TORRE MATUK |
   | Dr. Víctor Seminario | Dr. VICTOR ERNESTO SEMINARIO MARCELO |
-  | Dr. Álvaro Villanueva | *(vacío: no aparece en las citas exportadas hasta hoy)* |
+  | Dr. Álvaro Villanueva | Dr. ALVARO MARTIN VILLANUEVA GARCIA |
   | Dra. Karen Matos | Dra. KAREN DIANA MATOS PEÑA |
-  | Dra. Karen Matos – Particular | Dra. KAREN DIANA MATOS PEÑA |
+  | Dra. Karen Matos – Particular | *(vacío a propósito)* |
   | Dr. Iván Pacheco | Dr. IVAN PAOLO PACHECO MODESTO |
 
-  «Particular» queda guardado en el registro, para distinguirlo, pero en las cifras cuenta como la
-  Dra. Matos.
+  **«Dra. Karen Matos – Particular» y «Dra. Karen Matos» son médicos distintos** en los registros,
+  los filtros y las cifras (decidido el 05/10/2026). Por eso el particular lleva `DOCTOR_SOFDOC`
+  vacío: sus registros se miden con el nombre «Dra. Karen Matos – Particular», separado de la Dra.
+  Matos. Cuando la última consulta en SOFDOC es de la Dra. Matos, el formulario propone la primera
+  fila que coincide, «Dra. Karen Matos». La asesora elige «Particular» si corresponde.
 - **`PROCEDIMIENTOS`:** SANGRÍA, AMO, BIOPSIA, CITOMETRÍA DE FLUJO, CARIOTIPO, TRANSFUSIÓN DE SANGRE.
 - **`TRATAMIENTOS`:** HIERRO SACARATO, HIERRO DERISOMALTOSA, HIERRO CARBOXIMALTOSA.
 - **`MARCAS`**, con el formato `TRATAMIENTO | MARCA`:

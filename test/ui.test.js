@@ -294,3 +294,22 @@ test('resumen en computadora (3a): cifra grande a la izquierda y tres métricas 
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('detalle: cuántos no volvieron a ninguna reevaluación, por mes y en total', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.locator('.nav button[data-vista="tablero"]').click();
+    await pagina.waitForSelector('#tablero table');
+    const seccion = pagina.locator('.seccion', { hasText: '¿Vuelven los pacientes nuevos?' });
+    assert.match(await seccion.locator('th').last().textContent(), /No volvieron a ninguna/);
+    const fila = async texto => (await seccion.locator('tr', { hasText: texto }).innerText()).replace(/\s+/g, ' ');
+    assert.match(await fila('junio 2026'), /63% \(25\/40\)$/);
+    assert.match(await fila('julio 2026'), /67% \(39\/58\)$/);
+    const total = await fila('Total');
+    assert.match(total, /^Total 32% \(46\/146\) 53% \(17\/32\) 63% \(5\/8\) 68% \(100\/146\)$/);
+    assert.equal(await seccion.locator('tr.total').count(), 1);
+    await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
+    assert.match(await fila('Total'), /67% \(4\/6\)$/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

@@ -301,15 +301,20 @@ test('detalle: cuántos no volvieron a ninguna reevaluación, por mes y en total
     await pagina.locator('.nav button[data-vista="tablero"]').click();
     await pagina.waitForSelector('#tablero table');
     const seccion = pagina.locator('.seccion', { hasText: '¿Vuelven los pacientes nuevos?' });
-    assert.match(await seccion.locator('th').last().textContent(), /No volvieron a ninguna/);
+    assert.match(await seccion.locator('th').nth(1).textContent(), /Solo vinieron a la primera consulta/);
     const fila = async texto => (await seccion.locator('tr', { hasText: texto }).innerText()).replace(/\s+/g, ' ');
-    assert.match(await fila('junio 2026'), /63% \(25\/40\)$/);
-    assert.match(await fila('julio 2026'), /67% \(39\/58\)$/);
+    assert.match(await fila('junio 2026'), /^junio 2026 63% \(25\/40\) 38% \(15\/40\)/);
+    assert.match(await fila('julio 2026'), /^julio 2026 67% \(39\/58\)/);
+    assert.equal(await seccion.locator('tr', { hasText: 'setiembre 2026' }).count(), 0, 'mes sin nadie con plazo vencido');
     const total = await fila('Total');
-    assert.match(total, /^Total 32% \(46\/146\) 53% \(17\/32\) 63% \(5\/8\) 68% \(100\/146\)$/);
+    assert.match(total, /^Total 68% \(100\/146\) 32% \(46\/146\) 53% \(17\/32\) 63% \(5\/8\)$/);
     assert.equal(await seccion.locator('tr.total').count(), 1);
+    const resumen = (await seccion.locator('.total-primera').innerText()).replace(/\s+/g, ' ');
+    assert.match(resumen, /100 de 146 pacientes nuevos \(68%\) solo vinieron a su primera consulta y no volvieron nunca/);
+    assert.match(resumen, /Otros 50 tampoco han vuelto, pero todavía están dentro de su plazo/);
     await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
-    assert.match(await fila('Total'), /67% \(4\/6\)$/);
+    assert.match(await fila('Total'), /^Total 67% \(4\/6\)/);
+    assert.doesNotMatch(await seccion.locator('.total-primera').innerText(), /Otros/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

@@ -206,6 +206,8 @@ button{cursor:pointer}
 .linea-tiempo li::before{content:'';position:absolute;left:-5px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--chp-ink)}
 .linea-tiempo li.esperada::before{background:var(--chp-bg);border:1px dashed var(--chp-accent)}
 table{width:100%;border-collapse:collapse;font-size:14px}
+.total-primera{font-size:18px;margin:14px 0 6px}
+.total-primera b{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:600;color:var(--chp-accent);margin-right:4px}
 tr.total td{font-weight:700;border-top:1px solid var(--chp-ink)}
 th,td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--chp-rule);vertical-align:top}
 th{color:var(--chp-muted);font-weight:500;font-size:13px}
@@ -889,15 +891,18 @@ function pintarTablero() {
   const T = t => ({ t }), N = t => ({ t, num: true });
 
   const coh = agrupar(k.cohortes.filter(r => okMes(r.COHORTE) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO)),
-    r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0] }),
-    (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); });
+    r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0 }),
+    (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); o.curso += Number(r.EN_CURSO) || 0; });
   // Volver = cualquier consulta posterior: quien no volvió a la 1.ª no volvió a ninguna.
   const celdaCoh = (a, b) => `${pct(a, b)} <span class="muted">(${a}/${b})</span>${barra(a, b)}`;
-  const filaCoh = (nombre, o) => [nombre].concat([1, 2, 3].map(e => celdaCoh(o[e][0], o[e][1])),
-    celdaCoh(o[1][1] - o[1][0], o[1][1]));
-  const filasCoh = coh.map(([c, o]) => filaCoh(esc(nombreMes(c)), o));
-  const totalCoh = { 1: [0, 0], 2: [0, 0], 3: [0, 0] };
-  coh.forEach(([, o]) => [1, 2, 3].forEach(e => { totalCoh[e][0] += o[e][0]; totalCoh[e][1] += o[e][1]; }));
+  const filaCoh = (nombre, o) => [nombre, celdaCoh(o[1][1] - o[1][0], o[1][1])].concat([1, 2, 3].map(e => celdaCoh(o[e][0], o[e][1])));
+  // Un mes en el que a nadie le venció aún el plazo no tiene nada que mostrar; sus pacientes en plazo van en la línea de arriba.
+  const filasCoh = coh.filter(([, o]) => o[1][1]).map(([c, o]) => filaCoh(esc(nombreMes(c)), o));
+  const totalCoh = { 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0 };
+  coh.forEach(([, o]) => { totalCoh.curso += o.curso; [1, 2, 3].forEach(e => { totalCoh[e][0] += o[e][0]; totalCoh[e][1] += o[e][1]; }); });
+  const soloPrimera = totalCoh[1][1] - totalCoh[1][0];
+  const lineaPrimera = `<p class="total-primera"><b class="num">${soloPrimera}</b> de ${totalCoh[1][1]} pacientes nuevos (${pct(soloPrimera, totalCoh[1][1])}) solo vinieron a su primera consulta y no volvieron nunca.` +
+    (totalCoh.curso ? ` <span class="muted">Otros ${totalCoh.curso} tampoco han vuelto, pero todavía están dentro de su plazo: no se cuentan.</span>` : '') + '</p>';
 
   const ind = k.indicaciones.filter(r => okMes(r.MES) && okMed(r.MEDICO));
   const sumaInd = (o, r) => { o.n += Number(r.INDICADAS); o.a += Number(r.ACEPTADAS); };
@@ -925,9 +930,10 @@ function pintarTablero() {
       <label>Médico ${opciones('t-med', 'Todos', meds, fMed)}</label>
     </div>
     <div class="seccion"><h2>¿Vuelven los pacientes nuevos?</h2>
-      <p class="muted">Pacientes agrupados por el mes de su primera consulta. Solo cuentan los que ya debían haber vuelto. «No volvieron a ninguna»: después de su primera consulta no regresaron nunca.</p>
-      ${tabla([T('Pacientes nuevos de'), N('Volvieron a su 1.ª reevaluación'), N('A su 2.ª reevaluación'), N('A su 3.ª reevaluación'),
-        N('No volvieron a ninguna')], filasCoh, filaCoh('Total', totalCoh))}</div>
+      <p class="muted">Pacientes agrupados por el mes de su primera consulta. Solo cuentan los que ya debían haber vuelto. Un paciente atendido en dos especialidades cuenta en cada una.</p>
+      ${coh.length ? lineaPrimera : ''}
+      ${tabla([T('Pacientes nuevos de'), N('Solo vinieron a la primera consulta'), N('Volvieron a su 1.ª reevaluación'), N('A su 2.ª reevaluación'),
+        N('A su 3.ª reevaluación')], filasCoh, filaCoh('Total', totalCoh))}</div>
     <div class="seccion"><h2>¿Qué campañas traen pacientes que vuelven?</h2>
       <p class="muted">Pacientes nuevos desde que existe el CRM, según el último anuncio o canal por el que escribieron antes de su primera consulta. El filtro de especialidad no cambia esta sección.</p>
       ${tabla([T('Canal'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CANAL))}
@@ -1189,7 +1195,8 @@ const DEMO = (() => {
         { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 52, VOLVIERON: 17 },
         { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 2, ELEGIBLES: 17, VOLVIERON: 9 },
         { COHORTE: '2026-07', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: 'Dr. JUVENAL HANAMPA ROQUE', ETAPA: 1, ELEGIBLES: 6, VOLVIERON: 2 },
-        { COHORTE: '2026-08', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 48, VOLVIERON: 12 }
+        { COHORTE: '2026-08', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 48, VOLVIERON: 12, EN_CURSO: 20 },
+        { COHORTE: '2026-09', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 30 }
       ],
       indicaciones: [
         { MES: '2026-08', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: ELI, INDICADAS: 30, ACEPTADAS: 14 },

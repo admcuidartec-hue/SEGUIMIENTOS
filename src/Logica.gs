@@ -736,9 +736,12 @@ function kpiCohortes(citas, reglas, hoy) {
     var plazo = plazoDe(reglas, s.especialidad);
     for (var etapa = 1; etapa <= 3 && r.length >= etapa; etapa++) {
       var volvio = r.length >= etapa + 1;
-      if (!volvio && sumarDias(r[etapa - 1].FECHA, plazo.vence) > hoy) continue;
+      var enCurso = !volvio && sumarDias(r[etapa - 1].FECHA, plazo.vence) > hoy;
+      // En curso solo interesa en la 1.ª: «solo vino a su primera consulta, pero aún está en plazo».
+      if (enCurso && etapa > 1) continue;
       var clave = [mesDe(r[0].FECHA), s.especialidad, r[0].MEDICO, etapa].join('|');
-      if (!acc[clave]) acc[clave] = { COHORTE: mesDe(r[0].FECHA), ESPECIALIDAD: s.especialidad, MEDICO: r[0].MEDICO, ETAPA: etapa, ELEGIBLES: 0, VOLVIERON: 0 };
+      if (!acc[clave]) acc[clave] = { COHORTE: mesDe(r[0].FECHA), ESPECIALIDAD: s.especialidad, MEDICO: r[0].MEDICO, ETAPA: etapa, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 0 };
+      if (enCurso) { acc[clave].EN_CURSO++; continue; }
       acc[clave].ELEGIBLES++;
       if (volvio) acc[clave].VOLVIERON++;
     }

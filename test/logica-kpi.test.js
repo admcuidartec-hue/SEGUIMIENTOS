@@ -13,9 +13,10 @@ test('cohortes: solo cuentan los pacientes a quienes ya les tocaba volver', () =
   ];
   const k = plano(L.kpiCohortes(citas, reglas(L), '2026-10-01'));
   assert.deepEqual(k, [
-    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 1, ELEGIBLES: 2, VOLVIERON: 1 },
-    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 2, ELEGIBLES: 1, VOLVIERON: 0 }
-  ]);
+    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 1, ELEGIBLES: 2, VOLVIERON: 1, EN_CURSO: 0 },
+    { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 2, ELEGIBLES: 1, VOLVIERON: 0, EN_CURSO: 0 },
+    { COHORTE: '2026-09', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO, ETAPA: 1, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 1 }
+  ], 'el de setiembre solo vino a la primera, pero todavía está en plazo');
 });
 
 test('indicaciones: sin médico solicitante se usa el de la última cita anterior', () => {

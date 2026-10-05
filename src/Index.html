@@ -186,6 +186,23 @@ button{cursor:pointer}
 .mm-col.actual .mm-mes{font-weight:700;color:var(--chp-brand)}
 .mm-col:hover .mm-mes{text-decoration:underline}
 
+/* ---------- Registro ---------- */
+[hidden]{display:none!important}
+.form-reg{max-width:640px;margin-top:20px;display:flex;flex-direction:column;gap:22px}
+.form-reg fieldset{border:0;border-top:1px solid var(--chp-ink);margin:0;padding:14px 0 0;display:flex;flex-direction:column;gap:12px;min-width:0}
+.form-reg legend{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--chp-brand);padding:0 8px 0 0}
+.form-reg legend small{text-transform:none;letter-spacing:0;font-weight:400;color:var(--chp-muted)}
+.campo{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--chp-muted)}
+.entrada{background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-size:17px;padding:6px 0;color:var(--chp-ink);font-family:inherit;min-width:0;max-width:100%}
+.form-reg .sel{font-size:16px;max-width:100%}
+.form-reg .btn-marca{align-self:flex-start;font-size:16px;padding:12px 22px}
+.g-dup{border-left:3px solid var(--chp-pending);padding:10px 14px;background:var(--chp-row-hover)}
+.g-dup p{margin:0 0 10px}
+.g-item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--chp-rule);align-items:baseline}
+.g-item.anulado b,.g-item.anulado .linea-g{text-decoration:line-through;color:var(--chp-muted)}
+.linea-g{font-size:14px;color:var(--chp-soft)}
+.g-motivo{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
+
 /* ---------- Ficha y Detalle ---------- */
 .vista-sub{margin-top:28px}
 .buscador{width:100%;max-width:520px;background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-size:20px;padding:6px 0}
@@ -306,6 +323,7 @@ td.n,th.n{text-align:right}
     <nav class="nav">
       <button type="button" data-vista="resumen">Resumen</button>
       <button type="button" data-vista="bandeja" aria-current="page">Bandeja</button>
+      <button type="button" data-vista="registro">Registro</button>
       <button type="button" data-vista="ficha">Buscar paciente</button>
       <button type="button" data-vista="tablero">Detalle</button>
     </nav>
@@ -346,6 +364,45 @@ td.n,th.n{text-align:right}
         <div id="lista" aria-live="polite"></div>
         <aside id="panel" hidden></aside>
       </div>
+    </section>
+
+    <section class="vista" id="v-registro" hidden>
+      <div class="cabeza"><div><h1 class="titulo">Registro</h1><div class="fecha">Procedimientos, tratamientos y altas médicas</div></div></div>
+      <div class="tipos" role="group" aria-label="Qué registra">
+        <button type="button" data-modo-reg="indicacion" aria-pressed="true">Indicación</button>
+        <button type="button" data-modo-reg="alta" aria-pressed="false">Alta médica</button>
+      </div>
+      <form id="f-reg" class="form-reg" autocomplete="off" novalidate>
+        <fieldset><legend>1 · Paciente</legend>
+          <label class="campo">DNI o carné de extranjería <input id="g-dni" class="entrada" maxlength="12"></label>
+          <p id="g-conocido" class="muted" aria-live="polite"></p>
+          <label class="campo solo-ind">Nombres y apellidos <input id="g-nombre" class="entrada"></label>
+          <label class="campo solo-ind">Teléfono o usuario <input id="g-contacto" class="entrada"></label>
+          <label class="campo">Fecha <input id="g-fecha" class="entrada" type="date"></label>
+        </fieldset>
+        <fieldset><legend>2 · Doctor</legend>
+          <select id="g-doctor" class="sel" aria-label="Doctor"></select>
+        </fieldset>
+        <fieldset class="solo-ind"><legend>3 · Procedimiento <small>(si aplica)</small></legend>
+          <select id="g-proc" class="sel" aria-label="Procedimiento"></select>
+        </fieldset>
+        <fieldset class="solo-ind"><legend>4 · Tratamiento <small>(si aplica)</small></legend>
+          <select id="g-trat" class="sel" aria-label="Tratamiento"></select>
+          <div id="g-trat-extra" hidden>
+            <label class="campo">¿Cuántas sesiones?
+              <select id="g-sesiones" class="sel"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option value="otro">Otro</option></select></label>
+            <label class="campo" id="g-otro-c" hidden>Número de sesiones <input id="g-otro" class="entrada" type="number" min="6" max="20"></label>
+            <label class="campo" id="g-marca-c" hidden>Marca <select id="g-marca" class="sel"></select></label>
+          </div>
+        </fieldset>
+        <fieldset class="solo-alta" hidden><legend>3 · Especialidad del alta</legend>
+          <select id="g-esp" class="sel" aria-label="Especialidad"></select>
+          <label class="campo">Nota (opcional) <input id="g-nota-alta" class="entrada"></label>
+        </fieldset>
+        <div id="g-dup" class="g-dup" hidden></div>
+        <button type="submit" class="btn-marca" id="g-guardar">Registrar</button>
+      </form>
+      <div class="seccion"><h2>Registrados hoy</h2><div id="g-hoy"></div></div>
     </section>
 
     <section class="vista" id="v-ficha" hidden>
@@ -470,6 +527,7 @@ function irA(vista) {
   document.querySelectorAll('.vista').forEach(s => { s.hidden = s.id !== 'v-' + vista; });
   if (vista === 'tablero') cargarTablero();
   if (vista === 'resumen') cargarResumen();
+  if (vista === 'registro') { iniciarRegistro(); cargarRegistrosHoy(); }
 }
 
 /**
@@ -763,6 +821,192 @@ document.addEventListener('keydown', ev => {
     if (boton) copiarDesde(boton, tel); else copiarTexto(tel).then(ok => avisar(ok ? 'Copiado: ' + tel : tel));
   }
 });
+
+/* ==========================================================================
+   REGISTRO — procedimientos, tratamientos (con sesiones) y altas médicas.
+   La asesora es la del selector «¿Quién es usted?». El servidor vuelve a
+   revisar todo (validarRegistro / validarAlta): aquí solo se ayuda a llenar.
+   ========================================================================== */
+const G = { listo: false, modo: 'indicacion', paciente: null, confirmar: false };
+let esperaDni;
+
+function opcionesSelect(sel, valores, vacio) {
+  sel.innerHTML = `<option value="">${esc(vacio)}</option>` + valores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+}
+
+/** Opciones de doctor, con el que corresponde al médico de SOFDOC ya elegido (el primero: «Dra. Karen Matos», no el particular). */
+function opcionesDoctor(medicoSofdoc) {
+  const docs = (E.boot && E.boot.doctores) || [];
+  const propuesto = docs.find(d => d.sofdoc && norm(d.sofdoc) === norm(medicoSofdoc));
+  return '<option value="">— Doctor que da el alta —</option>' + docs.map(d =>
+    `<option value="${esc(d.doctor)}"${propuesto === d ? ' selected' : ''}>${esc(d.doctor)}</option>`).join('');
+}
+
+function iniciarRegistro() {
+  if (G.listo || !E.boot) return;
+  G.listo = true;
+  const b = E.boot;
+  opcionesSelect($('#g-doctor'), (b.doctores || []).map(x => x.doctor), '— Elija —');
+  opcionesSelect($('#g-proc'), b.procedimientos || [], 'Ninguno');
+  opcionesSelect($('#g-trat'), b.tratamientos || [], 'Ninguno');
+  $('#g-fecha').value = hoy();
+  $('#g-fecha').max = hoy();
+  pintarEspecialidades();
+  $('#g-dni').addEventListener('input', () => { clearTimeout(esperaDni); esperaDni = setTimeout(buscarDni, 350); });
+  $('#g-trat').addEventListener('change', pintarTratamiento);
+  $('#g-sesiones').addEventListener('change', () => { $('#g-otro-c').hidden = $('#g-sesiones').value !== 'otro'; });
+  document.querySelectorAll('[data-modo-reg]').forEach(x => x.addEventListener('click', () => ponerModoRegistro(x.dataset.modoReg)));
+  $('#f-reg').addEventListener('submit', ev => { ev.preventDefault(); enviarRegistro(); });
+  $('#g-dup').addEventListener('click', ev => {
+    if (ev.target.id === 'g-dup-si') { G.confirmar = true; enviarRegistro(); }
+    if (ev.target.id === 'g-dup-no') { G.confirmar = false; $('#g-dup').hidden = true; }
+  });
+  $('#g-hoy').addEventListener('click', clicRegistradosHoy);
+}
+
+function pintarTratamiento() {
+  const t = $('#g-trat').value;
+  $('#g-trat-extra').hidden = !t;
+  const marcas = ((E.boot && E.boot.marcas) || {})[norm(t)] || [];
+  $('#g-marca-c').hidden = !marcas.length;
+  opcionesSelect($('#g-marca'), marcas, '— Elija —');
+}
+
+function ponerModoRegistro(modo) {
+  G.modo = modo;
+  document.querySelectorAll('[data-modo-reg]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.modoReg === modo)));
+  document.querySelectorAll('#f-reg .solo-ind').forEach(x => { x.hidden = modo !== 'indicacion'; });
+  document.querySelectorAll('#f-reg .solo-alta').forEach(x => { x.hidden = modo !== 'alta'; });
+  $('#g-guardar').textContent = modo === 'alta' ? 'Registrar alta' : 'Registrar';
+  $('#g-dup').hidden = true;
+  G.confirmar = false;
+  pintarEspecialidades();
+}
+
+const documentoOk = v => { const d = norm(v).replace(/[\s.\-]/g, ''); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
+
+async function buscarDni() {
+  const dni = $('#g-dni').value;
+  G.paciente = null;
+  $('#g-conocido').textContent = '';
+  pintarEspecialidades();
+  if (!documentoOk(dni)) return;
+  let r;
+  try { r = await llamar('buscarPacienteRegistro', dni); } catch (e) { avisar(e.message); return; }
+  if ($('#g-dni').value !== dni) return;  // mientras tanto escribieron otro DNI
+  G.paciente = r;
+  if (!r.encontrado) {
+    $('#g-conocido').textContent = 'Todavía no está en SOFDOC. Puede registrarlo igual.';
+  } else {
+    $('#g-conocido').textContent = `Paciente conocido · última consulta ${fechaCorta(r.ultimaFecha)} con ${medicoCorto(r.ultimoMedico)}`;
+    if (!$('#g-nombre').value.trim()) $('#g-nombre').value = r.nombre;
+    if (!$('#g-contacto').value.trim() && r.telefonos.length) $('#g-contacto').value = r.telefonos[0];
+    if (!$('#g-doctor').value && r.doctor) $('#g-doctor').value = r.doctor;
+  }
+  pintarEspecialidades();
+}
+
+function pintarEspecialidades() {
+  const p = G.paciente, esps = p && p.encontrado ? p.especialidades : [];
+  $('#g-esp').innerHTML = esps.length
+    ? esps.map(e => `<option value="${esc(e.especialidad)}"${e.alta ? ' disabled' : ''}>${esc(e.especialidad)}${e.alta ? ' · ya tiene alta' : ''}</option>`).join('')
+    : '<option value="">— Escriba un DNI con consultas —</option>';
+}
+
+async function enviarRegistro() {
+  if (!exigirUsuario()) return;
+  const boton = $('#g-guardar');
+  boton.disabled = true;
+  try {
+    if (G.modo === 'alta') {
+      await llamar('darDeAlta', { usuario: usuario(), dni: $('#g-dni').value, especialidad: $('#g-esp').value,
+        doctor: $('#g-doctor').value, fecha: $('#g-fecha').value, nota: $('#g-nota-alta').value });
+      avisar(`Alta registrada: ${G.paciente && G.paciente.nombre ? G.paciente.nombre : $('#g-dni').value} · ${$('#g-esp').value}`);
+      cargarBandeja();
+    } else {
+      const trat = $('#g-trat').value;
+      const r = await llamar('guardarRegistro', { usuario: usuario(), dni: $('#g-dni').value, nombre: $('#g-nombre').value,
+        contacto: $('#g-contacto').value, fecha: $('#g-fecha').value, doctor: $('#g-doctor').value, procedimiento: $('#g-proc').value,
+        tratamiento: trat, sesiones: trat ? ($('#g-sesiones').value === 'otro' ? $('#g-otro').value : $('#g-sesiones').value) : '',
+        marca: trat ? $('#g-marca').value : '', confirmado: G.confirmar });
+      if (r.duplicado) {
+        $('#g-dup').innerHTML = `<p>Ya se registró el ${fechaCorta(r.duplicado.FECHA)} (${esc(r.duplicado.ID)}): ${esc(r.duplicado.TEXTO)}. ¿Registrar de todos modos?</p>
+          <button type="button" class="btn-marca" id="g-dup-si">Registrar de todos modos</button>
+          <button type="button" class="btn-linea" id="g-dup-no">Cancelar</button>`;
+        $('#g-dup').hidden = false;
+        return;
+      }
+      avisar(`Registrado: ${r.registros.map(x => x.TEXTO).join(' + ')} — ${r.registros[0].NOMBRE} · ${r.registros.map(x => x.ID).join(', ')}`);
+    }
+    limpiarRegistro();
+    E.kpi = null;
+    E.resumen = null;
+    cargarRegistrosHoy();
+  } catch (e) {
+    avisar('No se guardó: ' + e.message);
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+/** Limpia todo menos la fecha: la asesora suele registrar varios pacientes del mismo día seguidos. */
+function limpiarRegistro() {
+  ['#g-dni', '#g-nombre', '#g-contacto', '#g-otro', '#g-nota-alta', '#g-doctor', '#g-proc', '#g-trat'].forEach(s => { $(s).value = ''; });
+  $('#g-sesiones').value = '1';
+  $('#g-otro-c').hidden = true;
+  $('#g-conocido').textContent = '';
+  $('#g-dup').hidden = true;
+  G.paciente = null;
+  G.confirmar = false;
+  pintarTratamiento();
+  pintarEspecialidades();
+}
+
+async function cargarRegistrosHoy() {
+  let lista;
+  try { lista = await llamar('getRegistrosHoy'); } catch (e) { $('#g-hoy').innerHTML = `<p class="hace">${esc(e.message)}</p>`; return; }
+  $('#g-hoy').innerHTML = lista.length ? lista.map(x => `<div class="g-item${x.ANULADO ? ' anulado' : ''}" data-id="${esc(x.ID)}">
+      <span class="num">${esc(x.HORA)}</span>
+      <span><b>${esc(x.NOMBRE)}</b> · DNI ${esc(x.DNI)}<br><span class="linea-g">${esc(x.TEXTO)} · ${esc(x.ASESORA)} · ${esc(x.ID)}</span></span>
+      ${x.ANULADO ? '<span class="muted">Anulado</span>' : `<button type="button" class="btn-texto" data-anular="${esc(x.ID)}">Anular</button>`}
+    </div>`).join('') : '<p class="muted">Todavía no hay registros hoy.</p>';
+}
+
+/** El motivo se pide en la misma fila: prompt() puede estar bloqueado dentro del iframe de Apps Script. */
+function pedirMotivo(contenedor, que, id) {
+  document.querySelectorAll('.g-motivo').forEach(x => x.remove());
+  contenedor.insertAdjacentHTML('beforeend', `<div class="g-motivo"><input class="entrada" id="g-motivo" placeholder="Motivo (obligatorio)">
+    <button type="button" class="btn-marca" data-confirmar-anular="${esc(id)}" data-que="${que}">Anular</button>
+    <button type="button" class="btn-texto" data-cancelar-anular>Cancelar</button></div>`);
+  $('#g-motivo').focus();
+}
+
+const FUNCION_ANULAR = { registro: 'anularRegistro', sesion: 'anularSesion', alta: 'anularAlta' };
+
+async function confirmarAnulacion(boton, alTerminar) {
+  if (!exigirUsuario()) return;
+  const motivo = $('#g-motivo').value.trim();
+  if (!motivo) { avisar('Escriba el motivo de la anulación.'); return; }
+  boton.disabled = true;
+  try {
+    await llamar(FUNCION_ANULAR[boton.dataset.que], { usuario: usuario(), id: boton.dataset.confirmarAnular, motivo });
+    avisar('Anulado: ' + boton.dataset.confirmarAnular);
+    E.kpi = null;
+    E.resumen = null;
+    alTerminar();
+  } catch (e) {
+    boton.disabled = false;
+    avisar('No se anuló: ' + e.message);
+  }
+}
+
+function clicRegistradosHoy(ev) {
+  const a = ev.target.closest('[data-anular]');
+  if (a) { pedirMotivo(a.closest('.g-item'), a.dataset.anular.startsWith('ALT-') ? 'alta' : 'registro', a.dataset.anular); return; }
+  const c = ev.target.closest('[data-confirmar-anular]');
+  if (c) { confirmarAnulacion(c, () => { cargarRegistrosHoy(); cargarBandeja(); }); return; }
+  if (ev.target.closest('[data-cancelar-anular]')) ev.target.closest('.g-motivo').remove();
+}
 
 /* ==========================================================================
    BUSCADOR Y FICHA
@@ -1198,8 +1442,19 @@ async function iniciar() {
 const DEMO = (() => {
   const hoy = '2026-10-01';
   const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS'];
-  const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'ALTA MÉDICA', 'OTRO'];
+  const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
   const ELI = 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA', KAREN = 'Dra. KAREN DIANA MATOS PEÑA';
+  const doctores = [{ doctor: 'Dr. Elí Cabanillas', sofdoc: ELI }, { doctor: 'Dra. Karen Matos', sofdoc: KAREN },
+    { doctor: 'Dra. Karen Matos – Particular', sofdoc: '' }];
+  const registros = [{ ID: 'REG-000001', FECHA_HORA: '2026-08-05 10:00', FECHA: '2026-08-05', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas',
+    NOMBRE: 'ROSA ELENA QUISPE HUAMÁN', DNI: '40111222', CONTACTO: '987654321', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA',
+    MARCA: 'FERINJECT', SESIONES: 2, ANULADO: '', MOTIVO_ANULACION: '' }];
+  const sesiones = [{ ID: 'SES-000001', FECHA_HORA: '2026-08-05 12:00', ID_REGISTRO: 'REG-000001', NUMERO: 1, FECHA: '2026-08-05', ASESORA: 'MAGALY', ANULADO: '' }];
+  const altas = [];
+  const frase = s => { const t = String(s).toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const textoRegDemo = r => r.TIPO !== 'HIERRO' ? frase(r.DETALLE)
+    : frase(r.DETALLE) + (r.MARCA ? ' · ' + frase(r.MARCA) : '') + ' × ' + r.SESIONES + (Number(r.SESIONES) === 1 ? ' sesión' : ' sesiones');
+  const siguiente = (lista, prefijo) => prefijo + '-' + String(lista.length + 1).padStart(6, '0');
   function mas(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
   const p = (DNI, ESPECIALIDAD, NOMBRE, TELEFONOS, MEDICO_ULTIMO, PRIMERA_CITA, ULTIMA_CITA, N_REALIZADAS, ESTADO, DIAS_ATRASO, N_SEGUIMIENTOS, ULTIMO_SEGUIMIENTO, PENDIENTE) =>
     ({ DNI, ESPECIALIDAD, NOMBRE, TELEFONOS, MEDICO_ULTIMO, PRIMERA_CITA, ULTIMA_CITA, N_REALIZADAS,
@@ -1245,7 +1500,9 @@ const DEMO = (() => {
     bootstrap: () => ({
       hoy, usuarios, motivos,
       especialidades: [...new Set(pacientes.map(x => x.ESPECIALIDAD))].sort(),
-      medicos: [...new Set(pacientes.map(x => x.MEDICO_ULTIMO))].sort()
+      medicos: [...new Set(pacientes.map(x => x.MEDICO_ULTIMO))].sort(),
+      doctores, procedimientos: ['SANGRÍA', 'AMO', 'BIOPSIA'], tratamientos: ['HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA'],
+      marcas: { 'HIERRO CARBOXIMALTOSA': ['FERINJECT', 'LIKFER'], 'HIERRO DERISOMALTOSA': ['MONOFER'] }
     }),
     getBandeja: () => {
       const reeval = pacientes.filter(x => x.ESTADO === 'VENCIDO').map(x => Object.assign({ TIPO_SEGUIMIENTO: 'REEVALUACION' }, x));
@@ -1318,6 +1575,59 @@ const DEMO = (() => {
         r('2026-08', KAREN, [35, 20, 0, 20, 6, 0, 10, 5, 2, 2, 0, 0]),
         r('2026-07', KAREN, [38, 25, 0, 22, 8, 0, 9, 4, 5, 4, 0, 0])
       ] };
+    },
+    buscarPacienteRegistro: dni => {
+      const s = pacientes.filter(x => x.DNI === String(dni).trim());
+      if (!s.length) return { encontrado: false };
+      const u = s.slice().sort((a, b) => a.ULTIMA_CITA < b.ULTIMA_CITA ? 1 : -1)[0];
+      const d = doctores.find(x => x.sofdoc === u.MEDICO_ULTIMO);
+      return { encontrado: true, nombre: u.NOMBRE, telefonos: String(u.TELEFONOS || '').split(' / ').filter(Boolean), ultimaFecha: u.ULTIMA_CITA,
+        ultimoMedico: u.MEDICO_ULTIMO, doctor: d ? d.doctor : '', especialidades: s.map(x => ({ especialidad: x.ESPECIALIDAD, alta: x.ESTADO === 'ALTA' })) };
+    },
+    guardarRegistro: x => {
+      exigir(x, false);
+      const base = { FECHA: x.fecha, ASESORA: x.usuario, DOCTOR: x.doctor, NOMBRE: String(x.nombre).trim().toUpperCase(), DNI: x.dni,
+        CONTACTO: x.contacto, MARCA: '', ANULADO: '', MOTIVO_ANULACION: '' };
+      const filas = [];
+      if (x.procedimiento) filas.push(Object.assign({}, base, { TIPO: 'PROCEDIMIENTO', DETALLE: x.procedimiento, SESIONES: 1 }));
+      if (x.tratamiento) filas.push(Object.assign({}, base, { TIPO: 'HIERRO', DETALLE: x.tratamiento, MARCA: x.marca, SESIONES: Number(x.sesiones) }));
+      if (!filas.length) throw new Error('Elija un procedimiento, un tratamiento o ambos.');
+      if (!x.confirmado) {
+        const dup = registros.find(r => !r.ANULADO && filas.some(f => f.DNI === r.DNI && f.DETALLE === r.DETALLE));
+        if (dup) return { ok: false, duplicado: { ID: dup.ID, FECHA: dup.FECHA, TEXTO: textoRegDemo(dup) } };
+      }
+      filas.forEach(f => { f.ID = siguiente(registros, 'REG'); f.FECHA_HORA = hoy + ' 11:00'; f.TEXTO = textoRegDemo(f); registros.push(f); });
+      return { ok: true, registros: filas };
+    },
+    getRegistrosHoy: () => registros.filter(r => r.FECHA_HORA.startsWith(hoy)).map(r => ({ ID: r.ID, HORA: r.FECHA_HORA.slice(11, 16),
+      ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegDemo(r), ANULADO: !!r.ANULADO }))
+      .concat(altas.filter(a => a.FECHA_HORA.startsWith(hoy)).map(a => ({ ID: a.ID, HORA: a.FECHA_HORA.slice(11, 16), ASESORA: a.REGISTRADO_POR,
+        NOMBRE: (pacientes.find(p => p.DNI === a.DNI) || {}).NOMBRE || '', DNI: a.DNI, TEXTO: 'Alta médica · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR, ANULADO: !!a.ANULADO })))
+      .sort((a, b) => a.HORA < b.HORA ? 1 : a.HORA > b.HORA ? -1 : (a.ID < b.ID ? 1 : -1)),
+    anularRegistro: x => {
+      exigir(x, false);
+      const r = registros.find(y => y.ID === x.id);
+      r.ANULADO = 'SÍ'; r.MOTIVO_ANULACION = x.motivo;
+      pendientes.filter(p => p.ID_REGISTRO === x.id).forEach(p => { p.ESTADO = 'ANULADO'; });
+      return { ok: true };
+    },
+    darDeAlta: x => {
+      exigir(x, false);
+      if (!x.doctor) throw new Error('Elija el doctor que da el alta.');
+      const a = { ID: siguiente(altas, 'ALT'), FECHA_HORA: hoy + ' 11:30', FECHA: x.fecha, DNI: x.dni, ESPECIALIDAD: x.especialidad,
+        DOCTOR: x.doctor, REGISTRADO_POR: x.usuario, ANULADO: '', MOTIVO_ANULACION: '' };
+      altas.push(a);
+      const pac = pacientes.find(p => p.DNI === x.dni && p.ESPECIALIDAD === x.especialidad);
+      if (pac) pac.ESTADO = 'ALTA';
+      return { ok: true, alta: a };
+    },
+    anularAlta: x => {
+      exigir(x, false);
+      const a = altas.find(y => y.ID === x.id);
+      a.ANULADO = 'SÍ'; a.MOTIVO_ANULACION = x.motivo;
+      const pac = pacientes.find(p => p.DNI === a.DNI && p.ESPECIALIDAD === a.ESPECIALIDAD);
+      if (pac) pac.ESTADO = 'VENCIDO';
+      return { ok: true };
     },
     marcarSeguimiento: x => registrar(x, 'HECHO'),
     descartar: x => registrar(x, 'DESCARTADO'),

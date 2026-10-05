@@ -244,7 +244,7 @@ test('detalle: campañas y canales que traen pacientes que vuelven, con filtro d
 test('bandeja: botones por tipo con su número; hierro y procedimientos son listas propias', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
-    const textos = await pagina.locator('.tipos button').allTextContents();
+    const textos = await pagina.locator('#tipos button').allTextContents();
     assert.deepEqual(textos.map(t => t.replace(/\s+/g, ' ').trim()),
       ['Todos 7', 'Reevaluaciones 4', 'Hierro (Ferinject) 2', 'Procedimientos 1']);
     await tipo(pagina, 'HIERRO');
@@ -342,6 +342,86 @@ test('detalle: el relato «de cada 100 pacientes nuevos» con su dibujo de 100 c
     await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
     await pagina.selectOption('#t-med', '');
     assert.match((await pagina.locator('.historia').innerText()).replace(/\s+/g, ' '), /Son pocos pacientes \(6\): tome estas cifras con cautela/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+const irRegistro = async p => { await p.locator('.nav button[data-vista="registro"]').click(); await p.waitForSelector('#f-reg'); };
+
+test('registro: la marca depende del tratamiento y «Otro» pide el número', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await irRegistro(pagina);
+    assert.equal(await pagina.locator('#g-trat-extra').isVisible(), false);
+    await pagina.selectOption('#g-trat', 'HIERRO CARBOXIMALTOSA');
+    assert.deepEqual(await pagina.locator('#g-marca option').allTextContents(), ['— Elija —', 'FERINJECT', 'LIKFER']);
+    await pagina.selectOption('#g-trat', 'HIERRO DERISOMALTOSA');
+    assert.deepEqual(await pagina.locator('#g-marca option').allTextContents(), ['— Elija —', 'MONOFER']);
+    await pagina.selectOption('#g-trat', 'HIERRO SACARATO');
+    assert.equal(await pagina.locator('#g-marca-c').isVisible(), false, 'el sacarato no pide marca');
+    assert.equal(await pagina.locator('#g-otro').isVisible(), false);
+    await pagina.selectOption('#g-sesiones', 'otro');
+    assert.equal(await pagina.locator('#g-otro').isVisible(), true);
+    await pagina.selectOption('#g-trat', '');
+    assert.equal(await pagina.locator('#g-trat-extra').isVisible(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: DNI conocido, registrar, aviso de duplicado, registrados hoy y anular', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await irRegistro(pagina);
+    const llenar = async () => {
+      await pagina.fill('#g-dni', '40222333');
+      await pagina.waitForFunction(() => /Paciente conocido/.test(document.querySelector('#g-conocido').textContent));
+      await pagina.fill('#g-contacto', '@jorge.m');
+      await pagina.selectOption('#g-proc', 'SANGRÍA');
+    };
+    await llenar();
+    assert.equal(await pagina.locator('#g-conocido').textContent(), 'Paciente conocido · última consulta 18/07/2026 con Dra. Matos');
+    assert.equal(await pagina.inputValue('#g-nombre'), 'JORGE LUIS MENDOZA PAREDES');
+    assert.equal(await pagina.inputValue('#g-doctor'), 'Dra. Karen Matos');
+    await pagina.locator('#g-guardar').click();
+    await pagina.waitForFunction(() => /Registrado:/.test(document.querySelector('#aviso').textContent));
+    assert.equal(await pagina.locator('#aviso').textContent(), 'Registrado: Sangría — JORGE LUIS MENDOZA PAREDES · REG-000002');
+    assert.equal(await pagina.inputValue('#g-dni'), '', 'el formulario se limpia');
+    await pagina.waitForFunction(() => document.querySelectorAll('#g-hoy .g-item').length === 1);
+
+    await llenar();
+    await pagina.locator('#g-guardar').click();
+    await pagina.waitForSelector('#g-dup:not([hidden])');
+    assert.match(await pagina.locator('#g-dup').textContent(), /Ya se registró el 01\/10\/2026 \(REG-000002\): Sangría\. ¿Registrar de todos modos\?/);
+    await pagina.locator('#g-dup-si').click();
+    await pagina.waitForFunction(() => document.querySelectorAll('#g-hoy .g-item').length === 2);
+
+    await pagina.locator('[data-anular="REG-000003"]').click();
+    await pagina.fill('#g-motivo', 'Duplicado');
+    await pagina.locator('[data-confirmar-anular="REG-000003"]').click();
+    await pagina.waitForSelector('#g-hoy .g-item.anulado');
+    assert.match(await pagina.locator('#g-hoy .g-item.anulado').textContent(), /REG-000003[\s\S]*Anulado/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: alta médica desde la pestaña; el paciente sale de la bandeja', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'RACHEL');
+    await irRegistro(pagina);
+    await pagina.locator('[data-modo-reg="alta"]').click();
+    assert.equal(await pagina.locator('#g-nombre').isVisible(), false);
+    await pagina.fill('#g-dni', '40222333');
+    await pagina.waitForFunction(() => /HEMATOLOGÍA/.test(document.querySelector('#g-esp').textContent));
+    assert.equal(await pagina.locator('#g-guardar').textContent(), 'Registrar alta');
+    await pagina.locator('#g-guardar').click();
+    await pagina.waitForFunction(() => /Alta registrada/.test(document.querySelector('#aviso').textContent));
+    assert.equal(await pagina.locator('#aviso').textContent(), 'Alta registrada: JORGE LUIS MENDOZA PAREDES · HEMATOLOGÍA');
+    await pagina.waitForFunction(() => /Alta médica · HEMATOLOGÍA · Dra\. Karen Matos/.test(document.querySelector('#g-hoy').textContent));
+    await pagina.locator('.nav button[data-vista="bandeja"]').click();
+    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 6);
+    assert.ok(!(await filas(pagina)).includes('JORGE LUIS MENDOZA PAREDES'));
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

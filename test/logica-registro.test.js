@@ -190,3 +190,41 @@ test('pendientesIndicacion: el ACEPTÓ de un registro cierra el histórico y sus
   const conRef = Object.assign(seg({ fecha: '2026-10-01', esp: 'HIERRO' }), { REFERENCIA: 'REG-000001' });
   assert.equal(plano(L.pendientesIndicacion(citas, [hist], [conRef], reglas(L), HOY))[0].N_SEGUIMIENTOS, 0);
 });
+
+test('validarAlta: consultas en esa especialidad, doctor del catálogo, fecha válida y sin alta vigente', () => {
+  const citas = [cita({ fecha: '2026-08-01' }), cita({ fecha: '2026-09-10' })];
+  const p = o => Object.assign({ usuario: 'magaly', dni: '40111222', especialidad: 'hematologia', doctor: 'Dr. Elí Cabanillas', fecha: '2026-09-10', nota: ' ok ' }, o);
+  const v = (o, vig) => plano(L.validarAlta(p(o), CAT, citas, vig || {}, HOY));
+  assert.deepEqual(v({}).alta, { FECHA: '2026-09-10', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dr. Elí Cabanillas',
+    REGISTRADO_POR: 'MAGALY', NOTA: 'ok', ANULADO: '', MOTIVO_ANULACION: '' });
+  assert.match(v({ usuario: '' }).error, /Elija quién es usted/);
+  assert.match(v({ especialidad: 'REUMATOLOGÍA' }).error, /no tiene consultas realizadas en REUMATOLOGÍA/);
+  assert.match(v({ doctor: '' }).error, /doctor que da el alta/);
+  assert.match(v({ fecha: '2026-10-06' }).error, /futura/);
+  assert.match(v({ fecha: '2026-09-09' }).error, /anterior a la última consulta \(10\/09\/2026\)/);
+  assert.match(v({}, { '40111222|HEMATOLOGIA': { FECHA: '2026-09-10' } }).error, /ya tiene un alta vigente/);
+});
+
+test('altasVigentes: sin anular y sin consultas posteriores; los descartes «ALTA MÉDICA» también cuentan', () => {
+  const citas = [cita({ fecha: '2026-08-01' }), cita({ dni: '40222333', fecha: '2026-08-01' }), cita({ dni: '40222333', fecha: '2026-09-20' })];
+  const alta = o => Object.assign({ ID: 'ALT-000001', FECHA: '2026-08-01', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dr. Elí Cabanillas',
+    REGISTRADO_POR: 'MAGALY', ANULADO: '' }, o);
+  assert.deepEqual(Object.keys(plano(L.altasVigentes([alta()], [], citas))), ['40111222|HEMATOLOGIA']);
+  assert.deepEqual(plano(L.altasVigentes([alta({ ANULADO: 'SÍ' })], [], citas)), {});
+  assert.deepEqual(plano(L.altasVigentes([alta({ DNI: '40222333' })], [], citas)), {}, 'volvió después del alta');
+  const desc = Object.assign(seg({ fecha: '2026-08-05', accion: 'DESCARTADO', motivo: 'Alta médica' }), {});
+  const v = plano(L.altasVigentes([], [desc], citas))['40111222|HEMATOLOGIA'];
+  assert.deepEqual([v.FECHA, v.DOCTOR, v.REGISTRADO_POR], ['2026-08-05', '', 'MAGALY']);
+  const descHierro = Object.assign(seg({ fecha: '2026-08-05', esp: 'HIERRO', accion: 'DESCARTADO', motivo: 'ALTA MÉDICA' }), {});
+  assert.deepEqual(plano(L.altasVigentes([], [descHierro], citas)), {});
+});
+
+test('estado ALTA: va antes que DESCARTADO y saca la serie de la bandeja', () => {
+  const citas = [cita({ fecha: '2026-06-01' })];
+  const vig = L.altasVigentes([{ ID: 'ALT-000001', FECHA: '2026-06-01', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', ANULADO: '' }], [], citas);
+  const segs = [seg({ fecha: '2026-08-01', accion: 'DESCARTADO', motivo: 'OTRO' })];
+  const p = plano(L.armarPacientes(citas, [], segs, reglas(L), HOY, [], vig));
+  assert.equal(p[0].ESTADO, 'ALTA');
+  assert.deepEqual(plano(L.ordenarBandeja(p)), []);
+  assert.equal(plano(L.armarPacientes(citas, [], [], reglas(L), HOY))[0].ESTADO, 'VENCIDO', 'sin altas, como antes');
+});

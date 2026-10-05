@@ -279,9 +279,9 @@ function armarSeries(citas) {
 
 /**
  * Estado de una serie. Gana la primera regla que se cumple (diseño §5):
- * DESCARTADO, AGENDADO, CONTACTADO, RECUPERADO, AL DÍA, POR VENCER, VENCIDO, ANTIGUO.
+ * ALTA, DESCARTADO, AGENDADO, CONTACTADO, RECUPERADO, AL DÍA, POR VENCER, VENCIDO, ANTIGUO.
  */
-function estadoDeSerie(serie, seguimientos, reglas, hoy) {
+function estadoDeSerie(serie, seguimientos, reglas, hoy, alta) {
   var plazo = plazoDe(reglas, serie.especialidad);
   var r = serie.realizadas;
   var ultima = r.length ? r[r.length - 1].FECHA : '';
@@ -295,6 +295,8 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy) {
   out.esperada = sumarDias(ultima, plazo.esperado);
   out.vence = sumarDias(ultima, plazo.vence);
   out.atraso = Math.max(0, diasEntre(out.vence, hoy));
+  // El alta va primero: el doctor cerró el seguimiento (diseño de Registro, §5bis).
+  if (alta) { out.estado = 'ALTA'; return out; }
 
   var lista = (seguimientos || []).slice().sort(function (a, b) {
     return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0;
@@ -570,14 +572,14 @@ function segsPorSerie(seguimientos) {
   return out;
 }
 
-function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos) {
+function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas) {
   var series = armarSeries(citas);
   var tel = telefonosPorDni(indicaciones, contactos), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
   var out = [];
   Object.keys(series).forEach(function (k) {
     var s = series[k];
     if (!s.realizadas.length) return;
-    var e = estadoDeSerie(s, segs[k], reglas, hoy);
+    var e = estadoDeSerie(s, segs[k], reglas, hoy, (altas || {})[k]);
     out.push({
       DNI: s.dni,
       ESPECIALIDAD: s.especialidad,

@@ -214,3 +214,50 @@ function pendientesRegistro(d) {
     };
   }).filter(Boolean);
 }
+
+/* ---------- Alta médica (por especialidad) ---------- */
+
+function validarAlta(p, catalogos, citas, vigentes, hoy) {
+  function no(m) { return { error: m, alta: null }; }
+  if (!p) return no('Faltan los datos del alta.');
+  var quien = enLista_(catalogos.usuarios, p.usuario);
+  if (!quien) return no('Elija quién es usted en el selector de arriba.');
+  var dni = normDni(p.dni);
+  if (!dni) return no('Falta el DNI del paciente.');
+  var k = claveSerie(dni, p.especialidad);
+  var serie = armarSeries((citas || []).filter(function (c) { return c.DNI === dni; }))[k];
+  if (!serie || !serie.realizadas.length) return no('Ese paciente no tiene consultas realizadas en ' + textoLimpio_(p.especialidad).toUpperCase() + '.');
+  var doctor = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(p.doctor); })[0];
+  if (!doctor) return no('Elija el doctor que da el alta.');
+  var fecha = fechaIso(p.fecha), ultima = serie.realizadas[serie.realizadas.length - 1].FECHA;
+  if (!fecha) return no('Falta la fecha del alta.');
+  if (fecha > hoy) return no('La fecha no puede ser futura.');
+  // Antes de la última consulta el alta quedaría cerrada al instante (hay una consulta posterior).
+  if (fecha < ultima) return no('El alta no puede ser anterior a la última consulta (' + fechaDma_(ultima) + ').');
+  if ((vigentes || {})[k]) return no('Ese paciente ya tiene un alta vigente en ' + serie.especialidad + '.');
+  return { error: '', alta: { FECHA: fecha, DNI: dni, ESPECIALIDAD: serie.especialidad, DOCTOR: doctor.doctor, REGISTRADO_POR: quien,
+    NOTA: textoLimpio_(p.nota), ANULADO: '', MOTIVO_ANULACION: '' } };
+}
+
+/**
+ * Altas vigentes por serie (DNI + especialidad): sin anular y sin ninguna consulta realizada después.
+ * Los descartes antiguos con motivo «ALTA MÉDICA» cuentan como altas con la fecha del seguimiento.
+ */
+function altasVigentes(altas, seguimientos, citas) {
+  var series = armarSeries(citas), out = {}, candidatas = [];
+  (altas || []).forEach(function (a) {
+    if (anulado_(a)) return;
+    candidatas.push({ ID: a.ID, FECHA: fechaIso(a.FECHA), DNI: normDni(a.DNI), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR || '', REGISTRADO_POR: a.REGISTRADO_POR || '' });
+  });
+  (seguimientos || []).forEach(function (s) {
+    if (normTexto(s.ACCION) !== 'DESCARTADO' || normTexto(s.MOTIVO) !== 'ALTA MEDICA' || TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)]) return;
+    candidatas.push({ ID: s.ID, FECHA: fechaIso(s.FECHA_HORA), DNI: normDni(s.DNI), ESPECIALIDAD: s.ESPECIALIDAD, DOCTOR: '', REGISTRADO_POR: s.RESPONSABLE || '' });
+  });
+  candidatas.forEach(function (a) {
+    var k = claveSerie(a.DNI, a.ESPECIALIDAD), serie = series[k];
+    if (!serie || !a.FECHA) return;
+    if (serie.realizadas.some(function (c) { return c.FECHA > a.FECHA; })) return;
+    if (!out[k] || a.FECHA > out[k].FECHA) out[k] = a;
+  });
+  return out;
+}

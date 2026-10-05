@@ -159,7 +159,7 @@ button{cursor:pointer}
 .r-desglose span{display:inline-flex;align-items:center;gap:8px}
 .r-nota{font-style:italic;color:var(--chp-muted);margin:10px 0 0;font-size:14px}
 .r-meta{margin:12px 0 0;font-size:14px;color:var(--chp-soft)}
-.r-metricas{display:grid;grid-template-columns:repeat(3,1fr)}
+.r-metricas{display:grid;grid-template-columns:repeat(4,1fr)}
 .r-metrica{border-left:1px solid var(--chp-rule);padding:0 24px 4px 28px;display:flex;flex-direction:column;gap:4px}
 .r-num{font-family:'Barlow Condensed',sans-serif;font-size:72px;font-weight:600;line-height:1}
 .r-num.pend{color:var(--chp-pending)}
@@ -240,6 +240,7 @@ td.n{white-space:nowrap}
 .reparto i:only-child{border-radius:4px}
 .paso1{background:var(--chp-paso1)}.paso2{background:var(--chp-paso2)}.paso3{background:var(--chp-paso3)}.paso4{background:var(--chp-paso4)}
 .paso-plazo{background:repeating-linear-gradient(135deg,var(--chp-line) 0 2px,var(--chp-track) 2px 6px)}
+.paso-alta{background:var(--chp-good)}
 .ley-reparto{display:none;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--chp-soft);margin:6px 0 10px}
 .muestra{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .historia{display:grid;grid-template-columns:auto 1fr;gap:20px 48px;align-items:start;margin:18px 0 28px}
@@ -1289,6 +1290,8 @@ function historia(t, meses, meta, fMed, fMes) {
     const malo = orden[0], bueno = orden[orden.length - 1];
     frases.push(`<p>El mes con más pacientes perdidos fue ${esc(nombreMes(malo.c))} (${porc(malo.no)} no volvió); el mejor, ${esc(nombreMes(bueno.c))} (${porc(bueno.no)}).</p>`);
   }
+  const altas = t.alta ? t.alta[1] + t.alta[2] + t.alta[3] : 0;
+  if (altas) frases.push(`<p>Además, ${altas} recibieron el alta médica: no cuentan como perdidos.</p>`);
   if (meta) frases.push(`<p>La meta es que vuelva el ${meta}%; hoy vuelve el ${porc(p1)}.</p>`);
   if (t.curso) frases.push(`<p class="muted">Otros ${t.curso} pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo: aún no se cuentan.</p>`);
   if (e1 < 20) frases.push(`<p class="muted">Son pocos pacientes (${e1}): tome estas cifras con cautela.</p>`);
@@ -1317,17 +1320,19 @@ function pintarTablero() {
   const T = t => ({ t }), N = t => ({ t, num: true });
 
   const coh = agrupar(k.cohortes.filter(r => okMes(r.COHORTE) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO)),
-    r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0 }),
-    (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); o.curso += Number(r.EN_CURSO) || 0; });
+    r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0, alta: { 1: 0, 2: 0, 3: 0 } }),
+    (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); o.curso += Number(r.EN_CURSO) || 0; o.alta[r.ETAPA] += Number(r.ALTAS) || 0; });
   // Cada paciente nuevo cuenta UNA vez, según la última reevaluación a la que llegó (volver = cualquier
   // consulta posterior). Las partes suman los pacientes del mes a quienes ya les venció el plazo.
   const PASOS = [
     { t: 'No volvió nunca', c: 'paso1' }, { t: 'Volvió a 1 reevaluación', c: 'paso2' },
-    { t: 'Volvió a 2 reevaluaciones', c: 'paso3' }, { t: 'Volvió a 3 o más', c: 'paso4' }, { t: 'Aún en plazo', c: 'paso-plazo' }
+    { t: 'Volvió a 2 reevaluaciones', c: 'paso3' }, { t: 'Volvió a 3 o más', c: 'paso4' }, { t: 'Aún en plazo', c: 'paso-plazo' },
+    { t: 'Alta médica', c: 'paso-alta' }
   ];
+  // Un alta en la etapa k no es pérdida: sale de «aún en plazo» de esa etapa (o, en la 1.ª, suma al total del mes).
   const partes = o => {
-    const [v1, e1] = o[1], [v2, e2] = o[2], [v3, e3] = o[3];
-    return { total: e1, n: [e1 - v1, e2 - v2, e3 - v3, v3, (v1 - e2) + (v2 - e3)] };
+    const [v1, e1] = o[1], [v2, e2] = o[2], [v3, e3] = o[3], al = o.alta;
+    return { total: e1 + al[1], n: [e1 - v1, e2 - v2, e3 - v3, v3, (v1 - e2 - al[2]) + (v2 - e3 - al[3]), al[1] + al[2] + al[3]] };
   };
   const filaCoh = (nombre, o) => {
     const p = partes(o);
@@ -1337,19 +1342,21 @@ function pintarTablero() {
     return [nombre, p.total, reparto].concat(celdas);
   };
   // Un mes en el que a nadie le venció aún el plazo no tiene nada que repartir; sus pacientes en plazo van en la línea de arriba.
-  const filasCoh = coh.filter(([, o]) => o[1][1]).map(([c, o]) => filaCoh(esc(nombreMes(c)), o));
-  const totalCoh = { 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0 };
-  coh.forEach(([, o]) => { totalCoh.curso += o.curso; [1, 2, 3].forEach(e => { totalCoh[e][0] += o[e][0]; totalCoh[e][1] += o[e][1]; }); });
+  const filasCoh = coh.filter(([, o]) => partes(o).total).map(([c, o]) => filaCoh(esc(nombreMes(c)), o));
+  const totalCoh = { 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0, alta: { 1: 0, 2: 0, 3: 0 } };
+  coh.forEach(([, o]) => { totalCoh.curso += o.curso; [1, 2, 3].forEach(e => { totalCoh[e][0] += o[e][0]; totalCoh[e][1] += o[e][1]; totalCoh.alta[e] += o.alta[e]; }); });
   const mesesCoh = coh.filter(([, o]) => o[1][1]).map(([c, o]) => ({ c, o }));
   const relato = historia(totalCoh, mesesCoh, k.meta, fMed, fMes);
   const cabCoh = [T('Mes de la primera consulta'), N('Pacientes nuevos'), T('Reparto')].concat(
     PASOS.map(x => ({ t: x.t, num: true, html: `<span class="muestra ${x.c}"></span>${esc(x.t)}` })));
 
   const ind = k.indicaciones.filter(r => okMes(r.MES) && okMed(r.MEDICO));
-  const sumaInd = (o, r) => { o.n += Number(r.INDICADAS); o.a += Number(r.ACEPTADAS); };
-  const filaInd = ([c, o]) => [esc(c), o.n, o.a, pct(o.a, o.n) + barra(o.a, o.n)];
-  const indTipo = agrupar(ind, r => r.TIPO === 'HIERRO' ? 'Hierro (Ferinject)' : r.DETALLE, () => ({ n: 0, a: 0 }), sumaInd).map(filaInd);
-  const indMed = agrupar(ind, r => r.MEDICO, () => ({ n: 0, a: 0 }), sumaInd).map(filaInd);
+  const sumaInd = (o, r) => { o.n += Number(r.INDICADAS); o.a += Number(r.ACEPTADAS); o.c += Number(r.COMPLETADAS ?? r.ACEPTADAS) || 0; };
+  const filaInd = ([c, o]) => [esc(c), o.n, o.a, o.c, pct(o.a, o.n) + barra(o.a, o.n)];
+  const nombreInd = r => r.TIPO !== 'HIERRO' ? r.DETALLE : norm(r.DETALLE) === 'HIERRO' ? 'Hierro (Ferinject)'
+    : String(r.DETALLE).charAt(0) + String(r.DETALLE).slice(1).toLowerCase();
+  const indTipo = agrupar(ind, nombreInd, () => ({ n: 0, a: 0, c: 0 }), sumaInd).map(filaInd);
+  const indMed = agrupar(ind, r => r.MEDICO, () => ({ n: 0, a: 0, c: 0 }), sumaInd).map(filaInd);
 
   const rec = k.recuperacion.filter(r => okMes(r.MES) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO));
   const sumaRec = (o, r) => { o.n++; if (Number(r.VOLVIO)) { o.v++; o.d.push(Number(r.DIAS)); } };
@@ -1382,10 +1389,10 @@ function pintarTablero() {
       <h3>Por campaña</h3>
       ${tabla([T('Campaña'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CAMPANA))}</div>
     <div class="seccion"><h2>Procedimientos (hierro y otros)</h2>
-      <p class="muted">De lo cotizado, cuánto se hizo. Los procedimientos no tienen especialidad: ese filtro no los cambia.</p>
-      ${tabla([T('Procedimiento'), N('Cotizados'), N('Se hicieron'), N('Porcentaje')], indTipo)}
+      <p class="muted">De lo cotizado, cuánto se empezó y cuánto se completó: todas las sesiones de un tratamiento, o el procedimiento hecho. Lo registrado hace menos de 7 días todavía no cuenta. Los procedimientos no tienen especialidad: ese filtro no los cambia.</p>
+      ${tabla([T('Procedimiento'), N('Cotizados'), N('Empezaron'), N('Completaron'), N('Empezaron (%)')], indTipo)}
       <h3>Por médico</h3>
-      ${tabla([T('Médico'), N('Cotizados'), N('Se hicieron'), N('Porcentaje')], indMed)}</div>
+      ${tabla([T('Médico'), N('Cotizados'), N('Empezaron'), N('Completaron'), N('Empezaron (%)')], indMed)}</div>
     <div class="seccion"><h2>Recuperación</h2>
       <p class="muted">De los seguimientos hechos, cuántos pacientes volvieron y en cuántos días (mediana).</p>
       ${tabla([T('Responsable'), N('Seguimientos'), N('Volvieron'), N('Porcentaje'), N('Días')], recResp)}
@@ -1404,8 +1411,8 @@ function pintarTablero() {
    RESUMEN (propuesta 3a) — una cifra grande, tres secundarias y el mes a mes.
    Un paciente que no volvió cuenta en el mes de su última consulta.
    ========================================================================== */
-const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO',
-  'HIERRO', 'HIERRO_NO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
+const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
+  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
 
 async function cargarResumen() {
   if (E.resumen) { pintarResumen(); return; }
@@ -1422,9 +1429,10 @@ function sumarMes(filas, mes) {
   const o = {};
   CAMPOS_RESUMEN.forEach(c => { o[c] = 0; });
   filas.filter(f => f.MES === mes).forEach(f => CAMPOS_RESUMEN.forEach(c => { o[c] += Number(f[c]) || 0; }));
-  o.REEVAL = o.NUEVOS - o.NUEVOS_CURSO + o.CONTROL - o.CONTROL_CURSO;
+  o.REEVAL = o.NUEVOS - o.NUEVOS_CURSO - o.NUEVOS_ALTA + o.CONTROL - o.CONTROL_CURSO - o.CONTROL_ALTA;
   o.REEVAL_NO = o.NUEVOS_NO + o.CONTROL_NO;
   o.CURSO = o.NUEVOS_CURSO + o.CONTROL_CURSO;
+  o.ALTA = o.NUEVOS_ALTA + o.CONTROL_ALTA;
   return o;
 }
 
@@ -1478,12 +1486,14 @@ function pintarResumen() {
         <div class="r-grande num">${pct(m.REEVAL_NO, m.REEVAL)}</div>
         <p class="r-frase">de ${quien} pacientes de ${esc(mesSolo(E.rMes))} no volvieron a su reevaluación.</p>
         <p class="r-cuenta"><b class="num">${m.REEVAL_NO} de ${m.REEVAL}</b> pacientes</p>
-        <p class="r-desglose"><span><i class="m nuevo"></i>Nuevos ${m.NUEVOS_NO} de ${m.NUEVOS - m.NUEVOS_CURSO}</span><span><i class="m control"></i>En control ${m.CONTROL_NO} de ${m.CONTROL - m.CONTROL_CURSO}</span></p>
+        <p class="r-desglose"><span><i class="m nuevo"></i>Nuevos ${m.NUEVOS_NO} de ${m.NUEVOS - m.NUEVOS_CURSO - m.NUEVOS_ALTA}</span><span><i class="m control"></i>En control ${m.CONTROL_NO} de ${m.CONTROL - m.CONTROL_CURSO - m.CONTROL_ALTA}</span></p>
         ${m.CURSO ? `<p class="r-nota">A ${m.CURSO} pacientes de este mes aún no les toca volver: no cuentan todavía.</p>` : ''}
+        ${m.ALTA ? `<p class="r-nota">${m.ALTA} pacientes recibieron el alta médica: no cuentan como «no volvió».</p>` : ''}
         ${meta ? `<p class="r-meta">Meta: que vuelva el ${meta} % (que no vuelva como máximo el ${100 - meta} %).</p>` : ''}
       </div>
       <div class="r-metricas">
         ${metrica(m.HIERRO_NO, m.HIERRO, 'pend', 'no siguieron el hierro (Ferinject)')}
+        ${metrica(m.HIERRO_COMPLETO, m.HIERRO - m.HIERRO_NO, 'buena', 'completaron el tratamiento de hierro', 'aún sin tratamientos empezados')}
         ${metrica(m.PROC_NO, m.PROC, 'pend', 'no siguieron otros procedimientos')}
         ${metrica(m.RECUPERADOS, m.SEGUIMIENTOS, 'buena', 'volvieron tras el seguimiento', 'aún sin seguimientos este mes')}
       </div>
@@ -1659,15 +1669,15 @@ const DEMO = (() => {
         { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 2, ELEGIBLES: 15, VOLVIERON: 8 },
         { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 3, ELEGIBLES: 8, VOLVIERON: 5 },
         { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 52, VOLVIERON: 17 },
-        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 2, ELEGIBLES: 17, VOLVIERON: 9 },
+        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 2, ELEGIBLES: 17, VOLVIERON: 9, ALTAS: 2 },
         { COHORTE: '2026-07', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: 'Dr. JUVENAL HANAMPA ROQUE', ETAPA: 1, ELEGIBLES: 6, VOLVIERON: 2 },
         { COHORTE: '2026-08', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 48, VOLVIERON: 12, EN_CURSO: 20 },
         { COHORTE: '2026-09', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 30 }
       ],
       indicaciones: [
-        { MES: '2026-08', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: ELI, INDICADAS: 30, ACEPTADAS: 14 },
-        { MES: '2026-08', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', MEDICO: KAREN, INDICADAS: 9, ACEPTADAS: 1 },
-        { MES: '2026-09', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: KAREN, INDICADAS: 25, ACEPTADAS: 13 }
+        { MES: '2026-08', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: ELI, INDICADAS: 30, ACEPTADAS: 14, COMPLETADAS: 10 },
+        { MES: '2026-08', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', MEDICO: KAREN, INDICADAS: 9, ACEPTADAS: 1, COMPLETADAS: 1 },
+        { MES: '2026-09', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: KAREN, INDICADAS: 25, ACEPTADAS: 13, COMPLETADAS: 13 }
       ],
       recuperacion: [
         { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 6 },
@@ -1688,12 +1698,13 @@ const DEMO = (() => {
     }),
     getResumen: () => {
       const r = (MES, MEDICO, v) => ({ MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], CONTROL: v[3], CONTROL_NO: v[4],
-        CONTROL_CURSO: v[5], HIERRO: v[6], HIERRO_NO: v[7], PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11] });
+        CONTROL_CURSO: v[5], HIERRO: v[6], HIERRO_NO: v[7], PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11],
+        NUEVOS_ALTA: v[12] || 0, CONTROL_ALTA: v[13] || 0, HIERRO_COMPLETO: v[14] || 0 });
       return { hoy, meta: 60, medicos: [ELI, KAREN], filas: [
         r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4]),
-        r('2026-08', ELI, [40, 24, 0, 30, 9, 0, 15, 6, 4, 3, 0, 0]),
+        r('2026-08', ELI, [40, 24, 0, 30, 9, 0, 15, 6, 4, 3, 0, 0, 0, 0, 6]),
         r('2026-08', KAREN, [35, 20, 0, 20, 6, 0, 10, 5, 2, 2, 0, 0]),
-        r('2026-07', KAREN, [38, 25, 0, 22, 8, 0, 9, 4, 5, 4, 0, 0])
+        r('2026-07', KAREN, [38, 25, 0, 22, 8, 0, 9, 4, 5, 4, 0, 0, 2, 0, 0])
       ] };
     },
     buscarPacienteRegistro: dni => {

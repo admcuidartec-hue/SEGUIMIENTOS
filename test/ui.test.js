@@ -158,7 +158,7 @@ test('resumen: el Dr. Eli ve sus pacientes; navega por mes; el mes en curso se a
     assert.match(t, /Meta: que vuelva el 60 %/);
     assert.match(await pagina.locator('.mm-col[data-mes="2026-09"]').textContent(), /en curso · a 35 aún no les toca volver/);
     assert.match(await pagina.locator('.mm-col[data-mes="2026-08"]').textContent(), /47%\s*agosto\s*cerrado/);
-    assert.equal(await pagina.locator('.r-metrica').count(), 3);
+    assert.equal(await pagina.locator('.r-metrica').count(), 4);
     await pagina.selectOption('#r-med', '');
     assert.match(await pagina.locator('#resumen').textContent(), /59 de 125/);
     await pagina.locator('.mm-col[data-mes="2026-07"]').click();
@@ -303,11 +303,11 @@ test('detalle: hasta dónde llegó cada paciente nuevo; las partes suman el tota
     const seccion = pagina.locator('.seccion', { hasText: '¿Hasta dónde llegan los pacientes nuevos?' });
     const cab = (await seccion.locator('th').allInnerTexts()).map(t => t.trim());
     assert.deepEqual(cab, ['Mes de la primera consulta', 'Pacientes nuevos', 'Reparto', 'No volvió nunca', 'Volvió a 1 reevaluación',
-      'Volvió a 2 reevaluaciones', 'Volvió a 3 o más', 'Aún en plazo']);
+      'Volvió a 2 reevaluaciones', 'Volvió a 3 o más', 'Aún en plazo', 'Alta médica']);
     const fila = async texto => (await seccion.locator('tr', { hasText: texto }).innerText()).replace(/\s+/g, ' ').trim();
-    assert.equal(await fila('junio 2026'), 'junio 2026 40 25 · 63% 7 · 18% 3 · 8% 5 · 13% 0');
-    assert.equal(await fila('julio 2026'), 'julio 2026 58 39 · 67% 8 · 14% 0 0 11 · 19%');
-    assert.equal(await fila('Total'), 'Total 146 100 · 68% 15 · 10% 3 · 2% 5 · 3% 23 · 16%');
+    assert.equal(await fila('junio 2026'), 'junio 2026 40 25 · 63% 7 · 18% 3 · 8% 5 · 13% 0 0');
+    assert.equal(await fila('julio 2026'), 'julio 2026 58 39 · 67% 8 · 14% 0 0 9 · 16% 2 · 3%');
+    assert.equal(await fila('Total'), 'Total 146 100 · 68% 15 · 10% 3 · 2% 5 · 3% 21 · 14% 2 · 1%');
     assert.equal(await seccion.locator('tr', { hasText: 'setiembre 2026' }).count(), 0, 'mes sin nadie con plazo vencido');
     assert.equal(await seccion.locator('tr', { hasText: 'junio 2026' }).locator('.reparto i').count(), 4, 'sin segmentos vacíos');
     assert.match(await seccion.locator('tr', { hasText: 'junio 2026' }).locator('.reparto i').first().getAttribute('title'),
@@ -315,7 +315,7 @@ test('detalle: hasta dónde llegó cada paciente nuevo; las partes suman el tota
     assert.match((await seccion.locator('.historia').innerText()).replace(/\s+/g, ' '),
       /Otros 50 pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo/);
     await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
-    assert.equal(await fila('Total'), 'Total 6 4 · 67% 0 0 0 2 · 33%');
+    assert.equal(await fila('Total'), 'Total 6 4 · 67% 0 0 0 2 · 33% 0');
     assert.doesNotMatch(await seccion.locator('.historia').innerText(), /Otros/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -334,6 +334,7 @@ test('detalle: el relato «de cada 100 pacientes nuevos» con su dibujo de 100 c
     assert.match(t, /Quien vuelve una vez tiende a seguir: el 53% vuelve también a la 2\.ª/);
     assert.match(t, /El mes con más pacientes perdidos fue agosto 2026 \(75% no volvió\); el mejor, junio 2026 \(63%\)/);
     assert.match(t, /La meta es que vuelva el 60%; hoy vuelve el 32%/);
+    assert.match(t, /Además, 2 recibieron el alta médica: no cuentan como perdidos/);
     assert.equal(await h.locator('.waffle i').count(), 100);
     assert.equal(await h.locator('.waffle i.paso1').count(), 68);
     assert.equal(await h.locator('.waffle i.paso4').count(), 10);
@@ -487,6 +488,40 @@ test('ficha: el tratamiento con sus sesiones, «Lo hizo», anular la última y �
     await pagina.locator('[data-alta-ok="HEMATOLOGÍA"]').click();
     await pagina.waitForFunction(() => /Alta médica/.test(document.querySelector('#ficha').textContent));
     assert.match(await pagina.locator('#ficha').innerText(), /HEMATOLOGÍA · 01\/10\/2026 · Dr\. Elí Cabanillas · registró MAGALY · vigente/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('resumen: tratamientos de hierro completados y altas fuera de «no volvió»', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'DR. ELI CABANILLAS');
+    await pagina.locator('.nav button[data-vista="resumen"]').click();
+    await pagina.waitForSelector('#r-mes-actual');
+    await pagina.locator('#r-ant').click();
+    const completo = pagina.locator('.r-metrica', { hasText: 'completaron el tratamiento de hierro' });
+    assert.match(await completo.innerText(), /67%[\s\S]*6 de 9/);
+    await pagina.selectOption('#r-med', '');
+    await pagina.locator('.mm-col[data-mes="2026-07"]').click();
+    const t = (await pagina.locator('#resumen').innerText()).replace(/\s+/g, ' ');
+    assert.match(t, /^julio 2026/);
+    assert.match(t, /57%/);
+    assert.match(t, /33 de 58 pacientes/);
+    assert.match(t, /Nuevos 25 de 36/);
+    assert.match(t, /2 pacientes recibieron el alta médica: no cuentan como «no volvió»/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('detalle: procedimientos con cotizados, empezaron y completaron', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.locator('.nav button[data-vista="tablero"]').click();
+    await pagina.waitForSelector('#tablero table');
+    const s = pagina.locator('.seccion', { hasText: 'Procedimientos (hierro y otros)' });
+    assert.deepEqual((await s.locator('table').first().locator('th').allInnerTexts()).map(x => x.trim()),
+      ['Procedimiento', 'Cotizados', 'Empezaron', 'Completaron', 'Empezaron (%)']);
+    assert.match((await s.locator('tr', { hasText: 'Hierro (Ferinject)' }).first().innerText()).replace(/\s+/g, ' '), /Hierro \(Ferinject\) 55 27 23 49%/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

@@ -349,7 +349,9 @@ function confirmarEmparejamiento(p) {
 
 function getKpi() {
   var d = datos_();
-  return limpiarParaEnvio(calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos));
+  var kpi = calcularKpi(d.citas, d.indicaciones, d.seguimientos, d.reglas, d.hoy, d.contactos);
+  kpi.meta = d.reglas.metaRetorno;
+  return limpiarParaEnvio(kpi);
 }
 
 /** Pantalla «Resumen»: filas por mes y médico; la app suma según el filtro elegido. */

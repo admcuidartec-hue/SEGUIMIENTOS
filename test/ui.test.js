@@ -312,12 +312,36 @@ test('detalle: hasta dónde llegó cada paciente nuevo; las partes suman el tota
     assert.equal(await seccion.locator('tr', { hasText: 'junio 2026' }).locator('.reparto i').count(), 4, 'sin segmentos vacíos');
     assert.match(await seccion.locator('tr', { hasText: 'junio 2026' }).locator('.reparto i').first().getAttribute('title'),
       /No volvió nunca: 25 \(63%\)/);
-    const resumen = (await seccion.locator('.total-primera').innerText()).replace(/\s+/g, ' ');
-    assert.match(resumen, /100 de 146 pacientes nuevos \(68%\) no volvieron nunca después de su primera consulta/);
-    assert.match(resumen, /Otros 50 tampoco han vuelto, pero todavía están dentro de su plazo/);
+    assert.match((await seccion.locator('.historia').innerText()).replace(/\s+/g, ' '),
+      /Otros 50 pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo/);
     await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
     assert.equal(await fila('Total'), 'Total 6 4 · 67% 0 0 0 2 · 33%');
-    assert.doesNotMatch(await seccion.locator('.total-primera').innerText(), /Otros/);
+    assert.doesNotMatch(await seccion.locator('.historia').innerText(), /Otros/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('detalle: el relato «de cada 100 pacientes nuevos» con su dibujo de 100 cuadritos', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.locator('.nav button[data-vista="tablero"]').click();
+    await pagina.waitForSelector('#tablero table');
+    const h = pagina.locator('.historia');
+    const t = (await h.innerText()).replace(/\s+/g, ' ');
+    assert.match(t, /De cada 100 pacientes nuevos, 68 no vuelven nunca después de su primera consulta/);
+    assert.match(t, /32 vuelven a su 1\.ª reevaluación, 17 llegan a la 2\.ª y 10 a la 3\.ª/);
+    assert.match(t, /Donde más se pierden es en el primer regreso: el 68% no vuelve después de la primera consulta/);
+    assert.match(t, /Quien vuelve una vez tiende a seguir: el 53% vuelve también a la 2\.ª/);
+    assert.match(t, /El mes con más pacientes perdidos fue agosto 2026 \(75% no volvió\); el mejor, junio 2026 \(63%\)/);
+    assert.match(t, /La meta es que vuelva el 60%; hoy vuelve el 32%/);
+    assert.equal(await h.locator('.waffle i').count(), 100);
+    assert.equal(await h.locator('.waffle i.paso1').count(), 68);
+    assert.equal(await h.locator('.waffle i.paso4').count(), 10);
+    await pagina.selectOption('#t-med', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
+    assert.match((await h.innerText()).replace(/\s+/g, ' '), /De cada 100 pacientes nuevos del Dr\. Cabanillas/);
+    await pagina.selectOption('#t-esp', 'REUMATOLOGÍA');
+    await pagina.selectOption('#t-med', '');
+    assert.match((await pagina.locator('.historia').innerText()).replace(/\s+/g, ' '), /Son pocos pacientes \(6\): tome estas cifras con cautela/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

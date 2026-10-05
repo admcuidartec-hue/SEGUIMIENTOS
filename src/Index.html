@@ -219,8 +219,17 @@ td.n{white-space:nowrap}
 .paso-plazo{background:repeating-linear-gradient(135deg,var(--chp-line) 0 2px,var(--chp-track) 2px 6px)}
 .ley-reparto{display:none;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--chp-soft);margin:6px 0 10px}
 .muestra{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-.total-primera{font-size:18px;margin:14px 0 6px}
-.total-primera b{font-family:'Barlow Condensed',sans-serif;font-size:40px;font-weight:600;color:var(--chp-accent);margin-right:4px}
+.historia{display:grid;grid-template-columns:auto 1fr;gap:20px 48px;align-items:start;margin:18px 0 28px}
+.h-dibujo{margin:0;display:flex;gap:20px;align-items:flex-start}
+.waffle{display:grid;grid-template-columns:repeat(10,16px);grid-auto-rows:16px;gap:3px;flex:0 0 auto}
+.waffle i{display:block;border-radius:3px}
+.h-dibujo ul{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.h-dibujo li b{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;margin-right:4px}
+.h-texto{max-width:620px;font-size:17px}
+.h-texto p{margin:0 0 10px}
+.h-titular{font-size:24px;line-height:1.3}
+.h-titular b{color:var(--chp-accent)}
+.nota-tabla{font-size:13px;margin-top:10px}
 tr.total td{font-weight:700;border-top:1px solid var(--chp-ink)}
 th,td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--chp-rule);vertical-align:top}
 th{color:var(--chp-muted);font-weight:500;font-size:13px}
@@ -283,6 +292,10 @@ td.n,th.n{text-align:right}
   .mm-nota{display:none}
   .ficha-cab h1{font-size:34px}
   .ley-reparto{display:flex}
+  .historia{grid-template-columns:1fr}
+  .h-dibujo{flex-direction:column}
+  .h-texto{order:-1}
+  .h-titular{font-size:20px}
 }
 </style>
 </head>
@@ -892,6 +905,52 @@ function opciones(id, etiqueta, valores, actual, nombre) {
     valores.map(v => `<option value="${esc(v)}"${v === actual ? ' selected' : ''}>${esc(nombre ? nombre(v) : v)}</option>`).join('') + '</select>';
 }
 
+/**
+ * El relato de la sección «¿Hasta dónde llegan…?»: lo mismo que la tabla, dicho en frases y en 100
+ * cuadritos. «De cada 100» encadena las tasas de cada etapa, así que no lo distorsionan los
+ * pacientes que aún están en plazo para la siguiente.
+ */
+function historia(t, meses, meta, fMed, fMes) {
+  const [v1, e1] = t[1], [v2, e2] = t[2], [v3, e3] = t[3];
+  if (!e1) return '<p class="muted">Todavía no hay pacientes nuevos a quienes les haya vencido el plazo con estos filtros.</p>';
+  const p1 = v1 / e1, p2 = e2 ? v2 / e2 : null, p3 = e3 ? v3 / e3 : null;
+  const r1 = Math.round(100 * p1);
+  const r2 = p2 === null ? null : Math.round(100 * p1 * p2);
+  const r3 = p2 === null || p3 === null ? null : Math.round(100 * p1 * p2 * p3);
+  const porc = x => Math.round(100 * x) + '%';
+  const quienes = 'pacientes nuevos' + (fMed ? ' del ' + medicoCorto(fMed) : '') + (fMes ? ' de ' + nombreMes(fMes) : '');
+
+  const frases = [`<p class="h-titular">De cada 100 ${esc(quienes)}, <b>${100 - r1} no vuelven nunca</b> después de su primera consulta.</p>`];
+  let camino = `${r1} vuelven a su 1.ª reevaluación`;
+  if (r2 !== null) camino += r3 !== null ? `, ${r2} llegan a la 2.ª y ${r3} a la 3.ª` : ` y ${r2} llegan a la 2.ª`;
+  frases.push(`<p>${camino}.</p>`);
+  const perdidas = [1 - p1, p2 === null ? -1 : 1 - p2, p3 === null ? -1 : 1 - p3];
+  const peor = perdidas.indexOf(Math.max(...perdidas));
+  frases.push(peor === 0
+    ? `<p>Donde más se pierden es en el primer regreso: el ${porc(1 - p1)} no vuelve después de la primera consulta.` +
+      (p2 !== null ? ` Quien vuelve una vez tiende a seguir: el ${porc(p2)} vuelve también a la 2.ª.` : '') + '</p>'
+    : `<p>Donde más se pierden es entre la ${peor}.ª y la ${peor + 1}.ª reevaluación: el ${porc(perdidas[peor])} no sigue.</p>`);
+  const comparables = meses.filter(m => m.o[1][1] >= 20).map(m => ({ c: m.c, no: 1 - m.o[1][0] / m.o[1][1] }));
+  if (!fMes && comparables.length >= 2) {
+    const orden = [...comparables].sort((a, b) => b.no - a.no);
+    const malo = orden[0], bueno = orden[orden.length - 1];
+    frases.push(`<p>El mes con más pacientes perdidos fue ${esc(nombreMes(malo.c))} (${porc(malo.no)} no volvió); el mejor, ${esc(nombreMes(bueno.c))} (${porc(bueno.no)}).</p>`);
+  }
+  if (meta) frases.push(`<p>La meta es que vuelva el ${meta}%; hoy vuelve el ${porc(p1)}.</p>`);
+  if (t.curso) frases.push(`<p class="muted">Otros ${t.curso} pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo: aún no se cuentan.</p>`);
+  if (e1 < 20) frases.push(`<p class="muted">Son pocos pacientes (${e1}): tome estas cifras con cautela.</p>`);
+
+  const grupos = [100 - r1, r2 === null ? r1 : r1 - r2, r2 === null ? 0 : r3 === null ? r2 : r2 - r3, r3 === null ? 0 : r3];
+  const nombres = ['No volvió nunca', 'Volvió a 1 reevaluación', 'Volvió a 2 reevaluaciones', 'Volvió a 3 o más'];
+  const cuadros = grupos.map((n, i) => `<i class="paso${i + 1}" title="${nombres[i]}: ${n} de cada 100"></i>`.repeat(n)).join('');
+  const leyenda = grupos.map((n, i) => n ? `<li><span class="muestra paso${i + 1}"></span><b class="num">${n}</b> ${nombres[i].toLowerCase()}</li>` : '').join('');
+  return `<div class="historia">
+    <figure class="h-dibujo"><div class="waffle" role="img" aria-label="De cada 100: ${grupos.map((n, i) => n + ' ' + nombres[i].toLowerCase()).join(', ')}">${cuadros}</div>
+      <figcaption><ul>${leyenda}</ul><small class="muted">Cada cuadrito es 1 de cada 100 pacientes nuevos.</small></figcaption></figure>
+    <div class="h-texto">${frases.join('')}</div>
+  </div>`;
+}
+
 function pintarTablero() {
   const k = E.kpi;
   const valor = id => ($(id) ? $(id).value : '');
@@ -928,9 +987,8 @@ function pintarTablero() {
   const filasCoh = coh.filter(([, o]) => o[1][1]).map(([c, o]) => filaCoh(esc(nombreMes(c)), o));
   const totalCoh = { 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0 };
   coh.forEach(([, o]) => { totalCoh.curso += o.curso; [1, 2, 3].forEach(e => { totalCoh[e][0] += o[e][0]; totalCoh[e][1] += o[e][1]; }); });
-  const soloPrimera = totalCoh[1][1] - totalCoh[1][0];
-  const lineaPrimera = `<p class="total-primera"><b class="num">${soloPrimera}</b> de ${totalCoh[1][1]} pacientes nuevos (${pct(soloPrimera, totalCoh[1][1])}) no volvieron nunca después de su primera consulta.` +
-    (totalCoh.curso ? ` <span class="muted">Otros ${totalCoh.curso} tampoco han vuelto, pero todavía están dentro de su plazo: no se cuentan.</span>` : '') + '</p>';
+  const mesesCoh = coh.filter(([, o]) => o[1][1]).map(([c, o]) => ({ c, o }));
+  const relato = historia(totalCoh, mesesCoh, k.meta, fMed, fMes);
   const cabCoh = [T('Mes de la primera consulta'), N('Pacientes nuevos'), T('Reparto')].concat(
     PASOS.map(x => ({ t: x.t, num: true, html: `<span class="muestra ${x.c}"></span>${esc(x.t)}` })));
 
@@ -960,10 +1018,11 @@ function pintarTablero() {
       <label>Médico ${opciones('t-med', 'Todos', meds, fMed)}</label>
     </div>
     <div class="seccion"><h2>¿Hasta dónde llegan los pacientes nuevos?</h2>
-      <p class="muted">Pacientes nuevos de cada mes, según la última reevaluación a la que llegaron. Cada paciente cuenta una sola vez, así que las partes suman el total del mes. Solo cuentan aquellos a quienes ya les venció el plazo; un paciente atendido en dos especialidades cuenta en cada una.</p>
-      ${coh.length ? lineaPrimera : ''}
+      ${relato}
+      <h3>Mes por mes</h3>
       <div class="ley-reparto">${PASOS.map(x => `<span><span class="muestra ${x.c}"></span>${esc(x.t)}</span>`).join('')}</div>
-      ${tabla(cabCoh, filasCoh, filaCoh('Total', totalCoh))}</div>
+      ${tabla(cabCoh, filasCoh, filaCoh('Total', totalCoh))}
+      <p class="muted nota-tabla">Cada paciente cuenta una sola vez, según la última reevaluación a la que llegó: las partes suman el total del mes. Solo cuentan aquellos a quienes ya les venció el plazo; un paciente atendido en dos especialidades cuenta en cada una.</p></div>
     <div class="seccion"><h2>¿Qué campañas traen pacientes que vuelven?</h2>
       <p class="muted">Pacientes nuevos desde que existe el CRM, según el último anuncio o canal por el que escribieron antes de su primera consulta. El filtro de especialidad no cambia esta sección.</p>
       ${tabla([T('Canal'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CANAL))}
@@ -1246,6 +1305,7 @@ const DEMO = (() => {
         { MES: '2026-09', MEDICO: ELI, CANAL: 'GOOGLE', CAMPANA: 'Sin campaña', NUEVOS: 8, EN_CURSO: 5, VOLVIERON: 1 },
         { MES: '2026-08', MEDICO: KAREN, CANAL: 'Sin lead en el CRM', CAMPANA: 'Sin lead en el CRM', NUEVOS: 6, EN_CURSO: 0, VOLVIERON: 2 }
       ],
+      meta: 60,
       motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }],
       sinCandidato: [{ ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' }]
     }),

@@ -62,7 +62,7 @@ hechos registrados.
   misma `FECHA_HORA`.
 - **Anulación:**
   - `ANULADO` vale `SÍ` o queda vacío. Una fila nunca se borra.
-  - **Al anular** también se anulan sus sesiones, que dejan de contar.
+  - **Al anular**, sus sesiones dejan de contar porque el estado del registro pasa a ANULADO. No se reescriben.
 - **Valores fijos:** lo indicado no se modifica después. Para corregirlo se anula y se registra de nuevo.
 
 ### 3.2 `SESIONES`
@@ -70,6 +70,7 @@ hechos registrados.
 `ID, FECHA_HORA, ID_REGISTRO, NUMERO, FECHA, ASESORA, NOTA, ANULADO, MOTIVO_ANULACION`
 
 - **`NUMERO`:** 1, 2, 3…, el que le toca. No puede pasar de las `SESIONES` indicadas.
+- **Anular una sesión:** solo la última del tratamiento. Anular una del medio rompería la numeración de las siguientes.
 - **`FECHA`:** la de la sesión. No puede ser futura ni anterior a la `FECHA` del registro.
 
 ### 3.3 Estado calculado de un registro
@@ -258,7 +259,7 @@ DNI + tipo).
   - La especialidad es la de la fila.
 - **La revisión la hace `validarAlta(p, catalogos, series, hoy)`.** Rechaza:
   - un DNI sin citas realizadas en esa especialidad;
-  - una fecha futura o anterior a la primera consulta;
+  - una fecha futura o anterior a la **última** consulta de esa especialidad, porque con una consulta posterior el alta quedaría cerrada al instante;
   - un doctor fuera del catálogo;
   - un alta ya vigente para esa especialidad.
 - **Bitácora:** cada alta y cada anulación deja una línea en `BITACORA`.

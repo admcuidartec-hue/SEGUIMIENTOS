@@ -246,7 +246,7 @@ test('bandeja: botones por tipo con su número; hierro y procedimientos son list
   try {
     const textos = await pagina.locator('#tipos button').allTextContents();
     assert.deepEqual(textos.map(t => t.replace(/\s+/g, ' ').trim()),
-      ['Todos 7', 'Reevaluaciones 4', 'Hierro (Ferinject) 2', 'Procedimientos 1']);
+      ['Todos 7', 'Reevaluaciones 4', 'Hierro 2', 'Procedimientos 1']);
     await tipo(pagina, 'HIERRO');
     assert.deepEqual(await filas(pagina), ['ANA MARÍA FLORES RÍOS', 'ROSA ELENA QUISPE HUAMÁN']);
     assert.match(await pagina.locator('.fila', { hasText: 'ANA MARÍA' }).textContent(),

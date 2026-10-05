@@ -16,6 +16,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 |---|---|
 | `src/Logica.gs` | Lógica pura. **Sin llamadas a Google**: se prueba con `npm test` |
 | `src/Codigo.gs` | Lee y escribe el Sheets; funciones que llama la app |
+| `src/Registro.gs` | Lógica pura de la pestaña Registro: registros, sesiones y altas |
+| `src/RegistroServidor.gs` | Funciones de la pestaña Registro que escriben `REGISTROS`, `SESIONES` y `ALTAS` |
 | `src/Menu.gs` | Menú `Seguimientos` del Sheets |
 | `src/Index.html` | La app. El bloque `DEMO` del final permite abrirla en el navegador sin desplegar: **no lo elimine** |
 
@@ -23,7 +25,9 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 
 - `npm test` (lógica) y `npm run test:ui` (interfaz) deben pasar antes de subir.
 - No cambie los nombres `doGet`, `bootstrap`, `getBandeja`, `getPaciente`, `buscar`,
-  `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`.
+  `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`, `guardarRegistro`,
+  `marcarSesion`, `anularRegistro`, `anularSesion`, `darDeAlta`, `anularAlta`, `getRegistrosHoy`,
+  `buscarPacienteRegistro`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.
@@ -32,6 +36,11 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - **No escriba colores a mano** fuera de `:root` y `html[data-modo="oscuro"]`.
 - **Ningún dato real de pacientes en el repositorio.**
 - **Nunca `npm audit fix --force`**: sube clasp a la v3 y rompe los scripts.
+- Los procedimientos y tratamientos se registran en la pestaña **Registro** (`REGISTROS`, `SESIONES`) y las
+  altas médicas en `ALTAS`, por especialidad. `INDICACIONES` es historial congelado.
+- Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión.
+- El estado de un registro (cotizado, en curso, completo, anulado) se calcula con `estadoRegistro`; no se guarda.
+- `SEGUIMIENTOS` se escribe por posición: una columna nueva solo se agrega al final (`encabezadoAmpliable`).
 - Sin conexión a WhatsApp: la app muestra los datos y se marca «Seguimiento hecho».
 - La bandeja tiene tres tipos de seguimiento: reevaluación (series `VENCIDO`), hierro y
   procedimiento (cotizado y no hecho, `pendientesIndicacion`). Los de hierro y procedimiento
@@ -48,6 +57,7 @@ git pull                 # siempre primero
 npm test && npm run test:ui
 npm run subir            # solo cambia @HEAD, el banco de pruebas
 npm run actualizar       # publica para el equipo conservando la URL
+# después, en el Sheets: menú Preparar hojas y luego Verificar
 ```
 
 - Script (incrustado en el libro madre): `10jN1KMUrKYWTAQNrh68hMlBrA6s5Hvc-YI06n1rHaZV9gDIT99hjdZZY`

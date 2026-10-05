@@ -150,7 +150,7 @@ button{cursor:pointer}
 .r-pasos button:disabled{visibility:hidden}
 .r-medico{margin-left:auto;font-size:15px;color:var(--chp-muted);display:flex;gap:10px;align-items:baseline;min-width:0}
 .r-medico .sel{color:var(--chp-ink);min-width:0;flex:0 1 auto;max-width:100%;text-overflow:ellipsis}
-.r-principal{display:grid;grid-template-columns:5fr 7fr;gap:40px;padding:36px 0 32px;border-bottom:1px solid var(--chp-rule);align-items:end}
+.r-principal{display:grid;grid-template-columns:4fr 8fr;gap:40px;padding:36px 0 32px;border-bottom:1px solid var(--chp-rule);align-items:end}
 .r-grande{font-family:'Barlow Condensed',sans-serif;font-size:128px;font-weight:600;line-height:.9;color:var(--chp-accent)}
 .r-frase{font-size:20px;margin:16px 0 8px;max-width:440px}
 .r-cuenta{margin:0;color:var(--chp-muted)}
@@ -160,8 +160,8 @@ button{cursor:pointer}
 .r-nota{font-style:italic;color:var(--chp-muted);margin:10px 0 0;font-size:14px}
 .r-meta{margin:12px 0 0;font-size:14px;color:var(--chp-soft)}
 .r-metricas{display:grid;grid-template-columns:repeat(4,1fr)}
-.r-metrica{border-left:1px solid var(--chp-rule);padding:0 24px 4px 28px;display:flex;flex-direction:column;gap:4px}
-.r-num{font-family:'Barlow Condensed',sans-serif;font-size:72px;font-weight:600;line-height:1}
+.r-metrica{border-left:1px solid var(--chp-rule);padding:0 16px 4px 20px;display:flex;flex-direction:column;gap:4px}
+.r-num{font-family:'Barlow Condensed',sans-serif;font-size:60px;font-weight:600;line-height:1}
 .r-num.pend{color:var(--chp-pending)}
 .r-num.buena{color:var(--chp-good)}
 .r-etq{font-size:16px}
@@ -196,6 +196,8 @@ button{cursor:pointer}
 .entrada{background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-size:17px;padding:6px 0;color:var(--chp-ink);font-family:inherit;min-width:0;max-width:100%}
 .form-reg .sel{font-size:16px;max-width:100%}
 .form-reg .btn-marca{align-self:flex-start;font-size:16px;padding:12px 22px}
+.seccion h2 .btn-texto{font-size:14px;font-weight:500;margin-left:14px;letter-spacing:0}
+#g-trat-extra{display:flex;flex-direction:column;gap:12px}
 .g-dup{border-left:3px solid var(--chp-pending);padding:10px 14px;background:var(--chp-row-hover)}
 .g-dup p{margin:0 0 10px}
 .g-item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--chp-rule);align-items:baseline}
@@ -264,7 +266,7 @@ td.n,th.n{text-align:right}
 .aviso{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--chp-toast);color:var(--chp-on-toast);padding:10px 18px;border-radius:2px;z-index:30;max-width:calc(100% - 32px)}
 
 /* ---------- Laptops: la barra superior en una sola línea ---------- */
-@media (max-width:1439px){
+@media (max-width:1599px){
   .marca span{display:none}
   .barra{gap:24px}
   .nav{gap:20px}
@@ -358,7 +360,7 @@ td.n,th.n{text-align:right}
       <div class="tipos" id="tipos" role="group" aria-label="Tipo de seguimiento">
         <button type="button" data-tipo="" aria-pressed="true">Todos <b class="num">–</b></button>
         <button type="button" data-tipo="REEVALUACION" aria-pressed="false">Reevaluaciones <b class="num">–</b></button>
-        <button type="button" data-tipo="HIERRO" aria-pressed="false">Hierro (Ferinject) <b class="num">–</b></button>
+        <button type="button" data-tipo="HIERRO" aria-pressed="false">Hierro <b class="num">–</b></button>
         <button type="button" data-tipo="PROCEDIMIENTO" aria-pressed="false">Procedimientos <b class="num">–</b></button>
       </div>
       <div class="filtros">
@@ -1085,7 +1087,7 @@ function lineaDeTiempo(citas) {
   }).join('');
 }
 
-const PARA = { HIERRO: 'Hierro (Ferinject)', PROCEDIMIENTO: 'Procedimiento' };
+const PARA = { HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento' };
 
 const NOMBRE_REG = { COTIZADO: 'Cotizado', 'EN CURSO': 'En curso', COMPLETO: 'Completo', ANULADO: 'Anulado' };
 
@@ -1492,7 +1494,7 @@ function pintarResumen() {
         ${meta ? `<p class="r-meta">Meta: que vuelva el ${meta} % (que no vuelva como máximo el ${100 - meta} %).</p>` : ''}
       </div>
       <div class="r-metricas">
-        ${metrica(m.HIERRO_NO, m.HIERRO, 'pend', 'no siguieron el hierro (Ferinject)')}
+        ${metrica(m.HIERRO_NO, m.HIERRO, 'pend', 'no siguieron el tratamiento de hierro')}
         ${metrica(m.HIERRO_COMPLETO, m.HIERRO - m.HIERRO_NO, 'buena', 'completaron el tratamiento de hierro', 'aún sin tratamientos empezados')}
         ${metrica(m.PROC_NO, m.PROC, 'pend', 'no siguieron otros procedimientos')}
         ${metrica(m.RECUPERADOS, m.SEGUIMIENTOS, 'buena', 'volvieron tras el seguimiento', 'aún sin seguimientos este mes')}

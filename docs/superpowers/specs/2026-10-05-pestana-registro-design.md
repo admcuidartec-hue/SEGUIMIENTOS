@@ -1,7 +1,7 @@
 # Pestaña Registro y arquitectura del libro madre — Diseño
 
 - Fecha: 05/10/2026
-- Estado: **borrador para revisión**
+- Estado: **aprobado (05/10/2026)**
 - Amplía: `2026-10-01-plataforma-seguimientos-design.md` y `2026-10-03-filtro-tipos-y-resumen-3a-design.md`
 - Libro madre: **BD SOFDOC SEGUIMIENTOS** (`1L8fY-NXWE1agakIPEdqoLnLry0-lvYr0Z-9JfsfGxRM`)
 

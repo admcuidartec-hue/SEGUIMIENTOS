@@ -169,3 +169,23 @@ test('bootstrap: reglas con las siete claves y metaDiaria 15; getPaciente trae t
   assert.equal(b.reglas.metaDiaria, 15);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).telefonos, ['987654321', '912345678']);
 });
+
+test('getPaciente: sin consultas, el nombre sale del registro más reciente y, si no hay, de la indicación más reciente', () => {
+  const reg = (ID, FECHA, NOMBRE) => ({ ID, FECHA_HORA: FECHA + ' 10:00', FECHA, ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE, DNI: '45000111',
+    CONTACTO: '987000111', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: 1, ANULADO: '', MOTIVO_ANULACION: '' });
+  const { ctx } = servidor([], [], [reg('REG-000002', '2026-09-20', 'ANA LUCÍA PÉREZ ROJAS'), reg('REG-000001', '2026-08-01', 'ANA PEREZ')]);
+  const r = plano(ctx.getPaciente('45000111'));
+  assert.equal(r.nombre, 'ANA LUCÍA PÉREZ ROJAS');
+  assert.equal(r.registros.length, 2);
+  // Solo en INDICACIONES: la más reciente.
+  const base = ctx.datos_;
+  ctx.datos_ = () => {
+    const d = base();
+    d.indicaciones = d.indicaciones.concat([{ DNI: '45000222', NOMBRE: 'LUIS VIEJO', FECHA: '2026-05-01', TIPO: 'HIERRO', ESTADO: 'COTIZÓ' },
+      { DNI: '45000222', NOMBRE: 'LUIS ALBERTO NUEVO', FECHA: '2026-07-01', TIPO: 'HIERRO', ESTADO: 'COTIZÓ' }]);
+    return d;
+  };
+  assert.equal(plano(ctx.getPaciente('45000222')).nombre, 'LUIS ALBERTO NUEVO');
+  // Con consultas manda la consulta.
+  assert.equal(plano(ctx.getPaciente('40111222')).nombre, plano(ctx.getPaciente('40111222')).citas.slice(-1)[0].NOMBRE);
+});

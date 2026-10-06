@@ -1662,6 +1662,18 @@ test('pacientes: el buscador encuentra por nombre y por DNI y se usa con el tecl
     assert.equal(await pagina.locator('#pres').isVisible(), false);
     assert.equal(await pagina.evaluate(() => document.activeElement.id), 'pq');
     // Sin resultados.
+    // Una respuesta vieja se descarta: «ros» sigue en vuelo cuando ya se escribió «jor», y llega después.
+    await pagina.evaluate(() => { DEMO._demora.buscar = 700; });
+    const nb = await llamadas(pagina, 'buscar');
+    await pagina.locator('#pq').fill('ros');
+    await pagina.waitForFunction(n => DEMO._llamadas.buscar > n, nb);
+    await pagina.evaluate(() => { DEMO._demora.buscar = 0; });
+    await buscarEn(pagina, 'jor');
+    await pagina.waitForTimeout(900);
+    assert.equal(await llamadas(pagina, 'buscar'), nb + 2);
+    const jor = await opciones(pagina);
+    assert.ok(jor.length >= 1 && jor.every(t => /^Jorge /.test(t)), jor.join(' | '));
+    assert.equal(await pagina.evaluate(() => PA.q), 'jor');
     await buscarEn(pagina, 'zzzz');
     assert.equal((await pagina.locator('#pres').textContent()).trim(), 'Ningún paciente coincide con «zzzz».');
     assert.deepEqual(errores, []);
@@ -1731,6 +1743,8 @@ test('pacientes: la ficha muestra estado por especialidad, «Debía volver el �
     assert.deepEqual(await textoDe(pagina, '#f-contacto .contacto .num'), ['987 654 321', '014 332 210']);
     assert.equal((await espDe(pagina, 'HEMATOLOGÍA').locator('.tag').textContent()).trim(), 'Al día');
     assert.match(await espDe(pagina, 'HEMATOLOGÍA').locator('.tag').getAttribute('class'), /e-ok/);
+    // Con la fecha esperada todavía por llegar, «Debe volver el …».
+    assert.equal((await espDe(pagina, 'HEMATOLOGÍA').locator('.tiempo li.esperada').textContent()).trim(), 'Debe volver el 03/10/2026 (plazo máximo 18/10/2026)');
 
     // Teresa: alta vigente (y su especialidad en «Alta médica», sin «Dar de alta…»); Elena: alta cerrada.
     await abrirFicha(pagina, '41666777');
@@ -1951,6 +1965,31 @@ test('pacientes: «Ver ficha completa →» del panel abre la ficha de ese pacie
     assert.equal(await panelAbierto(pagina), false);
     assert.equal(await pagina.evaluate(() => S.fichaDni), '');
     assert.equal(await pagina.locator('.menu [aria-current="page"]').getAttribute('data-sec'), 'pacientes');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: quien vino solo por Registro (sin consultas) tiene ficha con su nombre desde «Ver ficha completa»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, 'REG-000003');
+    await pagina.locator('#panel [data-ficha]').click();
+    await esperarFicha(pagina, '40555666');
+    assert.equal(await pagina.locator('#ficha .ficha header h2').textContent(), 'Ana María Flores Ríos');
+    assert.match(await pagina.locator('#ficha').textContent(), /Sin consultas realizadas\./);
+    assert.equal(await pagina.locator('#ficha .trat[data-reg="REG-000003"]').count(), 1);
+    assert.equal((await pagina.evaluate(() => llamar('getPaciente', '40555666'))).citas.length, 0, 'el DEMO no le da consultas');
+    // Aunque el nombre no llegue, si alguna sección trae algo se muestra la ficha.
+    await pagina.evaluate(() => {
+      DEMO.getPaciente = dni => ({ dni, nombre: '', series: [], citas: [], porConfirmar: [], seguimientos: [], registros: [], altas: [],
+        indicaciones: [{ FECHA: '2026-08-01', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 1, ESTADO: 'COTIZÓ', TELEFONO: '987000111', OBSERVACIONES: '' }],
+        fallecido: '', telefonos: [], telefonosDescartados: [] });
+      S.fichaDni = '45000222';
+      ir('pacientes', true);
+    });
+    await esperarFicha(pagina, '45000222');
+    assert.doesNotMatch(await pagina.locator('#ficha').textContent(), /No encontramos/);
+    assert.equal(await pagina.locator('#ficha .previos tbody tr').count(), 1);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

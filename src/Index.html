@@ -2544,7 +2544,9 @@ function pintarFicha() {
     return;
   }
   const p = PA.p;
-  if (!p.nombre && !p.especialidades.length && !p.trats.length) { c.innerHTML = `<p class="vacio">No encontramos el DNI ${esc(PA.dni)}.</p>`; return; }
+  // Se muestra la ficha si cualquier sección trae algo (un paciente puede venir solo por Registro o por una indicación).
+  const algo = p.nombre || p.especialidades.length || p.trats.length || p.previos.length || p.altas.length || p.hist.length || p.porConfirmar.length;
+  if (!algo) { c.innerHTML = `<p class="vacio">No encontramos el DNI ${esc(PA.dni)}.</p>`; return; }
   c.innerHTML = htmlFicha(p);
   if (PA.alta) {
     const sel = $('#falta-doc');
@@ -2559,7 +2561,7 @@ const motivoAqui = (que, id) => anulandoAqui(que, id) ? htmlMotivo('fmotivo', PA
 
 function htmlFicha(p) {
   const h = PA.anulando && PA.anulando.que === 'seguimiento' ? PA.anulando.id : '';
-  return `<article class="ficha"><header><h2>${esc(p.nombre)}</h2><span class="mono">DNI ${esc(p.dni)}</span>`
+  return `<article class="ficha"><header><h2>${esc(p.nombre || 'Paciente sin nombre registrado')}</h2><span class="mono">DNI ${esc(p.dni)}</span>`
     + (p.fallecido ? `<p class="fallecido"><i class="ph-fill ph-warning"></i><span>Figura como fallecido el ${esc(dmy(p.fallecido.f))} (${esc(p.fallecido.quien)}). Si es un error, anule «Falleció» en la historia de seguimientos.</span></p>` : '')
     + (p.malos.length ? `<p class="descartados">Números equivocados: ${p.malos.map(t => `<s>${esc(telBonito(t))}</s>`).join(', ')}</p>` : '')
     + '</header><div class="f-main">'
@@ -2969,6 +2971,9 @@ const DEMO = (() => {
   { ID: 'ALT-000002', FECHA_HORA: '2026-09-18 16:40', FECHA: '2026-09-18', DNI: '41666777', ESPECIALIDAD: 'HEMATOLOGÍA',
     DOCTOR: 'Dr. Elí Cabanillas', REGISTRADO_POR: 'MAGALY', NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' });
   const regPorId = id => registros.find(r => r.ID === id);
+  // Tarea 9: Ana María vino solo por Registro y todavía no tiene consultas en SOFDOC (en el servidor real ningún registro
+  // crea consultas; el DEMO las inventa para los demás). Su ficha toma el nombre del registro.
+  regPorId('REG-000003').SIN_CONSULTA = true;
 
   /* ---- Seguimientos guardados (SEGUIMIENTOS) ---- */
   const seguimientos = [];
@@ -3223,7 +3228,7 @@ const DEMO = (() => {
   /* ---- Pacientes: personas, citas y teléfonos que salen de lo de arriba ---- */
   const conCitas = series.map(s => [s.DNI, s.NOMBRE, s.ESPECIALIDAD, s.MEDICO_ULTIMO, s.PRIMERA_CITA, s.ULTIMA_CITA, s.N_REALIZADAS, s.PROXIMA_AGENDADA])
     .concat(antiguas.map(a => [a.DNI, a.NOMBRE, a.ESPECIALIDAD_CONSULTA, a.MEDICO_ULTIMO, a.ULTIMA_CITA, a.ULTIMA_CITA, 1, '']))
-    .concat(registros.filter(r => !r.ANULADO).map(r => { const d = doctorDe(r.DOCTOR); return [r.DNI, r.NOMBRE, 'HEMATOLOGÍA', d && d.sofdoc ? d.sofdoc : r.DOCTOR, r.FECHA, r.FECHA, 1, '']; }));
+    .concat(registros.filter(r => !r.ANULADO && !r.SIN_CONSULTA).map(r => { const d = doctorDe(r.DOCTOR); return [r.DNI, r.NOMBRE, 'HEMATOLOGÍA', d && d.sofdoc ? d.sofdoc : r.DOCTOR, r.FECHA, r.FECHA, 1, '']; }));
   const citas = [];
   conCitas.forEach(([DNI, NOMBRE, ESPECIALIDAD, MEDICO, primera, ultima, n, agendada]) => {
     const c = (FECHA, ESTADO, MODALIDAD) => {
@@ -3300,7 +3305,10 @@ const DEMO = (() => {
       const k = dniDe(dni), propias = citas.filter(c => c.DNI === k);
       const sus = series.filter(s => s.DNI === k).map(comoSerie);
       return {
-        dni: k, nombre: sus.length ? sus[0].NOMBRE : propias.length ? propias[propias.length - 1].NOMBRE : '',
+        // Como el servidor: sin consultas, el nombre del registro más reciente y, si no, el de la indicación más reciente.
+        dni: k, nombre: sus.length ? sus[0].NOMBRE : propias.length ? propias[propias.length - 1].NOMBRE
+          : ((registros.filter(r => r.DNI === k).sort((a, b) => a.FECHA < b.FECHA ? -1 : 1).pop()
+            || indicaciones.filter(i => i.DNI === k).sort((a, b) => a.FECHA < b.FECHA ? -1 : 1).pop() || {}).NOMBRE || ''),
         series: sus, citas: propias,
         indicaciones: indicaciones.filter(i => i.DNI === k),
         porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === k)),

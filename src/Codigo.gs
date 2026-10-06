@@ -322,7 +322,7 @@ function getPaciente(dni) {
   var ultima = citas[citas.length - 1];
   return limpiarParaEnvio({
     dni: k,
-    nombre: series.length ? series[0].NOMBRE : (ultima ? ultima.NOMBRE : ''),
+    nombre: series.length ? series[0].NOMBRE : (ultima ? ultima.NOMBRE : nombreSinConsultas_(d, k)),
     series: series,
     citas: citas,
     indicaciones: d.indicaciones.filter(function (i) { return i.DNI === k; }),
@@ -345,6 +345,21 @@ function getPaciente(dni) {
     telefonos: d.telefonos[k] || [],
     telefonosDescartados: telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos)[k] || []
   });
+}
+
+/**
+ * Nombre de quien todavía no tiene consultas: el del registro más reciente y, si no hay, el de la indicación más reciente.
+ * Sin esto, un paciente que solo vino por Registro abría una ficha sin nombre.
+ */
+function nombreSinConsultas_(d, k) {
+  var masReciente = function (filas, cuando) {
+    return filas.filter(function (x) { return x.DNI === k && String(x.NOMBRE || '').trim(); })
+      .sort(function (a, b) { var x = cuando(a), y = cuando(b); return x < y ? -1 : x > y ? 1 : 0; }).pop();
+  };
+  var r = masReciente(d.registros || [], function (x) { return fechaIso(x.FECHA) + ' ' + String(x.FECHA_HORA || ''); });
+  if (r) return String(r.NOMBRE).trim();
+  var i = masReciente(d.indicaciones || [], function (x) { return fechaIso(x.FECHA); });
+  return i ? String(i.NOMBRE).trim() : '';
 }
 
 function buscar(texto) {

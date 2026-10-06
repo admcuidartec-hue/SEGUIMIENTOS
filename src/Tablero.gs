@@ -147,6 +147,14 @@ function armarTablero(d) {
     var r = resultadoDe(s);
     return r && r.grupo === 'SIGUE' && r.fecha === hoy;
   }).length;
+  var marcadas = telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos);
+  Object.keys(col).forEach(function (c) {
+    col[c].forEach(function (t) {
+      var dni = normDni(t.DNI);
+      t.TELEFONOS_DESCARTADOS = marcadas[dni] || [];
+      t.SIN_CONTACTO = !((d.telefonos || {})[dni] || []).length && !String(t.TELEFONOS || '').trim() && !textoLimpio_(t.USUARIO);
+    });
+  });
   return {
     columnas: col,
     cerrados: cerrados,

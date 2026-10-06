@@ -7,8 +7,8 @@ const { cita, reglas } = require('./fixtures');
 const CAT = { usuarios: ['MAGALY', 'RACHEL'], motivos: [], alias: {}, doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: '' }],
   procedimientos: [], tratamientos: [], marcas: {} };
 
-function servidor(hoja, extraEnHoja, registros) {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs']);
+function servidor(hoja, extraEnHoja, registros, cabecera) {
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
   const escrito = { SEGUIMIENTOS: [], BITACORA: [], anulados: [], llamadas: [] };
   const lock = { tomado: 0, flush: 0 };
   const L = cargar();
@@ -17,6 +17,8 @@ function servidor(hoja, extraEnHoja, registros) {
     citas: [cita({ fecha: '2026-07-01' })], indicaciones: [{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' },
       { DNI: '40111222', TELEFONO: '912345678', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' }],
     contactos: [], registros: registros || [], sesiones: [], altas: [], seguimientosTodos: enHoja.slice(), seguimientos: enHoja.filter(s => !L.anulado_(s)) });
+  ctx.hoja_ = () => ({});
+  ctx.encabezado_ = () => cabecera || ctx.COLUMNAS_SEGUIMIENTOS.slice();
   ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
   ctx.SpreadsheetApp = { flush: () => { lock.flush++; } };
   ctx.leerSeguimientos_ = () => enHoja.concat(extraEnHoja || [], escrito.SEGUIMIENTOS);
@@ -118,4 +120,29 @@ test('«lo hizo» de un registro va a marcarSesion y no escribe en SEGUIMIENTOS'
   ctx.registrarResultado(p({ especialidad: tarjeta.ESPECIALIDAD, referencia: 'REG-000004', resultado: 'LO HIZO', fecha: '2026-10-06', nota: 'ok' }));
   assert.deepEqual(escrito.llamadas, [['marcarSesion', { usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-06', nota: 'ok' }]]);
   assert.equal(escrito.SEGUIMIENTOS.length, 0);
+});
+
+test('hojas sin preparar: registrar y anular se niegan, no escriben y sueltan el candado', () => {
+  const hoja = [{ ID: 'SEG-2', FECHA_HORA: '2026-10-02 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'NO CONTESTÓ', ACCION: 'HECHO', REFERENCIA: '' }];
+  const cab = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'Menu.gs']).COLUMNAS_SEGUIMIENTOS.slice(0, -2);
+  const { ctx, escrito, lock } = servidor(hoja, [], [], cab);
+  assert.throws(() => ctx.registrarResultado(p({})), /Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas\./);
+  assert.throws(() => ctx.anularResultado({ usuario: 'MAGALY', id: 'SEG-2', motivo: 'x' }), /Falta preparar las hojas/);
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, escrito.anulados.length, escrito.BITACORA.length, lock.tomado], [0, 0, 0, 0]);
+});
+
+test('descartar desde una pestaña vieja conserva el motivo original en MOTIVO', () => {
+  const { ctx, escrito } = servidor();
+  ctx.descartar(p({ motivo: 'NÚMERO EQUIVOCADO' }));
+  const s = escrito.SEGUIMIENTOS[0];
+  assert.deepEqual([s.RESULTADO, s.ACCION, s.MOTIVO], ['NO DESEA CONTINUAR', 'DESCARTADO', 'NÚMERO EQUIVOCADO']);
+  const o = servidor();
+  o.ctx.descartar(p({ motivo: '' }));
+  assert.equal(o.escrito.SEGUIMIENTOS[0].MOTIVO, 'OTRO');
+});
+
+test('un campo motivo del payload nuevo no cambia MOTIVO de un resultado normal', () => {
+  const { ctx, escrito } = servidor();
+  ctx.registrarResultado(p({ resultado: 'NO DESEA CONTINUAR', motivo: 'COSTO' }));
+  assert.equal(escrito.SEGUIMIENTOS[0].MOTIVO, 'NO DESEA CONTINUAR');
 });

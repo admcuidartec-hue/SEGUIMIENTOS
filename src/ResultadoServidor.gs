@@ -11,7 +11,16 @@ function tarjetasAbiertas_(d) {
   return (c.POR_CONTACTAR || []).concat(c.AGENDADO || [], c.EN_TRATAMIENTO || []);
 }
 
-function registrarResultado(p) {
+function registrarResultado(p) { return registrarResultado_(p, null); }
+
+/** Guarda contra la ventana de publicación: SEGUIMIENTOS se escribe por posición y necesita sus columnas nuevas. */
+function exigirHojaPreparada_() {
+  var plan = encabezadoAmpliable(encabezado_(hoja_('SEGUIMIENTOS')), COLUMNAS_SEGUIMIENTOS);
+  if (plan.error || plan.agregar.length) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+}
+
+/** `opciones` es interno (no viene de la app): { motivo } conserva el motivo original de una pestaña vieja. */
+function registrarResultado_(p, opciones) {
   var d = datos_();
   var v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(d) });
   if (v.error) throw new Error(v.error);
@@ -24,6 +33,7 @@ function registrarResultado(p) {
   }
   var lock = bloquear_(), s;
   try {
+    exigirHojaPreparada_();
     var ahora = new Date();
     // Otra asesora pudo marcar otro número entretanto: se decide con la hoja releída dentro del candado.
     var frescos = leerSeguimientos_().filter(function (x) { return !anulado_(x); });
@@ -33,6 +43,7 @@ function registrarResultado(p) {
     v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(d) });
     if (v.error) throw new Error(v.error);
     t = v.tarjeta;
+    if (opciones && opciones.motivo) v.fila.MOTIVO = opciones.motivo;
     var quedan = true;
     if (v.fila.TELEFONO) {
       var marca = { DNI: v.fila.DNI, RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: v.fila.TELEFONO, FECHA_HORA: fechaHoraTexto_(ahora) };
@@ -61,6 +72,7 @@ function anularResultado(p) {
   if (id.indexOf('SEG-') !== 0) throw new Error('Aquí solo se anulan resultados de seguimiento (SEG-…).');
   var lock = bloquear_();
   try {
+    exigirHojaPreparada_();
     var error = validarAnulacionResultado(id, leerSeguimientos_());
     if (error) throw new Error(error);
     marcarAnulado_('SEGUIMIENTOS', id, motivo);

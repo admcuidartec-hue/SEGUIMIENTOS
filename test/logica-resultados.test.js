@@ -177,3 +177,10 @@ test('resumenAntiguos cuenta las filas por clase', () => {
     Object.assign(res('2026-10-02', 'NO CONTESTÓ'), { ANULADO: 'SÍ' })]));
   assert.deepEqual(r, { hechos: 1, descartes: 1, fallecidos: 1, nuevos: 1, anulados: 1 });
 });
+
+test('validarAnulacionResultado: una acción desconocida no rompe; solo se anula si es la última', () => {
+  const raro = (id, h) => ({ ID: id, FECHA_HORA: h, DNI: '1', ESPECIALIDAD: 'HEMATOLOGÍA', ACCION: 'XYZ', REFERENCIA: '' });
+  const lista = [raro('SEG-1', '2026-10-01 09:00'), raro('SEG-2', '2026-10-02 09:00')];
+  assert.equal(L.validarAnulacionResultado('SEG-2', lista), '');
+  assert.match(L.validarAnulacionResultado('SEG-1', lista), /Solo se puede anular el último/);
+});

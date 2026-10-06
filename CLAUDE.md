@@ -69,9 +69,14 @@ En producción desde el 02/10/2026. Versión 3 (03/10/2026): interfaz editorial 
 git pull                 # siempre primero
 npm test && npm run test:ui
 npm run subir            # solo cambia @HEAD, el banco de pruebas
+# en el Sheets: menú Seguimientos → «Preparar hojas» y luego «Verificar»
+#   (debe decir «SEGUIMIENTOS tiene todas sus columnas»)
+# en el @HEAD: probar un guardado y un «Deshacer»
 npm run actualizar       # publica para el equipo conservando la URL
-# después, en el Sheets: menú Preparar hojas y luego Verificar
+# pedir a las asesoras que recarguen la app (las pestañas abiertas siguen con la versión vieja)
 ```
+
+Ese orden importa: hasta que «Preparar hojas» agrega las 5 columnas, `registrarResultado` y `anularResultado` se niegan a escribir (SEGUIMIENTOS se escribe por posición).
 
 - Script (incrustado en el libro madre): `10jN1KMUrKYWTAQNrh68hMlBrA6s5Hvc-YI06n1rHaZV9gDIT99hjdZZY`
 - Deployment estable (el que usa el equipo): `AKfycbzSvnyttpl1VOiKNDilyPPoqlD7VkxPDxwExa4kS75mgbgTfRbe16kJj6fpfGoBUWCkcA`

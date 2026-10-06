@@ -364,10 +364,11 @@ function marcarSeguimiento(p) { return registrarResultado(copia_(p || {}, { resu
 
 function descartar(p) {
   var r = RESULTADOS[normTexto(p && p.motivo)];
-  var q = r && r.grupo === 'CIERRE' && r.pide !== 'DOCTOR'
-    ? { resultado: r.nombre, motivo: r.nombre }
+  var cierre = r && r.grupo === 'CIERRE' && r.pide !== 'DOCTOR';
+  var q = cierre ? { resultado: r.nombre, motivo: r.nombre }
     : { resultado: 'NO DESEA CONTINUAR', motivo: textoLimpio_(p && p.motivo) || 'OTRO' };
-  return registrarResultado(copia_(p || {}, q));
+  // El motivo original de la pestaña vieja se conserva en MOTIVO (no el genérico) para no sesgar «Motivos de descarte».
+  return registrarResultado_(copia_(p || {}, q), cierre ? null : { motivo: q.motivo });
 }
 
 function confirmarEmparejamiento(p) {

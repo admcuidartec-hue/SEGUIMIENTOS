@@ -203,7 +203,8 @@ function validarAnulacionResultado(id, seguimientos) {
   var s = lista.filter(function (x) { return x.ID === id; })[0];
   if (!s) return 'No encontré ' + id + '.';
   if (anulado_(s)) return id + ' ya estaba anulado.';
-  if (resultadoDe(s).resultado === 'FALLECIÓ') return '';
+  var rs = resultadoDe(s);
+  if (rs && rs.resultado === 'FALLECIÓ') return '';
   var mismo = lista.filter(function (x) {
     return !anulado_(x) && normDni(x.DNI) === normDni(s.DNI) && normTexto(x.ESPECIALIDAD) === normTexto(s.ESPECIALIDAD) &&
       textoLimpio_(x.REFERENCIA) === textoLimpio_(s.REFERENCIA);

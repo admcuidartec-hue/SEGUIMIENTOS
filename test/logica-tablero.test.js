@@ -79,3 +79,14 @@ test('armarTablero: deduplicación de COMPLETADO por CLAVE, manteniendo la tarje
   assert.ok(completados[0].ETIQUETA.startsWith('Alta médica'), 'etiqueta es la del alta (FECHA_CLAVE más reciente)');
   assert.equal(t.cifras.completadosMes, 1, 'métrica de completados cuenta después de deduplicación');
 });
+
+test('cada tarjeta lleva TELEFONOS_DESCARTADOS y SIN_CONTACTO; sin d.telefonos no se rompe', () => {
+  const p1 = Object.assign(pac(), { DNI: '5', USUARIO: '' });
+  const sinTel = tablero({ pacientes: [p1] }).columnas.POR_CONTACTAR[0];
+  assert.deepEqual([sinTel.TELEFONOS_DESCARTADOS, sinTel.SIN_CONTACTO], [[], true]);
+  const marca = { ID: 'SEG-1', FECHA_HORA: '2026-10-05 09:00', DNI: '5', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: '987654321', ACCION: 'TELEFONO' };
+  const t = tablero({ pacientes: [p1], seguimientos: [marca], telefonos: { 5: ['912345678'] } }).columnas.POR_CONTACTAR[0];
+  assert.deepEqual([t.TELEFONOS_DESCARTADOS, t.SIN_CONTACTO], [['987654321'], false]);
+  const u = tablero({ pacientes: [Object.assign(p1, { USUARIO: 'Madre' })] }).columnas.POR_CONTACTAR[0];
+  assert.equal(u.SIN_CONTACTO, false);
+});

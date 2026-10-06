@@ -859,6 +859,15 @@ async function guardarResultado(k, resultado, extra = {}) {
       E.bandeja.tarjetas.splice(Math.min(pos, E.bandeja.tarjetas.length), 0, t);
       c.porAtender++;
       pintarBandeja();
+    } else if (sigueEnLista && !(r && r.tarjeta && r.tarjeta.COLUMNA === 'POR_CONTACTAR')) {
+      // El servidor la cerró (p. ej. otra asesora marcó el otro número): la tarjeta ya no es de la bandeja.
+      if (E.bandeja.tarjetas.includes(t)) {
+        E.bandeja.tarjetas = E.bandeja.tarjetas.filter(x => x !== t);
+        c.porAtender--;
+        if (E.sel === k) E.sel = siguiente;
+        if (E.abierto === k) E.abierto = siguiente;
+        pintarBandeja();
+      }
     }
     const deshacer = r && (r.seguimiento ? ['anularResultado', r.seguimiento.ID] : r.alta ? ['anularAlta', r.alta.ID] : r.sesion ? ['anularSesion', r.sesion.ID] : null);
     avisar(`Guardado: ${t.NOMBRE} · ${ETIQUETA_RES[resultado].toLowerCase()}`, deshacer && { texto: 'Deshacer', fn: async () => {
@@ -1183,6 +1192,8 @@ async function abrirFicha(dni) {
 }
 
 const ESTADO_BUENO = { 'AL DÍA': 1, 'RECUPERADO': 1, 'AGENDADO': 1, 'ALTA': 1 };
+// Un AGENDADO sin cita ni llamada fijada (sin respuesta, por reintentar) no es una buena noticia.
+const esBueno = s => !!ESTADO_BUENO[s.ESTADO] && !(s.ESTADO === 'AGENDADO' && s.AGENDA && !['CITA', 'LLAMAR'].includes(s.AGENDA));
 const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más de 6 meses', 'POR VENCER': 'Le toca volver pronto',
   'AL DÍA': 'Al día', 'CONTACTADO': 'Se le escribió, esperando respuesta', 'RECUPERADO': 'Volvió tras el seguimiento',
   'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas', 'ALTA': 'Alta médica',
@@ -1224,7 +1235,7 @@ function pintarFicha(p) {
   const series = p.series.map(s => {
     const citas = p.citas.filter(c => norm(c.ESPECIALIDAD) === norm(s.ESPECIALIDAD));
     return `<div class="seccion">
-      <h2>${esc(s.ESPECIALIDAD)}<span class="estado ${ESTADO_BUENO[s.ESTADO] ? 'bien' : 'mal'}">${esc(NOMBRE_ESTADO[s.ESTADO] || s.ESTADO)}</span>
+      <h2>${esc(s.ESPECIALIDAD)}<span class="estado ${esBueno(s) ? 'bien' : 'mal'}">${esc(NOMBRE_ESTADO[s.ESTADO] || s.ESTADO)}</span>
         ${s.ESTADO !== 'ALTA' ? `<button type="button" class="btn-texto" data-alta-esp="${esc(s.ESPECIALIDAD)}" data-medico="${esc(s.MEDICO_ULTIMO)}">Dar de alta…</button>` : ''}</h2>
       <div class="tipo-caso"><span class="marcas">${marcas({ N_REALIZADAS: s.N_REALIZADAS })}</span>${textoTipo(s)}</div>
       <p class="muted">Teléfonos: ${esc(s.TELEFONOS) || '—'}</p>
@@ -1242,20 +1253,21 @@ function pintarFicha(p) {
 
   const textoRes = s => {
     const r = s.RESULTADO || (s.ACCION === 'HECHO' ? 'SEGUIMIENTO HECHO' : s.ACCION === 'DESCARTADO' ? 'DESCARTADO' : s.ACCION);
-    const f = fechaCorta(s.FECHA_PROXIMA).slice(0, 5);
+    const f = esc(fechaCorta(s.FECHA_PROXIMA).slice(0, 5));
     return ({ 'LO PENSARÁ': `lo pensará · llamar el ${f}`, 'AGENDÓ CITA': `agendó para el ${f}`, 'LO HIZO': `lo hizo el ${f}`,
       'NÚMERO EQUIVOCADO': `número equivocado: ${esc(s.TELEFONO)}`, 'DESCARTADO': `descartado${s.MOTIVO ? ': ' + esc(s.MOTIVO.toLowerCase()) : ''}`,
       'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || esc(String(r).toLowerCase());
   };
-  const claveSeg = s => s.DNI + '|' + s.ESPECIALIDAD + '|' + (s.REFERENCIA || '');
-  const ordenados = p.seguimientos.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : 1);
+  const claveSeg = s => String(s.DNI ?? '').replace(/\D/g, '') + '|' + norm(s.ESPECIALIDAD) + '|' + String(s.REFERENCIA ?? '').trim();
+  const estaAnulado = s => norm(s.ANULADO) === 'SI';
+  const ordenados = p.seguimientos.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0);
   const ultimoDe = {};
-  ordenados.filter(s => s.ANULADO !== 'SÍ').forEach(s => { ultimoDe[claveSeg(s)] = s.ID; });
+  ordenados.filter(s => !estaAnulado(s)).forEach(s => { ultimoDe[claveSeg(s)] = s.ID; });
   const seguimientos = p.seguimientos.length
     ? `<ol class="historia">${ordenados.map(s => {
-        const anulado = s.ANULADO === 'SÍ';
+        const anulado = estaAnulado(s);
         const puede = !anulado && String(s.ID).startsWith('SEG-') && (s.RESULTADO === 'FALLECIÓ' || ultimoDe[claveSeg(s)] === s.ID);
-        return `<li class="${anulado ? 'anulado' : ''}"><b>${fechaCorta(s.FECHA_HORA).slice(0, 5)} ${esc(s.RESPONSABLE)}:</b> ${textoRes(s)}
+        return `<li class="${anulado ? 'anulado' : ''}"><b>${esc(fechaCorta(s.FECHA_HORA).slice(0, 5))} ${esc(s.RESPONSABLE)}:</b> ${textoRes(s)}
           <span class="muted">· ${esc(PARA[norm(s.ESPECIALIDAD)] || 'Reevaluación · ' + s.ESPECIALIDAD)}${s.NOTA ? ' · ' + esc(s.NOTA) : ''}${anulado ? ' · anulado: ' + esc(s.MOTIVO_ANULACION) : ''}</span>
           ${puede ? `<button type="button" class="btn-texto" data-anular-seg="${esc(s.ID)}">Anular</button>` : ''}</li>`;
       }).join('')}</ol>`

@@ -704,3 +704,39 @@ test('bandeja: un «No contestó» rápido en otra fila no borra la nota del pan
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('¿Qué pasó?: número equivocado con otro contacto, pero el servidor la cerró: la tarjeta sale de la bandeja', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'REEVALUACION');
+    await pagina.evaluate(() => { const o = DEMO.registrarResultado; DEMO.registrarResultado = x => { const r = o(x); r.tarjeta = ''; return r; }; });
+    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).first().click();
+    await pagina.locator('[data-res="NÚMERO EQUIVOCADO"]').click();
+    await pagina.locator('.qp-paso input[name="qp-tel"]').first().check();
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForSelector('#aviso:not([hidden])');
+    await pagina.waitForFunction(() => ![...document.querySelectorAll('#lista .fila .nombre')].some(x => x.textContent.includes('ROSA ELENA')));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Ficha: historial con ANULADO en minúsculas, texto escapado y AGENDADO sin cita no es verde', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    const html = await pagina.evaluate(() => {
+      const seg = (id, h, extra) => Object.assign({ ID: id, FECHA_HORA: h, DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', RESULTADO: 'NO CONTESTÓ', REFERENCIA: '', NOTA: '', FECHA_PROXIMA: '' }, extra);
+      pintarFicha({ dni: '40111222', nombre: 'X', porConfirmar: [], citas: [], indicaciones: [], registros: [], altas: [], telefonosDescartados: [],
+        series: [{ ESPECIALIDAD: 'HEMATOLOGÍA', ESTADO: 'AGENDADO', AGENDA: 'SIN RESPUESTA', TELEFONOS: '', MEDICO_ULTIMO: '', N_REALIZADAS: 1 },
+          { ESPECIALIDAD: 'REUMATOLOGÍA', ESTADO: 'AGENDADO', AGENDA: 'CITA', TELEFONOS: '', MEDICO_ULTIMO: '', N_REALIZADAS: 1 }],
+        seguimientos: [seg('SEG-1', '2026-10-01 09:00', {}), seg('SEG-2', '2026-10-02 09:00', { ANULADO: 'si' }), seg('SEG-3', '2026-10-02 09:00', { RESULTADO: 'LO PENSARÁ', FECHA_PROXIMA: '<b>x</b>' })] });
+      return { ficha: document.querySelector('#ficha').innerHTML, estados: [...document.querySelectorAll('#ficha .estado')].map(e => e.className) };
+    });
+    assert.match(html.estados[0], /mal/);
+    assert.match(html.estados[1], /bien/);
+    assert.ok(!html.ficha.includes('<b>x</b>'), 'FECHA_PROXIMA escapada');
+    assert.match(html.ficha, /class="anulado"/);
+    assert.ok(!/data-anular-seg="SEG-2"/.test(html.ficha), 'la anulada no ofrece Anular');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

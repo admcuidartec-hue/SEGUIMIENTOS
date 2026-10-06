@@ -1736,7 +1736,8 @@ const DEMO = (() => {
   let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
     candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
   const muertos = {};
-  const seguimientos = [{ ID: 'SEG-1', FECHA_HORA: '2026-09-10 11:20', DNI: '40333444', ESPECIALIDAD: 'REUMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: 'Dijo que llamará' }];
+  const seguimientos = [{ ID: 'SEG-1', FECHA_HORA: '2026-09-10 11:20', DNI: '40333444', ESPECIALIDAD: 'REUMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: 'Dijo que llamará' },
+    { ID: 'SEG-0', FECHA_HORA: '2026-09-20 09:30', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: '', RESULTADO: 'NO CONTESTÓ', FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '' }];
 
   function exigir(x, conMotivo) {
     if (!x || !usuarios.includes(x.usuario)) throw new Error('Elija quién es usted en el selector de arriba.');

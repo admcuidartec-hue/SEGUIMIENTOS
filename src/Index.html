@@ -269,8 +269,8 @@ html.con-vt .vista{animation:none}
 .historia b{color:var(--ink);font-weight:600;font-family:var(--mono);font-size:12.5px}
 .historia li.anulado .txt{text-decoration:line-through;color:var(--muted)}
 .historia .enlace{margin-left:6px;font-size:12.5px}
-.historia .motivo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
-.historia .motivo input{flex:1 1 180px;height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink)}
+.motivo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.motivo input{flex:1 1 180px;height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink)}
 .hist-skel{display:flex;flex-direction:column;gap:12px}
 .hist-skel i{display:block;height:10px;border-radius:4px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel-2) 50%,var(--skel) 75%);background-size:200% 100%;animation:brillo 1.4s linear infinite}
 .hist-skel i:nth-child(2){width:80%}.hist-skel i:nth-child(3){width:60%}
@@ -355,8 +355,96 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .hoy li.sin-fila{display:block;padding:0;border-bottom:0}
 .nota-chips{color:var(--muted)}
 
+/* Pacientes (README §6.4): buscador de 52 px y ficha en dos columnas, contenido y lateral fijo. */
+.busq{position:relative;max-width:640px;margin-top:14px}
+.busq label{display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-s);color:var(--muted);transition:border-color .15s ease}
+.busq label:focus-within{border-color:var(--accent)}
+.busq label>i{font-size:19px}
+.busq input{flex:1;min-width:0;height:100%;border:0;background:none;outline:none;font-size:16px;color:var(--ink)}
+/* La lista sale al escribir (teclado): aparece sin animación. */
+.resultados{position:absolute;z-index:10;left:0;right:0;top:58px;list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.resultados button{width:100%;display:flex;align-items:center;gap:12px;min-height:48px;padding:6px 10px;border:0;border-radius:var(--r-s);background:transparent;color:var(--ink);text-align:left}
+.resultados button:hover,.resultados [aria-selected="true"] button{background:var(--surface-2)}
+.resultados .n{flex:1;min-width:0;font-weight:500}
+.resultados .mono{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.resultados .nada{padding:14px 10px;color:var(--muted)}
+.ficha-skel{margin-top:32px;max-width:640px}
+.ficha{margin-top:32px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:36px 48px;align-items:start}
+.ficha header{grid-column:1/-1;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.ficha header h2{margin:0;font-size:36px;font-weight:600;letter-spacing:-.03em;line-height:1.1;text-wrap:balance;outline:none}
+.ficha header>.mono{color:var(--muted)}
+.ficha header .fallecido{animation:none;margin-top:8px}
+.descartados{margin:0;font-size:13px;color:var(--muted)}
+.descartados s{font-family:var(--mono)}
+.f-main{display:flex;flex-direction:column;gap:36px;min-width:0}
+.bloque{display:flex;flex-direction:column;gap:14px;min-width:0}
+.bloque>h3{margin:0;font-size:17px;font-weight:600}
+.lado{position:sticky;top:24px;display:flex;flex-direction:column;gap:28px;min-width:0}
+.lado .bloque{gap:8px}
+.lado .bloque>h3{font-size:12.5px;color:var(--muted)}
+.emparejar{display:flex;flex-direction:column;gap:10px;padding:16px;border:1px solid var(--warn);border-radius:var(--r);background:var(--warn-soft)}
+.emparejar h3{margin:0;font-size:16px;font-weight:600}
+.emparejar p{margin:0;color:var(--soft)}
+.emparejar p b{color:var(--ink)}
+.emparejar .botones,.alta-form .botones{display:flex;gap:8px;flex-wrap:wrap}
+.emparejar .btn{height:auto;min-height:44px;padding:8px 14px;text-align:left}
+.esp{display:flex;flex-direction:column;gap:10px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.esp-cab{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
+.esp h4{margin:0;font-size:16px;font-weight:600}
+.esp-cab .enlace{margin-left:auto;min-height:44px}
+.esp .tag,.trat .tag{max-width:100%}
+.e-mal{background:var(--accent-soft);color:var(--accent)}
+.e-ok{background:var(--good-soft);color:var(--good)}
+.e-alta{background:var(--info-soft);color:var(--info)}
+.e-curso,.e-pend{background:var(--warn-soft);color:var(--warn)}
+.e-anulado{background:var(--surface-2);color:var(--muted)}
+.perfil{margin:0;color:var(--soft)}
+.esp-pend{margin:0;display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:var(--soft)}
+.esp-pend i{font-size:17px;color:var(--warn)}
+.esp-pend b{color:var(--ink)}
+.tiempo{list-style:none;margin:6px 0 0 5px;padding:2px 0 0 14px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.tiempo li{position:relative;font-size:13.5px;color:var(--soft)}
+.tiempo li::before{content:'';position:absolute;left:-21px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--line-2);border:2px solid var(--line-2)}
+.tiempo li b{color:var(--ink);font-weight:600}
+.tiempo .mono{font-size:12.5px}
+.tiempo li.esperada{color:var(--accent);font-weight:500}
+.tiempo li.esperada::before{background:var(--surface);border-color:var(--accent)}
+.alta-form>b{font-size:15px}
+.trat{display:flex;flex-direction:column;gap:10px;padding:16px 18px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);min-width:0}
+.trat-cab{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
+.trat-cab b{font-size:15px}
+.trat-meta{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.trat .prog{max-width:320px}
+.trat .prog i{height:6px}
+.sesiones{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.ses{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;min-height:36px;font-size:13.5px}
+.ses>i{font-size:17px}
+.ses.hecha>i{color:var(--good)}
+.ses.pend{color:var(--soft)}
+.ses.pend>i{color:var(--muted)}
+.ses.anulada{color:var(--muted)}
+.ses.anulada .tx{text-decoration:line-through}
+.ses .lohizo{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.ses .lohizo .ctl,.ses .lohizo .btn{height:40px}
+.ses .motivo,.altas .motivo{flex-basis:100%}
+.trat-acc{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.trat-acc .motivo{flex-basis:100%;margin-top:0}
+.desplazable{overflow-x:auto}
+.previos{width:100%;border-collapse:collapse;font-size:13.5px}
+.previos th{text-align:left;font-size:12px;font-weight:500;color:var(--muted);padding:0 12px 8px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.previos td{padding:10px 12px 10px 0;border-bottom:1px solid var(--line);vertical-align:top}
+.previos td.mono{white-space:nowrap}
+.previos td.obs{color:var(--soft)}
+.altas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px}
+.altas li{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;font-size:13.5px}
+.a-estado{font-size:12px;font-weight:600;color:var(--good)}
+.altas li.cerrada .a-estado{color:var(--muted)}
+.altas li.anulada .a-estado{color:var(--accent)}
+.altas li.anulada .a-cab{text-decoration:line-through;color:var(--muted)}
+.a-det{flex-basis:100%;font-size:12.5px;color:var(--soft)}
+
 /* Responsivo */
-@media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}.reg{grid-template-columns:minmax(0,1fr)}.hoy{position:static}}
+@media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}.reg{grid-template-columns:minmax(0,1fr)}.hoy{position:static}.ficha{grid-template-columns:minmax(0,1fr)}.lado{position:static}}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){
   .side{display:none}.topmovil{display:flex}.navmovil{display:grid}
@@ -366,6 +454,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
   .filtros .relleno{display:none}
   .coltabs{display:flex}.tablero{grid-template-columns:minmax(0,1fr)}.col{min-height:0}.col:not(.movil){display:none}
   .barra-reg{bottom:64px}
+  .ficha{margin-top:24px}.ficha header h2{font-size:26px}
   .panel{width:100%}.p-volver{display:inline-flex}.p-cerrar{display:none}.p-top,.p-cuerpo{padding-left:16px;padding-right:16px}
 }
 @view-transition{navigation:auto}
@@ -440,6 +529,10 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
       <section class="vista" id="v-pacientes" hidden>
         <h1>Pacientes</h1>
         <p class="cargando" role="status">Cargando…</p>
+        <div id="pac-cuerpo" hidden>
+          <div class="busq"><label><i class="ph ph-magnifying-glass" aria-hidden="true"></i><input id="pq" autocomplete="off" spellcheck="false" placeholder="DNI o nombre (mínimo 3 letras)" aria-label="Buscar por DNI o nombre" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="pres"></label><ul class="resultados" id="pres" role="listbox" aria-label="Pacientes encontrados" hidden></ul></div>
+          <div id="ficha"></div>
+        </div>
       </section>
       <section class="vista" id="v-indicadores" hidden>
         <h1>Indicadores</h1>
@@ -1192,7 +1285,7 @@ const RES = {};
 ACC.concat(CIERRES).forEach(a => { RES[a.k] = a; RES[a.r] = a; });
 // Cierres que dejan una fila en «cerrados este mes» (el alta va a Completado).
 const CIERRAN = ['NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'];
-const ANULAR = { seguimiento: 'anularResultado', alta: 'anularAlta', sesion: 'anularSesion' };
+const ANULAR = { seguimiento: 'anularResultado', alta: 'anularAlta', sesion: 'anularSesion', registro: 'anularRegistro' };
 const accDe = p => ACC.filter(a => !a.solo || a.solo.includes(p.t));
 const cierresDe = p => CIERRES.filter(c => !c.conTel || activos(p).length);
 const EASE_IO = 'cubic-bezier(.77,0,.175,1)', EASE_OUT = 'cubic-bezier(.23,1,.32,1)';
@@ -1703,6 +1796,23 @@ function textoRes(s) {
     'NÚMERO EQUIVOCADO': `número equivocado: ${s.TELEFONO}`, 'DESCARTADO': `descartado${s.MOTIVO ? ': ' + String(s.MOTIVO).toLowerCase() : ''}`,
     'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || String(r || '').toLowerCase();
 }
+const PARA = { HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento' };
+/**
+ * Filas de seguimientos para la historia (la del panel y la de la ficha), en el orden en que llegan.
+ * «Anular» va solo en la última sin anular de cada seguimiento (especialidad + referencia) y en un «Falleció».
+ * conPara agrega de qué seguimiento es («Hierro», «Reevaluación · Hematología»): la ficha los muestra todos juntos.
+ */
+function filasSeguimientos(segs, conPara) {
+  const claveSeg = s => norm(s.ESPECIALIDAD) + '|' + String(s.REFERENCIA || '').trim();
+  const ultimo = {};
+  segs.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0)
+    .filter(s => !esAnulado(s.ANULADO)).forEach(s => { ultimo[claveSeg(s)] = s.ID; });
+  return segs.map(s => ({ cuando: String(s.FECHA_HORA || ''), f: dm(String(s.FECHA_HORA || '').slice(0, 10)), quien: nombreBonito(s.RESPONSABLE),
+    txt: textoRes(s), nota: s.NOTA || '', anulado: esAnulado(s.ANULADO), motivo: s.MOTIVO_ANULACION || '',
+    para: conPara ? PARA[norm(s.ESPECIALIDAD)] || 'Reevaluación · ' + frase(s.ESPECIALIDAD) : '',
+    anular: !esAnulado(s.ANULADO) && /^SEG-/.test(String(s.ID)) && (s.RESULTADO === 'FALLECIÓ' || ultimo[claveSeg(s)] === s.ID) ? { que: 'seguimiento', id: s.ID } : null }));
+}
+const recientesPrimero = (a, b) => a.cuando < b.cuando ? 1 : a.cuando > b.cuando ? -1 : 0;
 /**
  * Filas de la historia de una tarjeta: los seguimientos de esa especialidad y referencia (más un «Falleció»),
  * las sesiones de su registro y las altas de su especialidad. La más reciente primero.
@@ -1710,14 +1820,8 @@ function textoRes(s) {
  */
 function filasHistoria(p, d) {
   const esp = norm(p.raw.ESPECIALIDAD), ref = String(p.idRegistro || '').trim();
-  const claveSeg = s => norm(s.ESPECIALIDAD) + '|' + String(s.REFERENCIA || '').trim();
   const segs = (d.seguimientos || []).filter(s => (norm(s.ESPECIALIDAD) === esp && String(s.REFERENCIA || '').trim() === ref) || s.RESULTADO === 'FALLECIÓ');
-  const ultimo = {};
-  segs.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0)
-    .filter(s => !esAnulado(s.ANULADO)).forEach(s => { ultimo[claveSeg(s)] = s.ID; });
-  const filas = segs.map(s => ({ cuando: String(s.FECHA_HORA || ''), f: dm(String(s.FECHA_HORA || '').slice(0, 10)), quien: nombreBonito(s.RESPONSABLE),
-    txt: textoRes(s), nota: s.NOTA || '', anulado: esAnulado(s.ANULADO), motivo: s.MOTIVO_ANULACION || '',
-    anular: !esAnulado(s.ANULADO) && /^SEG-/.test(String(s.ID)) && (s.RESULTADO === 'FALLECIÓ' || ultimo[claveSeg(s)] === s.ID) ? { que: 'seguimiento', id: s.ID } : null }));
+  const filas = filasSeguimientos(segs);
   const reg = ref && (d.registros || []).find(x => x.ID === ref);
   if (reg && reg.ESTADO !== 'ANULADO') {
     const ss = reg.sesiones || [];
@@ -1727,7 +1831,7 @@ function filasHistoria(p, d) {
   (d.altas || []).filter(a => norm(a.ESPECIALIDAD) === esp).forEach(a => filas.push({ cuando: String(a.FECHA || ''), f: dm(String(a.FECHA || '').slice(0, 10)),
     quien: nombreBonito(a.REGISTRADO_POR), txt: 'alta médica' + (a.DOCTOR ? ' · ' + a.DOCTOR : ''), nota: '', anulado: esAnulado(a.ANULADO),
     motivo: a.MOTIVO_ANULACION || '', anular: !esAnulado(a.ANULADO) && /^ALT-/.test(String(a.ID)) ? { que: 'alta', id: a.ID } : null }));
-  return filas.sort((a, b) => a.cuando < b.cuando ? 1 : a.cuando > b.cuando ? -1 : 0);
+  return filas.sort(recientesPrimero);
 }
 async function cargarHistoria(p) {
   const n = cargarHistoria.n = (cargarHistoria.n || 0) + 1, clave = p.id;
@@ -1744,34 +1848,48 @@ async function cargarHistoria(p) {
   }
   pintarHistoria();
 }
-function pintarHistoria() {
-  const c = $('#p-hist');
-  if (!c) return;
-  const h = P.hist;
-  if (!h || h.estado === 'cargando') { c.innerHTML = '<div class="hist-skel" aria-hidden="true"><i></i><i></i><i></i></div>'; return; }
-  if (h.estado === 'error') { c.innerHTML = `<p class="p-vacio">No se pudo cargar la historia: ${esc(h.msg)} <button type="button" class="enlace" data-rehist>Reintentar</button></p>`; return; }
-  if (!h.filas.length) { c.innerHTML = '<p class="p-vacio">Todavía no hay seguimientos.</p>'; return; }
-  c.innerHTML = '<ol class="historia">' + h.filas.map((x, i) => `<li class="${x.anulado ? 'anulado' : ''}">`
-    + `<span class="txt"><b>${esc(x.f)}</b> · ${esc(x.quien)}: ${esc(x.txt)}${x.nota ? ' · ' + esc(x.nota) : ''}</span>`
+/** El motivo de una anulación, en la misma fila (prompt() puede estar bloqueado dentro del iframe de Apps Script). */
+const htmlMotivo = (id, valor) => `<div class="motivo"><input id="${id}" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(valor || '')}">`
+  + '<button type="button" class="btn btn-p" data-confirmar-anular>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button></div>';
+/**
+ * La historia de seguimientos (panel y ficha): esqueleto, error, vacía o la lista. `anulando` es el ID con el motivo abierto
+ * e `idMotivo` el id de su campo. «Anular» lleva el índice de la fila en `data-anular`.
+ */
+function htmlHistoria(h, anulando, idMotivo) {
+  if (!h || h.estado === 'cargando') return '<div class="hist-skel" aria-hidden="true"><i></i><i></i><i></i></div>';
+  if (h.estado === 'error') return `<p class="p-vacio">No se pudo cargar la historia: ${esc(h.msg)} <button type="button" class="enlace" data-rehist>Reintentar</button></p>`;
+  if (!h.filas.length) return '<p class="p-vacio">Todavía no hay seguimientos.</p>';
+  return '<ol class="historia">' + h.filas.map((x, i) => `<li class="${x.anulado ? 'anulado' : ''}">`
+    + `<span class="txt"><b>${esc(x.f)}</b> · ${esc(x.quien)}: ${esc(x.txt)}${x.para ? ' · ' + esc(x.para) : ''}${x.nota ? ' · ' + esc(x.nota) : ''}</span>`
     + (x.anulado ? ` · anulado${x.motivo ? ': ' + esc(x.motivo) : ''}` : '')
     + (x.anular ? `<button type="button" class="enlace" data-anular="${i}">Anular</button>` : '')
-    + (x.anular && P.anulando === x.anular.id ? '<div class="motivo"><input id="motivo-anular" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación">'
-      + '<button type="button" class="btn btn-p" data-confirmar-anular>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button></div>' : '')
+    + (x.anular && anulando && anulando === x.anular.id ? htmlMotivo(idMotivo) : '')
     + '</li>').join('') + '</ol>';
 }
-/** Anula una fila de la historia con su motivo (obligatorio); ninguna fila se borra. */
+function pintarHistoria() {
+  const c = $('#p-hist');
+  if (c) c.innerHTML = htmlHistoria(P.hist, P.anulando, 'motivo-anular');
+}
+/**
+ * Anula en el servidor con su motivo (obligatorio): resultado, sesión, alta o registro. Lo usan el panel y la ficha.
+ * Ninguna fila se borra. Devuelve true si el servidor anuló.
+ */
+async function anularConMotivo(que, id, motivo, boton, campo) {
+  if (!exigirUsuario()) return false;
+  if (!motivo) { avisar('Escriba el motivo de la anulación.'); const c = $(campo); if (c) c.focus(); return false; }
+  if (boton) boton.disabled = true;
+  try {
+    await llamar(ANULAR[que], { usuario: S.usuario, id, motivo });
+  } catch (e) { if (boton) boton.disabled = false; avisar('No se anuló: ' + e.message); return false; }
+  avisar('Anulado: ' + id + '.');
+  invalidarIndicadores();
+  return true;
+}
+/** Anula una fila de la historia del panel. */
 async function confirmarAnulacion(boton) {
-  if (!exigirUsuario()) return;
   const fila = P.hist && P.hist.filas && P.hist.filas.find(x => x.anular && x.anular.id === P.anulando);
   if (!fila) return;
-  const motivo = ($('#motivo-anular').value || '').trim();
-  if (!motivo) { avisar('Escriba el motivo de la anulación.'); $('#motivo-anular').focus(); return; }
-  boton.disabled = true;
-  try {
-    await llamar(ANULAR[fila.anular.que], { usuario: S.usuario, id: fila.anular.id, motivo });
-  } catch (e) { boton.disabled = false; avisar('No se anuló: ' + e.message); return; }
-  avisar('Anulado: ' + fila.anular.id + '.');
-  invalidarIndicadores();
+  if (!await anularConMotivo(fila.anular.que, fila.anular.id, ($('#motivo-anular').value || '').trim(), boton, '#motivo-anular')) return;
   P.anulando = '';
   const p = S.pacientes.find(x => x.id === seleccion.panel);
   if (p) cargarHistoria(p);
@@ -2239,6 +2357,437 @@ async function confirmarAnulacionHoy(boton) {
   if (S.fase === 'listo') cargarTablero(null, true);
 }
 
+/* ============ PACIENTES (README §6.4; MAPEO §1.9-§1.11 y §5) ============ */
+// Copiados de la app anterior (Index-anterior.html): el estado de cada especialidad se lee como siempre.
+const ESTADO_BUENO = { 'AL DÍA': 1, 'RECUPERADO': 1, 'AGENDADO': 1, 'ALTA': 1 };
+// Un AGENDADO sin cita ni llamada fijada (sin respuesta, por reintentar) no es una buena noticia.
+const esBueno = s => !!ESTADO_BUENO[s.ESTADO] && !(s.ESTADO === 'AGENDADO' && s.AGENDA && !['CITA', 'LLAMAR'].includes(s.AGENDA));
+const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más de 6 meses', 'POR VENCER': 'Le toca volver pronto',
+  'AL DÍA': 'Al día', 'CONTACTADO': 'Se le escribió, esperando respuesta', 'RECUPERADO': 'Volvió tras el seguimiento',
+  'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas', 'ALTA': 'Alta médica',
+  'CERRADO': 'Seguimiento cerrado', 'FALLECIDO': 'Fallecido', 'AGENDADO': 'Agendado o por volver a llamar' };
+// Con estos estados ya no se espera que vuelva: sin la línea «Debía volver el …».
+const SIN_ESPERA = { 'ALTA': 1, 'CERRADO': 1, 'FALLECIDO': 1, 'DESCARTADO': 1 };
+const NOMBRE_REG = { COTIZADO: 'Pendiente', 'EN CURSO': 'En curso', COMPLETO: 'Completado', ANULADO: 'Anulado' };
+const TONO_REG = { COTIZADO: 'e-pend', 'EN CURSO': 'e-curso', COMPLETO: 'e-ok', ANULADO: 'e-anulado' };
+const isoDe = v => String(v || '').slice(0, 10);
+
+/** Consultas de una especialidad: «Primera cita», «Reevaluación n»; las no realizadas, con su estado. */
+function lineaDeTiempo(citas) {
+  let n = 0;
+  return citas.map(c => {
+    const realizada = norm(c.ESTADO) === 'REALIZADO';
+    return { titulo: realizada ? (n++ === 0 ? 'Primera cita' : 'Reevaluación ' + (n - 1)) : frase(c.ESTADO), f: isoDe(c.FECHA), realizada,
+      det: [medicoCorto(c.MEDICO), String(c.MODALIDAD || '').toLowerCase()].filter(Boolean).join(' · ') };
+  });
+}
+/** «Paciente nuevo» o «En control»; si no volvió, a cuál reevaluación faltó (textoTipo de la app anterior). */
+function perfilDe(s) {
+  const n = Number(s.N_REALIZADAS) || 1;
+  if (s.ESTADO === 'VENCIDO' || s.ESTADO === 'ANTIGUO') return n <= 1 ? 'Paciente nuevo · no volvió a su 1.ª reevaluación' : `En control · faltó a su ${n}.ª reevaluación`;
+  return n <= 1 ? 'Paciente nuevo' : 'En control';
+}
+const ESTADO_PREVIO = { COTIZO: 'Cotizó, no lo hizo', ACEPTO: 'Lo hizo' };
+
+/** getPaciente(dni) -> lo que pinta la ficha (MAPEO §1.10). Los nulos llegan como ''. */
+function adaptarFicha(r) {
+  r = r || {};
+  const malos = (r.telefonosDescartados || []).map(String), citas = (r.citas || []).slice().sort((a, b) => isoDe(a.FECHA) < isoDe(b.FECHA) ? -1 : isoDe(a.FECHA) > isoDe(b.FECHA) ? 1 : 0);
+  const altas = (r.altas || []).map(a => {
+    const anulado = esAnulado(a.ANULADO), id = String(a.ID || '');
+    return { id, esp: a.ESPECIALIDAD, f: isoDe(a.FECHA), doctor: a.DOCTOR || '', quien: nombreBonito(a.REGISTRADO_POR), anulado,
+      motivo: a.MOTIVO_ANULACION || '', estado: anulado ? 'anulada' : a.VIGENTE ? 'vigente' : 'cerrada', anulable: !anulado && /^ALT-/.test(id) };
+  });
+  return {
+    dni: String(r.dni || ''), nombre: nombreBonito(r.nombre),
+    fallecido: r.fallecido ? { f: isoDe(r.fallecido.fecha), quien: nombreBonito(r.fallecido.quien) } : null,
+    malos,
+    tels: (r.telefonos || []).map(String).filter(t => t && malos.indexOf(t) < 0),
+    porConfirmar: (r.porConfirmar || []).map(i => ({ id: String(i.ID || ''), tipo: frase(i.TIPO), f: isoDe(i.FECHA), nombre: nombreBonito(i.NOMBRE),
+      tel: String(i.TELEFONO || ''), candidatos: (i.candidatos || []).map(c => ({ dni: String(c.dni || ''), nombre: nombreBonito(c.nombre) })) })),
+    especialidades: (r.series || []).map(s => {
+      const propias = lineaDeTiempo(citas.filter(c => norm(c.ESPECIALIDAD) === norm(s.ESPECIALIDAD)));
+      const hechas = propias.filter(c => c.realizada), esperada = isoDe(s.PROXIMA_ESPERADA);
+      const conAlta = altas.some(a => a.estado === 'vigente' && norm(a.esp) === norm(s.ESPECIALIDAD));
+      return { esp: s.ESPECIALIDAD, estado: NOMBRE_ESTADO[s.ESTADO] || frase(s.ESTADO), tono: s.ESTADO === 'ALTA' ? 'e-alta' : esBueno(s) ? 'e-ok' : 'e-mal',
+        perfil: perfilDe(s), pend: s.PENDIENTE || '', consultas: propias, ultima: hechas.length ? hechas[hechas.length - 1].f : '',
+        esperada: esperada && !SIN_ESPERA[s.ESTADO] ? { f: esperada, vence: isoDe(s.VENCE), pasada: esperada <= S.hoy } : null,
+        puedeAlta: s.ESTADO !== 'ALTA' && !conAlta, medico: s.MEDICO_ULTIMO || '' };
+    }),
+    trats: (r.registros || []).map(x => {
+      const e = String(x.ESTADO || '');
+      return { id: String(x.ID || ''), titulo: x.TEXTO || '', f: isoDe(x.FECHA), med: x.DOCTOR || '', quien: nombreBonito(x.ASESORA), n: Number(x.SESIONES) || 0,
+        estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO', abierto: e === 'COTIZADO' || e === 'EN CURSO',
+        motivo: x.MOTIVO_ANULACION || '',
+        sesiones: (x.sesiones || []).map(s => ({ id: String(s.ID || ''), numero: Number(s.NUMERO) || 0, f: isoDe(s.FECHA), quien: nombreBonito(s.ASESORA) }))
+          .sort((a, b) => a.numero - b.numero) };
+    }),
+    altas,
+    previos: (r.indicaciones || []).map(i => ({ f: isoDe(i.FECHA), det: etiquetaCat(i.DETALLE) + (Number(i.CANTIDAD) > 1 ? ' ×' + Number(i.CANTIDAD) : ''),
+      estado: ESTADO_PREVIO[norm(i.ESTADO)] || frase(i.ESTADO), tel: i.TELEFONO ? telBonito(i.TELEFONO) : '', obs: i.OBSERVACIONES ? frase(i.OBSERVACIONES) : '' })),
+    hist: filasSeguimientos(r.seguimientos || [], true).sort(recientesPrimero)
+  };
+}
+
+const PA = {
+  listo: false,
+  q: '', res: [], activo: 0, buscando: false,   // buscador
+  dni: '', estado: '', msg: '', p: null,        // ficha abierta: estado '' | 'cargando' | 'listo' | 'error'; p = adaptarFicha()
+  alta: null,         // { esp, doctor, fecha, nota, teclado }: «Dar de alta…» abierto
+  fechas: {},         // la fecha elegida para «Lo hizo», por registro
+  anulando: null,     // { que, id }: la fila con el motivo abierto
+  motivo: '',
+  enVuelo: '',        // una escritura sin respuesta: no se manda otra
+  // El servidor no devuelve las sesiones anuladas (sesionesDe_): las anuladas aquí se muestran tachadas hasta cambiar de paciente.
+  sesAnuladas: {}
+};
+
+/* ---- Buscador: buscar(texto) desde 3 letras; se muestran los 6 primeros ---- */
+function alEscribir() {
+  const q = $('#pq').value;
+  PA.q = q;
+  clearTimeout(alEscribir.t);
+  if (norm(q).length < 3) { PA.buscando = false; PA.res = []; cerrarLista(); return; }
+  PA.buscando = true;
+  alEscribir.t = setTimeout(() => buscarPacientes(q), 250);
+}
+async function buscarPacientes(q) {
+  let r, error = '';
+  try { r = await llamar('buscar', q.trim()); } catch (e) { error = e.message; }
+  if (PA.q !== q) return;   // ya escribió otra cosa: esta respuesta es vieja
+  PA.buscando = false;
+  PA.res = error ? [] : (r || []).slice(0, 6);
+  PA.activo = 0;
+  pintarLista(error ? 'No se pudo buscar: ' + error : '');
+}
+function pintarLista(error) {
+  const ul = $('#pres'), q = $('#pq');
+  ul.hidden = false;
+  q.setAttribute('aria-expanded', 'true');
+  if (error || !PA.res.length) {
+    ul.innerHTML = `<li class="nada">${esc(error || 'Ningún paciente coincide con «' + PA.q.trim() + '».')}</li>`;
+    q.removeAttribute('aria-activedescendant');
+    return;
+  }
+  ul.innerHTML = PA.res.map((r, i) => `<li role="option" id="pres-${i}" aria-selected="${i === PA.activo}">`
+    + `<button type="button" tabindex="-1" data-dni="${esc(r.DNI)}"><span class="n">${esc(nombreBonito(r.NOMBRE))}</span> <span class="mono">DNI ${esc(r.DNI)}</span></button></li>`).join('');
+  q.setAttribute('aria-activedescendant', 'pres-' + PA.activo);
+}
+function cerrarLista() {
+  const ul = $('#pres'), q = $('#pq');
+  if (!ul) return;
+  ul.hidden = true;
+  q.setAttribute('aria-expanded', 'false');
+  q.removeAttribute('aria-activedescendant');
+}
+function teclaBuscador(e) {
+  const abierta = !$('#pres').hidden;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!abierta || !PA.res.length) return;
+    e.preventDefault();
+    PA.activo = Math.max(0, Math.min(PA.res.length - 1, PA.activo + (e.key === 'ArrowDown' ? 1 : -1)));
+    pintarLista();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (abierta && !PA.buscando && PA.res[PA.activo]) abrirFicha(PA.res[PA.activo].DNI, true);
+  } else if (e.key === 'Escape' && abierta) {
+    // Primero se cierra la lista; el siguiente Esc ya sale del campo.
+    e.preventDefault();
+    e.stopPropagation();
+    cerrarLista();
+  }
+}
+
+/* ---- Ficha ---- */
+/** Abre la ficha de `dni` (desde el buscador o desde «Ver ficha completa»). Con el teclado aparece sin animación. */
+function abrirFicha(dni, teclado) {
+  dni = String(dni || '');
+  clearTimeout(alEscribir.t);
+  Object.assign(PA, { q: '', res: [], buscando: false });
+  $('#pq').value = '';
+  cerrarLista();
+  if (PA.dni !== dni || PA.estado !== 'listo') {
+    Object.assign(PA, { dni, estado: 'cargando', p: null, alta: null, fechas: {}, anulando: null, motivo: '', sesAnuladas: {} });
+    pintarFicha();
+  }
+  return cargarFicha(!teclado);
+}
+/** Pide getPaciente. Si la ficha ya estaba pintada, la reemplaza sin esqueleto (tras una escritura). */
+async function cargarFicha(animar) {
+  const n = cargarFicha.n = (cargarFicha.n || 0) + 1, dni = PA.dni;
+  let r;
+  try {
+    r = await llamar('getPaciente', dni);
+  } catch (e) {
+    if (n !== cargarFicha.n || PA.dni !== dni) return;
+    if (PA.estado === 'listo') { avisar('No se pudo actualizar la ficha: ' + e.message); return; }
+    Object.assign(PA, { estado: 'error', msg: e.message });
+    pintarFicha();
+    return;
+  }
+  if (n !== cargarFicha.n || PA.dni !== dni) return;
+  const nueva = PA.estado !== 'listo';
+  PA.p = adaptarFicha(r);
+  PA.estado = 'listo';
+  pintarFicha();
+  const el = $('#ficha .ficha');
+  if (nueva && animar && el && !reducido) el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE_OUT });
+}
+
+function pintarFicha() {
+  const c = $('#ficha');
+  if (!PA.dni) { c.innerHTML = ''; return; }
+  if (PA.estado === 'cargando') { c.innerHTML = '<div class="hist-skel ficha-skel" role="status" aria-label="Cargando la ficha"><i></i><i></i><i></i></div>'; return; }
+  if (PA.estado === 'error') {
+    c.innerHTML = `<div class="error"><i class="ph ph-warning-circle"></i><div><b>No se pudo abrir la ficha.</b> ${esc(PA.msg)}</div>`
+      + '<button type="button" class="btn btn-s" data-reficha>Reintentar</button></div>';
+    return;
+  }
+  const p = PA.p;
+  if (!p.nombre && !p.especialidades.length && !p.trats.length) { c.innerHTML = `<p class="vacio">No encontramos el DNI ${esc(PA.dni)}.</p>`; return; }
+  c.innerHTML = htmlFicha(p);
+  if (PA.alta) {
+    const sel = $('#falta-doc');
+    sel.value = PA.alta.doctor;
+    PA.alta.doctor = sel.value;   // un doctor que no está en la lista queda sin elegir
+  }
+}
+
+/** Abierto el motivo de esta fila: su «Anular» se oculta y debajo va el campo. */
+const anulandoAqui = (que, id) => !!PA.anulando && PA.anulando.que === que && PA.anulando.id === id;
+const motivoAqui = (que, id) => anulandoAqui(que, id) ? htmlMotivo('fmotivo', PA.motivo) : '';
+
+function htmlFicha(p) {
+  const h = PA.anulando && PA.anulando.que === 'seguimiento' ? PA.anulando.id : '';
+  return `<article class="ficha"><header><h2>${esc(p.nombre)}</h2><span class="mono">DNI ${esc(p.dni)}</span>`
+    + (p.fallecido ? `<p class="fallecido"><i class="ph-fill ph-warning"></i><span>Figura como fallecido el ${esc(dmy(p.fallecido.f))} (${esc(p.fallecido.quien)}). Si es un error, anule «Falleció» en la historia de seguimientos.</span></p>` : '')
+    + (p.malos.length ? `<p class="descartados">Números equivocados: ${p.malos.map(t => `<s>${esc(telBonito(t))}</s>`).join(', ')}</p>` : '')
+    + '</header><div class="f-main">'
+    + p.porConfirmar.map(i => htmlEmparejar(p, i)).join('')
+    + `<section class="bloque"><h3>Especialidades</h3> ${p.especialidades.length ? p.especialidades.map(htmlEsp).join('') : '<p class="p-vacio">Sin consultas realizadas.</p>'}</section>`
+    + `<section class="bloque"><h3>Tratamientos y procedimientos registrados</h3> ${p.trats.length ? p.trats.map(htmlTrat).join('') : '<p class="p-vacio">No tiene registros en la plataforma.</p>'}</section>`
+    + `<section class="bloque"><h3>Procedimientos indicados antes de la plataforma</h3> ${p.previos.length ? '<div class="desplazable"><table class="previos"><thead><tr><th>Fecha</th><th>Detalle</th><th>Estado</th><th>Teléfono</th><th>Observaciones</th></tr></thead><tbody>'
+      + p.previos.map(x => `<tr><td class="mono">${esc(dmy(x.f))}</td><td>${esc(x.det)}</td><td>${esc(x.estado)}</td><td class="mono">${esc(x.tel)}</td><td class="obs">${esc(x.obs)}</td></tr>`).join('')
+      + '</tbody></table></div>' : '<p class="p-vacio">Ninguno.</p>'}</section>`
+    + '</div><aside class="lado">'
+    + `<section class="bloque" id="f-contacto"><h3>Contacto</h3> ${p.tels.length ? p.tels.map(t => `<div class="contacto"><span class="v"><small>Teléfono</small><span class="num">${esc(telBonito(t))}</span></span>`
+      + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(t)}"><i class="ph ph-copy"></i>Copiar</button></div>`).join('')
+      : '<p class="sin-tel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}</section>`
+    + `<section class="bloque" id="f-altas"><h3>Altas médicas</h3> ${p.altas.length ? '<ul class="altas">' + p.altas.map(htmlAlta).join('') + '</ul>' : '<p class="p-vacio">Ninguna.</p>'}</section>`
+    + `<section class="bloque" id="f-hist"><h3>Historia de seguimientos</h3> ${htmlHistoria({ estado: 'listo', filas: p.hist }, h, 'fmotivo')}</section>`
+    + '</aside></article>';
+}
+function htmlEmparejar(p, i) {
+  return `<section class="emparejar" data-ind="${esc(i.id)}"><h3>¿Es esta la misma persona?</h3>`
+    + `<p>${esc(i.tipo)} del ${esc(dmy(i.f))} a nombre de <b>${esc(i.nombre)}</b>${i.tel ? ' · teléfono ' + esc(telBonito(i.tel)) : ''}</p>`
+    + '<div class="botones">' + i.candidatos.map(c => `<button type="button" class="btn ${c.dni === p.dni ? 'btn-p' : 'btn-s'}" data-emparejar="${esc(i.id)}" data-dni="${esc(c.dni)}">${esc(c.nombre)} · ${esc(c.dni)}</button>`).join('')
+    + '</div></section>';
+}
+function htmlEsp(e) {
+  const a = PA.alta && PA.alta.esp === e.esp ? PA.alta : null;
+  return `<div class="esp" data-esp="${esc(e.esp)}"><div class="esp-cab"><h4>${esc(frase(e.esp))}</h4><span class="tag ${e.tono}">${esc(e.estado)}</span>`
+    + (e.puedeAlta && !a ? `<button type="button" class="enlace" data-dar-alta="${esc(e.esp)}">Dar de alta…</button>` : '') + '</div>'
+    + `<p class="perfil">${esc(e.perfil)}</p>`
+    + (e.pend ? `<p class="esp-pend"><i class="ph-fill ph-warning"></i><span><b>Procedimiento pendiente.</b> ${esc(e.pend)}</span></p>` : '')
+    + (a ? `<div class="alta-form caja${a.teclado ? ' quieta' : ''}"><b>Alta médica de ${esc(frase(e.esp))}</b>`
+      + `<div class="dos"><label class="campo">Doctor que da el alta<select id="falta-doc">${opcionesDoctores()}</select></label>`
+      + `<label class="campo">Fecha del alta<input type="date" id="falta-fec" value="${esc(a.fecha)}"${e.ultima ? ` min="${esc(e.ultima)}"` : ''} max="${esc(S.hoy)}"></label></div>`
+      + `<label class="campo">Nota (opcional)<input id="falta-nota" autocomplete="off" value="${esc(a.nota)}"></label>`
+      + '<div class="botones"><button type="button" class="btn btn-p" data-alta-ok>Confirmar alta</button><button type="button" class="btn btn-s" data-alta-cancelar>Cancelar</button></div></div>' : '')
+    + '<ol class="tiempo">' + e.consultas.map(c => `<li><b>${esc(c.titulo)}</b> · <span class="mono">${esc(dmy(c.f))}</span>${c.det ? ' · ' + esc(c.det) : ''}</li>`).join('')
+    + (e.esperada ? `<li class="esperada">${e.esperada.pasada ? 'Debía' : 'Debe'} volver el ${esc(dmy(e.esperada.f))}${e.esperada.vence ? ' (plazo máximo ' + esc(dmy(e.esperada.vence)) + ')' : ''}</li>` : '')
+    + '</ol></div>';
+}
+function htmlTrat(t) {
+  const k = t.sesiones.length, ultima = k ? t.sesiones[k - 1].f : t.f;
+  let ses = '';
+  if (!t.anulado) {
+    for (let i = 0; i < Math.max(t.n, k); i++) {
+      const s = t.sesiones[i], nombre = 'Sesión ' + (i + 1);
+      if (s) {
+        const anula = i === k - 1 && !anulandoAqui('sesion', s.id) ? ` <button type="button" class="enlace" data-anular-ses="${esc(s.id)}">Anular sesión</button>` : '';
+        ses += `<li class="ses hecha"><i class="ph-fill ph-check-circle"></i><span class="tx">${nombre} · <span class="mono">${esc(dmy(s.f))}</span> · ${esc(s.quien)}</span>${anula}${i === k - 1 ? motivoAqui('sesion', s.id) : ''}</li>`;
+      } else if (i === k && t.abierto) {
+        const f = t.id in PA.fechas ? PA.fechas[t.id] : S.hoy;
+        ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span><span class="lohizo">`
+          + `<input type="date" class="ctl mono" data-fecha-ses="${esc(t.id)}" value="${esc(f)}" min="${esc(ultima)}" max="${esc(S.hoy)}" aria-label="Fecha de la sesión ${i + 1}">`
+          + `<button type="button" class="btn btn-p" data-lohizo="${esc(t.id)}">Lo hizo</button></span></li>`;
+      } else ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span></li>`;
+    }
+    ses += (PA.sesAnuladas[t.id] || []).map(a => `<li class="ses anulada"><i class="ph ph-x-circle"></i><span class="tx">Sesión ${esc(a.numero)} · <span class="mono">${esc(dmy(a.f))}</span> · ${esc(a.quien)}</span> · anulada: ${esc(a.motivo)}</li>`).join('');
+  }
+  return `<div class="trat" data-reg="${esc(t.id)}"><div class="trat-cab"><b>${esc(t.titulo)}</b> <span class="tag ${t.tono}">${esc(t.estado)}</span></div>`
+    + `<span class="trat-meta">${esc(t.id)} · ${esc(dmy(t.f))} · ${esc(t.med)} · registró ${esc(t.quien)}${t.anulado ? ' · anulado' + (t.motivo ? ': ' + esc(t.motivo) : '') : ''}</span>`
+    + (t.n > 1 && !t.anulado ? '<div class="prog" aria-hidden="true">' + Array.from({ length: t.n }, (_, i) => `<i class="${i < k ? 'si' : ''}"></i>`).join('') + '</div>' : '')
+    + (ses ? `<ol class="sesiones">${ses}</ol>` : '')
+    + (t.abierto ? '<div class="trat-acc">' + (anulandoAqui('registro', t.id) ? '' : `<button type="button" class="enlace" data-anular-reg="${esc(t.id)}">Anular registro</button>`)
+      + motivoAqui('registro', t.id) + '</div>' : '')
+    + '</div>';
+}
+function htmlAlta(a) {
+  const estado = a.estado === 'vigente' ? 'Vigente' : a.estado === 'cerrada' ? 'Cerrada: volvió después' : 'Anulada' + (a.motivo ? ': ' + a.motivo : '');
+  return `<li class="${a.estado}" data-alta="${esc(a.id)}"><span class="a-cab"><b>${esc(frase(a.esp))}</b> · <span class="mono">${esc(dmy(a.f))}</span></span> `
+    + `<span class="a-estado">${esc(estado)}</span> <span class="a-det">${esc(a.doctor || 'Sin doctor')} · registró ${esc(a.quien)}</span>`
+    + (a.anulable && !anulandoAqui('alta', a.id) ? ` <button type="button" class="enlace" data-anular-alta="${esc(a.id)}">Anular</button>` : '')
+    + motivoAqui('alta', a.id) + '</li>';
+}
+
+/* ---- Escrituras de la ficha: una a la vez; al terminar se recargan la ficha y el tablero ---- */
+async function trasEscribirFicha() {
+  invalidarIndicadores();
+  if (S.fase === 'listo') cargarTablero(null, true);
+  await cargarFicha();
+}
+/** o: { boton, fn, datos, aviso: r => texto, luego: r => {} }. Devuelve si se guardó. */
+async function escribirFicha(o) {
+  if (PA.enVuelo || !exigirUsuario()) return false;
+  PA.enVuelo = o.fn;
+  if (o.boton) o.boton.disabled = true;
+  let r;
+  try {
+    r = await llamar(o.fn, Object.assign({ usuario: S.usuario }, o.datos));
+  } catch (e) {
+    PA.enVuelo = '';
+    if (o.boton) o.boton.disabled = false;
+    avisar('No se guardó: ' + e.message);
+    return false;
+  }
+  avisar(o.aviso(r || {}));
+  if (o.luego) o.luego(r || {});
+  await trasEscribirFicha();
+  PA.enVuelo = '';
+  return true;
+}
+function emparejar(b) {
+  escribirFicha({ boton: b, fn: 'confirmarEmparejamiento', datos: { id: b.dataset.emparejar, dni: b.dataset.dni }, aviso: () => 'Emparejamiento confirmado.' });
+}
+function abrirAlta(esp, teclado) {
+  const e = PA.p && PA.p.especialidades.find(x => x.esp === esp);
+  if (!e || PA.enVuelo) return;
+  const doc = ((S.boot && S.boot.doctores) || []).find(d => d.sofdoc && norm(d.sofdoc) === norm(e.medico));
+  Object.assign(PA, { alta: { esp, doctor: doc ? doc.doctor : '', fecha: S.hoy, nota: '', teclado }, anulando: null, motivo: '' });
+  pintarFicha();
+  $('#falta-doc').focus();
+}
+function cerrarAlta() {
+  if (!PA.alta || PA.enVuelo) return;
+  const esp = PA.alta.esp;
+  PA.alta = null;
+  pintarFicha();
+  const b = $$('#ficha [data-dar-alta]').find(x => x.dataset.darAlta === esp);
+  if (b) b.focus();
+}
+function confirmarAlta(b) {
+  const a = PA.alta;
+  if (!a || PA.enVuelo) return;
+  if (!a.doctor) { avisar('Elija el doctor que da el alta.'); $('#falta-doc').focus(); return; }
+  if (!a.fecha) { avisar('Falta la fecha del alta.'); $('#falta-fec').focus(); return; }
+  escribirFicha({ boton: b, fn: 'darDeAlta', datos: { dni: PA.dni, especialidad: a.esp, doctor: a.doctor, fecha: a.fecha, nota: a.nota.trim() },
+    aviso: r => 'Alta médica registrada: ' + frase(a.esp) + (r.alta && r.alta.ID ? ' · ' + r.alta.ID : ''), luego: () => { PA.alta = null; } });
+}
+function loHizo(b) {
+  const t = PA.p && PA.p.trats.find(x => x.id === b.dataset.lohizo);
+  if (!t || PA.enVuelo) return;
+  const f = t.id in PA.fechas ? PA.fechas[t.id] : S.hoy;
+  if (!f) { avisar('Falta la fecha de la sesión.'); return; }
+  escribirFicha({ boton: b, fn: 'marcarSesion', datos: { id: t.id, fecha: f, nota: '' },
+    aviso: r => r.completo ? 'Tratamiento completado: ' + t.id + '.' : `Sesión ${(r.sesion && Number(r.sesion.NUMERO)) || t.sesiones.length + 1} de ${t.n} registrada: ${t.id}.`,
+    luego: () => { delete PA.fechas[t.id]; } });
+}
+
+/* ---- Anular (registro, sesión, alta o seguimiento): motivo en la misma fila, como en el panel ---- */
+function abrirAnulacion(que, id) {
+  if (PA.enVuelo) return;
+  Object.assign(PA, { anulando: { que, id }, motivo: '', alta: null });
+  pintarFicha();
+  $('#fmotivo').focus();
+}
+function cancelarAnulacionFicha() {
+  if (PA.enVuelo || !PA.anulando) return;
+  const { que, id } = PA.anulando;
+  PA.anulando = null;
+  PA.motivo = '';
+  pintarFicha();
+  const sel = { registro: '[data-anular-reg]', sesion: '[data-anular-ses]', alta: '[data-anular-alta]' }[que];
+  const b = sel ? $$('#ficha ' + sel).find(x => x.getAttribute(sel.slice(1, -1)) === id) : $('#f-hist [data-anular]');
+  if (b) b.focus();
+}
+async function confirmarAnulacionFicha(boton) {
+  const A = PA.anulando;
+  if (!A || PA.enVuelo) return;
+  // La sesión se recuerda antes: después de anularla el servidor ya no la devuelve.
+  let ses = null;
+  if (A.que === 'sesion') PA.p.trats.forEach(t => t.sesiones.forEach(s => { if (s.id === A.id) ses = { reg: t.id, numero: s.numero, f: s.f, quien: s.quien }; }));
+  PA.enVuelo = A.id;
+  const motivo = PA.motivo.trim();
+  if (!await anularConMotivo(A.que, A.id, motivo, boton, '#fmotivo')) { PA.enVuelo = ''; return; }
+  if (ses) (PA.sesAnuladas[ses.reg] = PA.sesAnuladas[ses.reg] || []).push(Object.assign({ motivo }, ses));
+  PA.anulando = null;
+  PA.motivo = '';
+  await trasEscribirFicha();
+  PA.enVuelo = '';
+}
+
+/* ---- Eventos ---- */
+function clicFicha(e) {
+  const t = e.target.closest('button');
+  if (!t || t.disabled) return;
+  const d = t.dataset;
+  if (t.hasAttribute('data-reficha')) { PA.estado = 'cargando'; pintarFicha(); cargarFicha(); }
+  else if (d.copiar) { copiar(d.copiar); t.classList.add('ok'); t.innerHTML = '<i class="ph ph-check"></i>Copiado'; }
+  else if (d.emparejar) emparejar(t);
+  else if (d.darAlta) abrirAlta(d.darAlta, e.detail === 0);
+  else if (t.hasAttribute('data-alta-ok')) confirmarAlta(t);
+  else if (t.hasAttribute('data-alta-cancelar')) cerrarAlta();
+  else if (d.lohizo) loHizo(t);
+  else if (d.anularReg) abrirAnulacion('registro', d.anularReg);
+  else if (d.anularSes) abrirAnulacion('sesion', d.anularSes);
+  else if (d.anularAlta) abrirAnulacion('alta', d.anularAlta);
+  else if (d.anular !== undefined) { const f = PA.p && PA.p.hist[Number(d.anular)]; if (f && f.anular) abrirAnulacion(f.anular.que, f.anular.id); }
+  else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacionFicha(t);
+  else if (t.hasAttribute('data-cancelar-anular')) cancelarAnulacionFicha();
+}
+function entradaFicha(e) {
+  const el = e.target;
+  if (el.id === 'fmotivo') PA.motivo = el.value;
+  else if (PA.alta && el.id === 'falta-doc') PA.alta.doctor = el.value;
+  else if (PA.alta && el.id === 'falta-fec') PA.alta.fecha = el.value;
+  else if (PA.alta && el.id === 'falta-nota') PA.alta.nota = el.value;
+  else if (el.dataset.fechaSes) PA.fechas[el.dataset.fechaSes] = el.value;
+}
+function teclaFicha(e) {
+  if (e.target.id === 'fmotivo') {
+    if (e.key === 'Enter') { e.preventDefault(); confirmarAnulacionFicha($('#ficha [data-confirmar-anular]')); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelarAnulacionFicha(); }
+  } else if (e.key === 'Escape' && PA.alta && e.target.closest('.alta-form')) { e.preventDefault(); e.stopPropagation(); cerrarAlta(); }
+}
+
+/** Una vez, tras bootstrap. */
+function iniciarPacientes() {
+  const q = $('#pq');
+  q.addEventListener('input', alEscribir);
+  q.addEventListener('keydown', teclaBuscador);
+  $('#pres').addEventListener('click', e => { const b = e.target.closest('[data-dni]'); if (b) abrirFicha(b.dataset.dni, e.detail === 0); });
+  document.addEventListener('pointerdown', e => { if (!(e.target.closest && e.target.closest('.busq'))) cerrarLista(); });
+  const f = $('#ficha');
+  f.addEventListener('click', clicFicha);
+  f.addEventListener('input', entradaFicha);
+  f.addEventListener('change', entradaFicha);
+  f.addEventListener('keydown', teclaFicha);
+  $('#v-pacientes .cargando').hidden = true;
+  $('#pac-cuerpo').hidden = false;
+  PA.listo = true;
+  if (S.seccion === 'pacientes') VISTAS.pacientes.mostrar();
+}
+VISTAS.pacientes.mostrar = () => {
+  if (!PA.listo) return;
+  // «Ver ficha completa →» del panel.
+  if (S.fichaDni) { const dni = S.fichaDni; S.fichaDni = ''; abrirFicha(dni); return; }
+  // Al volver, la ficha abierta se pide de nuevo en silencio: pudo cambiar desde el tablero.
+  if (PA.dni && PA.estado === 'listo' && !PA.enVuelo) cargarFicha();
+  else if (!PA.dni && matchMedia('(min-width: 761px)').matches) $('#pq').focus({ preventScroll: true });
+};
+
 /* ============ Arranque ============ */
 async function iniciar() {
   S.modo = LS.get('seg.modo') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro');
@@ -2272,6 +2821,7 @@ async function iniciar() {
   pintarSaludo();
   iniciarTablero();
   iniciarRegistro();
+  iniciarPacientes();
   cargarTablero(pedidoTablero);
 }
 
@@ -2413,7 +2963,10 @@ const DEMO = (() => {
   sesiones.push(SES('SES-000001', 'REG-000001', 1, '2026-09-10', 'MAGALY'), SES('SES-000002', 'REG-000002', 1, '2026-09-28', 'RACHEL'),
     SES('SES-000003', 'REG-000005', 1, '2026-09-22', 'RACHEL'), SES('SES-000004', 'REG-000005', 2, '2026-09-29', 'ANA'),
     SES('SES-000005', 'REG-000006', 1, '2026-09-22', 'ANA'));
-  altas.push({ ID: 'ALT-000001', FECHA_HORA: '2026-09-18 16:40', FECHA: '2026-09-18', DNI: '41666777', ESPECIALIDAD: 'HEMATOLOGÍA',
+  // Tarea 9: Elena tuvo un alta en agosto y volvió el 30/09, así que esa alta quedó cerrada («volvió después»).
+  altas.push({ ID: 'ALT-000001', FECHA_HORA: '2026-08-10 11:00', FECHA: '2026-08-10', DNI: '41222333', ESPECIALIDAD: 'HEMATOLOGÍA',
+    DOCTOR: 'Dr. Elí Cabanillas', REGISTRADO_POR: 'RACHEL', NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' },
+  { ID: 'ALT-000002', FECHA_HORA: '2026-09-18 16:40', FECHA: '2026-09-18', DNI: '41666777', ESPECIALIDAD: 'HEMATOLOGÍA',
     DOCTOR: 'Dr. Elí Cabanillas', REGISTRADO_POR: 'MAGALY', NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' });
   const regPorId = id => registros.find(r => r.ID === id);
 
@@ -2701,7 +3254,9 @@ const DEMO = (() => {
       PRIMERA_CITA: hechas[0].FECHA, ULTIMA_CITA: u.FECHA, N_REALIZADAS: hechas.length,
       ESTADO: hoy < esperada ? 'AL DÍA' : hoy < vence ? 'POR VENCER' : 'VENCIDO' }));
   });
-  const vigente = (dni, esp) => altas.filter(a => !a.ANULADO && a.DNI === dni && mismo(a.ESPECIALIDAD, esp)).pop() || null;
+  // Como altasVigentes: sin anular y sin ninguna consulta realizada después del alta.
+  const vigente = (dni, esp) => altas.filter(a => !a.ANULADO && a.DNI === dni && mismo(a.ESPECIALIDAD, esp)
+    && !citas.some(c => c.DNI === dni && mismo(c.ESPECIALIDAD, esp) && c.ESTADO === 'REALIZADO' && c.FECHA > a.FECHA)).pop() || null;
 
   const api = {
     bootstrap: () => ({

@@ -63,7 +63,7 @@ test('el menú cambia de pantalla y marca el ítem con aria-current', async () =
       await pagina.locator(`.menu [data-sec="${sec}"]`).click();
       await pagina.waitForSelector(`#v-${sec}`, { state: 'visible' });
       for (const otra of SECCIONES.filter(s => s !== sec)) assert.equal(await visible(pagina, `#v-${otra}`), false, `${sec}: ${otra} oculta`);
-      if (sec !== 'tablero' && sec !== 'registro') assert.match(await pagina.locator(`#v-${sec}`).textContent(), /Cargando…/);
+      if (sec === 'indicadores') assert.match(await pagina.locator(`#v-${sec}`).textContent(), /Cargando…/);
       assert.deepEqual(await pagina.locator('.menu [aria-current="page"]').evaluateAll(l => l.map(x => x.dataset.sec)), [sec]);
     }
     assert.equal(await pagina.locator('#v-registro h1').textContent(), 'Registro');
@@ -1454,18 +1454,18 @@ test('registro: alta médica con las especialidades del paciente; la que ya tien
     await pagina.locator('#aesps [data-esp="REUMATOLOGÍA"]').click();
     await pagina.locator('#anota').fill('Controles en otra sede');
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="ALT-000002"]');
+    await pagina.waitForSelector('#lhoy li[data-reg="ALT-000003"]');
     assert.deepEqual(await ultimo(pagina, 'darDeAlta'), { usuario: 'MAGALY', dni: '41666777', especialidad: 'REUMATOLOGÍA',
       doctor: 'Dr. Juvenal Hanampa', fecha: '2026-10-01', nota: 'Controles en otra sede' });
-    assert.equal(await aviso(pagina), 'Alta médica registrada: Teresa del Pilar Rojas Vargas · Reumatología · ALT-000002');
-    assert.match(await filaHoy(pagina, 'ALT-000002').textContent(), /Alta médica · REUMATOLOGÍA · Dr\. Juvenal Hanampa/);
+    assert.equal(await aviso(pagina), 'Alta médica registrada: Teresa del Pilar Rojas Vargas · Reumatología · ALT-000003');
+    assert.match(await filaHoy(pagina, 'ALT-000003').textContent(), /Alta médica · REUMATOLOGÍA · Dr\. Juvenal Hanampa/);
     assert.equal(await pagina.locator('#adni').inputValue(), '', 'el formulario se limpia');
     // Su anulación va por anularAlta.
-    await filaHoy(pagina, 'ALT-000002').locator('[data-anular]').click();
-    await filaHoy(pagina, 'ALT-000002').locator('.anula input').fill('Especialidad equivocada');
-    await filaHoy(pagina, 'ALT-000002').locator('[data-confirmar-anular]').click();
-    await pagina.waitForSelector('#lhoy li.anulado[data-reg="ALT-000002"]');
-    assert.deepEqual(await ultimo(pagina, 'anularAlta'), { usuario: 'MAGALY', id: 'ALT-000002', motivo: 'Especialidad equivocada' });
+    await filaHoy(pagina, 'ALT-000003').locator('[data-anular]').click();
+    await filaHoy(pagina, 'ALT-000003').locator('.anula input').fill('Especialidad equivocada');
+    await filaHoy(pagina, 'ALT-000003').locator('[data-confirmar-anular]').click();
+    await pagina.waitForSelector('#lhoy li.anulado[data-reg="ALT-000003"]');
+    assert.deepEqual(await ultimo(pagina, 'anularAlta'), { usuario: 'MAGALY', id: 'ALT-000003', motivo: 'Especialidad equivocada' });
     assert.equal(await llamadas(pagina, 'anularRegistro'), 0);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -1583,6 +1583,374 @@ test('registro: el DNI conserva el cursor al quitar caracteres no válidos', asy
     await pagina.keyboard.type('x');
     assert.equal(await dni.inputValue(), '404X48555');
     assert.equal(await dni.evaluate(el => el.selectionStart), 4);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ============ Pacientes: buscador y ficha (Tarea 9) ============ */
+async function abrirPacientes(opciones = {}) {
+  const usuario = 'usuario' in opciones ? opciones.usuario : 'MAGALY';
+  const r = await abrir(Object.assign({}, opciones, usuario ? { guardado: { 'seg.usuario': usuario } } : {}));
+  try {
+    await r.pagina.waitForFunction(() => S.fase === 'listo');
+    await r.pagina.locator('.menu [data-sec="pacientes"]').click();
+    await r.pagina.waitForSelector('#pq', { state: 'visible' });
+  } catch (e) { await r.navegador.close(); throw e; }
+  return r;
+}
+/** Escribe en el buscador y espera la lista (o que siga oculta, con menos de 3 letras). */
+async function buscarEn(pagina, texto) {
+  await pagina.locator('#pq').fill(texto);
+  await pagina.waitForFunction(t => PA.q === t && !PA.buscando && !document.getElementById('pres').hidden, texto);
+}
+const opciones = pagina => pagina.locator('#pres [role="option"]').evaluateAll(l => l.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+/** Abre la ficha de `dni` desde el buscador y espera a que esté pintada. */
+async function abrirFicha(pagina, dni) {
+  await buscarEn(pagina, dni);
+  await pagina.locator(`#pres [data-dni="${dni}"]`).click();
+  await esperarFicha(pagina, dni);
+}
+const esperarFicha = (pagina, dni) => pagina.waitForFunction(dni => PA.estado === 'listo' && PA.dni === dni && !PA.enVuelo
+  && !!document.querySelector('#ficha .ficha'), dni);
+const textoDe = (pagina, sel) => pagina.locator(sel).evaluateAll(l => l.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+const espDe = (pagina, esp) => pagina.locator(`#ficha .esp[data-esp="${esp}"]`);
+const tratDe = (pagina, id) => pagina.locator(`#ficha .trat[data-reg="${id}"]`);
+
+test('pacientes: el buscador encuentra por nombre y por DNI y se usa con el teclado', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    assert.equal(await pagina.locator('#pq').getAttribute('placeholder'), 'DNI o nombre (mínimo 3 letras)');
+    assert.equal(await pagina.locator('#v-pacientes .cargando').isVisible(), false);
+    // Con menos de 3 letras no se busca.
+    await pagina.locator('#pq').fill('ro');
+    await pagina.waitForTimeout(450);
+    assert.equal(await llamadas(pagina, 'buscar'), 0);
+    assert.equal(await pagina.locator('#pres').isVisible(), false);
+    // Por nombre.
+    await buscarEn(pagina, 'rosa');
+    assert.equal(await ultimo(pagina, 'buscar'), 'rosa');
+    const nombres = await opciones(pagina);
+    assert.ok(nombres.some(t => /^Rosa Elena Quispe Huamán DNI 40111222$/.test(t)), nombres.join(' | '));
+    assert.ok(nombres.some(t => /Rosa Amelia Cárdenas Ríos DNI 41999000/.test(t)));
+    // Por DNI (prefijo), y solo los 6 primeros de los que devuelve el servidor.
+    await buscarEn(pagina, '4011');
+    assert.deepEqual(await opciones(pagina), ['Rosa Elena Quispe Huamán DNI 40111222']);
+    await buscarEn(pagina, '420');
+    const todos = await pagina.evaluate(() => llamar('buscar', '420'));
+    assert.ok(todos.length > 6, 'el DEMO devuelve más de 6');
+    assert.equal(await pagina.locator('#pres [role="option"]').count(), 6);
+    // ↑ ↓ mueven la selección; Enter abre esa ficha.
+    const sel = () => pagina.locator('#pres [role="option"]').evaluateAll(l => l.findIndex(x => x.getAttribute('aria-selected') === 'true'));
+    assert.equal(await sel(), 0);
+    await pagina.keyboard.press('ArrowDown');
+    await pagina.keyboard.press('ArrowDown');
+    assert.equal(await sel(), 2);
+    await pagina.keyboard.press('ArrowUp');
+    assert.equal(await sel(), 1);
+    assert.equal(await pagina.locator('#pq').getAttribute('aria-activedescendant'), await pagina.locator('#pres [role="option"]').nth(1).getAttribute('id'));
+    const elegido = await pagina.locator('#pres [role="option"]').nth(1).locator('[data-dni]').getAttribute('data-dni');
+    assert.equal(elegido, todos[1].DNI);
+    await pagina.keyboard.press('Enter');
+    await esperarFicha(pagina, elegido);
+    assert.equal(await ultimo(pagina, 'getPaciente'), elegido);
+    assert.equal(await pagina.locator('#ficha .ficha header .mono').textContent(), 'DNI ' + elegido);
+    assert.equal(await pagina.locator('#pres').isVisible(), false);
+    assert.equal(await pagina.locator('#pq').inputValue(), '');
+    // Esc cierra la lista y el foco sigue en el buscador.
+    await buscarEn(pagina, 'carmen');
+    await pagina.keyboard.press('Escape');
+    assert.equal(await pagina.locator('#pres').isVisible(), false);
+    assert.equal(await pagina.evaluate(() => document.activeElement.id), 'pq');
+    // Sin resultados.
+    await buscarEn(pagina, 'zzzz');
+    assert.equal((await pagina.locator('#pres').textContent()).trim(), 'Ningún paciente coincide con «zzzz».');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: la ficha muestra estado por especialidad, «Debía volver el …», registros con sesiones, altas y contacto', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    // Carmen: reevaluación vencida, con previos, número equivocado e historia.
+    await abrirFicha(pagina, '40333444');
+    assert.equal(await pagina.locator('#ficha .ficha header h2').textContent(), 'Carmen Sofía Torres Díaz');
+    const reu = espDe(pagina, 'REUMATOLOGÍA');
+    assert.equal((await reu.locator('h4').textContent()).trim(), 'Reumatología');
+    assert.equal((await reu.locator('.tag').textContent()).trim(), 'No volvió');
+    assert.match(await reu.locator('.tag').getAttribute('class'), /e-mal/);
+    assert.equal((await reu.locator('.perfil').textContent()).trim(), 'En control · faltó a su 3.ª reevaluación');
+    const linea = await textoDe(pagina, '#ficha .esp[data-esp="REUMATOLOGÍA"] .tiempo li');
+    assert.match(linea[0], /^Primera cita · 02\/04\/2026 · Dr\. Hanampa/);
+    assert.match(linea[1], /^Reevaluación 1 · /);
+    assert.match(linea[2], /^Reevaluación 2 · 23\/06\/2026/);
+    assert.equal(linea[3], 'Debía volver el 23/07/2026 (plazo máximo 07/08/2026)');
+    assert.equal(await reu.locator('.tiempo li.esperada').count(), 1);
+    assert.equal(await reu.locator('[data-dar-alta]').count(), 1);
+    // Procedimientos anteriores a la plataforma, con su teléfono.
+    const previos = await textoDe(pagina, '#ficha .previos tbody tr');
+    assert.equal(previos.length, 1);
+    assert.match(previos[0], /25\/08\/2026.*Hierro.*Cotizó, no lo hizo.*912 345 678/);
+    // Contacto (getPaciente.telefonos) con «Copiar»; el equivocado no se ofrece para copiar.
+    assert.deepEqual(await textoDe(pagina, '#f-contacto .contacto .num'), ['912 345 678']);
+    await pagina.locator('#f-contacto [data-copiar]').click();
+    await pagina.waitForFunction(() => /Copiado|No se pudo copiar/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'Copiado: 912345678');
+    assert.match(await pagina.locator('#f-contacto [data-copiar]').textContent(), /Copiado/);
+    // Historia con todos los seguimientos y «Anular» solo en el último.
+    const hist = await textoDe(pagina, '#f-hist .historia li');
+    assert.equal(hist.length, 2);
+    assert.match(hist[0], /^10\/09 · Rachel: no contestó · Reevaluación · Reumatología · Dijo que llamará/);
+    assert.match(hist[1], /número equivocado: 998877665/);
+    assert.equal(await pagina.locator('#f-hist [data-anular]').count(), 1);
+    assert.equal(await pagina.locator('#f-hist .historia li').first().locator('[data-anular]').count(), 1);
+    assert.equal((await pagina.locator('#f-altas').textContent()).replace(/\s+/g, ' ').trim(), 'Altas médicas Ninguna.');
+    assert.match(await pagina.locator('#ficha').textContent(), /No tiene registros en la plataforma\./);
+
+    // Rosa: registros con sus sesiones, y el anulado sin sesiones.
+    await abrirFicha(pagina, '40111222');
+    const r1 = tratDe(pagina, 'REG-000001');
+    assert.match(await r1.locator('.trat-cab').textContent(), /Hierro carboximaltosa · Ferinject × 3 sesiones\s*En curso/);
+    assert.equal((await r1.locator('.trat-meta').textContent()).trim(), 'REG-000001 · 03/09/2026 · Dr. Elí Cabanillas · registró Magaly');
+    const ses = await textoDe(pagina, '#ficha .trat[data-reg="REG-000001"] .ses');
+    assert.equal(ses.length, 3);
+    assert.match(ses[0], /^Sesión 1 · 10\/09\/2026 · Magaly\s*Anular sesión$/);
+    assert.match(ses[1], /^Sesión 2 · pendiente/);
+    assert.equal(ses[2], 'Sesión 3 · pendiente');
+    assert.equal(await r1.locator('[data-lohizo]').count(), 1, '«Lo hizo» solo en la siguiente');
+    assert.equal(await r1.locator('[data-fecha-ses]').inputValue(), '2026-10-01');
+    assert.equal(await r1.locator('[data-fecha-ses]').getAttribute('max'), '2026-10-01');
+    assert.equal(await r1.locator('[data-fecha-ses]').getAttribute('min'), '2026-09-10');
+    assert.equal(await r1.locator('[data-anular-ses]').count(), 1);
+    assert.equal(await r1.locator('[data-anular-reg]').count(), 1);
+    assert.equal(await r1.locator('.prog i').count(), 3);
+    const r7 = tratDe(pagina, 'REG-000007');
+    assert.match(await r7.locator('.trat-cab').textContent(), /Anulado/);
+    assert.match(await r7.locator('.trat-meta').textContent(), /anulado: Registrado dos veces/);
+    assert.equal(await r7.locator('.ses').count(), 0);
+    assert.equal(await r7.locator('button').count(), 0);
+    assert.deepEqual(await textoDe(pagina, '#f-contacto .contacto .num'), ['987 654 321', '014 332 210']);
+    assert.equal((await espDe(pagina, 'HEMATOLOGÍA').locator('.tag').textContent()).trim(), 'Al día');
+    assert.match(await espDe(pagina, 'HEMATOLOGÍA').locator('.tag').getAttribute('class'), /e-ok/);
+
+    // Teresa: alta vigente (y su especialidad en «Alta médica», sin «Dar de alta…»); Elena: alta cerrada.
+    await abrirFicha(pagina, '41666777');
+    const hem = espDe(pagina, 'HEMATOLOGÍA');
+    assert.equal((await hem.locator('.tag').textContent()).trim(), 'Alta médica');
+    assert.match(await hem.locator('.tag').getAttribute('class'), /e-alta/);
+    assert.equal(await hem.locator('[data-dar-alta]').count(), 0);
+    assert.equal(await hem.locator('.tiempo li.esperada').count(), 0, 'con alta no se espera que vuelva');
+    assert.equal(await espDe(pagina, 'REUMATOLOGÍA').locator('[data-dar-alta]').count(), 1);
+    const alta = await textoDe(pagina, '#f-altas li');
+    assert.equal(alta.length, 1);
+    assert.match(alta[0], /^Hematología · 18\/09\/2026\s*Vigente\s*Dr\. Elí Cabanillas · registró Magaly\s*Anular$/);
+    await abrirFicha(pagina, '41222333');
+    assert.match((await textoDe(pagina, '#f-altas li'))[0], /^Hematología · 10\/08\/2026\s*Cerrada: volvió después/);
+
+    // En el celular la ficha no se sale de la pantalla.
+    await abrirFicha(pagina, '40111222');
+    await pagina.setViewportSize({ width: 390, height: 844 });
+    assert.ok(await pagina.evaluate(() => document.documentElement.scrollWidth <= 390), 'sin scroll horizontal a 390 px');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: «Dar de alta…» abre doctor y fecha en la especialidad y registra el alta', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '41666777');
+    const reu = espDe(pagina, 'REUMATOLOGÍA');
+    await reu.locator('[data-dar-alta]').click();
+    assert.equal(await reu.locator('.alta-form').count(), 1, 'el formulario se abre dentro de la especialidad');
+    assert.equal(await pagina.locator('#ficha .alta-form').count(), 1);
+    assert.equal(await pagina.locator('#falta-doc').inputValue(), 'Dr. Juvenal Hanampa', 'propone el doctor de la última consulta');
+    assert.equal(await pagina.locator('#falta-fec').inputValue(), '2026-10-01');
+    assert.equal(await pagina.locator('#falta-fec').getAttribute('max'), '2026-10-01');
+    // Sin doctor no sale nada.
+    const n = await llamadas(pagina, 'darDeAlta');
+    await pagina.locator('#falta-doc').selectOption('');
+    await pagina.locator('#ficha [data-alta-ok]').click();
+    assert.equal(await aviso(pagina), 'Elija el doctor que da el alta.');
+    assert.equal(await llamadas(pagina, 'darDeAlta'), n);
+    // Error del servidor: el formulario sigue abierto.
+    await pagina.locator('#falta-doc').selectOption('Dr. Juvenal Hanampa');
+    await pagina.evaluate(() => { DEMO._fallar.darDeAlta = 'Sin conexión con el servidor.'; });
+    await pagina.locator('#ficha [data-alta-ok]').click();
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'No se guardó: Sin conexión con el servidor.');
+    assert.equal(await pagina.locator('#falta-doc').inputValue(), 'Dr. Juvenal Hanampa');
+    await pagina.evaluate(() => { delete DEMO._fallar.darDeAlta; });
+    // Bien.
+    await pagina.locator('#falta-nota').fill('Controles en otra sede');
+    const tab = await llamadas(pagina, 'getTablero');
+    await pagina.evaluate(() => { S.kpi = { x: 1 }; S.resumen = { x: 1 }; });
+    await pagina.locator('#ficha [data-alta-ok]').click();
+    await pagina.waitForFunction(() => /Alta médica registrada/.test(document.querySelector('#aviso span').textContent));
+    assert.deepEqual(await ultimo(pagina, 'darDeAlta'), { usuario: 'MAGALY', dni: '41666777', especialidad: 'REUMATOLOGÍA',
+      doctor: 'Dr. Juvenal Hanampa', fecha: '2026-10-01', nota: 'Controles en otra sede' });
+    assert.equal(await aviso(pagina), 'Alta médica registrada: Reumatología · ALT-000003');
+    await esperarFicha(pagina, '41666777');
+    await pagina.waitForFunction(() => document.querySelectorAll('#f-altas li').length === 2);
+    assert.equal((await espDe(pagina, 'REUMATOLOGÍA').locator('.tag').textContent()).trim(), 'Alta médica');
+    assert.equal(await espDe(pagina, 'REUMATOLOGÍA').locator('[data-dar-alta]').count(), 0);
+    assert.equal(await pagina.locator('#ficha .alta-form').count(), 0);
+    assert.deepEqual(await pagina.evaluate(() => [S.kpi, S.resumen]), [null, null]);
+    await pagina.waitForFunction(t => DEMO._llamadas.getTablero > t, tab);
+    // El alta nueva se anula desde el lateral, con motivo.
+    const fila = pagina.locator('#f-altas li[data-alta="ALT-000003"]');
+    await fila.locator('[data-anular-alta]').click();
+    await pagina.locator('#fmotivo').fill('Especialidad equivocada');
+    await pagina.keyboard.press('Enter');
+    await pagina.waitForFunction(() => /Anulada/.test((document.querySelector('#f-altas li[data-alta="ALT-000003"]') || {}).textContent || ''));
+    assert.deepEqual(await ultimo(pagina, 'anularAlta'), { usuario: 'MAGALY', id: 'ALT-000003', motivo: 'Especialidad equivocada' });
+    assert.match(await pagina.locator('#f-altas li[data-alta="ALT-000003"]').textContent(), /Anulada: Especialidad equivocada/);
+    assert.equal(await pagina.locator('#f-altas li[data-alta="ALT-000003"] [data-anular-alta]').count(), 0);
+    assert.equal((await espDe(pagina, 'REUMATOLOGÍA').locator('.tag').textContent()).trim(), 'Al día');
+    // Sin usuario no se registra nada.
+    await pagina.evaluate(() => elegirUsuario(''));
+    await espDe(pagina, 'REUMATOLOGÍA').locator('[data-dar-alta]').click();
+    const m = await llamadas(pagina, 'darDeAlta');
+    await pagina.locator('#ficha [data-alta-ok]').click();
+    assert.equal(await aviso(pagina), 'Elija quién es usted.');
+    assert.equal(await llamadas(pagina, 'darDeAlta'), m);
+    // Esc cierra el formulario.
+    await pagina.locator('#falta-fec').focus();
+    await pagina.keyboard.press('Escape');
+    assert.equal(await pagina.locator('#ficha .alta-form').count(), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: «Lo hizo» registra la sesión; «Anular sesión» y «Anular registro» piden motivo', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '40111222');
+    const r1 = tratDe(pagina, 'REG-000001');
+    await r1.locator('[data-fecha-ses]').fill('2026-09-30');
+    const tab = await llamadas(pagina, 'getTablero');
+    await r1.locator('[data-lohizo]').click();
+    await pagina.waitForFunction(() => /Sesión 2 de 3 registrada/.test(document.querySelector('#aviso span').textContent));
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-09-30', nota: '' });
+    assert.equal(await aviso(pagina), 'Sesión 2 de 3 registrada: REG-000001.');
+    await pagina.waitForFunction(() => /Sesión 2 · 30\/09\/2026 · Magaly/.test(document.querySelector('#ficha .trat[data-reg="REG-000001"]').textContent));
+    let ses = await textoDe(pagina, '#ficha .trat[data-reg="REG-000001"] .ses');
+    assert.match(ses[0], /^Sesión 1 · 10\/09\/2026 · Magaly$/, 'ya no es la última: sin «Anular sesión»');
+    assert.match(ses[1], /^Sesión 2 · 30\/09\/2026 · Magaly\s*Anular sesión$/);
+    assert.equal(await r1.locator('[data-anular-ses]').count(), 1);
+    assert.equal(await r1.locator('.prog i.si').count(), 2);
+    await pagina.waitForFunction(t => DEMO._llamadas.getTablero > t, tab);
+    // Anular sesión: sin motivo no sale; con motivo, la sesión queda tachada y vuelve a estar pendiente.
+    await r1.locator('[data-anular-ses]').click();
+    assert.equal(await pagina.evaluate(() => document.activeElement.id), 'fmotivo');
+    const n = await llamadas(pagina, 'anularSesion');
+    await pagina.locator('#ficha [data-confirmar-anular]').click();
+    assert.equal(await aviso(pagina), 'Escriba el motivo de la anulación.');
+    assert.equal(await llamadas(pagina, 'anularSesion'), n);
+    await pagina.locator('#fmotivo').fill('Fecha equivocada');
+    await pagina.locator('#ficha [data-confirmar-anular]').click();
+    await pagina.waitForSelector('#ficha .trat[data-reg="REG-000001"] .ses.anulada');
+    assert.deepEqual(await ultimo(pagina, 'anularSesion'), { usuario: 'MAGALY', id: 'SES-000006', motivo: 'Fecha equivocada' });
+    assert.equal(await aviso(pagina), 'Anulado: SES-000006.');
+    const anulada = r1.locator('.ses.anulada');
+    assert.match(await anulada.textContent(), /Sesión 2 · 30\/09\/2026 · Magaly · anulada: Fecha equivocada/);
+    assert.equal(await anulada.evaluate(e => getComputedStyle(e.querySelector('.tx')).textDecorationLine), 'line-through');
+    ses = await textoDe(pagina, '#ficha .trat[data-reg="REG-000001"] .ses:not(.anulada)');
+    assert.match(ses[0], /Anular sesión$/, 'la sesión 1 vuelve a ser la última');
+    assert.match(ses[1], /^Sesión 2 · pendiente/);
+    assert.equal(await r1.locator('[data-lohizo]').count(), 1);
+    // Cancelar y Esc cierran el motivo sin llamar.
+    await r1.locator('[data-anular-reg]').click();
+    await pagina.locator('#ficha [data-cancelar-anular]').click();
+    assert.equal(await pagina.locator('#fmotivo').count(), 0);
+    await r1.locator('[data-anular-reg]').click();
+    await pagina.keyboard.press('Escape');
+    assert.equal(await pagina.locator('#fmotivo').count(), 0);
+    assert.equal(await llamadas(pagina, 'anularRegistro'), 0);
+    // Anular registro con motivo: queda «Anulado», sin sesiones ni botones.
+    await r1.locator('[data-anular-reg]').click();
+    await pagina.locator('#fmotivo').fill('Paciente equivocado');
+    await pagina.locator('#ficha [data-confirmar-anular]').click();
+    await pagina.waitForFunction(() => /Anulado/.test(document.querySelector('#ficha .trat[data-reg="REG-000001"] .trat-cab').textContent));
+    assert.deepEqual(await ultimo(pagina, 'anularRegistro'), { usuario: 'MAGALY', id: 'REG-000001', motivo: 'Paciente equivocado' });
+    assert.match(await r1.locator('.trat-meta').textContent(), /anulado: Paciente equivocado/);
+    assert.equal(await r1.locator('[data-lohizo], [data-anular-reg], [data-anular-ses]').count(), 0);
+    assert.deepEqual(await pagina.evaluate(() => [S.kpi, S.resumen]), [null, null]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: confirmar el emparejamiento llama al servidor y quita el aviso', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '40222333');
+    const caja = pagina.locator('#ficha .emparejar');
+    assert.equal(await caja.count(), 1);
+    assert.match(await caja.textContent(), /¿Es esta la misma persona\?/);
+    assert.match((await caja.textContent()).replace(/\s+/g, ' '), /Hierro del 20\/07\/2026 a nombre de Jorge Mendoza · teléfono 945 112 233/);
+    const botones = caja.locator('[data-emparejar]');
+    assert.equal(await botones.count(), 2);
+    assert.match(await caja.locator('[data-dni="40222333"]').getAttribute('class'), /btn-p/, 'el de esta ficha va destacado');
+    assert.match(await caja.locator('[data-dni="40999888"]').textContent(), /Jorge Mendoza Salas · 40999888/);
+    assert.match(await pagina.locator('#f-contacto').textContent(), /Sin teléfono\./);
+    assert.equal(await pagina.locator('#ficha .previos tbody tr').count(), 0);
+    await caja.locator('[data-dni="40222333"]').click();
+    await pagina.waitForFunction(() => /Emparejamiento confirmado/.test(document.querySelector('#aviso span').textContent));
+    assert.deepEqual(await ultimo(pagina, 'confirmarEmparejamiento'), { usuario: 'MAGALY', id: 'IND-0003', dni: '40222333' });
+    assert.equal(await aviso(pagina), 'Emparejamiento confirmado.');
+    await pagina.waitForFunction(() => !document.querySelector('#ficha .emparejar') && PA.estado === 'listo');
+    assert.equal(await pagina.locator('#ficha .previos tbody tr').count(), 1);
+    assert.deepEqual(await textoDe(pagina, '#f-contacto .contacto .num'), ['945 112 233']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: el aviso de fallecido, los números tachados y la historia con «Anular» como en el panel', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '41999000');
+    assert.equal((await pagina.locator('#ficha .ficha header .fallecido').textContent()).trim(),
+      'Figura como fallecido el 24/09/2026 (Ana). Si es un error, anule «Falleció» en la historia de seguimientos.');
+    assert.match((await textoDe(pagina, '#f-hist .historia li'))[0], /falleció/);
+    assert.equal(await pagina.locator('#f-hist .historia li').first().locator('[data-anular]').count(), 1);
+    await abrirFicha(pagina, '40333444');
+    assert.equal(await pagina.locator('#ficha .fallecido').count(), 0);
+    const s = pagina.locator('#ficha header .descartados s');
+    assert.deepEqual(await s.allTextContents(), ['998 877 665']);
+    assert.equal(await s.first().evaluate(e => getComputedStyle(e).textDecorationLine), 'line-through');
+    // «Anular» del último seguimiento: el anulado se tacha con su motivo y «Anular» pasa al anterior.
+    await pagina.locator('#f-hist .historia li').first().locator('[data-anular]').click();
+    await pagina.locator('#fmotivo').fill('Era otro paciente');
+    await pagina.locator('#ficha [data-confirmar-anular]').click();
+    await pagina.waitForSelector('#f-hist .historia li.anulado');
+    assert.deepEqual(await ultimo(pagina, 'anularResultado'), { usuario: 'MAGALY', id: 'SEG-0004', motivo: 'Era otro paciente' });
+    const h = await textoDe(pagina, '#f-hist .historia li');
+    assert.match(h[0], /anulado: Era otro paciente/);
+    assert.equal(await pagina.locator('#f-hist .historia li').first().evaluate(e => getComputedStyle(e.querySelector('.txt')).textDecorationLine), 'line-through');
+    assert.equal(await pagina.locator('#f-hist .historia li').first().locator('[data-anular]').count(), 0);
+    assert.equal(await pagina.locator('#f-hist .historia li').nth(1).locator('[data-anular]').count(), 1);
+    // ANULADO se lee normalizado.
+    assert.deepEqual(await pagina.evaluate(() => ['SI', 'SÍ', 'si', 'sí', 'Sí', true, '', 'NO', false].map(esAnulado)),
+      [true, true, true, true, true, true, false, false, false]);
+    const filas = await pagina.evaluate(() => filasSeguimientos([
+      { ID: 'SEG-1', FECHA_HORA: '2026-09-01 10:00', ESPECIALIDAD: 'HEMATOLOGÍA', REFERENCIA: '', RESPONSABLE: 'ANA', RESULTADO: 'NO CONTESTÓ', ANULADO: '' },
+      { ID: 'SEG-2', FECHA_HORA: '2026-09-02 10:00', ESPECIALIDAD: 'HEMATOLOGÍA', REFERENCIA: '', RESPONSABLE: 'ANA', RESULTADO: 'NO CONTESTÓ', ANULADO: 'sí', MOTIVO_ANULACION: 'x' }
+    ]).map(f => [f.anulado, !!f.anular]));
+    assert.deepEqual(filas, [[false, true], [true, false]]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: «Ver ficha completa →» del panel abre la ficha de ese paciente', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, CARMEN);
+    await pagina.locator('#panel [data-ficha]').click();
+    await pagina.waitForSelector('#v-pacientes', { state: 'visible' });
+    await esperarFicha(pagina, '40333444');
+    assert.equal(await pagina.locator('#ficha .ficha header h2').textContent(), 'Carmen Sofía Torres Díaz');
+    assert.equal(await ultimo(pagina, 'getPaciente'), '40333444');
+    assert.equal(await panelAbierto(pagina), false);
+    assert.equal(await pagina.evaluate(() => S.fichaDni), '');
+    assert.equal(await pagina.locator('.menu [aria-current="page"]').getAttribute('data-sec'), 'pacientes');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

@@ -2309,3 +2309,151 @@ test('indicadores en el celular (390 px) y en oscuro: sin scroll horizontal en n
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+/* ============ Resumen imprimible (Tarea 11) ============ */
+
+/** Sustituye window.print por un contador (el diálogo real no se puede abrir en la prueba). */
+const espiarPrint = pagina => pagina.evaluate(() => { window.__print = 0; window.print = () => { window.__print++; }; });
+const imprimir = async pagina => {
+  await pagina.locator('#iimprimir').click();
+  await pagina.waitForFunction(() => window.__print > 0, null, { timeout: 10000 });
+};
+
+test('imprimible: se arma con los datos del DEMO, llama a window.print y su cifra grande coincide con la de la pantalla', async () => {
+  const { navegador, pagina, errores } = await abrirIndicadores();
+  try {
+    assert.equal(await pagina.locator('#iimprimir').textContent().then(t => t.trim()), 'Resumen para imprimir');
+    assert.equal(await pagina.locator('#imprimible').isVisible(), false, 'oculto en pantalla');
+    await espiarPrint(pagina);
+    const pantalla = await grande(pagina);
+    assert.equal(pantalla, '26%');
+    await imprimir(pagina);
+    assert.equal(await pagina.evaluate(() => window.__print), 1);
+    assert.equal(await pagina.locator('#imprimible .pag').count(), 2);
+    assert.equal(await pagina.locator('#imprimible #imp-p1').count(), 1);
+    assert.equal(await pagina.locator('#imprimible #imp-p2').count(), 1);
+    assert.equal((await pagina.locator('#imprimible .imp-grande').textContent()).trim(), pantalla, 'la cifra impresa es la de la pantalla');
+    const p1 = await pagina.locator('#imp-p1').textContent().then(t => t.replace(/\s+/g, ' '));
+    assert.match(p1, /todos los médicos/);
+    assert.match(p1, /setiembre 2026/);
+    assert.match(p1, /de los pacientes de setiembre no volvieron a su reevaluación\./);
+    assert.match(p1, /Son 9 de 35 pacientes/);
+    assert.deepEqual(await pagina.locator('#imp-p1 .imp-sec p').evaluateAll(l => l.map(p => p.textContent.replace(/\s+/g, ' ').trim())), [
+      '40% no siguieron el tratamiento de hierro (8 de 20).',
+      '0% completaron el tratamiento de hierro (0 de 12).',
+      '60% no siguieron otros procedimientos (3 de 5).',
+      '39% volvieron tras el seguimiento (7 de 18).']);
+    assert.equal(await pagina.locator('#imp-p1 .imp-barras [data-imp-mes]').count(), 6);
+    assert.equal(await pagina.locator('#imp-p1 .imp-barras .curso').count(), 1);
+    assert.equal(await pagina.locator('#imp-p1 .imp-conviene li').count(), 2);
+    assert.match(await pagina.locator('#imp-p1 .imp-conviene li').first().textContent(), /^Mejoró: de 50 % a 26 % en 6 meses\.$/);
+    assert.match(await pagina.locator('#imp-p1 .imp-conviene li').nth(1).textContent(), /^Lo que más se pierde: 60 % no siguieron otros procedimientos \(3 de 5\)\.$/);
+    assert.match(p1, /Generado el 0?1\/10\/2026|Generado el \d\d\/\d\d\/\d{4} · datos de SOFDOC y de la plataforma/);
+    // Página 2: 100 cuadritos, 5 canales (los mismos primeros de la pestaña Campañas) y 2 frases de procedimientos.
+    assert.equal(await pagina.locator('#imp-p2 .waffle i').count(), 100);
+    assert.match(await pagina.locator('#imp-p2 .imp-relato p').first().textContent(), /^De cada 100 pacientes nuevos, \d+ no vuelven nunca/);
+    const canales = await pagina.locator('#imp-p2 .imp-canales tbody tr').evaluateAll(l => l.map(tr => tr.children[0].textContent.trim()));
+    assert.equal(canales.length, 5);
+    assert.equal(await pagina.locator('#imp-p2 .imp-procs p').count(), 2);
+    assert.match(await pagina.locator('#imp-p2 .imp-procs p').first().textContent(), /de lo cotizado .* se empezó: \d+ de \d+\./);
+    await pestana(pagina, 'campanas');
+    const enPantalla = (await filasDe(pagina, '[data-tabla="canal"]')).slice(0, 5).map(f => f[0]);
+    assert.deepEqual(canales, enPantalla, 'los canales impresos son los primeros de la pantalla');
+    // Con el filtro de médico, la cifra impresa sigue siendo la de la pantalla.
+    await pestana(pagina, 'resumen');
+    await pagina.locator('#imed').selectOption('Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
+    const filtrada = await grande(pagina);
+    assert.equal(filtrada, '25%');
+    await imprimir(pagina);
+    assert.equal(await pagina.evaluate(() => window.__print), 2);
+    assert.equal((await pagina.locator('#imprimible .imp-grande').textContent()).trim(), filtrada);
+    assert.match(await pagina.locator('#imp-p1').textContent(), /de sus pacientes de setiembre/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('imprimible: si getResumen y getKpi no están en el caché, el botón los pide antes de imprimir', async () => {
+  const { navegador, pagina, errores } = await abrirIndicadores();
+  try {
+    await espiarPrint(pagina);
+    await pagina.evaluate(() => invalidarIndicadores());
+    const antes = await pagina.evaluate(() => ({ r: DEMO._llamadas.getResumen, k: DEMO._llamadas.getKpi }));
+    await imprimir(pagina);
+    const despues = await pagina.evaluate(() => ({ r: DEMO._llamadas.getResumen, k: DEMO._llamadas.getKpi }));
+    assert.equal(despues.r, antes.r + 1);
+    assert.equal(despues.k, antes.k + 1);
+    assert.equal((await pagina.locator('#imprimible .imp-grande').textContent()).trim(), '26%');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('queConvieneMirar: tendencia (mejoró, empeoró, se mantiene) y la cifra secundaria peor', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    const frases = await pagina.evaluate(() => {
+      const mes = (ps) => ps.map((p, i) => ({ mes: '2026-0' + (4 + i), p }));
+      const sec = [[8, 20, false, 'no siguieron el tratamiento de hierro', ''], [0, 12, true, 'completaron el tratamiento de hierro', 'x'],
+        [3, 5, false, 'no siguieron otros procedimientos', ''], [7, 18, true, 'volvieron tras el seguimiento', '']];
+      return {
+        baja: queConvieneMirar(mes([61, 58, 58, 57, 47, 25]), sec, 60),
+        sube: queConvieneMirar(mes([30, 31, 36]), sec, 60),
+        igual: queConvieneMirar(mes([40, 38, 43]), sec, 60),
+        justo5: queConvieneMirar(mes([40, 45]), sec, 60),
+        justo4: queConvieneMirar(mes([40, 44]), sec, 60),
+        peorHierro: queConvieneMirar(mes([40, 40]), [[5, 12, false, 'no siguieron el tratamiento de hierro', ''], [0, 0, true, 'completaron', 'v'], [1, 5, false, 'no siguieron otros procedimientos', ''], [0, 0, true, 'volvieron', 'v']], 60),
+        sinNada: queConvieneMirar(mes([null]), [[0, 0, false, 'a', ''], [0, 0, true, 'b', ''], [0, 0, false, 'c', ''], [0, 0, true, 'd', '']], 60)
+      };
+    });
+    assert.deepEqual(frases.baja, ['Mejoró: de 61 % a 25 % en 6 meses.', 'Lo que más se pierde: 60 % no siguieron otros procedimientos (3 de 5).']);
+    assert.equal(frases.sube[0], 'Empeoró: de 30 % a 36 % en 3 meses.');
+    assert.equal(frases.igual[0], 'Se mantiene alrededor de 43 %.');
+    assert.equal(frases.justo5[0], 'Empeoró: de 40 % a 45 % en 2 meses.');
+    assert.equal(frases.justo4[0], 'Se mantiene alrededor de 44 %.');
+    assert.equal(frases.peorHierro[1], 'Lo que más se pierde: 42 % no siguieron el tratamiento de hierro (5 de 12).');
+    assert.equal(frases.sinNada.length, 2);
+    assert.ok(frases.sinNada.every(t => typeof t === 'string' && t));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('imprimible: en pantalla de impresión solo se ve #imprimible, con la paleta clara aunque la app esté en oscuro', async () => {
+  const { navegador, pagina, errores } = await abrirIndicadores({ guardado: { 'seg.modo': 'oscuro' } });
+  try {
+    assert.equal(await pagina.evaluate(() => document.documentElement.dataset.modo), 'oscuro');
+    await espiarPrint(pagina);
+    await imprimir(pagina);
+    await pagina.emulateMedia({ media: 'print' });
+    assert.equal(await pagina.locator('#imprimible').isVisible(), true);
+    assert.equal(await pagina.locator('#imp-p1').isVisible(), true);
+    assert.equal(await pagina.locator('#imp-p2').isVisible(), true);
+    for (const sel of ['.app', '.side', '#vista', '.navmovil', '#panel', '#aviso']) {
+      assert.equal(await pagina.locator(sel).first().isVisible(), false, sel + ' no se imprime');
+    }
+    // Lo que hace el navegador al imprimir: beforeprint fuerza la paleta clara; afterprint devuelve el modo.
+    await pagina.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
+    assert.notEqual(await pagina.evaluate(() => document.documentElement.dataset.modo), 'oscuro');
+    assert.equal(await pagina.evaluate(() => getComputedStyle(document.querySelector('#imprimible .imp-grande')).color), 'rgb(140, 29, 24)');
+    assert.equal(await pagina.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgb(255, 255, 255)');
+    await pagina.evaluate(() => window.dispatchEvent(new Event('afterprint')));
+    assert.equal(await pagina.evaluate(() => document.documentElement.dataset.modo), 'oscuro');
+    await pagina.emulateMedia({ media: 'screen' });
+    assert.equal(await pagina.locator('#imprimible').isVisible(), false);
+    assert.equal(await pagina.locator('.app').isVisible(), true);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('imprimible: el PDF tiene exactamente dos páginas A4 y no trae palabras prohibidas', async () => {
+  const { navegador, pagina, errores } = await abrirIndicadores();
+  try {
+    await espiarPrint(pagina);
+    await imprimir(pagina);
+    const texto = await pagina.locator('#imprimible').evaluate(e => e.textContent);
+    assert.doesNotMatch(texto, /cohorte|días de atraso|\blead\b|KPI|Sin lead|—/i);
+    await pagina.emulateMedia({ media: 'print' });
+    const pdf = await pagina.pdf({ preferCSSPageSize: true });
+    const paginas = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+    assert.equal(paginas, 2, 'dos páginas');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

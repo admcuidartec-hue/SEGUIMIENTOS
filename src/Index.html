@@ -554,6 +554,87 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .sec-i{max-width:1120px;display:flex;flex-direction:column;gap:12px}
 .sec-i .desplazable,.bloque-i .desplazable{max-width:100%}
 
+/* Resumen imprimible (README §6.5; MAPEO §4): oculto en pantalla; al imprimir es lo único que se ve. Solo tokens: al imprimir
+   se fuerza la paleta clara quitando data-modo (ver beforeprint), así que sale igual aunque la app esté en oscuro. */
+#imprimible{display:none}
+.ind-der{display:flex;align-items:center;justify-content:flex-end;gap:8px 12px;flex-wrap:wrap;min-width:0}
+#ifiltros{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;min-width:0}
+#imprimible .pag{display:flex;flex-direction:column;gap:6mm;height:265mm;color:var(--ink);font-size:10.5pt;line-height:1.4;break-after:page}
+#imprimible .pag:last-child{break-after:auto}
+#imprimible p,#imprimible h2,#imprimible ul{margin:0}
+#imprimible h2{font-size:11pt;font-weight:600}
+#imprimible .imp-cab{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-bottom:4mm;border-bottom:1px solid var(--line)}
+#imprimible .imp-marca{display:flex;align-items:center;gap:10px}
+#imprimible .imp-marca .logo{width:30px;height:30px;flex-basis:30px;border-radius:8px;font-size:9pt}
+#imprimible .imp-marca span.t{display:flex;flex-direction:column}
+#imprimible .imp-marca b{font-weight:600;font-size:11pt}
+#imprimible .imp-marca small{font-size:8.5pt;color:var(--muted)}
+#imprimible .imp-mes{font-size:15pt;font-weight:600;letter-spacing:-.02em;white-space:nowrap}
+#imprimible .imp-rango{font-size:9pt;color:var(--muted)}
+#imprimible .imp-res{display:grid;grid-template-columns:44mm 1fr;gap:8mm;align-items:center}
+#imprimible .imp-grande{font-family:var(--mono);font-size:58pt;font-weight:500;letter-spacing:-.06em;line-height:.9;color:var(--accent)}
+#imprimible .imp-res div{display:flex;flex-direction:column;gap:2mm}
+#imprimible .imp-frase{font-size:15pt;font-weight:500;line-height:1.25;letter-spacing:-.01em}
+#imprimible .imp-suave{color:var(--soft)}
+#imprimible .imp-meta{font-weight:600;color:var(--soft)}
+#imprimible .imp-meta.ok{color:var(--good)}
+#imprimible .imp-meta.mal{color:var(--accent)}
+#imprimible .imp-blq{display:flex;flex-direction:column;gap:3mm}
+#imprimible .imp-sec,#imprimible .imp-procs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 8mm;border-top:1px solid var(--line)}
+#imprimible .imp-sec p,#imprimible .imp-procs p{padding:3mm 0;border-bottom:1px solid var(--line);display:flex;gap:4mm;align-items:baseline}
+#imprimible .imp-procs p{padding:2.5mm 0}
+#imprimible .imp-sec b,#imprimible .imp-procs b{font-family:var(--mono);font-weight:500;font-size:16pt;color:var(--warn);min-width:16mm}
+#imprimible .imp-procs b{font-size:14pt;min-width:15mm}
+#imprimible .imp-sec b.buena{color:var(--good)}
+#imprimible .imp-mm-cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+#imprimible .imp-ley{display:flex;gap:10px;font-size:8.5pt;color:var(--soft)}
+#imprimible .imp-ley span{display:inline-flex;align-items:center;gap:5px}
+#imprimible .imp-ley i{width:9px;height:9px;border-radius:2px;background:var(--accent)}
+#imprimible .imp-ley i.rayado{border:1.2px solid var(--accent);background:repeating-linear-gradient(135deg,var(--accent) 0 1.2px,transparent 1.2px 3.5px)}
+#imprimible .imp-ley i.meta{width:14px;height:0;border-radius:0;background:none;border-top:1.2px dashed var(--ink)}
+#imprimible .imp-barras{position:relative;height:48mm;margin-top:5mm;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:7mm;align-items:end;border-bottom:1px solid var(--line-2)}
+#imprimible .imp-barras .linea{position:absolute;left:0;right:0;border-top:1.2px dashed var(--ink);opacity:.7}
+#imprimible .imp-barras>div{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end}
+#imprimible .imp-barras span{position:relative;display:block;background:var(--accent);border-radius:3px 3px 0 0;opacity:.6}
+#imprimible .imp-barras .curso span{opacity:1;border:1.2px solid var(--accent);background:repeating-linear-gradient(135deg,var(--accent) 0 1.5px,transparent 1.5px 5px)}
+#imprimible .imp-barras b{position:absolute;bottom:100%;left:0;right:0;text-align:center;padding-bottom:1mm;font-family:var(--mono);font-weight:500;font-size:9.5pt}
+#imprimible .imp-barras .sin>b{position:static;color:var(--muted);padding:0}
+#imprimible .imp-ejes{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7mm;text-align:center;font-size:9pt;color:var(--soft)}
+#imprimible .imp-ejes .sel{color:var(--accent);font-weight:600}
+#imprimible .imp-conviene{margin-top:auto;display:flex;flex-direction:column;gap:2mm;padding:4mm 5mm;border-radius:6px;background:var(--accent-soft)}
+#imprimible .imp-conviene ul{padding-left:5mm;display:flex;flex-direction:column;gap:1mm}
+#imprimible .imp-pie{display:flex;justify-content:space-between;gap:6mm;font-size:8pt;color:var(--muted)}
+#imprimible .imp-pie span:last-child{white-space:nowrap}
+#imprimible .imp-llegan{display:grid;grid-template-columns:52mm 1fr;gap:9mm;align-items:start}
+#imprimible .imp-llegan figure{margin:0;display:flex;flex-direction:column;gap:3mm}
+#imprimible .waffle{width:auto;gap:1.2mm}
+#imprimible .waffle i{border-radius:1.5px}
+#imprimible .leyenda{gap:1.2mm;font-size:9.5pt}
+#imprimible .leyenda li{gap:6px}
+#imprimible .leyenda li i{width:8px;height:8px;flex-basis:8px;border-radius:2px}
+#imprimible .leyenda b{font-size:10.5pt;min-width:18px}
+#imprimible .imp-relato{display:flex;flex-direction:column;gap:2.5mm}
+#imprimible .imp-relato p.titular{font-size:16pt;font-weight:500;line-height:1.25;letter-spacing:-.015em}
+#imprimible .imp-relato p.titular b{color:var(--accent);font-weight:600}
+#imprimible .imp-relato p.meta{font-weight:600}
+#imprimible .imp-relato p.suave{color:var(--soft)}
+#imprimible .imp-canales{width:100%;border-collapse:collapse;font-size:9.5pt}
+#imprimible .imp-canales th{text-align:left;font-weight:600;font-size:8.5pt;color:var(--muted);padding:1.5mm 0;border-bottom:1px solid var(--line)}
+#imprimible .imp-canales th.d,#imprimible .imp-canales td.d{text-align:right;font-family:var(--mono)}
+#imprimible .imp-canales td{padding:1.8mm 0;border-bottom:1px solid var(--line)}
+#imprimible .imp-canales th.v,#imprimible .imp-canales td.v{padding-left:6mm}
+#imprimible .imp-canales .fila-v{display:flex;align-items:center;gap:3mm}
+#imprimible .imp-canales .imp-mini{flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden}
+#imprimible .imp-canales .imp-mini i{display:block;height:100%;background:var(--good)}
+#imprimible .imp-canales .fila-v span:last-child{font-family:var(--mono);min-width:24mm}
+@page{size:A4;margin:15mm}
+@media print{
+  .app,.navmovil,.velo,.panel,.aviso{display:none!important}
+  #imprimible{display:block}
+  html,body{background:var(--surface);color:var(--ink);font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  *,*::before,*::after{transition:none!important;animation:none!important}
+}
+
 /* Responsivo */
 @media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}.reg{grid-template-columns:minmax(0,1fr)}.hoy{position:static}.ficha{grid-template-columns:minmax(0,1fr)}.lado{position:static}.res,.llegan{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -653,9 +734,12 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
             <h1>Indicadores</h1>
             <div class="mes" role="group" aria-label="Mes" id="imes-c" hidden><button type="button" id="mant" aria-label="Mes anterior"><i class="ph ph-caret-left"></i></button><span id="imes" aria-live="polite"></span><button type="button" id="msig" aria-label="Mes siguiente"><i class="ph ph-caret-right"></i></button></div>
           </div>
-          <div id="ifiltros" hidden>
-            <label class="sel-chip"><i class="ph ph-stethoscope"></i><select id="imed" aria-label="Médico"></select><i class="ph ph-caret-down"></i></label>
-            <label class="sel-chip" id="iesp-c" hidden><i class="ph ph-heartbeat"></i><select id="iesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
+          <div class="ind-der">
+            <button type="button" class="btn btn-p" id="iimprimir"><i class="ph ph-printer"></i>Resumen para imprimir</button>
+            <div id="ifiltros" hidden>
+              <label class="sel-chip"><i class="ph ph-stethoscope"></i><select id="imed" aria-label="Médico"></select><i class="ph ph-caret-down"></i></label>
+              <label class="sel-chip" id="iesp-c" hidden><i class="ph ph-heartbeat"></i><select id="iesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
+            </div>
           </div>
         </div>
         <p class="cargando" role="status">Cargando…</p>
@@ -673,6 +757,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
   <button type="button" data-sec="pacientes"><i class="ph ph-users-three"></i>Pacientes</button>
   <button type="button" data-sec="indicadores"><i class="ph ph-chart-line-up"></i>Indicadores</button>
 </nav>
+<section id="imprimible" aria-label="Resumen del mes para imprimir"></section>
 <div class="velo" id="velo"></div>
 <aside class="panel" id="panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="panel-t"></aside>
 <div class="aviso" id="aviso" role="status" aria-live="polite"><span></span><button type="button" hidden></button></div>
@@ -3195,21 +3280,34 @@ const celdaBarra = (texto, ancho, tono, cero) => `<td><div class="valor${cero ? 
 const botonSoloMes = f => `<button type="button" class="pill" data-solomes aria-pressed="${f.soloMes}"><i class="ph ph-calendar-blank"></i>Solo ${esc(nombreMes(f.mes))}</button>`;
 const cabSeccion = (titulo, extra) => `<div class="i-cab"><h2 class="t">${titulo}</h2>${extra || ''}</div>`;
 
+/** La frase de la meta (la comparten la pantalla y el resumen impreso): { clase: 'ok'|'mal'|'', texto } o null sin meta. */
+function textoMeta(meta, p, curso) {
+  const tope = 100 - meta;
+  if (!meta) return null;
+  if (p === null) return { clase: '', texto: `Meta: que vuelva el ${meta} % (que no vuelva como máximo el ${tope} %).` };
+  if (p <= tope) return { clase: 'ok', texto: `Dentro de la meta: que vuelva el ${meta} % (no vuelve como máximo el ${tope} %).${curso ? ' El mes sigue en curso.' : ''}` };
+  return { clase: 'mal', texto: `Fuera de la meta por ${p - tope} puntos: la meta es que no vuelva como máximo el ${tope} %.` };
+}
+/** Mes a mes: seis meses (los últimos, o los que terminan en el elegido si es anterior), con su % que no volvió (null sin base). */
+function columnasMeses(filas, elegido) {
+  const meses = mesesInd(), idx = meses.indexOf(elegido);
+  const fin = idx >= meses.length - 6 ? meses.length : idx + 1;
+  return meses.slice(Math.max(0, fin - 6), fin).map(mes => {
+    const x = sumarMes(filas, mes);
+    return { mes, x, v: x.REEVAL ? pc(x.REEVAL_NO, x.REEVAL) : null, curso: x.CURSO > 0 };
+  });
+}
+
 function htmlResumen(k, R, f) {
   const filas = (R.filas || []).filter(x => okFiltro(x.MEDICO, f.med));
   const m = sumarMes(filas, f.mes), meta = Number(R.meta) || 0, tope = 100 - meta;
   const p = m.REEVAL ? pc(m.REEVAL_NO, m.REEVAL) : null;
   const nuevosBase = m.NUEVOS - m.NUEVOS_CURSO - m.NUEVOS_ALTA, controlBase = m.CONTROL - m.CONTROL_CURSO - m.CONTROL_ALTA;
-  let metaHtml = '';
-  if (meta && p === null) metaHtml = `<p class="r-meta">Meta: que vuelva el ${meta} % (que no vuelva como máximo el ${tope} %).</p>`;
-  else if (meta && p <= tope) metaHtml = `<p class="r-meta ok"><i class="ph-fill ph-check-circle"></i><span>Dentro de la meta: que vuelva el ${meta} % (no vuelve como máximo el ${tope} %).${m.CURSO ? ' El mes sigue en curso.' : ''}</span></p>`;
-  else if (meta) metaHtml = `<p class="r-meta mal"><i class="ph-fill ph-warning-circle"></i><span>Fuera de la meta por ${p - tope} puntos: la meta es que no vuelva como máximo el ${tope} %.</span></p>`;
-  // Mes a mes: seis meses; los últimos, o los que terminan en el elegido si es anterior.
-  const meses = mesesInd(), idx = meses.indexOf(f.mes);
-  const fin = idx >= meses.length - 6 ? meses.length : idx + 1, seis = meses.slice(Math.max(0, fin - 6), fin);
-  const cols = seis.map(mes => ({ mes, x: sumarMes(filas, mes) }));
-  const barras = cols.map(({ mes, x }) => {
-    const v = x.REEVAL ? pc(x.REEVAL_NO, x.REEVAL) : null, curso = x.CURSO > 0;
+  const mt = textoMeta(meta, p, m.CURSO);
+  const metaHtml = !mt ? '' : mt.clase === 'ok' ? `<p class="r-meta ok"><i class="ph-fill ph-check-circle"></i><span>${mt.texto}</span></p>`
+    : mt.clase === 'mal' ? `<p class="r-meta mal"><i class="ph-fill ph-warning-circle"></i><span>${mt.texto}</span></p>` : `<p class="r-meta">${mt.texto}</p>`;
+  const cols = columnasMeses(filas, f.mes);
+  const barras = cols.map(({ mes, x, v, curso }) => {
     const aria = nombreMes(mes) + ': ' + (v === null ? 'sin pacientes con el plazo vencido' : v + ' % no volvió') + (curso ? ', en curso' : '');
     return `<button type="button" data-mes="${esc(mes)}" class="${curso ? 'curso' : ''}${v === null ? ' sin' : ''}" aria-pressed="${mes === f.mes}" aria-label="${esc(aria)}">`
       + (v === null ? '<b>—</b>' : `<span style="height:${v}%"><b>${v}%</b></span>`) + '</button>';
@@ -3341,6 +3439,7 @@ function iniciarIndicadores() {
   });
   $('#mant').addEventListener('click', e => { const m = mesesInd(); cambiarMes(m[m.indexOf(IND.mes) - 1], e.detail !== 0); });
   $('#msig').addEventListener('click', e => { const m = mesesInd(); cambiarMes(m[m.indexOf(IND.mes) + 1], e.detail !== 0); });
+  $('#iimprimir').addEventListener('click', imprimirResumen);
   $('#imed').addEventListener('change', e => { IND.medico = e.target.value; pintarIndicadores(false); });
   $('#iesp').addEventListener('change', e => { IND.esp = e.target.value; pintarIndicadores(false); });
   $('#ipanel').addEventListener('click', e => {
@@ -3362,6 +3461,120 @@ VISTAS.indicadores.mostrar = () => {
   pastilla($('#iseg'), true);
   cargarIndicadores();
 };
+
+/* ---- Resumen para imprimir (2 páginas A4, para el director; MAPEO §4) ---- */
+/**
+ * «Qué conviene mirar»: dos frases con reglas fijas. meses = [{ mes, p }] de los que ve el resumen (p = % que no volvió,
+ * null sin base); secs = secundarias(m); meta = la meta de «vuelve» (se recibe por si la frase la necesita; hoy no cambia el texto).
+ * 1.ª, la tendencia: el último mes contra el primero con cifra; 5 puntos o más es «Mejoró» o «Empeoró», menos es «Se mantiene».
+ * 2.ª, la cifra de pérdida con mayor porcentaje («no siguieron …»); sin ninguna con base, la de menor porcentaje de las buenas.
+ */
+function queConvieneMirar(meses, secs, meta) {
+  const con = (meses || []).filter(x => x && x.p !== null && x.p !== undefined);
+  let t1;
+  if (!con.length) t1 = 'Todavía no hay pacientes con el plazo vencido para comparar los meses.';
+  else {
+    const a = con[0], b = con[con.length - 1], n = meses.indexOf(b) - meses.indexOf(a) + 1, d = b.p - a.p;
+    t1 = d <= -5 ? `Mejoró: de ${a.p} % a ${b.p} % en ${n} meses.` : d >= 5 ? `Empeoró: de ${a.p} % a ${b.p} % en ${n} meses.` : `Se mantiene alrededor de ${b.p} %.`;
+  }
+  const conBase = (secs || []).filter(x => x[1] > 0);
+  const perdidas = conBase.filter(x => !x[2]), pool = perdidas.length ? perdidas : conBase;
+  let t2 = 'Todavía no hay cifras de tratamientos ni de seguimiento en este mes.';
+  if (pool.length) {
+    // Entre las de pérdida manda el mayor porcentaje; entre las buenas (solo si no hay otra), el menor.
+    const peor = pool.reduce((m, x) => ((perdidas.length ? pc(x[0], x[1]) > pc(m[0], m[1]) : pc(x[0], x[1]) < pc(m[0], m[1])) ? x : m));
+    t2 = `Lo que más se pierde: ${pc(peor[0], peor[1])} % ${peor[3]} (${peor[0]} de ${peor[1]}).`;
+  }
+  return [t1, t2];
+}
+
+function htmlImpPagina1(R, f) {
+  const filas = (R.filas || []).filter(x => okFiltro(x.MEDICO, f.med));
+  const m = sumarMes(filas, f.mes), meta = Number(R.meta) || 0, tope = 100 - meta;
+  const p = m.REEVAL ? pc(m.REEVAL_NO, m.REEVAL) : null;
+  const cols = columnasMeses(filas, f.mes), sec = secundarias(m);
+  const [t1, t2] = queConvieneMirar(cols.map(c => ({ mes: c.mes, p: c.v })), sec, meta);
+  const mt = textoMeta(meta, p, 0);
+  const cuenta = `Son ${m.REEVAL_NO} de ${m.REEVAL} pacientes.` + (m.CURSO
+    ? (m.CURSO === 1 ? ' A 1 paciente de este mes aún no le toca volver: todavía no cuenta, así que la cifra puede subir.'
+      : ` A otros ${m.CURSO} de este mes aún no les toca volver: todavía no cuentan, así que la cifra puede subir.`) : '');
+  const barras = cols.map(({ mes, v, curso }) => `<div data-imp-mes="${esc(mes)}" class="${curso ? 'curso' : ''}${v === null ? ' sin' : ''}">`
+    + (v === null ? '<b>sin cifra</b>' : `<span style="height:${v}%"><b>${v}%</b></span>`) + '</div>').join('');
+  const ejes = cols.map(({ mes }) => `<span${mes === f.mes ? ' class="sel"' : ''}>${esc(mesSolo(mes))}</span>`).join('');
+  const sencillas = sec.map(([a, b, buena, texto, vacio]) =>
+    `<p><b class="${buena ? 'buena' : ''}">${pct(a, b)}</b> <span>${esc(texto)} (${a} de ${b})${!b && vacio ? ': ' + esc(vacio) : ''}.</span></p>`).join('');
+  return `<section class="pag" id="imp-p1">
+    <header class="imp-cab"><div class="imp-marca"><span class="logo">CHP</span><span class="t"><b>Seguimientos · Resumen del mes</b>
+      <small>Centro Hematológico del Perú · ${esc(f.med ? nombreMedico(f.med) : 'todos los médicos')} · todas las especialidades</small></span></div>
+      <span class="imp-mes">${esc(nombreMes(f.mes))}</span></header>
+    <section class="imp-res"><span class="imp-grande">${pct(m.REEVAL_NO, m.REEVAL)}</span>
+      <div><p class="imp-frase">de ${f.med ? 'sus' : 'los'} pacientes de ${esc(mesSolo(f.mes))} no volvieron a su reevaluación.</p>
+        <p class="imp-suave">${esc(cuenta)}</p>
+        ${mt ? `<p class="imp-meta ${mt.clase}">${esc(mt.texto)}</p>` : ''}</div></section>
+    <section class="imp-blq"><h2>Tratamientos y seguimiento, en una frase cada uno</h2><div class="imp-sec">${sencillas}</div></section>
+    <section class="imp-blq"><div class="imp-mm-cab"><h2>Mes a mes · % que no volvió a su reevaluación</h2>
+      <span class="imp-ley"><span><i></i>cerrado</span><span><i class="rayado"></i>en curso</span>${meta ? `<span><i class="meta"></i>meta ${tope} %</span>` : ''}</span></div>
+      <div class="imp-barras">${meta ? `<span class="linea" aria-hidden="true" style="bottom:${tope}%"></span>` : ''}${barras}</div>
+      <div class="imp-ejes">${ejes}</div></section>
+    <section class="imp-conviene"><h2>Qué conviene mirar</h2><ul><li>${esc(t1)}</li><li>${esc(t2)}</li></ul></section>
+    <footer class="imp-pie"><span>Generado el ${esc(dmy(S.hoy))} · datos de SOFDOC y de la plataforma</span><span>1 de 2</span></footer></section>`;
+}
+
+function htmlImpPagina2(k, f) {
+  // Página 2: acumulado de todos los meses (como la maqueta), con el filtro de médico.
+  const g = { mes: f.mes, med: f.med, esp: '', soloMes: false };
+  const d = datosLlegan(k, g), h = d.relato;
+  const nombres = PASOS.slice(0, 4).map(x => x.t.toLowerCase());
+  const rango = d.meses.length ? `${mesSolo(d.meses[0][0])} a ${nombreMes(d.meses[d.meses.length - 1][0])}` : '';
+  const arriba = h.vacio ? `<p class="imp-suave">${esc(h.vacio)}</p>` : `<section class="imp-llegan">
+      <figure><div class="waffle" role="img" aria-label="${esc('De cada 100: ' + h.grupos.map((n, i) => n + ' ' + nombres[i]).join(', '))}">${h.grupos.map((n, i) => `<i class="paso${i + 1}"></i>`.repeat(Math.max(0, n))).join('')}</div>
+        <ul class="leyenda">${h.grupos.map((n, i) => n ? `<li><i class="paso${i + 1}"></i><b>${n}</b><span>${esc(nombres[i])}</span></li>` : '').join('')}</ul></figure>
+      <div class="imp-relato">${h.frases.map(x => `<p${x.clase ? ` class="${x.clase}"` : ''}>${x.html}</p>`).join('')}</div></section>`;
+  const canales = filasCampanas(k, g, 'CANAL').slice(0, 5).map(([c, o]) => {
+    const base = o.n - o.c;
+    return `<tr><td>${esc(c)}</td><td class="d">${o.n}</td><td class="v"><span class="fila-v"><span class="imp-mini"><i style="width:${pc(o.v, base)}%"></i></span>`
+      + `<span>${base ? `${pc(o.v, base)} % (${o.v}/${base})` : 'sin cifra aún (0/0)'}</span></span></td></tr>`;
+  });
+  const procs = filasProcs(k, g, 'tipo').filter(([, o]) => o.n > 0).slice(0, 2).map(([c, o]) =>
+    `<p><b>${pc(o.a, o.n)}%</b> <span>de lo cotizado en ${esc(c)} se empezó: ${o.a} de ${o.n}.</span></p>`);
+  return `<section class="pag" id="imp-p2">
+    <header class="imp-cab"><b>¿Hasta dónde llegan los pacientes nuevos?</b><span class="imp-rango">${esc(rango)}${f.med ? ` · ${esc(nombreMedico(f.med))}` : ''}</span></header>
+    ${arriba}
+    <section class="imp-blq"><h2>¿Qué canales traen pacientes que vuelven?</h2>${canales.length
+      ? `<table class="imp-canales"><thead><tr><th>Canal</th><th class="d">Nuevos</th><th class="v">Volvieron a su 1.ª reevaluación</th></tr></thead><tbody>${canales.join('')}</tbody></table>`
+      : '<p class="imp-suave">Sin datos con estos filtros.</p>'}</section>
+    <section class="imp-blq"><h2>Procedimientos: de lo cotizado, cuánto se empezó</h2>${procs.length ? `<div class="imp-procs">${procs.join('')}</div>` : '<p class="imp-suave">Sin datos con estos filtros.</p>'}</section>
+    <footer class="imp-pie" style="margin-top:auto"><span>Cada paciente cuenta una sola vez, según la última reevaluación a la que llegó. Solo cuentan aquellos a quienes ya les venció el plazo.</span><span>2 de 2</span></footer></section>`;
+}
+
+/** Arma #imprimible con los filtros activos (mes y médico) y los datos del caché. */
+function armarImprimible() {
+  const f = { mes: IND.mes, med: IND.medico || '' };
+  $('#imprimible').innerHTML = htmlImpPagina1(S.resumen, f) + htmlImpPagina2(S.kpi, f);
+}
+/** El botón: pide lo que falte (getResumen, getKpi), arma la sección y abre el diálogo de impresión. */
+function imprimirResumen() {
+  const b = $('#iimprimir');
+  if (b.disabled) return;
+  const terminar = () => { armarImprimible(); window.print(); };
+  if (S.kpi && S.resumen) { terminar(); return; }
+  b.disabled = true;
+  const pedir = n => {
+    const gen = S.indGen;
+    return Promise.all([S.resumen || llamar('getResumen'), S.kpi || llamar('getKpi')]).then(([r, k]) => {
+      if (gen !== S.indGen && n < 2) return pedir(n + 1);   // una escritura invalidó el caché mientras tanto
+      S.resumen = r; S.kpi = k;
+    });
+  };
+  pedir(0).then(() => {
+    b.disabled = false;
+    if (S.seccion === 'indicadores') pintarIndicadores(false);   // fija mes y médico si aún no se habían pintado
+    terminar();
+  }, e => { b.disabled = false; avisar('No se pudo preparar el resumen: ' + e.message); });
+}
+/** Al imprimir siempre sale la paleta clara (los mismos tokens), aunque la app esté en oscuro. */
+window.addEventListener('beforeprint', () => { delete document.documentElement.dataset.modo; });
+window.addEventListener('afterprint', () => aplicarModo());
 
 /* ============ Arranque ============ */
 async function iniciar() {

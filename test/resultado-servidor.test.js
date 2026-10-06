@@ -28,7 +28,7 @@ function servidor(hoja, extraEnHoja, registros, cabecera) {
   ctx.fechaHoraTexto_ = () => '2026-10-06 10:30';
   ctx.marcarAnulado_ = (n, id, motivo) => { assert.equal(lock.tomado, 1); escrito.anulados.push([n, id, motivo]); };
   ctx.darDeAlta = p => { escrito.llamadas.push(['darDeAlta', plano(p)]); altas.push({ ID: 'ALT-000001', FECHA: p.fecha, DNI: p.dni, ESPECIALIDAD: p.especialidad, DOCTOR: p.doctor }); return { ok: true, alta: { ID: 'ALT-000001' } }; };
-  ctx.marcarSesion = p => { escrito.llamadas.push(['marcarSesion', plano(p)]); sesiones.push({ ID: 'SES-000001', ID_REGISTRO: p.id, FECHA: p.fecha, N: 1 }); return { ok: true, sesion: { ID: 'SES-000001' }, completo: false }; };
+  ctx.marcarSesion = p => { escrito.llamadas.push(['marcarSesion', plano(p)]); sesiones.push({ ID: 'SES-000001', FECHA_HORA: p.fecha + ' 10:30', ID_REGISTRO: p.id, NUMERO: sesiones.length + 1, FECHA: p.fecha, ASESORA: p.usuario, NOTA: p.nota || '', ANULADO: '', MOTIVO_ANULACION: '' }); return { ok: true, sesion: { ID: 'SES-000001' }, completo: false }; };
   return { ctx, escrito, lock };
 }
 const p = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'NO CONTESTÓ' }, o);
@@ -125,7 +125,16 @@ test('«lo hizo» de un registro va a marcarSesion y no escribe en SEGUIMIENTOS'
   assert.deepEqual(escrito.llamadas, [['marcarSesion', { usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-06', nota: 'ok' }]]);
   assert.equal(escrito.SEGUIMIENTOS.length, 0);
   assert.ok('tarjeta' in r, 'devuelve la tarjeta recalculada');
-  assert.ok(r.tarjeta === '' || r.tarjeta.CLAVE === 'REG-000004');
+  assert.equal(r.tarjeta.COLUMNA, 'COMPLETADO', 'era la última sesión');
+  assert.match(r.tarjeta.ETIQUETA, /Completó el tratamiento/);
+});
+
+test('«lo hizo» de una sesión que no es la última deja la tarjeta en tratamiento', () => {
+  const reg = { ID: 'REG-000004', FECHA_HORA: '2026-09-25 09:00', FECHA: '2026-09-25', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos',
+    DNI: '40111222', TIPO: 'HIERRO', CONTACTO: '987654321', DETALLE: '', SESIONES: 2 };
+  const { ctx } = servidor([], [], [reg]);
+  const r = plano(ctx.registrarResultado(p({ especialidad: 'HIERRO', referencia: 'REG-000004', resultado: 'LO HIZO', fecha: '2026-10-06' })));
+  assert.equal(r.tarjeta.COLUMNA, 'EN_TRATAMIENTO');
 });
 
 test('hojas sin preparar: registrar y anular se niegan, no escriben y sueltan el candado', () => {

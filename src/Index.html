@@ -100,6 +100,7 @@ html.con-vt .vista{animation:none}
 .btn{height:44px;padding:0 18px;border:0;border-radius:var(--r-s);font-weight:600;display:inline-flex;align-items:center;gap:8px;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .16s var(--ease-out)}
 .btn:active{transform:scale(.97)}
 .btn-p{background:var(--accent);color:var(--accent-ink)}
+.btn.redondo{border-radius:999px}
 .btn-p:hover{background:var(--accent-hover)}
 .pill{height:44px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--soft);font-weight:500;font-size:13.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:background-color .15s ease,border-color .15s ease,color .15s ease}
 .pill[aria-pressed="true"],.pill[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
@@ -175,12 +176,12 @@ html.con-vt .vista{animation:none}
 .prog{display:flex;gap:4px;margin-top:3px}
 .prog i{flex:1;height:5px;border-radius:3px;background:var(--line)}
 .prog i.si{background:var(--warn)}
-.t3{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:3px;font-size:12.5px;min-width:0}
+.t3{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 8px;margin-top:3px;font-size:12.5px;min-width:0}
 .t3 .izq{display:inline-flex;align-items:center;gap:5px;color:var(--soft);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .t3 .izq.sin{color:var(--muted)}
 .t3 .izq.ok{color:var(--good);font-weight:600;white-space:normal}
-.t3 .der{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--soft);white-space:nowrap}
-.chip-fecha{display:inline-flex;align-items:center;gap:5px;background:var(--info-soft);color:var(--info);border-radius:6px;padding:3px 8px;font-weight:600;white-space:nowrap}
+.t3 .der{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--soft);white-space:nowrap}
+.chip-fecha{display:inline-flex;align-items:center;gap:5px;background:var(--info-soft);color:var(--info);border-radius:6px;padding:3px 8px;font-weight:600;max-width:100%;min-width:0}
 .chip-fecha.mal{background:var(--accent-soft);color:var(--accent)}
 .skel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);padding:12px;display:flex;flex-direction:column;gap:9px}
 .skel i{display:block;height:10px;border-radius:4px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel-2) 50%,var(--skel) 75%);background-size:200% 100%;animation:brillo 1.4s linear infinite}
@@ -467,7 +468,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .res-izq p{margin:0}
 .grande{font-family:var(--mono);font-size:120px;font-weight:500;letter-spacing:-.06em;line-height:.9;color:var(--accent);display:inline-block}
 .r-frase{margin-top:6px!important;font-size:19px;font-weight:500;line-height:1.3;text-wrap:balance}
-.r-cuenta{color:var(--soft)}.r-cuenta b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.r-cuenta{color:var(--soft)}.r-cuenta b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
 .r-desglose{display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--soft);font-size:13.5px}
 .r-desglose span{display:inline-flex;align-items:center;gap:6px}
 .r-desglose i{width:9px;height:9px;border-radius:2px;background:var(--w1)}
@@ -499,7 +500,8 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .barras button.sin b{position:static;padding:0 0 6px;color:var(--muted)}
 .mesesx{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:20px;margin-top:-8px;text-align:center;font-size:13px}
 .mesesx span{display:flex;flex-direction:column;min-width:0}
-.mesesx span.sel b{color:var(--accent)}
+.mesesx b{font-weight:500}
+.mesesx span.sel b{color:var(--accent);font-weight:600}
 .mesesx small{color:var(--muted);font-size:12px}
 /* ¿Hasta dónde llegan? */
 .llegan{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:32px 56px;align-items:start}
@@ -629,8 +631,9 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 #imprimible .imp-canales .fila-v span:last-child{font-family:var(--mono);min-width:24mm}
 @page{size:A4;margin:15mm}
 @media print{
-  .app,.navmovil,.velo,.panel,.aviso{display:none!important}
-  #imprimible{display:block}
+  .velo,.aviso,.navmovil,.topmovil{display:none!important}
+  html.imp-listo .app,html.imp-listo .panel{display:none!important}
+  html.imp-listo #imprimible{display:block}
   html,body{background:var(--surface);color:var(--ink);font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   *,*::before,*::after{transition:none!important;animation:none!important}
 }
@@ -654,7 +657,9 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 @view-transition{navigation:auto}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
 ::view-transition-new(root){animation-name:vista}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+/* Movimiento reducido: transiciones al instante (0 s: con 1 ms, el «all» por omisión dejaba una transición de visibilidad
+   en cada hijo del panel al cerrarlo) y animaciones de 1 ms; los colores cambian igual, sin recorrido. */
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0s!important;transition-delay:0s!important;animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important}::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
 </style>
 </head>
 <body>
@@ -735,7 +740,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
             <div class="mes" role="group" aria-label="Mes" id="imes-c" hidden><button type="button" id="mant" aria-label="Mes anterior"><i class="ph ph-caret-left"></i></button><span id="imes" aria-live="polite"></span><button type="button" id="msig" aria-label="Mes siguiente"><i class="ph ph-caret-right"></i></button></div>
           </div>
           <div class="ind-der">
-            <button type="button" class="btn btn-p" id="iimprimir"><i class="ph ph-printer"></i>Resumen para imprimir</button>
+            <button type="button" class="btn btn-p redondo" id="iimprimir"><i class="ph ph-printer"></i>Resumen para imprimir</button>
             <div id="ifiltros" hidden>
               <label class="sel-chip"><i class="ph ph-stethoscope"></i><select id="imed" aria-label="Médico"></select><i class="ph ph-caret-down"></i></label>
               <label class="sel-chip" id="iesp-c" hidden><i class="ph ph-heartbeat"></i><select id="iesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
@@ -769,8 +774,12 @@ const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 /** Sin tildes y en MAYÚSCULAS, como normTexto del servidor. */
 const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
-const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
-if (document.startViewTransition && !reducido) document.documentElement.classList.add('con-vt');
+/** prefers-reduced-motion, al día: si la persona lo cambia con la app abierta, se respeta sin recargar. */
+const mqReducido = matchMedia('(prefers-reduced-motion: reduce)');
+let reducido = mqReducido.matches;
+const marcarVT = () => document.documentElement.classList.toggle('con-vt', !!document.startViewTransition && !reducido);
+marcarVT();
+mqReducido.addEventListener('change', e => { reducido = e.matches; marcarVT(); });
 /** Preferencias del navegador (seg.usuario, seg.modo, seg.tipo). Sin almacenamiento no pasa nada. */
 const LS = {
   get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
@@ -885,9 +894,14 @@ function aplicarModo() {
   });
 }
 
+/** D8: el saludo según la hora del equipo (en Lima): días hasta las 12, tardes hasta las 19, luego noches. */
+function saludoHora() {
+  const h = new Date().getHours();
+  return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
 function pintarSaludo() {
-  const u = yo();
-  $('#saludo').textContent = !u ? 'Buenos días' : u.rol === 'Médico' ? 'Buenos días, doctor ' + u.l.split(' ').pop() : 'Buenos días, ' + u.l;
+  const u = yo(), s = saludoHora();
+  $('#saludo').textContent = !u ? s : u.rol === 'Médico' ? s + ', doctor ' + u.l.split(' ').pop() : s + ', ' + u.l;
 }
 
 function pintarUsuarios() {
@@ -920,19 +934,24 @@ function exigirUsuario() {
 
 /* Cada pantalla puede definir mostrar(); se llama al entrar en ella. Las llenan las tareas siguientes. */
 const VISTAS = { tablero: {}, registro: {}, pacientes: {}, indicadores: {} };
+/** sinAnim: al arrancar o con el teclado (lo que se dispara con el teclado no se anima; README §7). */
 function ir(sec, sinAnim) {
   if (!VISTAS[sec]) sec = 'tablero';
   const cambiar = () => {
     S.seccion = sec;
     cerrarPanel(true);
-    $$('[data-sec]').forEach(b => { if (b.dataset.sec === sec) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    $$('[data-sec]').forEach(b => {
+      const on = b.dataset.sec === sec, i = b.querySelector('i');
+      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+      if (i) { i.classList.toggle('ph-fill', on); i.classList.toggle('ph', !on); }   // activo: icono relleno (README §6)
+    });
     Object.keys(VISTAS).forEach(k => { $('#v-' + k).hidden = k !== sec; });
-    if (VISTAS[sec].mostrar) VISTAS[sec].mostrar();
+    if (VISTAS[sec].mostrar) VISTAS[sec].mostrar(!!sinAnim);
     window.scrollTo(0, 0);
   };
   if (!sinAnim && !reducido && document.startViewTransition) document.startViewTransition(cambiar); else cambiar();
 }
-document.addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) ir(b.dataset.sec); });
+document.addEventListener('click', e => { const b = e.target.closest('[data-sec]'); if (b) ir(b.dataset.sec, e.detail === 0); });
 
 /** Pastilla deslizante: mide el botón activo del segmentado. */
 function pastilla(seg, instant) {
@@ -1797,10 +1816,10 @@ function resaltarCierre() {
   enfocar('#panel .acc.cierra button');
 }
 /** Lee el paso abierto y guarda. Lo que falte se avisa sin llamar al servidor. */
-function confirmarPaso() {
+function confirmarPaso(teclado) {
   const p = S.pacientes.find(x => x.id === seleccion.panel), ps = P.paso;
   if (!p || !ps) return;
-  const k = ps.k, extra = {};
+  const k = ps.k, extra = { teclado: !!teclado };
   if (ps.rango) { extra.fecha = ps.f; const m = validarFecha(k, ps.f, ps.rango); if (m) { avisar(m); return; } }
   if (k === 'alta') { extra.doctor = ps.doctor; if (!extra.doctor) { avisar('Elija el doctor que da el alta.'); return; } }
   if (k === 'numero') { if (!ps.tel) { avisar('Elija cuál teléfono está equivocado.'); return; } extra.telefono = ps.tel; }
@@ -2117,7 +2136,7 @@ $('#panel').addEventListener('click', e => {
   const t = e.target.closest('[data-acc],[data-confirmar],[data-volverpaso],[data-cerrar],[data-copiar],[data-ficha],[data-anular],[data-confirmar-anular],[data-cancelar-anular],[data-rehist]');
   if (!t) return;
   if (t.dataset.acc) elegir(t.dataset.acc);
-  else if (t.hasAttribute('data-confirmar')) confirmarPaso();
+  else if (t.hasAttribute('data-confirmar')) confirmarPaso(e.detail === 0);
   else if (t.hasAttribute('data-volverpaso')) cerrarPaso();
   else if (t.hasAttribute('data-cerrar')) cerrarPanel();
   else if (t.dataset.copiar) { copiar(t.dataset.copiar); t.classList.add('ok'); t.innerHTML = '<i class="ph ph-check"></i>Copiado'; }
@@ -2131,6 +2150,13 @@ $('#panel').addEventListener('click', e => {
   } else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacion(t);
   else if (t.hasAttribute('data-cancelar-anular')) { P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); }
   else if (t.hasAttribute('data-rehist')) { const p = S.pacientes.find(x => x.id === seleccion.panel); if (p) cargarHistoria(p); }
+});
+// Enter en la fecha o en el motivo confirma el paso, como el botón principal (el recorrido completo con el teclado).
+$('#panel').addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || !P.paso || !e.target.matches('#pf, #pm')) return;
+  e.preventDefault();
+  const b = $('#panel [data-confirmar]');
+  if (b && !b.disabled) confirmarPaso(true);
 });
 $('#panel').addEventListener('input', e => {
   const id = e.target.id;
@@ -3179,13 +3205,23 @@ const CON_ESP = { llegan: 1, recup: 1 };
 /** Las pestañas que suman todos los meses (con «Solo {mes}» para mirar uno). */
 const ACUMULADAS = { llegan: 1, campanas: 1, procs: 1 };
 const IND = {
-  listo: false, pidiendo: false, error: '',
+  listo: false, pidiendo: false, error: '', quieto: false,
   tab: 'resumen', mes: '', esp: '', sub: 'tipo', verCamp: false, soloMes: false,
   medico: null      // null = proponer el del usuario médico (D2) al pintar; luego, lo que elija
 };
 
-/** Los meses de getResumen, de más antiguo a más reciente. */
-const mesesInd = () => [...new Set(((S.resumen && S.resumen.filas) || []).map(f => f.MES).filter(Boolean))].sort();
+/** Los meses de getResumen, de más antiguo a más reciente (los del Resumen del mes y sus barras). */
+const mesesResumen = () => [...new Set(((S.resumen && S.resumen.filas) || []).map(f => f.MES).filter(Boolean))].sort();
+/**
+ * Los meses que recorre ‹ ›: los de getResumen y los de getKpi (primera consulta, procedimientos, seguimientos,
+ * campañas), para que «Solo {mes}» llegue a todo mes con datos.
+ */
+const mesesInd = () => {
+  const v = new Set(mesesResumen()), k = S.kpi || {};
+  (k.cohortes || []).forEach(r => { if (r.COHORTE) v.add(String(r.COHORTE)); });
+  ['indicaciones', 'recuperacion', 'campanas'].forEach(c => (k[c] || []).forEach(r => { if (r.MES) v.add(String(r.MES)); }));
+  return [...v].filter(m => /^\d{4}-\d{2}$/.test(m)).sort();
+};
 function medicosInd() {
   const v = new Set((S.resumen && S.resumen.medicos) || []);
   ['cohortes', 'indicaciones', 'recuperacion', 'campanas'].forEach(c => ((S.kpi && S.kpi[c]) || []).forEach(r => { if (r.MEDICO) v.add(r.MEDICO); }));
@@ -3196,18 +3232,18 @@ const filtrosInd = () => ({ mes: IND.mes, med: IND.medico || '', esp: CON_ESP[IN
 
 /** Al entrar: pide lo que falte en el caché (S.kpi, S.resumen). invalidarIndicadores() lo vacía tras cada escritura. */
 function cargarIndicadores() {
-  if (S.kpi && S.resumen) { pintarIndicadores('entrada'); return; }
+  if (S.kpi && S.resumen) { pintarIndicadores(IND.quieto ? false : 'entrada'); return; }
   if (!IND.pidiendo) {
     const gen = S.indGen;
-    IND.pidiendo = true; IND.error = '';
+    IND.pidiendo = true; IND.error = ''; estadoBotonImp();
     Promise.all([S.resumen || llamar('getResumen'), S.kpi || llamar('getKpi')]).then(([r, k]) => {
-      IND.pidiendo = false;
+      IND.pidiendo = false; estadoBotonImp();
       // Si hubo una escritura mientras tanto, esta respuesta ya es vieja: se vuelve a pedir.
       if (gen !== S.indGen) { if (S.seccion === 'indicadores') cargarIndicadores(); return; }
       S.resumen = r; S.kpi = k;
-      if (S.seccion === 'indicadores') pintarIndicadores(true);
+      if (S.seccion === 'indicadores') pintarIndicadores(!IND.quieto);
     }, e => {
-      IND.pidiendo = false;
+      IND.pidiendo = false; estadoBotonImp();
       if (gen !== S.indGen) { if (S.seccion === 'indicadores') cargarIndicadores(); return; }
       IND.error = e.message;
       if (S.seccion === 'indicadores') pintarIndicadores();
@@ -3230,8 +3266,9 @@ function pintarIndicadores(anim) {
       : '<p class="vacio" role="status">Calculando los indicadores…</p>';
     return;
   }
-  const meses = mesesInd();
-  if (!meses.includes(IND.mes)) IND.mes = meses[meses.length - 1] || '';
+  const meses = mesesInd(), delResumen = mesesResumen();
+  // Por omisión, el último mes del resumen (el que mira el director); si no hay, el último con algún dato.
+  if (!meses.includes(IND.mes)) IND.mes = delResumen[delResumen.length - 1] || meses[meses.length - 1] || '';
   const i = meses.indexOf(IND.mes);
   $('#imes').textContent = IND.mes ? nombreMes(IND.mes) : 'Sin datos';
   $('#mant').disabled = i <= 0;
@@ -3290,8 +3327,11 @@ function textoMeta(meta, p, curso) {
 }
 /** Mes a mes: seis meses (los últimos, o los que terminan en el elegido si es anterior), con su % que no volvió (null sin base). */
 function columnasMeses(filas, elegido) {
-  const meses = mesesInd(), idx = meses.indexOf(elegido);
-  const fin = idx >= meses.length - 6 ? meses.length : idx + 1;
+  // Meses del resumen; si el elegido solo está en getKpi, las barras terminan en el último anterior a él.
+  const meses = mesesResumen();
+  let idx = meses.length - 1;
+  while (idx >= 0 && meses[idx] > elegido) idx--;
+  const fin = idx < 0 ? Math.min(6, meses.length) : idx >= meses.length - 6 ? meses.length : idx + 1;
   return meses.slice(Math.max(0, fin - 6), fin).map(mes => {
     const x = sumarMes(filas, mes);
     return { mes, x, v: x.REEVAL ? pc(x.REEVAL_NO, x.REEVAL) : null, curso: x.CURSO > 0 };
@@ -3299,6 +3339,8 @@ function columnasMeses(filas, elegido) {
 }
 
 function htmlResumen(k, R, f) {
+  if (!f.mes) return '<p class="vacio">Todavía no hay meses con pacientes para resumir.</p>';
+  if (!mesesResumen().includes(f.mes)) return `<p class="vacio">Todavía no hay pacientes de ${esc(mesSolo(f.mes))} en el resumen. Las otras pestañas sí traen datos de ese mes.</p>`;
   const filas = (R.filas || []).filter(x => okFiltro(x.MEDICO, f.med));
   const m = sumarMes(filas, f.mes), meta = Number(R.meta) || 0, tope = 100 - meta;
   const p = m.REEVAL ? pc(m.REEVAL_NO, m.REEVAL) : null;
@@ -3370,7 +3412,7 @@ function htmlCampanas(k, R, f) {
 function htmlProcs(k, R, f) {
   const vistas = [['tipo', 'Por tipo'], ['escrito', 'Como se escribió'], ['medico', 'Por médico']];
   const filas = filasProcs(k, f, IND.sub).map(([c, o]) => `<tr><td class="n">${esc(c)}</td><td class="d">${o.n}</td><td class="d">${o.a}</td><td class="d">${o.c}</td>`
-    + celdaBarra(`${pc(o.a, o.n)} %`, pc(o.a, o.n), 'warn') + '</tr>');
+    + celdaBarra(o.n ? `${pc(o.a, o.n)} %` : '—', pc(o.a, o.n), 'warn', !o.n) + '</tr>');
   const espera = Number(S.reglas && S.reglas.esperaCotizacion) || 7;
   return `<section class="sec-i">${cabSeccion('Procedimientos (hierro y otros)',
       `<div class="chips" role="group" aria-label="Cómo agrupar">${vistas.map(([v, l]) => `<button type="button" class="pill" data-sub="${v}" aria-pressed="${IND.sub === v}">${l}</button>`).join('')}</div>${botonSoloMes(f)}`)}
@@ -3382,7 +3424,7 @@ function htmlProcs(k, R, f) {
 function htmlRecup(k, R, f) {
   const d = datosRecup(k, f), t = d.total, med = mediana(t.d);
   const fila = (nombre, o, actual) => `<tr${actual ? ' class="actual"' : ''}><td class="n">${esc(nombre)}</td><td class="d">${o.n}</td><td class="d">${mediana(o.d)}</td>`
-    + celdaBarra(`${pc(o.v, o.n)} % (${o.v}/${o.n})`, pc(o.v, o.n)) + '</tr>';
+    + celdaBarra(o.n ? `${pc(o.v, o.n)} % (${o.v}/${o.n})` : '— (0/0)', pc(o.v, o.n), '', !o.n) + '</tr>';
   const cab = primera => [[primera], ['Seguimientos', 'd'], ['Días hasta volver', 'd'], ['Volvieron tras el seguimiento', 'd ancha']];
   return `<section class="sec-i">${cabSeccion('Recuperación')}
     <p class="intro">Seguimientos hechos en ${esc(nombreMes(f.mes))} y cuántos de esos pacientes volvieron después. Los días son la mediana: la mitad de los que volvieron lo hizo en ese plazo o antes.</p>
@@ -3456,8 +3498,9 @@ function iniciarIndicadores() {
   IND.listo = true;
   if (S.seccion === 'indicadores') VISTAS.indicadores.mostrar();
 }
-VISTAS.indicadores.mostrar = () => {
+VISTAS.indicadores.mostrar = sinAnim => {
   if (!IND.listo) return;
+  IND.quieto = !!sinAnim;   // se entró con el teclado (o al arrancar): nada se anima, ni al llegar los datos
   pastilla($('#iseg'), true);
   cargarIndicadores();
 };
@@ -3547,18 +3590,36 @@ function htmlImpPagina2(k, f) {
     <footer class="imp-pie" style="margin-top:auto"><span>Cada paciente cuenta una sola vez, según la última reevaluación a la que llegó. Solo cuentan aquellos a quienes ya les venció el plazo.</span><span>2 de 2</span></footer></section>`;
 }
 
+/**
+ * Para qué quedó armado #imprimible: mes, médico y generación del caché. Al imprimir, el resumen solo sustituye a la
+ * pantalla si se armó con el botón para los filtros de ahora (html.imp-listo); un Ctrl+P en cualquier otro momento
+ * imprime la pantalla tal como se ve, nunca una hoja en blanco ni un resumen de otros filtros.
+ */
+const claveImp = () => [IND.mes, IND.medico || '', S.indGen].join('|');
 /** Arma #imprimible con los filtros activos (mes y médico) y los datos del caché. */
 function armarImprimible() {
   const f = { mes: IND.mes, med: IND.medico || '' };
-  $('#imprimible').innerHTML = htmlImpPagina1(S.resumen, f) + htmlImpPagina2(S.kpi, f);
+  if (!mesesResumen().includes(f.mes)) throw new Error(`todavía no hay pacientes de ${f.mes ? mesSolo(f.mes) : 'ningún mes'} en el resumen.`);
+  const html = htmlImpPagina1(S.resumen, f) + htmlImpPagina2(S.kpi, f);
+  $('#imprimible').innerHTML = html;
+  $('#imprimible').dataset.clave = claveImp();
 }
+/** El botón se deshabilita mientras se piden los datos (la primera carga de Indicadores o la suya propia). */
+const IMP = { pidiendo: false };
+function estadoBotonImp() { const b = $('#iimprimir'); if (b) b.disabled = IMP.pidiendo || (IND.pidiendo && !(S.kpi && S.resumen)); }
 /** El botón: pide lo que falte (getResumen, getKpi), arma la sección y abre el diálogo de impresión. */
 function imprimirResumen() {
-  const b = $('#iimprimir');
-  if (b.disabled) return;
-  const terminar = () => { armarImprimible(); window.print(); };
+  if ($('#iimprimir').disabled) return;
+  const fallo = e => { IMP.pidiendo = false; estadoBotonImp(); document.documentElement.classList.remove('imp-listo'); avisar('No se pudo preparar el resumen: ' + e.message); };
+  const terminar = () => {
+    try {
+      armarImprimible();
+      document.documentElement.classList.add('imp-listo');
+      window.print();
+    } catch (e) { fallo(e); }
+  };
   if (S.kpi && S.resumen) { terminar(); return; }
-  b.disabled = true;
+  IMP.pidiendo = true; estadoBotonImp();
   const pedir = n => {
     const gen = S.indGen;
     return Promise.all([S.resumen || llamar('getResumen'), S.kpi || llamar('getKpi')]).then(([r, k]) => {
@@ -3567,14 +3628,20 @@ function imprimirResumen() {
     });
   };
   pedir(0).then(() => {
-    b.disabled = false;
+    IMP.pidiendo = false; estadoBotonImp();
     if (S.seccion === 'indicadores') pintarIndicadores(false);   // fija mes y médico si aún no se habían pintado
     terminar();
-  }, e => { b.disabled = false; avisar('No se pudo preparar el resumen: ' + e.message); });
+  }).catch(fallo);
 }
-/** Al imprimir siempre sale la paleta clara (los mismos tokens), aunque la app esté en oscuro. */
-window.addEventListener('beforeprint', () => { delete document.documentElement.dataset.modo; });
-window.addEventListener('afterprint', () => aplicarModo());
+/**
+ * Al imprimir siempre sale la paleta clara (los mismos tokens), aunque la app esté en oscuro. Si #imprimible no es de
+ * los filtros de ahora (o no se armó), se desarma y se imprime la pantalla. Después de imprimir, se desarma siempre.
+ */
+window.addEventListener('beforeprint', () => {
+  delete document.documentElement.dataset.modo;
+  if ($('#imprimible').dataset.clave !== claveImp()) document.documentElement.classList.remove('imp-listo');
+});
+window.addEventListener('afterprint', () => { document.documentElement.classList.remove('imp-listo'); aplicarModo(); });
 
 /* ============ Arranque ============ */
 async function iniciar() {

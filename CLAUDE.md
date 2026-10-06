@@ -59,24 +59,61 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - «Número equivocado» marca el número y no cierra mientras quede otro contacto.
 - «Falleció» vale para todo el paciente.
 - Las filas anuladas (`ANULADO = SI`) no cuentan en ninguna cifra; `datos_` las filtra.
-- Tras publicar, usar «Preparar hojas», que agrega 5 columnas a `SEGUIMIENTOS` y `GRACIA_AGENDA_DIAS` a `REGLAS`, y después «Verificar».
+- Tras publicar, usar «Preparar hojas», que agrega 5 columnas a `SEGUIMIENTOS` y los parámetros que falten en `REGLAS`
+  (`GRACIA_AGENDA_DIAS` y `META_DIARIA_SEGUIMIENTOS`), y después «Verificar».
+
+## La interfaz (rediseño de Claude Design, 06/10/2026)
+
+El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visual) y la especificación en
+`docs/superpowers/specs/2026-10-06-rediseno-frontend-design.md`. Todo vive en `src/Index.html`.
+
+- **Menú lateral** (en el celular, barra superior y barra inferior): Tablero, Registro, Pacientes e Indicadores,
+  más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y `seg.tipo`.
+- **Tablero:** cuatro columnas (Por contactar, Agendado, En tratamiento, Completado) y el panel «¿Qué pasó?» de cada
+  tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`. Se puede arrastrar una tarjeta a otra columna: abre el
+  paso con confirmación, nunca guarda solo.
+- **Registro:** indicaciones (procedimientos y tratamientos) y altas médicas, con «Registrados hoy».
+- **Pacientes:** buscador y ficha completa, con anulaciones y «Dar de alta…».
+- **Indicadores:** siete pestañas para el director y el botón «Resumen para imprimir» (dos páginas A4). Un Ctrl+P sin
+  ese botón imprime la pantalla tal como se ve.
+- Lo que se dispara con el teclado no se anima, y con «reducir movimiento» del sistema nada se anima.
+
+**Atajos del tablero.** **H** («hecho») y **D** («descartar») ya no existen: se reemplazan por **1 a 4** y **X**.
+
+| Tecla | Qué hace |
+|---|---|
+| ↑ ↓ (o j k) y ← → | Moverse entre tarjetas y columnas |
+| Enter | Abrir el panel de la tarjeta |
+| 1 a 4 | «¿Qué pasó?»: No contestó, Lo pensará, Agendó cita, Lo hizo. El 1 guarda sin abrir el panel |
+| X | Cerrar el seguimiento (abre las opciones de cierre; nada se cierra sin confirmar) |
+| C | Copiar el teléfono |
+| / | Ir al buscador |
+| Esc | Cerrar el paso y luego el panel; salir de un campo |
+
+En un paso con fecha o motivo, Enter confirma.
 
 ## Publicar
 
 En producción desde el 02/10/2026. Versión 3 (03/10/2026): interfaz editorial de Claude Design, en `docs/diseno/handoff-2a`.
+El rediseño del 06/10/2026 (`docs/diseno/handoff-etapa1`) se publica todo junto, con estos pasos (especificación §6):
 
 ```bash
 git pull                 # siempre primero
 npm test && npm run test:ui
 npm run subir            # solo cambia @HEAD, el banco de pruebas
-# en el Sheets: menú Seguimientos → «Preparar hojas» y luego «Verificar»
-#   (debe decir «SEGUIMIENTOS tiene todas sus columnas»)
-# en el @HEAD: probar un guardado y un «Deshacer»
+# en el Sheets: menú Seguimientos → «Preparar hojas»
+#   (agrega META_DIARIA_SEGUIMIENTOS a REGLAS, 15 por omisión, y las columnas que falten en SEGUIMIENTOS)
+# luego «Verificar»: debe decir «SEGUIMIENTOS tiene todas sus columnas»
+#   y en REGLAS, MAX_SEGUIMIENTOS debe valer 2 (si la celda falta, el código usa 3)
+# en el @HEAD, probar: un resultado de cada tipo, «Deshacer», un registro y un alta,
+#   una impresión del resumen, el celular y el modo oscuro
 npm run actualizar       # publica para el equipo conservando la URL
 # pedir a las asesoras que recarguen la app (las pestañas abiertas siguen con la versión vieja)
+# y avisarles que H y D se reemplazan por 1 a 4 y X
 ```
 
 Ese orden importa: hasta que «Preparar hojas» agrega las 5 columnas, `registrarResultado` y `anularResultado` se niegan a escribir (SEGUIMIENTOS se escribe por posición).
+«Verificar» no muestra `MAX_SEGUIMIENTOS`: hay que mirarlo en la hoja `REGLAS`.
 
 - Script (incrustado en el libro madre): `10jN1KMUrKYWTAQNrh68hMlBrA6s5Hvc-YI06n1rHaZV9gDIT99hjdZZY`
 - Deployment estable (el que usa el equipo): `AKfycbzSvnyttpl1VOiKNDilyPPoqlD7VkxPDxwExa4kS75mgbgTfRbe16kJj6fpfGoBUWCkcA`

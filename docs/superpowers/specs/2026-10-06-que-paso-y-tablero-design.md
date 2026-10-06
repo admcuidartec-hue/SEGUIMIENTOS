@@ -1,7 +1,7 @@
 # Etapa 1: «¿Qué pasó?» y el tablero de cuatro columnas · Diseño
 
 - Fecha: 06/10/2026
-- Estado: **borrador, para revisar**
+- Estado: **aprobado** («sí a las tres, sigue con el plan», 06/10/2026)
 - Amplía:
   - `2026-10-03-filtro-tipos-y-resumen-3a-design.md`
   - `2026-10-05-pestana-registro-design.md`
@@ -36,12 +36,12 @@ construir y probar con la maqueta del estilo A.
 | Intentos | Solo **No contestó** cuenta para el cierre automático. Al 2.º seguido (`MAX_SEGUIMIENTOS`), y pasada la espera, se cierra solo |
 | Número equivocado | Se marca **ese teléfono** para el paciente en todas sus listas. Se cierra solo si no le queda ningún contacto |
 | Falleció | Vale para **el paciente entero**: sale de todas las listas, y Registro avisa si se le intenta registrar algo |
-| Se atiende en otro lugar | Cierra **solo ese seguimiento** (esa especialidad o ese tratamiento). *Revisar con el doctor* |
+| Se atiende en otro lugar | Cierra **solo ese seguimiento** (esa especialidad o ese tratamiento) |
 | Alta médica | En una reevaluación, usa el «Dar de alta» que ya existe (hoja `ALTAS`). En hierro o procedimiento, cierra con motivo «ALTA MÉDICA» |
 | Deshacer | Cada resultado se puede anular: al instante, con el aviso «Deshacer», o después, desde la historia, con motivo. **Ninguna fila se borra** |
 | Cotización en sus 7 días de espera | **No aparece en el tablero**; se ve en Registro y en la ficha, como hoy |
-| Sesión atrasada | Pasa a **Por contactar** con la etiqueta en rojo «Sesión 2 de 3 · atrasada N días». *Cambia la maqueta, donde la tarjeta roja seguía en «En tratamiento»* |
-| Esperando reintento tras «No contestó» | Va a **Agendado** con «Reintentar el dd/mm». *Revisar con el usuario* |
+| Sesión atrasada | Pasa a **Por contactar** con la etiqueta en rojo «Sesión 2 de 3 · atrasada N días». Cambia la maqueta, donde la tarjeta roja seguía en «En tratamiento» |
+| Esperando reintento tras «No contestó» | Va a **Agendado** con «Reintentar el dd/mm» |
 
 ## 3. Datos
 
@@ -394,15 +394,32 @@ mantienen funcionando la app actual.
 - **Mensajes por WhatsApp desde la app.**
 - **Plazos que dependan del diagnóstico.**
 
-## 9. Para revisar
+## 9. Respuestas y precisiones
 
-1. **«Se atiende en otro lugar».** ¿Cierra solo esa especialidad o tratamiento, o todo el
-   paciente? Esta especificación propone lo primero.
-2. **Esperando reintento tras «No contestó».** ¿Se ve en Agendado con «Reintentar el…», o
-   desaparece del tablero hasta que le toque? Esta especificación propone lo primero.
-3. **Sesión atrasada.** Pasa a Por contactar en rojo, y no se queda en «En tratamiento».
-4. **Doctor, pendiente:**
-   - qué significan los 45 días de la pregunta 1;
-   - los 15 días del hierro (pregunta 9a).
+**Respuestas del 06/10/2026.** Se aprobaron las tres propuestas:
+- «Se atiende en otro lugar» cierra solo ese seguimiento.
+- Tras «No contestó», la tarjeta espera en Agendado.
+- La sesión atrasada pasa a Por contactar.
 
-   No bloquean esta etapa: son parámetros de `REGLAS`.
+**Precisiones que salieron al escribir el plan:**
+
+1. **«No desea continuar»** guarda `MOTIVO = NO DESEA CONTINUAR` y el texto escrito en `NOTA`
+   («Motivo: …»). Así «Motivos de descarte» en Indicadores no se parte en un renglón por cada
+   texto distinto.
+2. **Alta médica en hierro o procedimiento** pide solo el doctor, que se guarda en `NOTA`
+   («Alta: Dra. …»). La fecha es la del registro.
+3. **Una reevaluación `AGENDADO` entra al tablero solo si tuvo seguimiento en el ciclo**
+   (`N_SEGUIMIENTOS > 0`). Sin esta regla, todos los pacientes con una cita futura en SOFDOC
+   llenarían la columna.
+4. **«Sin contacto»** solo cierra cuando hay al menos un número marcado como equivocado. Un
+   paciente que nunca tuvo teléfono sigue en Por contactar, como hoy, con «Sin teléfono».
+5. **Los registros completos** dejan de desaparecer de `pendientesRegistro`: vuelven con
+   `ESTADO = COMPLETADO`, para la columna Completado.
+6. **El plan cubre los pasos 1 a 5a de §7.** El tablero visual (5b) tendrá su propio plan
+   cuando llegue el diseño de Claude Design. `getTablero` queda listo y probado desde ahora.
+
+**Pendiente del doctor:**
+- qué significan los 45 días de la pregunta 1;
+- los 15 días del hierro (pregunta 9a).
+
+No bloquean esta etapa: son parámetros de `REGLAS`.

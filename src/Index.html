@@ -191,15 +191,98 @@ html.con-vt .vista{animation:none}
 .error div{flex:1;min-width:220px}
 .error b{display:block;font-weight:600}
 
-/* Panel mínimo (Tarea 5): solo el nombre. La Tarea 6 lo reemplaza por el panel «¿Qué pasó?». */
+/* Panel del paciente (README §6.2): cajón de 460 px desde la derecha, con velo. */
+.btn-s{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);font-weight:500}
+.btn-s:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.campo{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)}
+.campo input,.campo select,.campo textarea{height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-size:15px}
+.campo input[type="date"]{font-family:var(--mono)}
+.campo textarea{height:auto;min-height:64px;padding:10px 12px;resize:vertical;font-size:14px}
 .velo{position:fixed;inset:0;background:var(--velo);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:50}
 .velo.abierto{opacity:1;pointer-events:auto}
 .panel{position:fixed;top:0;right:0;bottom:0;width:460px;max-width:100%;background:var(--surface);border-left:1px solid var(--line);transform:translateX(100%);visibility:hidden;transition:transform .3s var(--ease-drawer),visibility 0s linear .3s;z-index:51;display:flex;flex-direction:column;outline:none}
 .panel.abierto{transform:none;visibility:visible;box-shadow:var(--shadow-lg);transition:transform .4s var(--ease-drawer),visibility 0s}
 .panel.instantaneo,.velo.instantaneo{transition:none}
-.p-top{padding:18px 24px 16px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px}
-.p-top h2{flex:1;margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.2;text-wrap:balance}
+.p-top{padding:18px 24px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.p-cab{display:flex;align-items:flex-start;gap:12px}
+.p-cab>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.p-tags{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.p-tags .tag{max-width:100%}
+.p-tags span:last-child{font-size:12.5px;color:var(--muted);white-space:nowrap}
+.p-top h2{margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.2;text-wrap:balance}
+.p-linea{color:var(--muted);font-size:13px}
+.p-volver{display:none;align-self:flex-start;height:44px;margin:-10px 0 0 -10px;padding:0 10px;border:0;background:none;color:var(--accent);font-weight:600;font-size:15px;align-items:center;gap:2px}
 .p-cerrar{width:44px;height:44px;flex:0 0 auto;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface-2);color:var(--soft);display:grid;place-items:center;font-size:18px}
+.p-cuerpo{flex:1;overflow:auto;padding:20px 24px 40px;display:flex;flex-direction:column;gap:26px}
+.p-cuerpo section{display:flex;flex-direction:column;gap:10px}
+.p-cuerpo h3{margin:0;font-size:12.5px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:8px}
+.p-cuerpo h3.grande{font-size:16px;color:var(--ink);letter-spacing:-.01em}
+.p-trat{font-weight:500}
+.datos{margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:12px}
+.datos dt{font-size:12px;color:var(--muted)}
+.datos dd{margin:0;font-family:var(--mono);font-size:14px;font-weight:500;overflow-wrap:anywhere}
+.p-cuerpo .prog i{height:6px}
+.alerta{margin:0;font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3;text-wrap:balance;color:var(--ink)}
+.alerta.mal{color:var(--accent)}.alerta.info{color:var(--info)}.alerta.ok{color:var(--good)}
+.p-pend{margin:0;font-size:13px;color:var(--soft)}
+.p-pend b{color:var(--ink)}
+.contacto{display:flex;align-items:center;gap:12px;min-height:56px;padding:5px 5px 5px 14px;border:1px solid var(--line);border-radius:var(--r-s)}
+.contacto .v{flex:1;min-width:0;display:flex;flex-direction:column}
+.contacto small{font-size:11.5px;color:var(--muted)}
+.contacto .num{font-family:var(--mono);font-size:17px;font-weight:500;overflow-wrap:anywhere}
+.contacto.malo .num{text-decoration:line-through;color:var(--muted)}
+.copiar.ok{background:var(--good-soft);color:var(--good);border-color:var(--good)}
+.sin-tel{margin:0;padding:12px 14px;border:1px dashed var(--line-2);border-radius:var(--r-s);color:var(--soft)}
+.sin-tel b{color:var(--ink)}
+.acc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border-radius:var(--r-s);transition:box-shadow .15s ease}
+.acc button{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px;text-align:left;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface-2);color:var(--ink);font-weight:500;line-height:1.25;transition:border-color .15s ease,transform .16s var(--ease-out)}
+.acc button:hover{border-color:var(--accent)}
+.acc button:active{transform:scale(.97)}
+.acc button i{font-size:19px;flex:0 0 auto}
+.acc button span{flex:1}
+.acc button span.kbd{flex:0 0 auto}
+.acc .i-gris{color:var(--muted)}.acc .i-info{color:var(--info)}.acc .i-ok{color:var(--good)}
+.acc.cierra button{background:transparent;color:var(--soft);font-size:13.5px}
+.acc.cierra button:hover{border-color:var(--line-2);color:var(--ink)}
+.acc.cierra.resaltado{box-shadow:0 0 0 2px var(--accent-ring)}
+.acc.cierra.resaltado button{border-color:var(--line-2);color:var(--ink)}
+.paso{display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface-2);animation:subir .22s var(--ease-out)}
+.paso.cierre{border-color:var(--accent)}
+.paso.instantaneo{animation:none}
+.paso h4{margin:0;font-size:17px;font-weight:600;display:flex;align-items:center;gap:10px;outline:none}
+.paso h4 i{font-size:22px;color:var(--info)}
+.paso.cierre h4 i{color:var(--accent)}.paso h4 i.i-ok{color:var(--good)}
+.paso p{margin:0;color:var(--soft);font-size:13.5px}
+.paso p b{color:var(--ink)}
+.paso .botones{display:flex;gap:8px;flex-wrap:wrap}
+.paso .opciones{display:flex;flex-direction:column;gap:6px}
+.paso .opciones label{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface);font-family:var(--mono);font-size:15px;cursor:pointer}
+.paso .volver{align-self:flex-start;height:32px;margin:-6px 0 -4px -6px;padding:0 6px;font-size:13px;gap:4px}
+@keyframes subir{from{opacity:0;transform:translateY(6px)}}
+.ok-cerrado{margin:0;display:flex;gap:10px;align-items:center;padding:14px 16px;border-radius:var(--r-s);background:var(--good-soft)}
+.ok-cerrado i{font-size:20px;color:var(--good)}
+.historia{list-style:none;margin:0 0 0 5px;padding:2px 0 0 14px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:12px}
+.historia li{position:relative;font-size:13px;color:var(--soft)}
+.historia li::before{content:'';position:absolute;left:-21px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid var(--line-2)}
+.historia li:first-child::before{border-color:var(--accent)}
+.historia b{color:var(--ink);font-weight:600;font-family:var(--mono);font-size:12.5px}
+.historia li.anulado .txt{text-decoration:line-through;color:var(--muted)}
+.historia .enlace{margin-left:6px;font-size:12.5px}
+.historia .motivo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.historia .motivo input{flex:1 1 180px;height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink)}
+.hist-skel{display:flex;flex-direction:column;gap:12px}
+.hist-skel i{display:block;height:10px;border-radius:4px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel-2) 50%,var(--skel) 75%);background-size:200% 100%;animation:brillo 1.4s linear infinite}
+.hist-skel i:nth-child(2){width:80%}.hist-skel i:nth-child(3){width:60%}
+.p-vacio{margin:0;color:var(--muted);font-size:13px}
+.ver-ficha{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;border:0;padding:0;background:none;color:var(--accent);font-weight:600}
+.ver-ficha:hover{color:var(--accent-hover)}
+/* Realce de la tarjeta que llega: solo se anima la opacidad del anillo. */
+.tarjeta{position:relative}
+.tarjeta::after{content:'';position:absolute;inset:-1px;border-radius:inherit;box-shadow:0 0 0 4px var(--accent-ring);opacity:0;pointer-events:none}
+.tarjeta.celebra::after{box-shadow:0 0 0 4px var(--good)}
+.chispa{position:fixed;width:6px;height:6px;z-index:90;pointer-events:none}
+.chispa.c0{background:var(--good)}.chispa.c1{background:var(--warn);border-radius:50%}.chispa.c2{background:var(--accent)}.chispa.c3{background:var(--info);border-radius:50%}
 
 /* Responsivo */
 @media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}}
@@ -211,6 +294,7 @@ html.con-vt .vista{animation:none}
   .buscar{width:100%}.atajos,.kbd{display:none}
   .filtros .relleno{display:none}
   .coltabs{display:flex}.tablero{grid-template-columns:minmax(0,1fr)}.col{min-height:0}.col:not(.movil){display:none}
+  .panel{width:100%}.p-volver{display:inline-flex}.p-cerrar{display:none}.p-top,.p-cuerpo{padding-left:16px;padding-right:16px}
 }
 @view-transition{navigation:auto}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
@@ -263,7 +347,7 @@ html.con-vt .vista{animation:none}
             <label class="sel-chip"><i class="ph ph-heartbeat"></i><select id="fesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
             <button type="button" class="pill" id="fsin" aria-pressed="false"><i class="ph ph-phone-slash"></i>Solo sin teléfono</button>
           </div>
-          <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓ ← →</span><span class="kbd">j k</span>moverse</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span></div>
+          <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓ ← →</span><span class="kbd">j k</span>moverse</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">1–4</span>qué pasó</span><span><span class="kbd">X</span>cerrar seguimiento</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span></div>
           <div id="err"></div>
           <div class="coltabs" id="coltabs" role="tablist" aria-label="Columnas"></div>
           <section class="tablero" id="tablero" aria-label="Tablero de seguimientos"></section>
@@ -292,9 +376,7 @@ html.con-vt .vista{animation:none}
   <button type="button" data-sec="indicadores"><i class="ph ph-chart-line-up"></i>Indicadores</button>
 </nav>
 <div class="velo" id="velo"></div>
-<aside class="panel" id="panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="panel-t">
-  <div class="p-top"><h2 id="panel-t"></h2><button type="button" class="p-cerrar" id="panel-cerrar" aria-label="Cerrar"><i class="ph ph-x"></i></button></div>
-</aside>
+<aside class="panel" id="panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="panel-t"></aside>
 <div class="aviso" id="aviso" role="status" aria-live="polite"><span></span><button type="button" hidden></button></div>
 
 <script>
@@ -354,7 +436,9 @@ const S = {
   tipo: '',         // '' | 'REEVALUACION' | 'HIERRO' | 'PROCEDIMIENTO' (seg.tipo, como la app anterior)
   medico: '', medicoPropuesto: '', esp: '', sinTel: false, q: '',
   lim: { rec: 6, mes: 4, ant: 3 },
-  colMovil: 1
+  colMovil: 1,
+  enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
+  fichaDni: ''      // «Ver ficha completa»: el DNI que abre Pacientes (Tarea 9)
 };
 
 /* ============ Adaptadores (MAPEO-SERVIDOR.md §0) ============ */
@@ -718,22 +802,28 @@ function iniciarTablero() {
   pastilla($('#seg'), true);
 }
 
-/** Pide getTablero (o usa el pedido del arranque) y pinta. Solo vale la última respuesta. */
-async function cargarTablero(pedido) {
+/**
+ * Pide getTablero (o usa el pedido del arranque) y pinta. Solo vale la última respuesta.
+ * silencioso: tras una escritura (Deshacer, Anular) no muestra esqueletos; las tarjetas viajan con FLIP a su sitio.
+ */
+async function cargarTablero(pedido, silencioso) {
   const n = cargarTablero.n = (cargarTablero.n || 0) + 1;
-  S.fase = 'cargando';
-  pintarTablero();
+  if (S.fase !== 'listo') silencioso = false;
+  if (!silencioso) { S.fase = 'cargando'; pintarTablero(); }
   try {
     const r = await (pedido || llamar('getTablero'));
     if (n !== cargarTablero.n) return;
+    if (silencioso) { conFlip(() => { adaptarTablero(r); pintarTablero(); }); trasRecargar(); return; }
     adaptarTablero(r);
     S.fase = 'listo';
   } catch (e) {
     if (n !== cargarTablero.n) return;
     console.error(e);
+    if (silencioso) { avisar('No se pudo actualizar el tablero: ' + e.message); return; }
     S.fase = 'error';
   }
   pintarTablero();
+  trasRecargar();
   // Cascada solo en la primera carga, y nunca con movimiento reducido.
   if (S.fase === 'listo' && !cargarTablero.ya && !reducido) {
     $$('#tablero .tarjeta').forEach((el, i) => el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
@@ -845,14 +935,28 @@ function copiarContacto(p) {
 
 document.addEventListener('keydown', e => {
   if (!tableroIniciado) return;
+  if (e.key === 'Tab' && seleccion.panel) { atraparFoco(e); return; }
   const tag = e.target.tagName, enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || e.target.isContentEditable;
+  const tecla = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (e.key === 'Escape') {
-    if (seleccion.panel) { e.preventDefault(); cerrarPanel(false, true); } else if (enCampo) e.target.blur();
+    // Con el panel: primero el motivo de una anulación, luego el paso, luego el panel.
+    if (seleccion.panel) {
+      e.preventDefault();
+      if (P.anulando) { P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); }
+      else if (P.paso) cerrarPaso(true);
+      else cerrarPanel(false, true);
+    } else if (enCampo) e.target.blur();
     return;
   }
   if (enCampo || e.metaKey || e.ctrlKey || e.altKey) return;
   if (seleccion.panel) {
-    if (e.key === 'c' || e.key === 'C') copiarContacto(S.pacientes.find(p => p.id === seleccion.panel));
+    const p = S.pacientes.find(x => x.id === seleccion.panel);
+    if (!p) return;
+    if (tecla === 'c') copiarContacto(p);
+    else if (p.col !== 4 && !P.paso && /^[1-4]$/.test(tecla)) {
+      const a = accDe(p)[Number(tecla) - 1];
+      if (a) { e.preventDefault(); elegir(a.k, true); }
+    } else if (p.col !== 4 && tecla === 'x') { e.preventDefault(); resaltarCierre(); }
     return;
   }
   if (S.seccion !== 'tablero' || S.fase !== 'listo') return;
@@ -877,35 +981,649 @@ document.addEventListener('keydown', e => {
   }
   if (ci < 0) return;
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirPanel(seleccion.id, true); }   // role="button": Enter y Espacio
-  else if (e.key === 'c' || e.key === 'C') copiarContacto(S.pacientes.find(p => p.id === seleccion.id));
+  else if (tecla === 'c') copiarContacto(S.pacientes.find(p => p.id === seleccion.id));
+  else if (/^[1-4]$/.test(tecla) || tecla === 'x') {
+    // 1 a 4 y X sobre la tarjeta seleccionada, con el panel cerrado. Solo «No contestó» guarda sin abrir el panel.
+    const p = S.pacientes.find(x => x.id === seleccion.id);
+    if (!p || p.col === 4) return;
+    e.preventDefault();
+    if (tecla === 'x') { abrirPanel(p.id, true, { cierre: true }); return; }
+    const a = accDe(p)[Number(tecla) - 1];
+    if (!a) return;
+    if (a.k === 'nocontesto') guardarResultado(p.id, a.r, { teclado: true });
+    else abrirPanel(p.id, true, { paso: a.k });
+  }
 });
 
-/* ============ Panel mínimo (Tarea 5): solo el nombre. Lo reemplaza el panel «¿Qué pasó?» de la Tarea 6 ============ */
-/** Abre el panel de la tarjeta `id`. Con el teclado aparece al instante (sin animación). */
-function abrirPanel(id, teclado) {
-  const p = S.pacientes.find(x => x.id === id);
+/* ============ Panel del paciente y «¿Qué pasó?» (README §6.2; MAPEO §1.3, §2) ============ */
+// Claves de la referencia -> RESULTADOS (MAPEO §2.1). «No desea continuar» no tiene un «otro» aparte.
+const ACC = [
+  { k: 'nocontesto', r: 'NO CONTESTÓ', l: 'No contestó', i: 'ph ph-phone-x i-gris' },
+  { k: 'pensara', r: 'LO PENSARÁ', l: 'Lo pensará', i: 'ph ph-clock-countdown i-info' },
+  { k: 'agendo', r: 'AGENDÓ CITA', l: 'Agendó cita', i: 'ph ph-calendar-plus i-info' },
+  { k: 'lohizo', r: 'LO HIZO', l: 'Lo hizo', i: 'ph ph-check-square i-ok', solo: ['hier', 'proc'] }
+];
+const CIERRES = [
+  { k: 'alta', r: 'ALTA MÉDICA', l: 'Alta médica', i: 'ph ph-seal-check' },
+  { k: 'numero', r: 'NÚMERO EQUIVOCADO', l: 'Número equivocado', i: 'ph ph-phone-disconnect', conTel: true },
+  { k: 'otrolugar', r: 'SE ATIENDE EN OTRO LUGAR', l: 'Se atiende en otro lugar', i: 'ph ph-buildings' },
+  { k: 'fallecio', r: 'FALLECIÓ', l: 'Falleció', i: 'ph ph-flower-lotus' },
+  { k: 'otro', r: 'NO DESEA CONTINUAR', l: 'No desea continuar', i: 'ph ph-dots-three-outline' }
+];
+const RES = {};
+ACC.concat(CIERRES).forEach(a => { RES[a.k] = a; RES[a.r] = a; });
+// Cierres que dejan una fila en «cerrados este mes» (el alta va a Completado).
+const CIERRAN = ['NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'];
+const ANULAR = { seguimiento: 'anularResultado', alta: 'anularAlta', sesion: 'anularSesion' };
+const accDe = p => ACC.filter(a => !a.solo || a.solo.includes(p.t));
+const cierresDe = p => CIERRES.filter(c => !c.conTel || activos(p).length);
+const EASE_IO = 'cubic-bezier(.77,0,.175,1)', EASE_OUT = 'cubic-bezier(.23,1,.32,1)';
+const esAnulado = v => v === true || norm(v) === 'SI';
+
+/** Estado del panel abierto. La nota vive aquí mientras el panel siga abierto en ese paciente. */
+const P = { clave: '', paso: null, nota: '', cierre: false, anulando: '', hist: null };
+
+/* ---- Movimiento: FLIP, salida y chispas (README §7). Solo transform y opacity ---- */
+function conFlip(fn, llega, celebra, sinAnim) {
+  if (sinAnim || reducido) { fn(); return; }
+  const antes = {};
+  $$('#tablero [data-card]').forEach(el => { antes[el.dataset.card] = el.getBoundingClientRect(); });
+  fn();
+  $$('#tablero [data-card]').forEach(el => {
+    const id = el.dataset.card, a = antes[id], b = el.getBoundingClientRect(), es = !!llega && id === llega;
+    if (a) {
+      const dx = a.left - b.left, dy = a.top - b.top;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        el.style.zIndex = es ? 6 : 2;
+        el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }], { duration: es ? 480 : 320, easing: EASE_IO })
+          .onfinish = () => { el.style.zIndex = ''; };
+      }
+    } else if (es) el.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: EASE_OUT });
+    if (es) {
+      el.classList.toggle('celebra', !!celebra);
+      el.animate([{ opacity: 1 }, { opacity: 1, offset: .55 }, { opacity: 0 }], { duration: 1400, easing: 'ease-out', pseudoElement: '::after' });
+      if (celebra) setTimeout(() => chispas(el), 460);
+    }
+  });
+}
+/** Repinta el tablero: las tarjetas que salen se desvanecen primero (180 ms); las demás viajan con FLIP. */
+function repintar(o) {
+  const anim = !o.sinAnim && !reducido;
+  const sale = anim ? (o.sale || []).map(tarjetaEl).filter(Boolean) : [];
+  const flip = () => conFlip(pintarTablero, o.llega, o.celebra, !anim);
+  if (!sale.length) { flip(); return; }
+  sale.forEach(el => el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.96)' }], { duration: 180, easing: EASE_OUT, fill: 'forwards' }));
+  setTimeout(flip, 180);
+}
+/** Celebración discreta: solo al completar un tratamiento y al cumplir la meta del día. */
+function chispas(el) {
+  if (!el || reducido) return;
+  const r = el.getBoundingClientRect(), cx = r.right - 14, cy = r.top + 14;
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 + Math.random() * .5, d = 26 + Math.random() * 22, s = document.createElement('i');
+    s.className = 'chispa c' + (i % 4);
+    s.style.left = cx + 'px'; s.style.top = cy + 'px';
+    document.body.appendChild(s);
+    s.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(a) * d}px),calc(-50% + ${Math.sin(a) * d}px)) scale(.4)`, opacity: 0 }],
+    { duration: 620 + Math.random() * 160, easing: EASE_OUT }).onfinish = () => s.remove();
+  }
+}
+
+/* ---- Abrir y cerrar ---- */
+/**
+ * Abre el panel de la tarjeta `clave`. Con el teclado aparece al instante (sin animación).
+ * opciones: { paso: clave de «¿Qué pasó?» } abre ese paso; { cierre: true } resalta «Cerrar el seguimiento» (X).
+ */
+function abrirPanel(clave, teclado, opciones) {
+  const p = S.pacientes.find(x => x.id === clave);
   if (!p) return;
-  seleccion.panel = id;
+  const o = opciones || {};
+  const ya = seleccion.panel === clave && P.clave === clave;
+  seleccion.panel = clave;
+  if (!ya) {
+    Object.assign(P, { clave, paso: null, nota: '', cierre: false, anulando: '', hist: null });
+    cargarHistoria(p);
+  }
   const inst = !!teclado || reducido;
   $('#panel').classList.toggle('instantaneo', inst);
   $('#velo').classList.toggle('instantaneo', inst);
-  $('#panel-t').textContent = nombreDe(p);
+  if (p.col !== 4 && o.paso) prepararPaso(p, o.paso, teclado);
+  if (p.col !== 4 && o.cierre) { P.paso = null; P.cierre = true; }
+  pintarPanel();
   $('#panel').classList.add('abierto');
   $('#velo').classList.add('abierto');
-  $('#panel').focus({ preventScroll: true });
+  if (P.paso) enfocarPaso();
+  else if (P.cierre) enfocar('#panel .acc.cierra button');
+  else $('#panel').focus({ preventScroll: true });
 }
-/** Cierra el panel. silencio: no devuelve el foco a la tarjeta (al cambiar de pantalla). */
+/** Cierra el panel. silencio: no devuelve el foco a la tarjeta (al cambiar de pantalla o tras guardar). */
 function cerrarPanel(silencio, teclado) {
   if (!seleccion.panel) return;
   const id = seleccion.panel;
   seleccion.panel = '';
+  Object.assign(P, { clave: '', paso: null, nota: '', cierre: false, anulando: '', hist: null });
   if (teclado) { $('#panel').classList.add('instantaneo'); $('#velo').classList.add('instantaneo'); }
   $('#panel').classList.remove('abierto');
   $('#velo').classList.remove('abierto');
   if (!silencio) { const el = tarjetaEl(id); if (el) el.focus({ preventScroll: true }); }
 }
+/** Tras recargar el tablero: el panel sigue a su tarjeta, o se cierra si salió. */
+function trasRecargar() {
+  if (!seleccion.panel) return;
+  if (S.pacientes.some(p => p.id === seleccion.panel)) pintarPanel(); else cerrarPanel(true);
+}
+/** Enfoca `sel` dentro del panel; si no existe, el panel mismo. */
+const enfocar = sel => { const el = $(sel); (el || $('#panel')).focus({ preventScroll: true }); };
+
+/** El foco no sale del panel mientras está abierto (aria-modal). */
+function atraparFoco(e) {
+  const f = $$('#panel button:not([disabled]), #panel input:not([disabled]), #panel select, #panel textarea')
+    .filter(el => el.getClientRects().length);
+  if (!f.length) { e.preventDefault(); $('#panel').focus(); return; }
+  const i = f.indexOf(document.activeElement);
+  if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+  else if (!e.shiftKey && (i < 0 || i === f.length - 1)) { e.preventDefault(); f[0].focus(); }
+}
+document.addEventListener('focusin', e => {
+  if (!seleccion.panel || !e.target.closest || e.target.closest('#panel') || e.target.closest('#aviso')) return;
+  $('#panel').focus({ preventScroll: true });
+});
+
+/* ---- Pintar ---- */
+function datosDe(p) {
+  if (p.t === 'reev') return [['Última consulta', dmy(p.ultima)], ['Debía volver el', dmy(p.debia)]];
+  if (p.t === 'hier') {
+    const d = [['Cotizó el', dmy(p.cotizo)]];
+    if (p.trat.n) d.push(['Sesión', `${p.trat.k} de ${p.trat.n}`]);
+    if (p.trat.ultima) d.push(['Última sesión', dmy(p.trat.ultima)]);
+    return d;
+  }
+  return [['Cotizó el', dmy(p.cotizo)], ['Procedimiento', p.proc]];
+}
+function alertaDe(p) {
+  if (p.col === 1) {
+    const mal = p.dias > 30 || p.atraso > 0 ? 'mal' : '';
+    if (p.t === 'reev') return [`hace ${plural(p.dias, 'día', 'días')} que no vuelve`, mal];
+    if (p.t === 'hier' && p.trat.k && p.trat.n) return [`sesión ${p.trat.k + 1} de ${p.trat.n} pendiente · hace ${plural(p.dias, 'día', 'días')}`, mal];
+    return [p.t === 'hier' ? `cotizó hace ${plural(p.dias, 'día', 'días')} y no empezó` : `cotizó hace ${plural(p.dias, 'día', 'días')} y no lo hizo`, mal];
+  }
+  if (p.col === 2) return [p.etiqueta, p.atraso > 0 || p.agenda === 'SIN RESPUESTA' ? 'mal' : 'info'];
+  if (p.col === 3) return [p.etiqueta, ''];
+  return [p.fin, 'ok'];
+}
+function contactosHtml(p) {
+  const act = activos(p);
+  return act.map((t, i) => `<div class="contacto"><span class="v"><small>Teléfono</small><span class="num">${esc(telBonito(t))}</span></span>`
+      + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(t)}"><i class="ph ph-copy"></i>Copiar${i === 0 ? ' <span class="kbd">C</span>' : ''}</button></div>`).join('')
+    + (p.usuario ? `<div class="contacto"><span class="v"><small>Usuario</small><span class="num">${esc(p.usuario)}</span></span>`
+      + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(p.usuario)}"><i class="ph ph-copy"></i>Copiar${act.length ? '' : ' <span class="kbd">C</span>'}</button></div>` : '')
+    + p.malos.map(t => `<div class="contacto malo"><span class="v"><small>Equivocado</small><span class="num">${esc(telBonito(t))}</span></span></div>`).join('')
+    + (!act.length && !p.usuario ? '<p class="sin-tel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>' : '');
+}
+function quePasoHtml(p) {
+  if (p.col === 4) return `<p class="ok-cerrado"><i class="ph-fill ph-check-circle"></i><span><b>Seguimiento cerrado.</b> ${esc(p.fin)}</span></p>`;
+  if (P.paso) return htmlPaso(p);
+  return '<section><h3 class="grande">¿Qué pasó?</h3>'
+    + `<div class="acc">${accDe(p).map((a, i) => `<button type="button" data-acc="${a.k}"><i class="${a.i}"></i><span>${a.l}</span><span class="kbd">${i + 1}</span></button>`).join('')}</div>`
+    + '<h3>Cerrar el seguimiento <span class="kbd">X</span></h3>'
+    + `<div class="acc cierra${P.cierre ? ' resaltado' : ''}">${cierresDe(p).map(c => `<button type="button" data-acc="${c.k}"><i class="${c.i}"></i><span>${c.l}</span></button>`).join('')}</div></section>`;
+}
+/** Pinta el panel de la tarjeta abierta. Conserva el foco si el elemento sigue existiendo. */
+function pintarPanel() {
+  const p = S.pacientes.find(x => x.id === seleccion.panel);
+  if (!p) return;
+  const a = document.activeElement, dentro = a && a.closest && a.closest('#panel') && a.id !== 'panel';
+  const foco = dentro ? (a.id ? '#' + a.id : a.dataset.acc ? `[data-acc="${a.dataset.acc}"]` : a.hasAttribute('data-volverpaso') ? '[data-volverpaso]' : '') : '';
+  const [alerta, tono] = alertaDe(p);
+  const linea = ['DNI ' + p.dni, frase(p.esp), nombreBonito(p.med)].filter(x => x && x !== 'DNI ').join(' · ');
+  const pend = p.t === 'reev' && p.raw.PENDIENTE ? `<p class="p-pend"><b>Procedimiento pendiente.</b> ${esc(p.raw.PENDIENTE)}</p>` : '';
+  const prog = p.t === 'hier' && p.trat.n
+    ? `<div class="prog" aria-hidden="true">${Array.from({ length: p.trat.n }, (_, i) => `<i class="${i < p.trat.k ? 'si' : ''}"></i>`).join('')}</div>` : '';
+  $('#panel').innerHTML = `<div class="p-top"><button type="button" class="p-volver" data-cerrar><i class="ph ph-caret-left"></i>Volver</button>`
+    + `<div class="p-cab"><div><div class="p-tags"><span class="tag t-${p.t}">${esc(tagDe(p))}</span>${p.perfil ? `<span>${esc(p.perfil)}</span>` : ''}</div>`
+    + `<h2 id="panel-t">${esc(nombreDe(p))}</h2><div class="p-linea">${esc(linea)}</div></div>`
+    + '<button type="button" class="p-cerrar" data-cerrar aria-label="Cerrar (Esc)"><i class="ph ph-x"></i></button></div></div>'
+    + '<div class="p-cuerpo">'
+    + `<section>${p.t === 'hier' && p.raw.DETALLE ? `<div class="p-trat">${esc(p.raw.DETALLE)}</div>` : ''}`
+    + `<dl class="datos">${datosDe(p).map(([l, v]) => `<div><dt>${l}</dt><dd>${esc(v) || '&nbsp;'}</dd></div>`).join('')}</dl>${prog}`
+    + `<p class="alerta${tono ? ' ' + tono : ''}">${esc(alerta)}</p>${pend}</section>`
+    + `<section><h3>Contacto</h3>${contactosHtml(p)}</section>`
+    + quePasoHtml(p)
+    + (p.col !== 4 ? `<label class="campo">Nota (opcional)<textarea id="nota" rows="2" placeholder="Se guarda con la respuesta">${esc(P.nota)}</textarea></label>` : '')
+    + '<section><h3>Historia</h3><div id="p-hist"></div></section>'
+    + `<button type="button" class="ver-ficha" data-ficha="${esc(p.dni)}">Ver ficha completa<i class="ph ph-arrow-right"></i></button>`
+    + '</div>';
+  if (P.paso) P.paso.visto = true;   // al repintar, el paso ya no vuelve a entrar
+  pintarHistoria();
+  if (dentro) enfocar(foco ? '#panel ' + foco : '#panel');
+}
+
+/* ---- Pasos ---- */
+/** Fecha propuesta y rango que valida el servidor (MAPEO §2.1). null si el paso no pide fecha. */
+function rangoPaso(p, k) {
+  const hoy = S.hoy, manana = masDias(hoy, 1);
+  if (k === 'pensara') return { min: manana, max: masDias(hoy, 90), f: manana };
+  if (k === 'agendo') {
+    const max = masDias(hoy, 180), pa = String(p.raw.PROXIMA_AGENDADA || '').slice(0, 10);
+    return { min: hoy, max, f: pa && pa >= hoy && pa <= max ? pa : hoy };
+  }
+  if (k === 'lohizo') return { min: p.idRegistro ? String(p.raw.ULTIMA_SESION || p.cotizo || '').slice(0, 10) : '', max: hoy, f: hoy };
+  if (k === 'alta' && p.t === 'reev') return { min: String(p.ultima || '').slice(0, 10), max: hoy, f: hoy };   // solo en reevaluación (MAPEO §3 G)
+  return null;
+}
+/** Los mensajes de validarResultado: lo que falte se avisa sin llamar al servidor. */
+function validarFecha(k, f, r) {
+  const falta = { pensara: 'Falta la fecha para volver a llamar.', agendo: 'Falta la fecha de la cita.', lohizo: 'Falta la fecha de la sesión.', alta: 'Falta la fecha del alta.' };
+  if (!f) return falta[k];
+  if (k === 'pensara' && (f < r.min || f > r.max)) return 'La fecha para volver a llamar va de mañana a 90 días.';
+  if (k === 'agendo' && (f < r.min || f > r.max)) return 'La fecha de la cita va de hoy a 180 días.';
+  if (f > r.max) return k === 'lohizo' ? 'La fecha de la sesión no puede ser futura.' : 'La fecha no puede ser futura.';
+  if (r.min && f < r.min) return k === 'alta' ? 'El alta no puede ser anterior a la última consulta.' : 'La fecha no puede ser anterior al ' + dmy(r.min) + '.';
+  return '';
+}
+function prepararPaso(p, k, teclado) {
+  const rango = rangoPaso(p, k), act = activos(p);
+  const doc = k === 'alta' ? ((S.boot && S.boot.doctores) || []).find(d => d.sofdoc && norm(d.sofdoc) === norm(p.med)) : null;
+  P.paso = { k, rango, f: rango ? rango.f : '', tel: k === 'numero' && act.length === 1 ? act[0] : '', motivo: '', doctor: doc ? doc.doctor : '', visto: !!teclado };
+  P.cierre = false;
+  P.anulando = '';
+}
+function htmlPaso(p) {
+  const ps = P.paso, k = ps.k, act = activos(p), para = p.t === 'reev' ? frase(p.esp) : p.t === 'hier' ? 'Hierro' : frase(p.proc) || 'Procedimiento';
+  let t = '', icon = 'ph ph-calendar-plus', aviso = '', campos = '', boton = 'Confirmar', deshab = false;
+  let cierre = ['otrolugar', 'fallecio', 'otro'].includes(k);
+  const fecha = l => `<label class="campo">${l}<input type="date" id="pf" value="${esc(ps.f)}"${ps.rango.min ? ` min="${esc(ps.rango.min)}"` : ''} max="${esc(ps.rango.max)}"></label>`;
+  if (k === 'agendo') { t = 'Agendó cita'; campos = fecha('Fecha de la cita'); boton = 'Pasar a Agendado'; aviso = 'Si la fecha pasa sin cita realizada en SOFDOC, vuelve a «Por contactar».'; }
+  if (k === 'pensara') { t = 'Lo pensará'; icon = 'ph ph-clock-countdown'; campos = fecha('Volver a llamar el'); boton = 'Guardar fecha'; aviso = 'Sale de «Por contactar» hasta ese día.'; }
+  if (k === 'lohizo') {
+    icon = 'ph ph-check-square i-ok';
+    if (p.t === 'hier' && p.idRegistro && p.trat.n) {
+      const n = p.trat.k + 1, ult = n >= p.trat.n;
+      t = `Lo hizo · sesión ${n} de ${p.trat.n}`; campos = fecha('Fecha de la sesión');
+      boton = ult ? 'Marcar como completado' : 'Pasar a En tratamiento';
+      aviso = ult ? 'Es la última sesión: el tratamiento queda completado.' : `Quedará pendiente la sesión ${n + 1} de ${p.trat.n}.`;
+    } else if (p.t === 'hier') { t = 'Lo hizo'; campos = fecha('Fecha en que lo hizo'); boton = 'Marcar como completado'; aviso = 'El tratamiento pasa a Completado.'; }
+    else { t = `Se hizo ${frase(p.proc)}`; campos = fecha('Fecha en que se lo hizo'); boton = 'Marcar como completado'; aviso = 'El procedimiento pasa a Completado.'; }
+  }
+  if (k === 'alta') {
+    t = 'Alta médica'; icon = 'ph ph-seal-check i-ok'; boton = 'Confirmar alta';
+    aviso = `Cierra el seguimiento de ${para}. No cuenta como «no volvió».`;
+    const docs = (S.boot && S.boot.doctores) || [];
+    campos = `<label class="campo">Doctor que da el alta<select id="pd"><option value="">Elija el doctor</option>${docs.map(d =>
+      `<option value="${esc(d.doctor)}"${d.doctor === ps.doctor ? ' selected' : ''}>${esc(d.doctor)}</option>`).join('')}</select></label>`
+      + (ps.rango ? fecha('Fecha del alta') : '');
+  }
+  if (k === 'numero') {
+    t = 'Número equivocado'; icon = 'ph ph-phone-disconnect';
+    const quedan = act.filter(x => x !== ps.tel);
+    if (act.length) {   // con un solo teléfono, ese queda elegido
+      campos = `<div class="opciones" role="radiogroup" aria-label="¿Cuál número está equivocado?">${act.map((x, i) =>
+        `<label><input type="radio" name="pn" id="pn-${i}" value="${esc(x)}"${x === ps.tel ? ' checked' : ''}>${esc(telBonito(x))}</label>`).join('')}</div>`;
+    }
+    aviso = !ps.tel ? 'Elija el número equivocado.' : quedan.length ? `Le queda el ${telBonito(quedan[0])}: el seguimiento sigue.`
+      : p.usuario ? `Le queda el usuario ${p.usuario}: el seguimiento sigue.` : 'No le queda otro contacto: se cerrará el seguimiento.';
+    cierre = !!ps.tel && !quedan.length && !p.usuario;
+    deshab = !ps.tel;
+    boton = cierre ? 'Cerrar el seguimiento' : 'Marcar número';
+  }
+  if (k === 'otrolugar') { t = 'Se atiende en otro lugar'; icon = 'ph ph-buildings'; aviso = 'Se cierra el seguimiento y el paciente sale del tablero.'; }
+  if (k === 'fallecio') { t = 'Falleció'; icon = 'ph ph-flower-lotus'; aviso = 'Se cierra el seguimiento y el paciente no volverá a aparecer en ninguna lista.'; }
+  if (k === 'otro') {
+    t = 'No desea continuar'; icon = 'ph ph-dots-three-outline';
+    campos = `<label class="campo">Motivo<input id="pm" autocomplete="off" placeholder="Por ejemplo: se atiende con su seguro" value="${esc(ps.motivo)}"></label>`;
+    aviso = 'Escriba el motivo. Se cierra el seguimiento.';
+    deshab = !ps.motivo.trim();
+  }
+  if (cierre && k !== 'numero') boton = 'Cerrar el seguimiento';
+  const pregunta = cierre ? `<p><b>¿Cerrar el seguimiento de ${esc(nombreDe(p))} (${esc(para)})?</b>${k === 'fallecio' ? ' Se cerrarán todos sus seguimientos.' : ''}</p>` : '';
+  return `<section class="paso${cierre ? ' cierre' : ''}${ps.visto ? ' instantaneo' : ''}" aria-labelledby="paso-t">`
+    + '<button type="button" class="ghost volver" data-volverpaso><i class="ph ph-caret-left"></i>Cambiar respuesta</button>'
+    + `<h4 id="paso-t" tabindex="-1"><i class="${icon}"></i>${esc(t)}</h4>${pregunta}<p id="paso-aviso">${esc(aviso)}</p>${campos}`
+    + `<div class="botones"><button type="button" class="btn btn-p" data-confirmar${deshab ? ' disabled' : ''}>${esc(boton)}</button>`
+    + '<button type="button" class="btn btn-s" data-volverpaso>Cancelar</button></div></section>';
+}
+/** El foco va al primer campo; en un cierre sin campos, al título del paso: ninguna tecla guarda un cierre. */
+function enfocarPaso() {
+  const k = P.paso && P.paso.k;
+  // Grupo de cierre: el foco va al título (o a lo que hay que elegir o escribir), nunca a un campo donde Enter haga algo.
+  const lista = k === 'otro' ? ['#pm'] : k === 'numero' ? ['#panel input[name="pn"]:checked', '#panel input[name="pn"]']
+    : CIERRES.some(c => c.k === k) ? [] : ['#pf'];
+  enfocar(lista.find(sel => $(sel)) || '#paso-t');
+}
+/** Elegir una respuesta: «No contestó» guarda directo; las demás abren su paso. */
+function elegir(k, teclado) {
+  const p = S.pacientes.find(x => x.id === seleccion.panel);
+  if (!p || p.col === 4) return;
+  if (k === 'nocontesto') { guardarResultado(p.id, 'NO CONTESTÓ', { teclado }); return; }
+  prepararPaso(p, k, teclado);
+  pintarPanel();
+  enfocarPaso();
+}
+function cerrarPaso() {
+  P.paso = null;
+  pintarPanel();
+  enfocar('#panel .acc button');
+}
+function resaltarCierre() {
+  P.paso = null; P.cierre = true;
+  pintarPanel();
+  enfocar('#panel .acc.cierra button');
+}
+/** Lee el paso abierto y guarda. Lo que falte se avisa sin llamar al servidor. */
+function confirmarPaso() {
+  const p = S.pacientes.find(x => x.id === seleccion.panel), ps = P.paso;
+  if (!p || !ps) return;
+  const k = ps.k, extra = {};
+  if (ps.rango) { extra.fecha = ps.f; const m = validarFecha(k, ps.f, ps.rango); if (m) { avisar(m); return; } }
+  if (k === 'alta') { extra.doctor = ps.doctor; if (!extra.doctor) { avisar('Elija el doctor que da el alta.'); return; } }
+  if (k === 'numero') { if (!ps.tel) { avisar('Elija cuál teléfono está equivocado.'); return; } extra.telefono = ps.tel; }
+  if (k === 'otro') { extra.motivo = ps.motivo.trim(); if (!extra.motivo) { avisar('Escriba el motivo.'); return; } }
+  guardarResultado(p.id, RES[k].r, extra);
+}
+
+/* ---- Guardado optimista (MAPEO §2.3) ---- */
+/**
+ * La tarjeta (forma del servidor) como quedaría tras `res`, con la regla del servidor aplicada en el navegador.
+ * '' si sale del tablero. Es solo una previsión: al llegar la respuesta manda r.tarjeta.
+ */
+function previsto(p, res, extra) {
+  const R = S.reglas || {}, hoy = S.hoy, f = String(extra.fecha || '').slice(0, 10);
+  const t = Object.assign({}, p.raw, { TELEFONOS_DESCARTADOS: (p.raw.TELEFONOS_DESCARTADOS || []).slice() });
+  const en = (col, etq, fc, mas) => Object.assign(t, { COLUMNA: col, ETIQUETA: etq, FECHA_CLAVE: fc || '' }, mas || {});
+  const agendar = (agenda, fecha, intento, etq) => {
+    t.N_SEGUIMIENTOS = p.intentos + 1;
+    return en('AGENDADO', etq, fecha, { ESTADO: 'AGENDADO', AGENDA: agenda, FECHA_AGENDA: fecha, INTENTO: intento, ATRASO: 0 });
+  };
+  if (res === 'NO CONTESTÓ') {
+    const N = Number(R.maxSeguimientos) || 2, k = Math.max(p.intento, p.intentos) + 1, fa = masDias(hoy, Number(R.espera) || 15);
+    return k >= N ? agendar('SIN RESPUESTA', fa, k, `Sin respuesta · se cierra el ${dm(fa)}`)
+      : agendar('REINTENTAR', fa, k, `Reintentar el ${dm(fa)} · intento ${k} de ${N}`);
+  }
+  if (res === 'LO PENSARÁ') return agendar('LLAMAR', f, 0, `Llamar el ${diaSem(f)} ${dm(f)}`);
+  if (res === 'AGENDÓ CITA') { if (p.t === 'reev') t.PROXIMA_AGENDADA = f; return agendar('CITA', f, 0, `Cita el ${diaSem(f)} ${dm(f)}`); }
+  if (res === 'LO HIZO') {
+    if (p.idRegistro && Number(t.SESIONES)) {
+      const N = Number(t.SESIONES), hechas = Number(t.HECHAS || 0) + 1;
+      Object.assign(t, { HECHAS: hechas, ULTIMA_SESION: f, N_SEGUIMIENTOS: 0, AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 });
+      if (hechas >= N) return en('COMPLETADO', p.t === 'proc' ? `Se hizo el ${dm(f)}` : 'Completó el tratamiento', f, { ESTADO_REGISTRO: 'COMPLETO', ATRASO: 0 });
+      const entre = Number(R.diasEntreSesiones) || 7, dias = diasEntre(f, hoy), sig = `Sesión ${hechas + 1} de ${N}`;
+      if (dias < entre) return en('EN_TRATAMIENTO', `${sig} · próxima ~${dm(masDias(f, entre))}`, masDias(f, entre), { ESTADO_REGISTRO: 'EN CURSO', ATRASO: 0 });
+      const atr = dias - entre;
+      return en('POR_CONTACTAR', sig + (atr > 0 ? ` · atrasada ${plural(atr, 'día', 'días')}` : ' · tocaba hoy'), '', { ESTADO_REGISTRO: 'EN CURSO', ATRASO: atr, DIAS: dias });
+    }
+    return f.slice(0, 7) === hoy.slice(0, 7) ? en('COMPLETADO', `Lo hizo el ${dm(f)}`, f) : '';
+  }
+  if (res === 'ALTA MÉDICA') {
+    if (p.t !== 'reev') return en('COMPLETADO', 'Alta médica', hoy);
+    return f.slice(0, 7) === hoy.slice(0, 7) ? en('COMPLETADO', 'Alta médica · ' + extra.doctor, f) : '';
+  }
+  if (res === 'NÚMERO EQUIVOCADO') {
+    const quedan = activos(p).filter(x => x !== extra.telefono);
+    return quedan.length || p.usuario ? sinTelefono(t, extra.telefono) : '';
+  }
+  return '';
+}
+const sinTelefono = (raw, tel) => {
+  const t = Object.assign({}, raw);
+  t.TELEFONOS = String(raw.TELEFONOS || '').split(' / ').filter(x => x && x !== tel).join(' / ');
+  t.TELEFONOS_DESCARTADOS = (raw.TELEFONOS_DESCARTADOS || []).filter(x => x !== tel).concat(tel);
+  return t;
+};
+/** Qué cambia en el tablero: [{ viejo, pos, nuevo }], la fila nueva de «cerrados» y si el panel sigue abierto. */
+function planDe(p, res, extra) {
+  const cambio = (viejo, raw) => ({ viejo, pos: S.pacientes.indexOf(viejo), nuevo: raw ? adaptarTarjeta(raw) : null });
+  const plan = { cambios: [], cerrado: null, sigue: false, celebra: false };
+  if (res === 'FALLECIÓ') {
+    // Cierra todos sus seguimientos: salen todas sus tarjetas abiertas (Completado se queda: es lo que ya pasó).
+    S.pacientes.filter(x => x.dni === p.dni && x.col >= 1 && x.col <= 3).forEach(x => plan.cambios.push(cambio(x, '')));
+    plan.cerrado = { CLAVE: p.dni, DNI: p.dni, NOMBRE: p.raw.NOMBRE || '', TIPO_SEGUIMIENTO: '', CIERRE: res, FECHA_CIERRE: S.hoy };
+    return plan;
+  }
+  const raw = previsto(p, res, extra);
+  plan.cambios.push(cambio(p, raw));
+  if (res === 'NÚMERO EQUIVOCADO') {
+    plan.sigue = !!raw;
+    // El número queda descartado para el paciente, no solo para esta tarjeta.
+    S.pacientes.filter(x => x !== p && x.dni === p.dni && x.tel.includes(extra.telefono)).forEach(x => plan.cambios.push(cambio(x, sinTelefono(x.raw, extra.telefono))));
+  }
+  if (!raw && CIERRAN.includes(res)) plan.cerrado = { CLAVE: p.id, DNI: p.dni, NOMBRE: p.raw.NOMBRE || '', TIPO_SEGUIMIENTO: p.tipo, CIERRE: res, FECHA_CIERRE: S.hoy };
+  plan.celebra = res === 'LO HIZO' && p.t === 'hier' && !!raw && raw.COLUMNA === 'COMPLETADO' && !!p.idRegistro;
+  return plan;
+}
+/** Pone `nuevo` en lugar de `viejo` (o lo saca, con null) respetando el orden de su columna. */
+function colocar(viejo, nuevo) {
+  const L = S.pacientes, i = viejo ? L.indexOf(viejo) : -1;
+  if (i >= 0) L.splice(i, 1);
+  if (!nuevo) return;
+  if (i >= 0 && viejo.col === nuevo.col) { L.splice(i, 0, nuevo); return; }
+  const misma = L.filter(x => x.col === nuevo.col);
+  const antesDe = nuevo.col === 4 ? misma[0]                                   // Completado: lo más reciente primero
+    : nuevo.col === 1 ? misma.find(x => x.intentos > nuevo.intentos)           // Por contactar: menos intentos primero
+      : misma.find(x => (x.fechaClave || '') > (nuevo.fechaClave || ''));     // Agendado y En tratamiento: por fecha
+  L.splice(antesDe ? L.indexOf(antesDe) : misma.length ? L.indexOf(misma[misma.length - 1]) + 1 : L.length, 0, nuevo);
+}
+/** Suma n a la meta del día de `quien` (hechosHoyPor). */
+function sumarMeta(cifras, quien, n) {
+  if (!cifras || !S.tablero || S.tablero.cifras !== cifras) return;
+  if (!cifras.hechosHoyPor || typeof cifras.hechosHoyPor !== 'object') cifras.hechosHoyPor = {};
+  const por = cifras.hechosHoyPor;
+  const k = Object.keys(por).find(x => x === quien) || Object.keys(por).find(x => norm(x) === norm(quien)) || quien;
+  por[k] = (Number(por[k]) || 0) + n;
+  pintarMeta();
+  return por[k];
+}
+function textoGuardado(p, res, r) {
+  const nombre = nombreDe(p), t = r && r.tarjeta, base = `Guardado: ${nombre} · ${RES[res].l.toLowerCase()}`;
+  if (r && r.completo) return p.t === 'proc' ? `${base}. Pasa a Completado.` : `${nombre} completó el tratamiento.`;
+  if (!t) return res === 'FALLECIÓ' ? `${base}. Se cerraron todos sus seguimientos.` : CIERRAN.includes(res) ? `${base}. Seguimiento cerrado.` : `${base}.`;
+  if (res === 'NO CONTESTÓ' && t.AGENDA === 'SIN RESPUESTA') return `${base}. Se cerrará el ${dm(t.FECHA_AGENDA)} si no responde.`;
+  if (res === 'NÚMERO EQUIVOCADO') return `${base}. El seguimiento sigue con el otro contacto.`;
+  return t.ETIQUETA ? `${base} · ${t.ETIQUETA}` : `${base}.`;
+}
+
+/**
+ * Guarda lo que pasó con la tarjeta `clave`. La tarjeta se mueve en el acto; al llegar la respuesta manda r.tarjeta
+ * (otra columna: viaja allí; '': sale). Si el servidor falla, todo vuelve y se avisa «No se guardó: …».
+ * extra: { fecha, telefono, motivo, doctor, teclado }.
+ */
+async function guardarResultado(clave, resultado, extra) {
+  extra = extra || {};
+  if (!exigirUsuario()) return;
+  const p = S.pacientes.find(x => x.id === clave);
+  if (!p || p.col === 4 || !RES[resultado]) return;   // Completado: el servidor solo acepta tarjetas abiertas
+  if (S.enVuelo.has(clave)) { avisar('Todavía se está guardando lo anterior de ' + nombreDe(p) + '.'); return; }
+  const quien = S.usuario, teclado = !!extra.teclado, enPanel = seleccion.panel === clave, nota = enPanel ? P.nota.trim() : '';
+  const plan = planDe(p, resultado, extra), cifras = S.tablero && S.tablero.cifras;
+  // La selección pasa a la siguiente de la columna si esta se va, para seguir con el teclado.
+  const lista = orden[p.col] || [], i = lista.indexOf(clave);
+  const fuera = plan.cambios.filter(c => !c.nuevo || c.nuevo.col !== c.viejo.col).map(c => c.viejo.id);
+  const sig = !fuera.includes(clave) ? clave
+    : lista.slice(i + 1).find(x => !fuera.includes(x)) || lista.slice(0, Math.max(i, 0)).reverse().find(x => !fuera.includes(x))
+      || (plan.cambios[0].nuevo ? clave : '');
+  S.enVuelo.add(clave);
+  if (enPanel) {
+    if (plan.sigue) { P.paso = null; P.nota = ''; } else cerrarPanel(true, teclado);
+  }
+  plan.cambios.forEach(c => colocar(c.viejo, c.nuevo));
+  if (plan.cerrado) S.cerrados = S.cerrados.concat([plan.cerrado]);
+  sumarMeta(cifras, quien, 1);
+  const principal = plan.cambios[0] && plan.cambios[0].nuevo;
+  repintar({ sale: plan.cambios.filter(c => !c.nuevo).map(c => c.viejo.id), llega: principal && principal.col !== p.col ? clave : '', celebra: plan.celebra, sinAnim: teclado });
+  if (enPanel && plan.sigue) pintarPanel();
+  else if (sig) seleccionar(sig, true);
+  const payload = { usuario: quien, dni: p.dni, especialidad: String(p.raw.ESPECIALIDAD || ''), referencia: p.idRegistro || '', resultado, nota,
+    fecha: extra.fecha || '', telefono: String(extra.telefono || '').replace(/\D/g, ''), motivo: extra.motivo || '', doctor: extra.doctor || '' };
+  let r;
+  try {
+    r = await llamar('registrarResultado', payload);
+  } catch (e) {
+    S.enVuelo.delete(clave);
+    // Todo vuelve: las tarjetas a su sitio, «cerrados» y la meta.
+    plan.cambios.forEach(c => { const j = S.pacientes.indexOf(c.nuevo); if (j >= 0) S.pacientes.splice(j, 1); });
+    plan.cambios.slice().sort((a, b) => a.pos - b.pos).forEach(c => {
+      if (!S.pacientes.some(x => x.id === c.viejo.id)) S.pacientes.splice(Math.max(0, Math.min(c.pos, S.pacientes.length)), 0, c.viejo);
+    });
+    if (plan.cerrado) S.cerrados = S.cerrados.filter(x => x !== plan.cerrado);
+    sumarMeta(cifras, quien, -1);
+    repintar({ llega: clave, sinAnim: teclado });
+    if (!seleccion.panel) seleccionar(clave, true);
+    avisar('No se guardó: ' + e.message);
+    // Si se guardaba desde el panel, vuelve a abrirse con la nota escrita.
+    if (enPanel && (!seleccion.panel || seleccion.panel === clave) && S.pacientes.some(x => x.id === clave)) {
+      abrirPanel(clave, true);
+      P.nota = nota;
+      pintarPanel();
+    }
+    return;
+  }
+  S.enVuelo.delete(clave);
+  // Manda el servidor: r.tarjeta es la tarjeta recalculada, o '' si salió del tablero.
+  const actual = S.pacientes.find(x => x.id === clave), t = r && r.tarjeta;
+  if (t) {
+    const nueva = adaptarTarjeta(t), mueve = !actual || actual.col !== nueva.col;
+    colocar(actual || null, nueva);
+    repintar({ llega: mueve ? clave : '', celebra: !!r.completo && p.t === 'hier', sinAnim: teclado || !mueve });
+  } else if (actual) {
+    colocar(actual, null);
+    repintar({ sale: [clave], sinAnim: teclado });
+  }
+  const hechos = Number(cifras && cifras.hechosHoyPor && cifras.hechosHoyPor[Object.keys(cifras.hechosHoyPor).find(x => norm(x) === norm(quien))]) || 0;
+  if (hechos && hechos === Number(S.reglas && S.reglas.metaDiaria)) setTimeout(() => chispas($('#metadia .barra')), 500);
+  if (seleccion.panel === clave) { pintarPanel(); const pa = S.pacientes.find(x => x.id === clave); if (pa) cargarHistoria(pa); }
+  const d = deshacerDe(r);
+  avisar(textoGuardado(p, resultado, r), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
+}
+/** Qué anula «Deshacer», según lo que devolvió registrarResultado (MAPEO §2.4). */
+const deshacerDe = r => r && (r.seguimiento && r.seguimiento.ID ? ['anularResultado', r.seguimiento.ID]
+  : r.alta && r.alta.ID ? ['anularAlta', r.alta.ID] : r.sesion && r.sesion.ID ? ['anularSesion', r.sesion.ID] : null);
+/** Anula lo recién guardado y recarga el tablero: entretanto otra asesora pudo cambiar algo. */
+async function deshacer(fn, id, quien, nombre) {
+  try {
+    await llamar(fn, { usuario: quien, id, motivo: 'Deshecho al momento' });
+    avisar('Deshecho: ' + nombre + '.');
+  } catch (e) { avisar('No se deshizo: ' + e.message); }
+  await cargarTablero(null, true);
+}
+
+/* ---- Historia (getPaciente al abrir el panel) ---- */
+/** El texto de cada fila de la historia, como textoRes de la app anterior. Sin escapar. */
+function textoRes(s) {
+  const r = s.RESULTADO || (s.ACCION === 'HECHO' ? 'SEGUIMIENTO HECHO' : s.ACCION === 'DESCARTADO' ? 'DESCARTADO' : s.ACCION);
+  const f = dm(String(s.FECHA_PROXIMA || '').slice(0, 10));
+  return ({ 'LO PENSARÁ': `lo pensará · llamar el ${f}`, 'AGENDÓ CITA': `agendó para el ${f}`, 'LO HIZO': `lo hizo el ${f}`,
+    'NÚMERO EQUIVOCADO': `número equivocado: ${s.TELEFONO}`, 'DESCARTADO': `descartado${s.MOTIVO ? ': ' + String(s.MOTIVO).toLowerCase() : ''}`,
+    'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || String(r || '').toLowerCase();
+}
+/**
+ * Filas de la historia de una tarjeta: los seguimientos de esa especialidad y referencia (más un «Falleció»),
+ * las sesiones de su registro y las altas de su especialidad. La más reciente primero.
+ * «Anular» va solo en la última sin anular de cada seguimiento, en un «Falleció», en la última sesión y en el alta.
+ */
+function filasHistoria(p, d) {
+  const esp = norm(p.raw.ESPECIALIDAD), ref = String(p.idRegistro || '').trim();
+  const claveSeg = s => norm(s.ESPECIALIDAD) + '|' + String(s.REFERENCIA || '').trim();
+  const segs = (d.seguimientos || []).filter(s => (norm(s.ESPECIALIDAD) === esp && String(s.REFERENCIA || '').trim() === ref) || s.RESULTADO === 'FALLECIÓ');
+  const ultimo = {};
+  segs.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0)
+    .filter(s => !esAnulado(s.ANULADO)).forEach(s => { ultimo[claveSeg(s)] = s.ID; });
+  const filas = segs.map(s => ({ cuando: String(s.FECHA_HORA || ''), f: dm(String(s.FECHA_HORA || '').slice(0, 10)), quien: nombreBonito(s.RESPONSABLE),
+    txt: textoRes(s), nota: s.NOTA || '', anulado: esAnulado(s.ANULADO), motivo: s.MOTIVO_ANULACION || '',
+    anular: !esAnulado(s.ANULADO) && /^SEG-/.test(String(s.ID)) && (s.RESULTADO === 'FALLECIÓ' || ultimo[claveSeg(s)] === s.ID) ? { que: 'seguimiento', id: s.ID } : null }));
+  const reg = ref && (d.registros || []).find(x => x.ID === ref);
+  if (reg && reg.ESTADO !== 'ANULADO') {
+    const ss = reg.sesiones || [];
+    ss.forEach((s, i) => filas.push({ cuando: String(s.FECHA || ''), f: dm(String(s.FECHA || '').slice(0, 10)), quien: nombreBonito(s.ASESORA),
+      txt: `sesión ${s.NUMERO} de ${reg.SESIONES}`, nota: '', anulado: false, motivo: '', anular: i === ss.length - 1 ? { que: 'sesion', id: s.ID } : null }));
+  }
+  (d.altas || []).filter(a => norm(a.ESPECIALIDAD) === esp).forEach(a => filas.push({ cuando: String(a.FECHA || ''), f: dm(String(a.FECHA || '').slice(0, 10)),
+    quien: nombreBonito(a.REGISTRADO_POR), txt: 'alta médica' + (a.DOCTOR ? ' · ' + a.DOCTOR : ''), nota: '', anulado: esAnulado(a.ANULADO),
+    motivo: a.MOTIVO_ANULACION || '', anular: !esAnulado(a.ANULADO) && /^ALT-/.test(String(a.ID)) ? { que: 'alta', id: a.ID } : null }));
+  return filas.sort((a, b) => a.cuando < b.cuando ? 1 : a.cuando > b.cuando ? -1 : 0);
+}
+async function cargarHistoria(p) {
+  const n = cargarHistoria.n = (cargarHistoria.n || 0) + 1, clave = p.id;
+  P.hist = { estado: 'cargando' };
+  pintarHistoria();
+  try {
+    const d = await llamar('getPaciente', p.dni);
+    if (n !== cargarHistoria.n || P.clave !== clave) return;
+    const actual = S.pacientes.find(x => x.id === clave) || p;
+    P.hist = { estado: 'listo', filas: filasHistoria(actual, d || {}) };
+  } catch (e) {
+    if (n !== cargarHistoria.n || P.clave !== clave) return;
+    P.hist = { estado: 'error', msg: e.message };
+  }
+  pintarHistoria();
+}
+function pintarHistoria() {
+  const c = $('#p-hist');
+  if (!c) return;
+  const h = P.hist;
+  if (!h || h.estado === 'cargando') { c.innerHTML = '<div class="hist-skel" aria-hidden="true"><i></i><i></i><i></i></div>'; return; }
+  if (h.estado === 'error') { c.innerHTML = `<p class="p-vacio">No se pudo cargar la historia: ${esc(h.msg)} <button type="button" class="enlace" data-rehist>Reintentar</button></p>`; return; }
+  if (!h.filas.length) { c.innerHTML = '<p class="p-vacio">Todavía no hay seguimientos.</p>'; return; }
+  c.innerHTML = '<ol class="historia">' + h.filas.map((x, i) => `<li class="${x.anulado ? 'anulado' : ''}">`
+    + `<span class="txt"><b>${esc(x.f)}</b> · ${esc(x.quien)}: ${esc(x.txt)}${x.nota ? ' · ' + esc(x.nota) : ''}</span>`
+    + (x.anulado ? ` · anulado${x.motivo ? ': ' + esc(x.motivo) : ''}` : '')
+    + (x.anular ? `<button type="button" class="enlace" data-anular="${i}">Anular</button>` : '')
+    + (x.anular && P.anulando === x.anular.id ? '<div class="motivo"><input id="motivo-anular" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación">'
+      + '<button type="button" class="btn btn-p" data-confirmar-anular>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button></div>' : '')
+    + '</li>').join('') + '</ol>';
+}
+/** Anula una fila de la historia con su motivo (obligatorio); ninguna fila se borra. */
+async function confirmarAnulacion(boton) {
+  if (!exigirUsuario()) return;
+  const fila = P.hist && P.hist.filas && P.hist.filas.find(x => x.anular && x.anular.id === P.anulando);
+  if (!fila) return;
+  const motivo = ($('#motivo-anular').value || '').trim();
+  if (!motivo) { avisar('Escriba el motivo de la anulación.'); $('#motivo-anular').focus(); return; }
+  boton.disabled = true;
+  try {
+    await llamar(ANULAR[fila.anular.que], { usuario: S.usuario, id: fila.anular.id, motivo });
+  } catch (e) { boton.disabled = false; avisar('No se anuló: ' + e.message); return; }
+  avisar('Anulado: ' + fila.anular.id + '.');
+  P.anulando = '';
+  const p = S.pacientes.find(x => x.id === seleccion.panel);
+  if (p) cargarHistoria(p);
+  $('#panel').focus({ preventScroll: true });
+  cargarTablero(null, true);
+}
+
+/* ---- Eventos del panel ---- */
+$('#panel').addEventListener('click', e => {
+  const t = e.target.closest('[data-acc],[data-confirmar],[data-volverpaso],[data-cerrar],[data-copiar],[data-ficha],[data-anular],[data-confirmar-anular],[data-cancelar-anular],[data-rehist]');
+  if (!t) return;
+  if (t.dataset.acc) elegir(t.dataset.acc);
+  else if (t.hasAttribute('data-confirmar')) confirmarPaso();
+  else if (t.hasAttribute('data-volverpaso')) cerrarPaso();
+  else if (t.hasAttribute('data-cerrar')) cerrarPanel();
+  else if (t.dataset.copiar) { copiar(t.dataset.copiar); t.classList.add('ok'); t.innerHTML = '<i class="ph ph-check"></i>Copiado'; }
+  else if (t.dataset.ficha) { S.fichaDni = t.dataset.ficha; ir('pacientes'); }
+  else if (t.hasAttribute('data-anular')) {
+    const fila = P.hist && P.hist.filas[Number(t.dataset.anular)];
+    if (!fila || !fila.anular) return;
+    P.anulando = fila.anular.id;
+    pintarHistoria();
+    enfocar('#motivo-anular');
+  } else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacion(t);
+  else if (t.hasAttribute('data-cancelar-anular')) { P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); }
+  else if (t.hasAttribute('data-rehist')) { const p = S.pacientes.find(x => x.id === seleccion.panel); if (p) cargarHistoria(p); }
+});
+$('#panel').addEventListener('input', e => {
+  const id = e.target.id;
+  if (id === 'nota') P.nota = e.target.value;
+  if (!P.paso) return;
+  if (id === 'pf') P.paso.f = e.target.value;
+  if (id === 'pm') { P.paso.motivo = e.target.value; const b = $('#panel [data-confirmar]'); if (b) b.disabled = !e.target.value.trim(); }
+});
+$('#panel').addEventListener('change', e => {
+  if (!P.paso) return;
+  if (e.target.id === 'pd') P.paso.doctor = e.target.value;
+  if (e.target.id === 'pf') P.paso.f = e.target.value;
+  if (e.target.name === 'pn') { P.paso.tel = e.target.value; pintarPanel(); }
+});
 $('#velo').addEventListener('click', () => cerrarPanel());
-$('#panel-cerrar').addEventListener('click', () => cerrarPanel());
 VISTAS.tablero.mostrar = () => pastilla($('#seg'), true);
 
 /* ============ Arranque ============ */
@@ -1149,7 +1867,9 @@ const DEMO = (() => {
     { ID: 'IND-0004', FECHA: '2026-09-01', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', CANTIDAD: 1, MEDICO_SOLICITANTE: ELI, ASESORA: 'MAGALY',
       NOMBRE: 'GLADYS NOEMÍ HUAMÁN PÉREZ', TELEFONO: '934000111', ESTADO: 'ACEPTÓ', OBSERVACIONES: '', DNI: '41444555', EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: '' },
     { ID: 'IND-0005', FECHA: '2026-08-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 1, MEDICO_SOLICITANTE: ELI, ASESORA: 'RACHEL',
-      NOMBRE: 'JULIO CÉSAR MORALES QUISPE', TELEFONO: '923000444', ESTADO: 'COTIZÓ', OBSERVACIONES: '', DNI: '41777888', EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: '' }
+      NOMBRE: 'JULIO CÉSAR MORALES QUISPE', TELEFONO: '923000444', ESTADO: 'COTIZÓ', OBSERVACIONES: '', DNI: '41777888', EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: '' },
+    { ID: 'IND-0006', FECHA: '2026-08-25', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 1, MEDICO_SOLICITANTE: HANAMPA, ASESORA: 'RACHEL',
+      NOMBRE: 'CARMEN SOFÍA TORRES DÍAZ', TELEFONO: '912345678', ESTADO: 'COTIZÓ', OBSERVACIONES: '', DNI: '40333444', EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: '' }
   ];
   let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
     candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
@@ -1162,7 +1882,10 @@ const DEMO = (() => {
     ind({ DNI: '41444555', TIPO_SEGUIMIENTO: 'PROCEDIMIENTO', NOMBRE: 'GLADYS NOEMÍ HUAMÁN PÉREZ', TELEFONOS: '934000111', FECHA_COTIZACION: '2026-09-01',
       DETALLE: 'SANGRÍA', ULTIMA_CITA: '2026-08-29', N_SEGUIMIENTOS: 1, ULTIMO_SEGUIMIENTO: '2026-09-26', ESTADO: 'COMPLETADO', FECHA_LOHIZO: '2026-09-25' }),
     ind({ DNI: '41777888', TIPO_SEGUIMIENTO: 'HIERRO', NOMBRE: 'JULIO CÉSAR MORALES QUISPE', TELEFONOS: '923000444', FECHA_COTIZACION: '2026-08-20',
-      DETALLE: 'Hierro (Ferinject)', ULTIMA_CITA: '2026-08-18', ULTIMO_SEGUIMIENTO: '2026-09-15', ESTADO: 'CERRADO', CIERRE: 'ALTA MÉDICA', FECHA_CIERRE: '2026-09-15' })
+      DETALLE: 'Hierro (Ferinject)', ULTIMA_CITA: '2026-08-18', ULTIMO_SEGUIMIENTO: '2026-09-15', ESTADO: 'CERRADO', CIERRE: 'ALTA MÉDICA', FECHA_CIERRE: '2026-09-15' }),
+    // Tarea 6: Carmen tiene además un hierro cotizado, para que «Falleció» saque dos tarjetas del mismo DNI.
+    ind({ DNI: '40333444', TIPO_SEGUIMIENTO: 'HIERRO', NOMBRE: 'CARMEN SOFÍA TORRES DÍAZ', TELEFONOS: '912345678', MEDICO_ULTIMO: HANAMPA,
+      ESPECIALIDAD_CONSULTA: 'REUMATOLOGÍA', FECHA_COTIZACION: '2026-08-25', DETALLE: 'Hierro (Ferinject)', ULTIMA_CITA: '2026-06-23' })
   ];
 
   /* ---- Tablero: las tarjetas viven aquí y se mueven con cada escritura ---- */
@@ -1170,9 +1893,10 @@ const DEMO = (() => {
     luis: ubicar(series[0], 'POR_CONTACTAR'),                     // reevaluación, paciente nuevo, con procedimiento pendiente
     carmen: ubicar(series[1], 'POR_CONTACTAR'),                   // reevaluación en control, 1 intento, un número descartado
     jorge: ubicar(series[2], 'POR_CONTACTAR'),                    // sin teléfono
-    rosa: ubicar(reg(regPorId('REG-000001')), 'POR_CONTACTAR'),   // hierro en curso, sesión atrasada
+    rosa: ubicar(reg(regPorId('REG-000001'), { TELEFONOS: '987654321 / 014332210' }), 'POR_CONTACTAR'),   // hierro en curso, atrasada, dos teléfonos
     ana: ubicar(reg(regPorId('REG-000003')), 'POR_CONTACTAR'),    // usuario @, sin teléfono
     pedro: ubicar(antiguas[0], 'POR_CONTACTAR'),                  // procedimiento antiguo
+    carmenHierro: ubicar(antiguas[4], 'POR_CONTACTAR'),           // hierro antiguo del mismo DNI que carmen
     maria: ubicar(series[3], 'AGENDADO'),                         // CITA
     victor: ubicar(antiguas[1], 'AGENDADO'),                      // LLAMAR
     lucia: ubicar(series[4], 'AGENDADO'),                         // REINTENTAR, intento 2 de 3

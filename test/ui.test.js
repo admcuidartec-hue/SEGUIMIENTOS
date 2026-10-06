@@ -597,3 +597,403 @@ test('tablero en celular: una columna a la vez, con pestañas, sin scroll horizo
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+/* ============ Panel del paciente y «¿Qué pasó?» (Tarea 6) ============ */
+
+const LUIS = '40444555|HEMATOLOGÍA', CARMEN = '40333444|REUMATOLOGÍA', CARMEN_H = '40333444|HIERRO', PEDRO = '40666777|PROCEDIMIENTO';
+const ROSA = 'REG-000001', SOFIA = 'REG-000002', TERESA = '41666777|HEMATOLOGÍA';
+/** Columna (1-4) en la que está pintada la tarjeta, o '' si no está en el tablero. */
+const colPintada = (pagina, id) => pagina.evaluate(id => {
+  const el = [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id);
+  return el ? el.closest('.col').dataset.col : '';
+}, id);
+const esperarCol = (pagina, id, col) => pagina.waitForFunction(([id, col]) => {
+  const el = [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id);
+  return (el ? el.closest('.col').dataset.col : '') === col;
+}, [id, col]);
+const textoTarjeta = (pagina, id) => pagina.evaluate(id => [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent.replace(/\s+/g, ' ').trim(), id);
+const llamadas = (pagina, fn) => pagina.evaluate(fn => DEMO._llamadas[fn] || 0, fn);
+const ultimo = (pagina, fn) => pagina.evaluate(fn => DEMO._ultimo[fn][0], fn);
+const aviso = pagina => pagina.locator('#aviso span').textContent();
+async function abrirPanelDe(pagina, id) {
+  await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+  await pagina.locator(`#tablero [data-card="${id}"]`).click();
+  await pagina.waitForFunction(id => seleccion.panel === id && document.getElementById('panel').classList.contains('abierto'), id);
+}
+/** Pone la fecha del paso y confirma. */
+async function confirmarPaso(pagina, fecha) {
+  if (fecha) await pagina.locator('#panel #pf').fill(fecha);
+  await pagina.locator('#panel [data-confirmar]').click();
+}
+async function esperarEstable(pagina) {
+  await pagina.waitForFunction(() => !S.enVuelo.size);
+}
+
+test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    // «Lo pensará» con fecha: Agendado, «Llamar …». El payload es el de MAPEO §1.3.
+    await abrirPanelDe(pagina, LUIS);
+    await pagina.locator('#panel [data-acc="pensara"]').click();
+    assert.equal(await pagina.locator('#panel #pf').inputValue(), '2026-10-02', 'propone mañana');
+    assert.equal(await pagina.locator('#panel #pf').getAttribute('min'), '2026-10-02');
+    assert.equal(await pagina.locator('#panel #pf').getAttribute('max'), '2026-12-30');
+    await confirmarPaso(pagina, '2026-10-08');
+    await esperarCol(pagina, LUIS, '2');
+    await esperarEstable(pagina);
+    assert.match(await textoTarjeta(pagina, LUIS), /Llamar el jue 08\/10/);
+    assert.deepEqual(await ultimo(pagina, 'registrarResultado'), { usuario: 'MAGALY', dni: '40444555', especialidad: 'HEMATOLOGÍA', referencia: '',
+      resultado: 'LO PENSARÁ', nota: '', fecha: '2026-10-08', telefono: '', motivo: '', doctor: '' });
+    assert.equal(await pagina.evaluate(() => seleccion.panel), '', 'el panel se cierra al guardar');
+    // «Agendó cita»: Agendado, «Cita …».
+    await abrirPanelDe(pagina, CARMEN);
+    await pagina.locator('#panel [data-acc="agendo"]').click();
+    assert.equal(await pagina.locator('#panel #pf').inputValue(), '2026-10-01', 'sin PROXIMA_AGENDADA propone hoy');
+    await confirmarPaso(pagina, '2026-10-06');
+    await esperarCol(pagina, CARMEN, '2');
+    await esperarEstable(pagina);
+    assert.match(await textoTarjeta(pagina, CARMEN), /Cita el mar 06\/10/);
+    // 1 sin abrir el panel: Agendado, «Reintentar …».
+    const antes = await llamadas(pagina, 'registrarResultado');
+    await pagina.locator(`#tablero [data-card="${PEDRO}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarCol(pagina, PEDRO, '2');
+    await esperarEstable(pagina);
+    assert.equal(await pagina.evaluate(() => seleccion.panel), '', '1 no abre el panel');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), antes + 1);
+    assert.match(await textoTarjeta(pagina, PEDRO), /Reintentar el 16\/10 · intento 1 de 3/);
+    // «Lo hizo» en hierro a tiempo: sigue en En tratamiento con la sesión siguiente; la última pasa a Completado.
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel [data-acc="lohizo"]').click();
+    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Lo hizo · sesión 2 de 3/);
+    await confirmarPaso(pagina, '2026-10-01');
+    await esperarEstable(pagina);
+    await esperarCol(pagina, SOFIA, '3');
+    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel [data-acc="lohizo"]').click();
+    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Lo hizo · sesión 3 de 3/);
+    assert.match(await pagina.locator('#panel [data-confirmar]').textContent(), /Marcar como completado/);
+    await confirmarPaso(pagina, '2026-10-01');
+    await esperarEstable(pagina);
+    await esperarCol(pagina, SOFIA, '4');
+    assert.match(await textoTarjeta(pagina, SOFIA), /Completó el tratamiento/);
+    // Lo pintado coincide con lo que el DEMO (el servidor) tiene ahora.
+    const d = await datosDemo(pagina);
+    for (const [id, c] of [[LUIS, 'AGENDADO'], [CARMEN, 'AGENDADO'], [PEDRO, 'AGENDADO'], [SOFIA, 'COMPLETADO']]) {
+      const t = d.columnas[c].find(x => x.CLAVE === id);
+      assert.ok(t, `${id} en ${c} en el DEMO`);
+      assert.ok((await textoTarjeta(pagina, id)).includes(t.ETIQUETA), `${id}: ${t.ETIQUETA}`);
+    }
+    assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 11 de 15/, 'la meta suma 1 por guardado');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corresponde', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const deshacer = async () => {
+      await pagina.waitForSelector('#aviso button:not([hidden])');
+      assert.equal(await pagina.locator('#aviso button').textContent(), 'Deshacer');
+      await pagina.locator('#aviso button').click();
+    };
+    // Seguimiento: anularResultado.
+    let tab = await llamadas(pagina, 'getTablero');
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarCol(pagina, LUIS, '2');
+    await esperarEstable(pagina);
+    assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 7 de 15/);
+    await deshacer();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularResultado === 1);
+    await esperarCol(pagina, LUIS, '1');
+    const a = await ultimo(pagina, 'anularResultado');
+    assert.equal(a.usuario, 'MAGALY'); assert.equal(a.motivo, 'Deshecho al momento'); assert.match(a.id, /^SEG-/);
+    assert.equal(await llamadas(pagina, 'getTablero'), tab + 1, 'después de deshacer se recarga el tablero');
+    await pagina.waitForFunction(() => /Hoy: 6 de 15/.test(document.getElementById('metadia').textContent));
+    // Sesión: anularSesion.
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel [data-acc="lohizo"]').click();
+    await confirmarPaso(pagina);
+    await esperarEstable(pagina);
+    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
+    await deshacer();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularSesion === 1);
+    await pagina.waitForFunction(() => /Sesión 2 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === 'REG-000002').textContent));
+    assert.match((await ultimo(pagina, 'anularSesion')).id, /^SES-/);
+    // Alta de una reevaluación: anularAlta.
+    await abrirPanelDe(pagina, LUIS);
+    await pagina.locator('#panel [data-acc="alta"]').click();
+    assert.equal(await pagina.locator('#panel #pd').inputValue(), 'Dra. Alejandra La Torre', 'propone el doctor de la tarjeta');
+    assert.equal(await pagina.locator('#panel #pf').inputValue(), '2026-10-01', 'en reevaluación pide la fecha');
+    await confirmarPaso(pagina);
+    await esperarCol(pagina, LUIS, '4');
+    await esperarEstable(pagina);
+    assert.match(await textoTarjeta(pagina, LUIS), /Alta médica · Dra\. Alejandra La Torre/);
+    await deshacer();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularAlta === 1);
+    await esperarCol(pagina, LUIS, '1');
+    assert.match((await ultimo(pagina, 'anularAlta')).id, /^ALT-/);
+    assert.equal(await llamadas(pagina, 'anularResultado'), 1, 'cada respuesta, su anulación');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: si el servidor falla, todo vuelve, «No se guardó: …» y sin «Deshacer»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const cifras = () => pagina.locator('#kpis dd').allTextContents();
+    const antes = await cifras();
+    await pagina.evaluate(() => { DEMO._fallar.registrarResultado = 'Sin conexión con el servidor.'; DEMO._demora.registrarResultado = 400; });
+    await abrirPanelDe(pagina, LUIS);
+    await pagina.locator('#panel [data-acc="pensara"]').click();
+    await confirmarPaso(pagina, '2026-10-08');
+    // Mientras tanto, se ve movida y la meta sumada.
+    await esperarCol(pagina, LUIS, '2');
+    assert.notDeepEqual(await cifras(), antes);
+    assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 7 de 15/);
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'No se guardó: Sin conexión con el servidor.');
+    await esperarCol(pagina, LUIS, '1');
+    assert.equal(await pagina.locator('#aviso button').isVisible(), false, 'sin «Deshacer»');
+    assert.deepEqual(await cifras(), antes);
+    assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 6 de 15/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: una tarjeta vieja («Ese paciente no está en la lista») vuelve con el aviso', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => { DEMO._fallar.registrarResultado = 'Ese paciente no está en la lista. Recargue la página.'; });
+    await pagina.locator(`#tablero [data-card="${PEDRO}"]`).focus();
+    await pagina.keyboard.press('1');
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'No se guardó: Ese paciente no está en la lista. Recargue la página.');
+    await esperarEstable(pagina);
+    assert.equal(await colPintada(pagina, PEDRO), '1');
+    assert.equal(await pagina.evaluate(id => S.pacientes.find(p => p.id === id).col, PEDRO), 1);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: los cierres confirman en el panel; «Falleció» saca todas las tarjetas del DNI', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const n = await llamadas(pagina, 'registrarResultado');
+    await abrirPanelDe(pagina, CARMEN);
+    await pagina.locator('#panel [data-acc="otrolugar"]').click();
+    assert.ok(await pagina.locator('#panel .paso.cierre').isVisible(), 'el paso de cierre lleva el borde de acento');
+    assert.match(await pagina.locator('#panel .paso').textContent(), /¿Cerrar el seguimiento de Carmen Sofía Torres Díaz/);
+    assert.equal(await llamadas(pagina, 'registrarResultado'), n, 'elegir un cierre no guarda');
+    await pagina.locator('#panel .paso [data-volverpaso]').first().click();
+    assert.equal(await pagina.locator('#panel .paso').count(), 0);
+    await pagina.locator('#panel [data-acc="fallecio"]').click();
+    assert.match(await pagina.locator('#panel .paso').textContent(), /Se cerrarán todos sus seguimientos\./);
+    assert.equal(await colPintada(pagina, CARMEN_H), '1', 'Carmen tiene otra tarjeta abierta (hierro)');
+    await pagina.locator('#panel [data-confirmar]').click();
+    await esperarEstable(pagina);
+    await esperarCol(pagina, CARMEN, '');   // salen tras desvanecerse (180 ms)
+    await esperarCol(pagina, CARMEN_H, '');
+    assert.equal((await ultimo(pagina, 'registrarResultado')).resultado, 'FALLECIÓ');
+    assert.match(await pagina.locator('#kpis').textContent(), /3 cerrados este mes/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: «Número equivocado» con dos teléfonos deja la tarjeta y tacha el número', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, ROSA);
+    assert.equal(await pagina.locator('#panel .contacto:not(.malo)').count(), 2);
+    await pagina.locator('#panel [data-acc="numero"]').click();
+    assert.equal(await pagina.locator('#panel [data-confirmar]').isDisabled(), true, 'con varios, se elige cuál');
+    assert.match(await pagina.locator('#panel .paso').textContent(), /Elija el número equivocado\./);
+    await pagina.locator('#panel input[name="pn"][value="014332210"]').check();
+    assert.match(await pagina.locator('#panel .paso').textContent(), /Le queda el 987 654 321: el seguimiento sigue\./);
+    assert.equal(await pagina.locator('#panel .paso.cierre').count(), 0, 'si sigue, no es un cierre');
+    await pagina.locator('#panel [data-confirmar]').click();
+    await esperarEstable(pagina);
+    assert.equal((await ultimo(pagina, 'registrarResultado')).telefono, '014332210');
+    assert.equal(await colPintada(pagina, ROSA), '1', 'la tarjeta sigue');
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !seleccion.panel);
+    await abrirPanelDe(pagina, ROSA);
+    assert.deepEqual(await pagina.locator('#panel .contacto.malo .num').allTextContents(), ['014 332 210']);
+    assert.equal(await pagina.locator('#panel .contacto:not(.malo)').count(), 1);
+    // Con un solo teléfono, ese queda elegido y se avisa que se cierra.
+    await pagina.keyboard.press('Escape');
+    await abrirPanelDe(pagina, LUIS);
+    await pagina.locator('#panel [data-acc="numero"]').click();
+    assert.match(await pagina.locator('#panel .paso').textContent(), /No le queda otro contacto: se cerrará el seguimiento\./);
+    assert.ok(await pagina.locator('#panel .paso.cierre').isVisible());
+    assert.equal(await pagina.locator('#panel [data-confirmar]').isDisabled(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: «No desea continuar» no se guarda sin motivo; con motivo, sí', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const n = await llamadas(pagina, 'registrarResultado');
+    await abrirPanelDe(pagina, LUIS);
+    assert.match(await pagina.locator('#panel [data-acc="otro"]').textContent(), /^\s*No desea continuar\s*$/);
+    await pagina.locator('#panel [data-acc="otro"]').click();
+    assert.equal(await pagina.locator('#panel [data-confirmar]').isDisabled(), true);
+    await pagina.locator('#panel #pm').fill('   ');
+    assert.equal(await pagina.locator('#panel [data-confirmar]').isDisabled(), true);
+    await pagina.evaluate(() => confirmarPaso());
+    assert.equal(await llamadas(pagina, 'registrarResultado'), n, 'sin motivo no sale nada');
+    await pagina.locator('#panel #pm').fill('Se mudó a Arequipa');
+    await pagina.locator('#panel [data-confirmar]').click();
+    await esperarEstable(pagina);
+    const p = await ultimo(pagina, 'registrarResultado');
+    assert.equal(p.resultado, 'NO DESEA CONTINUAR');
+    assert.equal(p.motivo, 'Se mudó a Arequipa');
+    await esperarCol(pagina, LUIS, '');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: la nota escrita antes de elegir el resultado llega en el payload', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, LUIS);
+    await pagina.locator('#panel #nota').fill('Llamar después de las 5');
+    await pagina.locator('#panel [data-acc="pensara"]').click();
+    assert.equal(await pagina.locator('#panel #nota').inputValue(), 'Llamar después de las 5', 'elegir no borra la nota');
+    await pagina.locator('#panel [data-volverpaso]').first().click();
+    assert.equal(await pagina.locator('#panel #nota').inputValue(), 'Llamar después de las 5');
+    await pagina.locator('#panel [data-acc="pensara"]').click();
+    await confirmarPaso(pagina, '2026-10-05');
+    await esperarEstable(pagina);
+    assert.equal((await ultimo(pagina, 'registrarResultado')).nota, 'Llamar después de las 5');
+    // Al abrir otro paciente, la nota empieza vacía.
+    await abrirPanelDe(pagina, CARMEN);
+    assert.equal(await pagina.locator('#panel #nota').inputValue(), '');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: la historia trae la entrada nueva y «Anular» de la última pide motivo y la tacha', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => { DEMO._demora.getPaciente = 300; });
+    await abrirPanelDe(pagina, CARMEN);
+    assert.ok(await pagina.locator('#panel .hist-skel').isVisible(), 'esqueleto mientras llega');
+    await pagina.waitForSelector('#panel .historia li');
+    const filas = () => pagina.locator('#panel .historia li').evaluateAll(l => l.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+    let h = await filas();
+    assert.equal(h.length, 2);
+    assert.match(h[0], /^10\/09 · Rachel: no contestó/);
+    assert.match(h[0], /Dijo que llamará/);
+    assert.match(h[1], /número equivocado: 998877665/);
+    assert.equal(await pagina.locator('#panel .historia [data-anular]').count(), 1, '«Anular» solo en la última');
+    await pagina.locator('#panel [data-acc="nocontesto"]').click();
+    await esperarEstable(pagina);
+    await abrirPanelDe(pagina, CARMEN);
+    await pagina.waitForSelector('#panel .historia li');
+    h = await filas();
+    assert.equal(h.length, 3);
+    assert.match(h[0], /^01\/10 · Magaly: no contestó/);
+    const anular = pagina.locator('#panel .historia li').first().locator('[data-anular]');
+    assert.equal(await anular.count(), 1);
+    assert.equal(await pagina.locator('#panel .historia [data-anular]').count(), 1);
+    await anular.click();
+    const n = await llamadas(pagina, 'anularResultado');
+    await pagina.locator('#panel [data-confirmar-anular]').click();
+    assert.equal(await aviso(pagina), 'Escriba el motivo de la anulación.');
+    assert.equal(await llamadas(pagina, 'anularResultado'), n);
+    await pagina.locator('#panel #motivo-anular').fill('Me equivoqué de paciente');
+    await pagina.locator('#panel [data-confirmar-anular]').click();
+    await pagina.waitForFunction(() => document.querySelector('#panel .historia li.anulado'));
+    assert.equal(await llamadas(pagina, 'anularResultado'), n + 1);
+    const a = await ultimo(pagina, 'anularResultado');
+    assert.equal(a.motivo, 'Me equivoqué de paciente');
+    h = await filas();
+    assert.match(h[0], /anulado: Me equivoqué de paciente/);
+    assert.equal(await pagina.locator('#panel .historia li').first().evaluate(e => getComputedStyle(e.querySelector('.txt')).textDecorationLine), 'line-through');
+    await esperarCol(pagina, CARMEN, '1');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: atajos (1 guarda sin panel, X abre el cierre sin guardar, Esc cierra el paso y luego el panel)', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const c1 = (await pintadas(pagina, '1')).map(v => v.id);
+    await pagina.locator(`#tablero [data-card="${c1[0]}"]`).focus();
+    let n = await llamadas(pagina, 'registrarResultado');
+    await pagina.keyboard.press('1');
+    await esperarEstable(pagina);
+    assert.equal(await llamadas(pagina, 'registrarResultado'), n + 1);
+    assert.equal(await pagina.evaluate(() => seleccion.panel), '');
+    assert.equal(await colPintada(pagina, c1[0]), '2');
+    assert.equal(await pagina.evaluate(() => seleccion.id), c1[1], 'la selección pasa a la siguiente');
+    assert.equal(await pagina.evaluate(() => document.activeElement.dataset.card), c1[1]);
+    // X abre el panel con el grupo de cierre resaltado, sin guardar.
+    n = await llamadas(pagina, 'registrarResultado');
+    await pagina.keyboard.press('x');
+    assert.equal(await pagina.evaluate(() => seleccion.panel), c1[1]);
+    assert.ok(await pagina.locator('#panel .acc.cierra.resaltado').isVisible());
+    assert.ok(await pagina.evaluate(() => !!document.activeElement.closest('#panel .acc.cierra')), 'el foco va al grupo de cierre');
+    // Ninguna tecla guarda un cierre: Enter abre el paso; Enter otra vez no confirma.
+    await pagina.keyboard.press('Enter');
+    assert.equal(await pagina.locator('#panel .paso').count(), 1);
+    await pagina.keyboard.press('Enter');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), n);
+    // Esc cierra el paso, y luego el panel.
+    await pagina.keyboard.press('Escape');
+    assert.equal(await pagina.locator('#panel .paso').count(), 0);
+    assert.equal(await pagina.evaluate(() => seleccion.panel), c1[1]);
+    // 2 a 4 con el panel abierto abren su paso.
+    await pagina.keyboard.press('3');
+    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Agendó cita/);
+    await pagina.keyboard.press('Escape');
+    await pagina.keyboard.press('Escape');
+    assert.equal(await pagina.evaluate(() => seleccion.panel), '');
+    assert.equal(await pagina.evaluate(() => document.activeElement.dataset.card), c1[1]);
+    // 2 sobre la tarjeta con el panel cerrado: lo abre en el paso, al instante.
+    await pagina.keyboard.press('2');
+    assert.equal(await pagina.evaluate(() => seleccion.panel), c1[1]);
+    assert.ok(await pagina.evaluate(() => document.getElementById('panel').classList.contains('instantaneo')));
+    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Lo pensará/);
+    assert.equal(await llamadas(pagina, 'registrarResultado'), n);
+    // El foco no sale del panel con Tab.
+    for (let i = 0; i < 25; i++) {
+      await pagina.keyboard.press(i % 5 ? 'Tab' : 'Shift+Tab');
+      assert.ok(await pagina.evaluate(() => !!document.activeElement.closest('#panel')), `Tab ${i}: el foco sigue en el panel`);
+    }
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: una tarjeta de Completado abre el panel de solo lectura, sin «¿Qué pasó?»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, TERESA);
+    const texto = await pagina.locator('#panel').textContent();
+    assert.doesNotMatch(texto, /¿Qué pasó\?/);
+    assert.equal(await pagina.locator('#panel [data-acc]').count(), 0);
+    assert.equal(await pagina.locator('#panel #nota').count(), 0);
+    assert.match(texto, /Seguimiento cerrado/);
+    await pagina.waitForSelector('#panel .historia li');
+    assert.match(await pagina.locator('#panel .historia').textContent(), /alta médica/i);
+    assert.equal(await pagina.locator('#panel .historia [data-anular]').count(), 1, 'el alta se puede anular');
+    const n = await llamadas(pagina, 'registrarResultado');
+    await pagina.keyboard.press('1');
+    await pagina.keyboard.press('x');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), n);
+    assert.equal(await pagina.locator('#panel .paso').count(), 0);
+    // Sin contacto: el texto de siempre. «Usuario» para el @.
+    await pagina.keyboard.press('Escape');
+    await abrirPanelDe(pagina, '40222333|HEMATOLOGÍA');
+    assert.match(await pagina.locator('#panel').textContent(), /Sin teléfono\. No hay número en SOFDOC ni en la otra base\./);
+    await pagina.keyboard.press('Escape');
+    await abrirPanelDe(pagina, 'REG-000003');
+    assert.match(await pagina.locator('#panel .contacto').first().textContent(), /Usuario.*@ana\.flores/);
+    assert.equal(await pagina.locator('#panel [data-acc="numero"]').count(), 0, 'sin teléfono no hay «Número equivocado»');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

@@ -1,0 +1,1971 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguimientos — Centro Hematológico del Perú</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   PALETA — estilo «editorial» (propuesta 2a de Claude Design, octubre 2026).
+   Los --chp-* son la ÚNICA fuente de color: fuera de estos dos bloques no se
+   escribe un color a mano (lo comprueba test/ui.test.js).
+   ========================================================================== */
+:root{
+  --chp-bg:#FAF6F1;--chp-panel:#FFFCF8;--chp-ink:#2A1715;--chp-soft:#5A4440;--chp-muted:#7A6460;
+  --chp-rule:#E3D8CF;--chp-row-hover:#F6EEE7;--chp-row-sel:#F3E8E0;--chp-line:#CDBFB5;
+  --chp-brand:#6F1713;--chp-on-brand:#FAF6F1;--chp-accent:#A8352C;--chp-good:#2F6B45;
+  --chp-pending:#B26B00;--chp-pending-text:#8A5300;--chp-new:#1F5A8C;--chp-control:#6A3D8F;
+  --chp-track:#E8DED5;--chp-toast:#2A1715;--chp-on-toast:#FAF6F1;
+  /* Escala ordinal de un solo tono (validada con dataviz): de «no volvió nunca» a «volvió 3 o más». */
+  --chp-paso1:#7A1F18;--chp-paso2:#A8352C;--chp-paso3:#CF6B5F;--chp-paso4:#E39D93;
+}
+html[data-modo="oscuro"]{
+  --chp-bg:#150A0A;--chp-panel:#1E0E0D;--chp-ink:#F3E9E4;--chp-soft:#D6C3BD;--chp-muted:#BFA9A3;
+  --chp-rule:#4A2A27;--chp-row-hover:#221110;--chp-row-sel:#2A1513;--chp-line:#5A3632;
+  --chp-brand:#E0736B;--chp-on-brand:#150A0A;--chp-accent:#E0736B;--chp-good:#7CCB98;
+  --chp-pending:#E0A84A;--chp-pending-text:#E0A84A;--chp-new:#7FB0E0;--chp-control:#B48BD6;
+  --chp-track:#3A201E;--chp-toast:#F3E9E4;--chp-on-toast:#150A0A;
+  --chp-paso1:#F2B3AC;--chp-paso2:#E0736B;--chp-paso3:#B0544C;--chp-paso4:#86403A;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--chp-bg);color:var(--chp-ink);font-family:'Barlow',system-ui,sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:'Barlow Condensed','Barlow',sans-serif;font-weight:600;margin:0;line-height:1}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--chp-accent);outline-offset:2px}
+[hidden]{display:none!important}
+.muted{color:var(--chp-muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* Botones: radio 2 px, sin sombras. */
+.btn-marca{background:var(--chp-brand);border:1px solid var(--chp-brand);color:var(--chp-on-brand);font-weight:600;border-radius:2px;padding:7px 14px}
+.btn-marca:hover{background:var(--chp-accent);border-color:var(--chp-accent)}
+.btn-linea{background:transparent;border:1px solid var(--chp-line);border-radius:2px;padding:7px 14px;font-weight:600}
+.btn-texto{background:none;border:0;padding:0;color:var(--chp-muted)}
+.sel{background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-weight:600;padding:2px 2px 3px;border-radius:0}
+.sel option{background:var(--chp-panel);color:var(--chp-ink)}
+
+/* ---------- Barra superior ---------- */
+.app{padding:32px 64px 0}
+.barra{display:flex;align-items:baseline;gap:32px;flex-wrap:wrap}
+.marca{display:flex;align-items:baseline;gap:12px}
+.marca b{font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:700;color:var(--chp-brand)}
+.marca span{font-size:12px;letter-spacing:.08em;color:var(--chp-muted);text-transform:uppercase}
+.nav{display:flex;gap:28px}
+.nav button{background:none;border:0;padding:0 0 4px;font-size:15px;color:var(--chp-soft);border-bottom:2px solid transparent}
+.nav button[aria-current="page"]{font-weight:600;color:var(--chp-brand);border-bottom-color:var(--chp-brand)}
+.quien{margin-left:auto;display:flex;align-items:baseline;gap:10px;font-size:14px}
+.quien .sel{font-size:15px;max-width:210px}
+.modo{font-size:13px}
+
+/* ---------- Encabezado de cada vista ---------- */
+.cabeza{display:flex;justify-content:space-between;align-items:flex-end;gap:32px;flex-wrap:wrap;margin-top:36px}
+.titulo{font-size:68px;line-height:.9}
+.fecha{font-size:16px;color:var(--chp-muted);margin-top:10px}
+.contadores{display:flex;gap:40px}
+.contador b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:64px;font-weight:600;line-height:.85}
+.contador span{font-size:13px;color:var(--chp-soft)}
+.contador.atender b{color:var(--chp-accent)}
+.contador.recuperados b{color:var(--chp-good)}
+.tipos{display:flex;flex-wrap:wrap;gap:8px 28px;margin-top:28px;font-size:16px}
+.tipos button{background:none;border:0;border-bottom:2px solid transparent;padding:0 0 5px;color:var(--chp-soft)}
+.tipos button b{font-weight:600;color:var(--chp-muted);margin-left:4px}
+.tipos button[aria-pressed="true"]{color:var(--chp-brand);font-weight:600;border-bottom-color:var(--chp-brand)}
+.tipos button[aria-pressed="true"] b{color:var(--chp-brand)}
+.filtros{display:flex;flex-wrap:wrap;gap:24px;align-items:baseline;margin-top:18px;padding-bottom:12px;border-bottom:1px solid var(--chp-ink);font-size:14px}
+.filtros label{display:flex;gap:8px;align-items:baseline;color:var(--chp-muted)}
+.filtros input[type=checkbox]{accent-color:var(--chp-brand)}
+.filtros .sel{color:var(--chp-ink);max-width:100%;min-width:0;text-overflow:ellipsis}
+.filtros label{min-width:0;max-width:100%}
+.sel{max-width:100%}
+.atajos{margin-left:auto;color:var(--chp-muted)}
+.atajos b{color:var(--chp-ink)}
+
+/* ---------- Bandeja: lista + panel ---------- */
+.cuerpo{display:flex;align-items:stretch}
+#lista{flex:1;min-width:0;padding-right:40px;overflow-x:hidden}
+.grupo{display:flex;align-items:baseline;gap:16px;padding:24px 0 8px;border-bottom:1px solid var(--chp-rule)}
+.grupo h2{font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--chp-brand)}
+.grupo span{font-size:14px;color:var(--chp-muted)}
+.fila{display:flex;align-items:center;gap:16px;padding:14px 12px;border-bottom:1px solid var(--chp-rule);cursor:pointer}
+.fila:hover{background:var(--chp-row-hover)}
+.fila.sel-fila,.fila.abierta{background:var(--chp-row-sel)}
+.marcas{width:14px;flex:0 0 14px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.m{display:block}
+.m.nuevo{width:10px;height:10px;border-radius:50%;background:var(--chp-new)}
+.m.control{width:10px;height:10px;background:var(--chp-control)}
+.m.pend{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid var(--chp-pending)}
+.texto{flex:1;min-width:0}
+.nombre{display:block;font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.linea{display:block;font-size:13px;color:var(--chp-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hace{color:var(--chp-accent)}
+.tel{width:170px;flex:0 0 170px}
+.cuerpo.con-panel .tel{display:none}
+.copiar-fila{background:none;border:0;padding:0;text-align:left}
+.copiar-fila .n{font-size:16px;font-weight:500;font-variant-numeric:tabular-nums}
+.copiar-fila small{display:block;font-size:12px;font-weight:600;color:var(--chp-accent)}
+.sin-tel{font-size:14px;font-weight:600;color:var(--chp-accent)}
+.chev{color:var(--chp-muted);font-size:18px}
+.vacio-grande{padding:60px 0}
+.vacio-grande b{display:block;font-family:'Barlow Condensed',sans-serif;font-size:48px;font-weight:600}
+.fantasma{height:72px;border-bottom:1px solid var(--chp-rule);background:linear-gradient(90deg,var(--chp-row-hover),var(--chp-bg),var(--chp-row-hover));background-size:200% 100%;animation:brillo 1.4s linear infinite}
+@keyframes brillo{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.fantasma{animation:none}}
+
+#panel{width:460px;flex:0 0 460px;border-left:1px solid var(--chp-ink);background:var(--chp-panel);padding:28px 40px 28px 36px;display:flex;flex-direction:column;gap:18px;overflow-y:auto;max-height:calc(100vh - 40px);position:sticky;top:0}
+.p-cab{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;letter-spacing:.1em;color:var(--chp-muted)}
+.p-cab .cerrar{font-size:14px;letter-spacing:0}
+#panel h2{font-size:38px;margin-bottom:8px}
+.p-tipo{display:flex;gap:10px;align-items:center;font-size:15px}
+.p-fechas{border-top:1px solid var(--chp-rule);padding-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}
+.p-fechas small{display:block;font-size:12px;color:var(--chp-muted)}
+.p-fechas .v{font-size:17px}
+.p-hace{grid-column:1/-1;font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:600;color:var(--chp-accent);margin-top:6px}
+.p-pend{display:flex;gap:10px;align-items:baseline;font-size:15px;color:var(--chp-pending-text)}
+.p-tels{border-top:1px solid var(--chp-rule);padding-top:16px}
+.p-tels>small{font-size:12px;color:var(--chp-muted)}
+.p-tel{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.p-tel .n{font-family:'Barlow Condensed',sans-serif;font-size:30px;font-weight:600;font-variant-numeric:tabular-nums}
+.p-tel .btn-linea{color:var(--chp-accent)}
+.p-sintel{color:var(--chp-brand)}
+.p-prev{font-size:14px;font-style:italic;color:var(--chp-muted)}
+#nota{width:100%;min-height:64px;background:transparent;border:0;border-bottom:1px solid var(--chp-ink);resize:vertical;padding:6px 0}
+.p-acciones{display:flex;gap:10px}
+.p-acciones .btn-marca{flex:1;font-size:16px;padding:13px}
+.p-acciones .btn-linea{font-weight:500;padding:13px 18px}
+.p-acciones kbd,.btn-marca kbd{font-family:inherit;opacity:.6;margin-left:6px}
+.p-ficha{margin-top:auto;color:var(--chp-accent);text-decoration:underline;background:none;border:0;padding:0;text-align:left}
+
+/* ---------- Resumen (propuesta 3a en computadora; en celular se apila) ---------- */
+.r-cab{display:flex;flex-wrap:wrap;align-items:center;gap:16px 28px;margin-top:28px;padding-bottom:18px;border-bottom:1px solid var(--chp-ink)}
+.r-mes{font-family:'Barlow Condensed',sans-serif;font-size:60px;font-weight:600;line-height:1;margin:0}
+.r-pasos{display:flex;gap:10px}
+.r-pasos button{background:transparent;border:1px solid var(--chp-line);border-radius:2px;padding:6px 14px;font-size:15px;color:var(--chp-ink)}
+.r-pasos button:disabled{visibility:hidden}
+.r-medico{margin-left:auto;font-size:15px;color:var(--chp-muted);display:flex;gap:10px;align-items:baseline;min-width:0}
+.r-medico .sel{color:var(--chp-ink);min-width:0;flex:0 1 auto;max-width:100%;text-overflow:ellipsis}
+.r-principal{display:grid;grid-template-columns:4fr 8fr;gap:40px;padding:36px 0 32px;border-bottom:1px solid var(--chp-rule);align-items:end}
+.r-grande{font-family:'Barlow Condensed',sans-serif;font-size:128px;font-weight:600;line-height:.9;color:var(--chp-accent)}
+.r-frase{font-size:20px;margin:16px 0 8px;max-width:440px}
+.r-cuenta{margin:0;color:var(--chp-muted)}
+.r-cuenta b{color:var(--chp-ink)}
+.r-desglose{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:center;margin:10px 0 0}
+.r-desglose span{display:inline-flex;align-items:center;gap:8px}
+.r-nota{font-style:italic;color:var(--chp-muted);margin:10px 0 0;font-size:14px}
+.r-meta{margin:12px 0 0;font-size:14px;color:var(--chp-soft)}
+.r-metricas{display:grid;grid-template-columns:repeat(4,1fr)}
+.r-metrica{border-left:1px solid var(--chp-rule);padding:0 16px 4px 20px;display:flex;flex-direction:column;gap:4px}
+.r-num{font-family:'Barlow Condensed',sans-serif;font-size:60px;font-weight:600;line-height:1}
+.r-num.pend{color:var(--chp-pending)}
+.r-num.buena{color:var(--chp-good)}
+.r-etq{font-size:16px}
+.r-sub{font-size:14px;color:var(--chp-muted)}
+.mm{margin-top:28px}
+.mm-cab{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 20px;align-items:baseline}
+.mm-cab small{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--chp-muted)}
+.mm-ley{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--chp-soft)}
+.mm-ley span{display:inline-flex;align-items:center;gap:6px}
+.mm-ley i{display:inline-block;width:16px;height:11px;background:var(--chp-accent)}
+.mm-ley i.rayado,.mm-barra.curso{background:repeating-linear-gradient(135deg,var(--chp-accent) 0 2px,transparent 2px 7px);border:1px solid var(--chp-accent)}
+.mm-ley i.meta{height:0;border-top:1px dashed var(--chp-ink);background:none}
+.mm-cols{display:grid;grid-template-columns:repeat(6,1fr);margin-top:14px}
+.mm-col{background:none;border:0;padding:0;text-align:left;color:var(--chp-ink);display:flex;flex-direction:column;min-width:0}
+.mm-area{position:relative;height:190px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 28px;border-bottom:1px solid var(--chp-ink)}
+.mm-pct{font-family:'Barlow Condensed',sans-serif;font-size:32px;font-weight:600;line-height:1.1}
+.mm-pct.vacio{color:var(--chp-line)}
+.mm-barra{display:block;background:var(--chp-accent);width:100%}
+.mm-meta{position:absolute;left:0;right:0;border-top:1px dashed var(--chp-ink)}
+.mm-mes{padding:10px 28px 0;font-size:17px}
+.mm-nota{padding:2px 28px 0;font-size:13px;color:var(--chp-muted)}
+.mm-col.actual .mm-mes{font-weight:700;color:var(--chp-brand)}
+.mm-col:hover .mm-mes{text-decoration:underline}
+
+/* ---------- Registro ---------- */
+[hidden]{display:none!important}
+.form-reg{max-width:640px;margin-top:20px;display:flex;flex-direction:column;gap:22px}
+.form-reg fieldset{border:0;border-top:1px solid var(--chp-ink);margin:0;padding:14px 0 0;display:flex;flex-direction:column;gap:12px;min-width:0}
+.form-reg legend{font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--chp-brand);padding:0 8px 0 0}
+.form-reg legend small{text-transform:none;letter-spacing:0;font-weight:400;color:var(--chp-muted)}
+.campo{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--chp-muted)}
+.entrada{background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-size:17px;padding:6px 0;color:var(--chp-ink);font-family:inherit;min-width:0;max-width:100%}
+.form-reg .sel{font-size:16px;max-width:100%}
+.form-reg .btn-marca{align-self:flex-start;font-size:16px;padding:12px 22px}
+.seccion h2 .btn-texto{font-size:14px;font-weight:500;margin-left:14px;letter-spacing:0}
+#g-trat-extra{display:flex;flex-direction:column;gap:12px}
+.g-dup{border-left:3px solid var(--chp-pending);padding:10px 14px;background:var(--chp-row-hover)}
+.g-dup p{margin:0 0 10px}
+.g-item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--chp-rule);align-items:baseline}
+.historia{list-style:none;padding:0;display:grid;gap:6px}
+.historia li.anulado{text-decoration:line-through;color:var(--chp-muted)}
+.g-item.anulado b,.g-item.anulado .linea-g{text-decoration:line-through;color:var(--chp-muted)}
+.linea-g{font-size:14px;color:var(--chp-soft)}
+.g-motivo{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
+
+.p-sesion,.p-alta-form,.reg-acciones{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.p-usuario{margin:6px 0 0}
+.reg-ficha{padding:12px 0;border-bottom:1px solid var(--chp-rule)}
+.reg-ficha .sesiones{margin:8px 0;padding-left:20px}
+.lista-altas{list-style:none;padding:0;margin:0}
+.lista-altas li{padding:8px 0;border-bottom:1px solid var(--chp-rule)}
+/* ---------- Ficha y Detalle ---------- */
+.vista-sub{margin-top:28px}
+.buscador{width:100%;max-width:520px;background:transparent;border:0;border-bottom:1px solid var(--chp-ink);font-size:20px;padding:6px 0}
+.resultados{display:flex;flex-direction:column;margin-top:12px;max-width:620px}
+.resultados button{background:none;border:0;border-bottom:1px solid var(--chp-rule);text-align:left;padding:12px 0;font-size:16px}
+.resultados button:hover{color:var(--chp-accent)}
+.seccion{border-top:1px solid var(--chp-ink);padding:18px 0 24px;overflow-x:auto}
+.seccion h2{font-size:24px;margin-bottom:8px}
+.seccion h3{font-size:18px;margin:16px 0 6px}
+.seccion p{margin:4px 0 10px}
+.ficha-cab{margin:28px 0 18px}
+.ficha-cab h1{font-size:48px}
+.estado{font-size:13px;font-weight:600;margin-left:10px;font-family:'Barlow',sans-serif}
+.estado.mal{color:var(--chp-accent)}
+.estado.bien{color:var(--chp-good)}
+.tipo-caso{display:flex;gap:10px;align-items:center;margin:4px 0}
+.confirmar{border-top:2px solid var(--chp-accent)}
+.confirmar .opciones{display:flex;flex-wrap:wrap;gap:10px}
+.linea-tiempo{list-style:none;padding:0;margin:10px 0 0 6px;border-left:1px solid var(--chp-ink)}
+.linea-tiempo li{padding:2px 0 10px 16px;position:relative}
+.linea-tiempo li::before{content:'';position:absolute;left:-5px;top:7px;width:9px;height:9px;border-radius:50%;background:var(--chp-ink)}
+.linea-tiempo li.esperada::before{background:var(--chp-bg);border:1px dashed var(--chp-accent)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+.reparto{display:flex;gap:2px;height:14px;min-width:200px;margin-top:3px}
+td.n{white-space:nowrap}
+.reparto i{display:block;height:100%}
+.reparto i:first-child{border-radius:4px 0 0 4px}
+.reparto i:last-child{border-radius:0 4px 4px 0}
+.reparto i:only-child{border-radius:4px}
+.paso1{background:var(--chp-paso1)}.paso2{background:var(--chp-paso2)}.paso3{background:var(--chp-paso3)}.paso4{background:var(--chp-paso4)}
+.paso-plazo{background:repeating-linear-gradient(135deg,var(--chp-line) 0 2px,var(--chp-track) 2px 6px)}
+.paso-alta{background:var(--chp-good)}
+.ley-reparto{display:none;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--chp-soft);margin:6px 0 10px}
+.muestra{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.historia{display:grid;grid-template-columns:auto 1fr;gap:20px 48px;align-items:start;margin:18px 0 28px}
+.h-dibujo{margin:0;display:flex;gap:20px;align-items:flex-start}
+.waffle{display:grid;grid-template-columns:repeat(10,16px);grid-auto-rows:16px;gap:3px;flex:0 0 auto}
+.waffle i{display:block;border-radius:3px}
+.h-dibujo ul{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.h-dibujo li b{font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:600;margin-right:4px}
+.h-texto{max-width:620px;font-size:17px}
+.h-texto p{margin:0 0 10px}
+.h-titular{font-size:24px;line-height:1.3}
+.h-titular b{color:var(--chp-accent)}
+.nota-tabla{font-size:13px;margin-top:10px}
+tr.total td{font-weight:700;border-top:1px solid var(--chp-ink)}
+th,td{text-align:left;padding:8px 10px 8px 0;border-bottom:1px solid var(--chp-rule);vertical-align:top}
+th{color:var(--chp-muted);font-weight:500;font-size:13px}
+td.n,th.n{text-align:right}
+.barra-p{height:4px;background:var(--chp-track);margin-top:5px;min-width:70px}
+.barra-p i{display:block;height:100%;background:var(--chp-accent)}
+
+.aviso{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--chp-toast);color:var(--chp-on-toast);padding:10px 18px;border-radius:2px;z-index:30;max-width:calc(100% - 32px)}
+.aviso-accion{color:var(--chp-on-toast);text-decoration:underline;margin-left:10px}
+.qp{display:grid;gap:10px}
+.qp-grupo{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.qp-grupo kbd{font-family:inherit;opacity:.6;margin-left:6px}
+.qp-grupo>span{width:100%;font-size:12px;color:var(--chp-muted)}
+.qp-cierre.abierto>span{color:var(--chp-ink);font-weight:600}
+.qp-paso{display:grid;gap:8px;padding:12px;border:1px solid var(--chp-line);border-radius:2px}
+.qp-paso.cierre{border-color:var(--chp-accent)}
+
+/* ---------- Laptops: la barra superior en una sola línea ---------- */
+@media (max-width:1599px){
+  .marca span{display:none}
+  .barra{gap:24px}
+  .nav{gap:20px}
+}
+@media (max-width:1023px){
+  .r-principal{grid-template-columns:1fr}
+  .mm-area,.mm-mes,.mm-nota{padding-left:10px;padding-right:10px}
+}
+@media (max-width:1180px){
+  .app{padding:24px 32px 0}
+  #lista{padding-right:24px}
+  #panel{width:400px;flex-basis:400px;padding:24px 24px 24px 28px}
+}
+
+/* ---------- Celular ---------- */
+@media (max-width:767px){
+  .app{padding:16px 16px 0}
+  .barra{gap:12px 20px}
+  .marca span{display:none}
+  .nav{gap:16px;overflow-x:auto;width:100%;font-size:14px}
+  .nav button{white-space:nowrap;font-size:14px}
+  .quien{margin-left:0;width:100%;justify-content:space-between;flex-wrap:nowrap}
+  .quien label{white-space:nowrap}
+  .quien .sel{min-width:0;flex:1 1 auto}
+  .modo{white-space:nowrap}
+  .titulo{font-size:44px}
+  .cabeza{margin-top:20px;gap:16px}
+  .contadores{gap:24px;width:100%}
+  .contador b{font-size:44px}
+  .atajos{display:none}
+  #lista{padding-right:0}
+  .tel,.chev{display:none}
+  .fila{padding:12px 4px}
+  .nombre,.linea{white-space:normal}
+  kbd{display:none}
+  .fila .hecho{min-height:44px}
+  #panel{position:fixed;inset:0;width:auto;max-height:none;border-left:0;z-index:20;padding:20px 16px 28px}
+  .p-acciones .btn-marca,.p-acciones .btn-linea,.qp-grupo button,.qp-paso button,.p-tel .btn-linea{min-height:44px}
+  .r-mes{font-size:40px}
+  .r-medico{margin-left:0;width:100%}
+  .r-principal{padding-top:24px}
+  .r-grande{font-size:96px}
+  .r-metricas{grid-template-columns:1fr}
+  .r-metrica{border-left:0;border-top:1px solid var(--chp-rule);padding:12px 0;display:grid;grid-template-columns:96px 1fr;column-gap:14px;align-items:center}
+  .r-num{font-size:40px;grid-row:span 2}
+  .mm-area{height:120px;padding:0 4px}
+  .mm-pct{font-size:16px}
+  .mm-mes{padding:6px 4px 0;font-size:13px}
+  .mm-nota{display:none}
+  .ficha-cab h1{font-size:34px}
+  .ley-reparto{display:flex}
+  .historia{grid-template-columns:1fr}
+  .h-dibujo{flex-direction:column}
+  .h-texto{order:-1}
+  .h-titular{font-size:20px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="barra">
+    <div class="marca"><b>Seguimientos</b><span>Centro Hematológico del Perú</span></div>
+    <nav class="nav">
+      <button type="button" data-vista="resumen">Resumen</button>
+      <button type="button" data-vista="bandeja" aria-current="page">Bandeja</button>
+      <button type="button" data-vista="registro">Registro</button>
+      <button type="button" data-vista="ficha">Buscar paciente</button>
+      <button type="button" data-vista="tablero">Detalle</button>
+    </nav>
+    <div class="quien">
+      <label for="usuario" class="muted">¿Quién es usted?</label>
+      <select id="usuario" class="sel"><option value="">— Elija —</option></select>
+      <button type="button" id="modo" class="btn-texto modo">Modo oscuro</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="vista" id="v-resumen" hidden>
+      <div class="resumen" id="resumen"></div>
+    </section>
+
+    <section class="vista" id="v-bandeja">
+      <div class="cabeza">
+        <div><h1 class="titulo">Bandeja del día</h1><div class="fecha" id="fecha"></div></div>
+        <div class="contadores">
+          <div class="contador atender"><b id="c-atender" class="num">–</b><span>por atender</span></div>
+          <div class="contador"><b id="c-hechos" class="num">–</b><span>hechos hoy</span></div>
+          <div class="contador recuperados"><b id="c-recuperados" class="num">–</b><span>recuperados</span></div>
+        </div>
+      </div>
+      <div class="tipos" id="tipos" role="group" aria-label="Tipo de seguimiento">
+        <button type="button" data-tipo="" aria-pressed="true">Todos <b class="num">–</b></button>
+        <button type="button" data-tipo="REEVALUACION" aria-pressed="false">Reevaluaciones <b class="num">–</b></button>
+        <button type="button" data-tipo="HIERRO" aria-pressed="false">Hierro <b class="num">–</b></button>
+        <button type="button" data-tipo="PROCEDIMIENTO" aria-pressed="false">Procedimientos <b class="num">–</b></button>
+      </div>
+      <div class="filtros">
+        <label>Especialidad <select id="f-esp" class="sel"><option value="">Todas</option></select></label>
+        <label>Médico <select id="f-med" class="sel"><option value="">Todos</option></select></label>
+        <label><input type="checkbox" id="f-sintel"> Solo sin teléfono</label>
+        <span class="atajos">↑ ↓ · <b>Enter</b> abrir · <b>C</b> copiar · <span id="atajo-res"><b>1</b>–<b>3</b> qué pasó</span> · <b>X</b> cierre</span>
+      </div>
+      <div class="cuerpo" id="cuerpo">
+        <div id="lista" aria-live="polite"></div>
+        <aside id="panel" hidden></aside>
+      </div>
+    </section>
+
+    <section class="vista" id="v-registro" hidden>
+      <div class="cabeza"><div><h1 class="titulo">Registro</h1><div class="fecha">Procedimientos, tratamientos y altas médicas</div></div></div>
+      <div class="tipos" role="group" aria-label="Qué registra">
+        <button type="button" data-modo-reg="indicacion" aria-pressed="true">Indicación</button>
+        <button type="button" data-modo-reg="alta" aria-pressed="false">Alta médica</button>
+      </div>
+      <form id="f-reg" class="form-reg" autocomplete="off" novalidate>
+        <fieldset><legend>1 · Paciente</legend>
+          <label class="campo">DNI o carné de extranjería <input id="g-dni" class="entrada" maxlength="12"></label>
+          <div id="g-conocido" class="muted" aria-live="polite"></div>
+          <label class="campo solo-ind">Nombres y apellidos <input id="g-nombre" class="entrada"></label>
+          <label class="campo solo-ind">Teléfono o usuario <input id="g-contacto" class="entrada"></label>
+          <label class="campo">Fecha <input id="g-fecha" class="entrada" type="date"></label>
+        </fieldset>
+        <fieldset><legend>2 · Doctor</legend>
+          <select id="g-doctor" class="sel" aria-label="Doctor"></select>
+        </fieldset>
+        <fieldset class="solo-ind"><legend>3 · Procedimiento <small>(si aplica)</small></legend>
+          <select id="g-proc" class="sel" aria-label="Procedimiento"></select>
+        </fieldset>
+        <fieldset class="solo-ind"><legend>4 · Tratamiento <small>(si aplica)</small></legend>
+          <select id="g-trat" class="sel" aria-label="Tratamiento"></select>
+          <div id="g-trat-extra" hidden>
+            <label class="campo">¿Cuántas sesiones?
+              <select id="g-sesiones" class="sel"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option value="otro">Otro</option></select></label>
+            <label class="campo" id="g-otro-c" hidden>Número de sesiones <input id="g-otro" class="entrada" type="number" min="6" max="20"></label>
+            <label class="campo" id="g-marca-c" hidden>Marca <select id="g-marca" class="sel"></select></label>
+          </div>
+        </fieldset>
+        <fieldset class="solo-alta" hidden><legend>3 · Especialidad del alta</legend>
+          <select id="g-esp" class="sel" aria-label="Especialidad"></select>
+          <label class="campo">Nota (opcional) <input id="g-nota-alta" class="entrada"></label>
+        </fieldset>
+        <div id="g-dup" class="g-dup" hidden></div>
+        <button type="submit" class="btn-marca" id="g-guardar">Registrar</button>
+      </form>
+      <div class="seccion"><h2>Registrados hoy</h2><div id="g-hoy"></div></div>
+    </section>
+
+    <section class="vista" id="v-ficha" hidden>
+      <div class="cabeza"><h1 class="titulo">Buscar paciente</h1></div>
+      <div class="vista-sub">
+        <input id="q" class="buscador" placeholder="DNI o nombre (mínimo 3 letras)" autocomplete="off">
+        <div id="resultados" class="resultados"></div>
+        <div id="ficha"></div>
+      </div>
+    </section>
+
+    <section class="vista" id="v-tablero" hidden>
+      <div class="cabeza"><h1 class="titulo">Detalle</h1></div>
+      <div class="vista-sub" id="tablero"></div>
+    </section>
+  </main>
+</div>
+<div class="aviso" id="aviso" role="status" hidden><span id="aviso-texto"></span></div>
+
+<script>
+/* ==========================================================================
+   PUENTE CON APPS SCRIPT. Abierto como archivo, usa el bloque DEMO del final.
+   ========================================================================== */
+const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
+
+function llamar(fn, ...args) {
+  if (EN_APPS_SCRIPT) {
+    return new Promise((res, rej) => google.script.run
+      .withSuccessHandler(res)
+      .withFailureHandler(e => rej(new Error(e.message || e)))[fn](...args));
+  }
+  if (!DEMO[fn]) return Promise.reject(new Error('El modo de demostración no tiene ' + fn + '.'));
+  return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(x)));
+}
+
+const E = {
+  boot: null, bandeja: null, error: '', fichaDni: '', kpi: null, resumen: null, rMed: null, rMes: '',
+  sel: '', abierto: '', paso: '', cierreAbierto: false, telElegido: '', nota: '', tipo: ''
+};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+
+function fechaCorta(iso) {
+  if (!iso) return '—';
+  const [a, m, d] = String(iso).slice(0, 10).split('-');
+  return `${d}/${m}/${a}`;
+}
+
+const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+const DIAS_ES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+function mesSolo(ym) { return MESES_ES[Number(String(ym).split('-')[1]) - 1] || String(ym || ''); }
+function nombreMes(ym) {
+  const [a, m] = String(ym || '').split('-');
+  return MESES_ES[Number(m) - 1] ? MESES_ES[Number(m) - 1] + ' ' + a : String(ym || '');
+}
+function diasDesde(desde, hasta) {
+  const d = s => { const [a, m, x] = String(s).slice(0, 10).split('-').map(Number); return Date.UTC(a, m - 1, x); };
+  return Math.round((d(hasta) - d(desde)) / 86400000);
+}
+const hoy = () => (E.boot && E.boot.hoy) || new Date().toISOString().slice(0, 10);
+function fechaLarga(iso) {
+  const [a, m, d] = iso.split('-').map(Number);
+  return DIAS_ES[new Date(Date.UTC(a, m - 1, d)).getUTCDay()] + ' ' + fechaCorta(iso);
+}
+const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '—';
+
+/** «DR. ELI CABANILLAS» -> el médico de la lista cuyo nombre contiene ELI y CABANILLAS. '' si el usuario no es médico. */
+function medicoDeUsuario(u, medicos) {
+  const t = norm(u).split(/[^A-Z]+/).filter(Boolean);
+  if (!t.length || (t[0] !== 'DR' && t[0] !== 'DRA')) return '';
+  const resto = t.slice(1);
+  return (medicos || []).find(m => { const n = norm(m); return resto.every(x => n.includes(x)); }) || '';
+}
+
+/** 'Dra. ALEJANDRA LA TORRE MATUK' -> 'Dra. La Torre'; 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA' -> 'Dr. Cabanillas'. */
+function medicoCorto(m) {
+  const p = String(m || '').trim().split(/\s+/);
+  if (p.length < 3) return String(m || '');
+  const titulo = /^dra?\.?$/i.test(p[0]) ? p[0] : '';
+  const nombres = titulo ? p.slice(1) : p;
+  let i = Math.max(0, nombres.length - 2);
+  const apellido = [nombres[i]];
+  while (i > 0 && /^(LA|DE|DEL|LOS|LAS)$/i.test(nombres[i - 1])) apellido.unshift(nombres[--i]);
+  const bonito = apellido.map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+  return (titulo ? titulo + ' ' : '') + bonito;
+}
+
+/** Aviso abajo. Con `accion` ({ texto, fn }) muestra un botón y dura 8 segundos. */
+function avisar(texto, accion) {
+  const a = $('#aviso');
+  a.innerHTML = `<span id="aviso-texto">${esc(texto)}</span>${accion ? ` <button type="button" class="btn-texto aviso-accion" data-deshacer>${esc(accion.texto)}</button>` : ''}`;
+  a.hidden = false;
+  avisar.accion = accion || null;
+  clearTimeout(avisar.t);
+  avisar.t = setTimeout(() => { a.hidden = true; avisar.accion = null; }, accion ? 8000 : 3500);
+}
+$('#aviso').addEventListener('click', ev => {
+  if (!ev.target.closest('[data-deshacer]') || !avisar.accion) return;
+  const fn = avisar.accion.fn;
+  avisar.accion = null;
+  $('#aviso').hidden = true;
+  fn();
+});
+
+function leerPref(k) { try { return localStorage.getItem('seg.' + k) || ''; } catch (e) { return ''; } }
+function guardarPref(k, v) { try { localStorage.setItem('seg.' + k, v); } catch (e) { /* sin almacenamiento: no pasa nada */ } }
+
+function llenarSelect(sel, lista) {
+  lista.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); });
+}
+
+function usuario() { return $('#usuario').value; }
+
+function exigirUsuario() {
+  if (usuario()) return true;
+  avisar('Elija quién es usted en el selector de arriba.');
+  $('#usuario').focus();
+  return false;
+}
+
+function ponerModo(m) {
+  document.documentElement.dataset.modo = m;
+  $('#modo').textContent = m === 'oscuro' ? 'Modo claro' : 'Modo oscuro';
+  guardarPref('modo', m);
+}
+
+function irA(vista) {
+  document.querySelectorAll('.nav button').forEach(b =>
+    b.dataset.vista === vista ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+  document.querySelectorAll('.vista').forEach(s => { s.hidden = s.id !== 'v-' + vista; });
+  if (vista === 'tablero') cargarTablero();
+  if (vista === 'resumen') cargarResumen();
+  if (vista === 'registro') { iniciarRegistro(); cargarRegistrosHoy(); }
+}
+
+/**
+ * Copia al portapapeles. En la app de Apps Script la página vive dentro de un
+ * iframe que a veces bloquea navigator.clipboard: por eso el plan B.
+ */
+async function copiarTexto(texto) {
+  try {
+    if (navigator.clipboard) { await navigator.clipboard.writeText(texto); return true; }
+  } catch (e) { /* se intenta el plan B */ }
+  const t = document.createElement('textarea');
+  t.value = texto;
+  t.setAttribute('readonly', '');
+  t.style.position = 'fixed';
+  t.style.opacity = '0';
+  document.body.appendChild(t);
+  t.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  t.remove();
+  return ok;
+}
+
+async function copiarDesde(boton, numero) {
+  const ok = await copiarTexto(numero);
+  if (!ok) { avisar('No se pudo copiar. El número es ' + numero); return; }
+  const destino = boton.querySelector('small') || boton;
+  const antes = destino.textContent;
+  destino.textContent = 'Copiado ✓';
+  setTimeout(() => { destino.textContent = antes; }, 1500);
+}
+
+/* ==========================================================================
+   BANDEJA — lista agrupada por urgencia + panel lateral.
+   El orden viene del servidor: primeros intentos, con procedimiento pendiente,
+   menos días sin volver. Dentro de cada grupo se respeta.
+   ========================================================================== */
+const GRUPOS = [
+  { titulo: 'Recientes', sub: 'hace 30 días o menos', hasta: 30 },
+  { titulo: 'Hace 1 a 2 meses', sub: 'hace 31 a 60 días', hasta: 60 },
+  { titulo: 'Más antiguos', sub: 'hace más de 60 días', hasta: Infinity }
+];
+const PREFIJO_GRUPO = { '': '', REEVALUACION: 'debían volver ', HIERRO: 'cotizado ', PROCEDIMIENTO: 'cotizado ' };
+/** Las filas de Registro se identifican por su ID: un paciente puede tener dos tratamientos abiertos. */
+const clave = t => t.ID_REGISTRO || (t.DNI + '|' + t.ESPECIALIDAD);
+const enCursoReg = t => !!t.ID_REGISTRO && t.ESTADO_REGISTRO === 'EN CURSO';
+/** Reevaluación, hierro o procedimiento. Una fila sin tipo es una reevaluación. */
+const tipoDe = t => t.TIPO_SEGUIMIENTO || 'REEVALUACION';
+const esIndicacion = t => tipoDe(t) !== 'REEVALUACION';
+/** Días desde que debía volver o, en hierro y procedimientos, desde que cotizó. */
+const diasSinVolver = t => esIndicacion(t) ? Number(t.DIAS) || 0 : Math.max(0, diasDesde(t.PROXIMA_ESPERADA, hoy()));
+const especialidadDe = t => esIndicacion(t) ? t.ESPECIALIDAD_CONSULTA : t.ESPECIALIDAD;
+const esNuevo = t => (Number(t.N_REALIZADAS) || 1) <= 1;
+const queCotizo = t => tipoDe(t) === 'HIERRO' ? t.DETALLE : 'Procedimiento: ' + t.DETALLE;
+
+function marcas(t) {
+  if (esIndicacion(t)) return `<i class="m pend" title="${tipoDe(t) === 'HIERRO' ? 'Hierro pendiente' : 'Procedimiento pendiente'}"></i>`;
+  return (esNuevo(t) ? '<i class="m nuevo" title="Paciente nuevo"></i>' : '<i class="m control" title="En control"></i>') +
+    (t.PENDIENTE ? '<i class="m pend" title="Procedimiento pendiente"></i>' : '');
+}
+
+function textoTipo(t) {
+  const n = Number(t.N_REALIZADAS) || 1;
+  return n <= 1 ? 'Paciente nuevo · no volvió a su 1.ª reevaluación' : `En control · faltó a su ${n}.ª reevaluación`;
+}
+
+/** Filtros de especialidad, médico y teléfono; el tipo se aplica aparte para poder contar cada botón. */
+function filtradas() {
+  if (!E.bandeja) return [];
+  const fe = $('#f-esp').value, fm = $('#f-med').value, sinTel = $('#f-sintel').checked;
+  return E.bandeja.tarjetas.filter(t =>
+    (!fe || especialidadDe(t) === fe) && (!fm || t.MEDICO_ULTIMO === fm) && (!sinTel || !t.TELEFONOS));
+}
+
+function visibles() {
+  return filtradas().filter(t => !E.tipo || tipoDe(t) === E.tipo);
+}
+
+function pintarTipos() {
+  const todas = filtradas();
+  document.querySelectorAll('#tipos button').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.tipo === E.tipo));
+    b.querySelector('b').textContent = E.bandeja ? todas.filter(t => !b.dataset.tipo || tipoDe(t) === b.dataset.tipo).length : '–';
+  });
+}
+
+async function cargarBandeja() {
+  E.error = '';
+  $('#lista').innerHTML = '<div class="fantasma"></div>'.repeat(6);
+  try {
+    E.bandeja = await llamar('getBandeja');
+  } catch (e) {
+    E.bandeja = null;
+    E.error = e.message;
+  }
+  pintarBandeja();
+}
+
+function filaHtml(t) {
+  const k = clave(t);
+  const tel = String(t.TELEFONOS || '').split(' / ').filter(Boolean)[0];
+  const clases = ['fila', k === E.sel ? 'sel-fila' : '', k === E.abierto ? 'abierta' : ''].join(' ');
+  const linea = enCursoReg(t)
+    ? `${esc(t.DETALLE)} · sesión ${t.HECHAS + 1} de ${t.SESIONES} pendiente · última el ${fechaCorta(t.ULTIMA_SESION)}`
+    : esIndicacion(t)
+    ? `${esc(queCotizo(t))} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Cotizó el ${fechaCorta(t.FECHA_COTIZACION)}`
+    : `${esNuevo(t) ? 'Nuevo' : 'En control'} · ${esc(medicoCorto(t.MEDICO_ULTIMO))} · Debía volver el ${fechaCorta(t.PROXIMA_ESPERADA)}`;
+  return `<div class="${clases}" data-k="${esc(k)}">
+    <span class="marcas">${marcas(t)}</span>
+    <span class="texto">
+      <span class="nombre">${esc(t.NOMBRE)}</span>
+      <span class="linea">${linea} · <span class="hace">hace ${diasSinVolver(t)} días</span></span>
+    </span>
+    <span class="tel">${tel
+      ? `<button type="button" class="copiar-fila" data-copiar="${esc(tel)}"><span class="n">${esc(tel)}</span><small>Copiar</small></button>`
+      : '<span class="sin-tel">Sin teléfono</span>'}</span>
+    <button type="button" class="btn-marca hecho">No contestó</button>
+    <span class="chev" aria-hidden="true">›</span>
+  </div>`;
+}
+
+function pintarBandeja() {
+  $('#fecha').textContent = fechaLarga(hoy());
+  if (E.error) {
+    $('#lista').innerHTML = `<p class="hace">No se pudo cargar la bandeja. ${esc(E.error)}</p><button type="button" class="btn-texto" id="reintentar">Reintentar</button>`;
+    $('#panel').hidden = true;
+    return;
+  }
+  if (!E.bandeja) return;
+  const c = E.bandeja.contador;
+  $('#c-atender').textContent = c.porAtender;
+  $('#c-hechos').textContent = c.hechosHoy;
+  $('#c-recuperados').textContent = c.recuperadosMes;
+  pintarTipos();
+
+  const lista = visibles();
+  const claves = lista.map(clave);
+  if (!claves.includes(E.sel)) E.sel = claves[0] || '';
+  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; }
+
+  if (!lista.length) {
+    $('#lista').innerHTML = E.tipo
+      ? '<div class="vacio-grande"><b>Nada en esta lista.</b>Pruebe con «Todos» o quite algún filtro.</div>'
+      : '<div class="vacio-grande"><b>Bandeja vacía.</b>No queda nadie a quien escribir hoy.</div>';
+  } else {
+    let desde = -1;
+    $('#lista').innerHTML = GRUPOS.map(g => {
+      const del = lista.filter(t => { const d = diasSinVolver(t); return d > desde && d <= g.hasta; });
+      desde = g.hasta;
+      if (!del.length) return '';
+      return `<div class="grupo"><h2>${g.titulo}</h2><span>${PREFIJO_GRUPO[E.tipo]}${g.sub} · ${del.length} ${del.length === 1 ? 'paciente' : 'pacientes'}</span></div>` +
+        del.map(filaHtml).join('');
+    }).join('');
+  }
+  const ts = pacienteDe(E.sel);
+  $('#atajo-res').innerHTML = `<b>1</b>–<b>${ts && esIndicacion(ts) ? 4 : 3}</b> qué pasó`;
+  $('#cuerpo').classList.toggle('con-panel', !!E.abierto);
+  pintarPanel();
+}
+
+function pacienteDe(k) { return E.bandeja && E.bandeja.tarjetas.find(t => clave(t) === k); }
+
+function pintarPanel() {
+  const t = E.abierto && pacienteDe(E.abierto);
+  const panel = $('#panel');
+  if (!t) { panel.hidden = true; panel.innerHTML = ''; return; }
+  const tels = String(t.TELEFONOS || '').split(' / ').filter(Boolean);
+  const celular = matchMedia('(max-width:767px)').matches;
+  panel.innerHTML = `
+    <div class="p-cab"><span>PACIENTE</span><button type="button" class="btn-texto cerrar">${celular ? '‹ Volver' : 'Cerrar  Esc'}</button></div>
+    <div>
+      <h2>${esc(t.NOMBRE)}</h2>
+      <div class="muted">DNI ${esc(t.DNI)}${especialidadDe(t) ? ' · ' + esc(especialidadDe(t)) : ''}</div>
+      <div class="muted">${esc(t.MEDICO_ULTIMO)}</div>
+    </div>
+    ${esIndicacion(t) ? `<div class="p-tipo"><span class="marcas">${marcas(t)}</span>${esc(queCotizo(t))} · ${enCursoReg(t) ? `sesión ${t.HECHAS + 1} de ${t.SESIONES} pendiente` : 'cotizó y no lo hizo'}</div>
+    <div class="p-fechas">
+      <div><small>Cotizó el</small><span class="v"><b>${fechaCorta(t.FECHA_COTIZACION)}</b></span></div>
+      <div><small>${enCursoReg(t) ? 'Última sesión' : 'Última consulta'}</small><span class="v">${fechaCorta(enCursoReg(t) ? t.ULTIMA_SESION : t.ULTIMA_CITA)}</span></div>
+      <div class="p-hace">hace ${diasSinVolver(t)} días ${enCursoReg(t) ? 'de la última sesión' : 'que cotizó'}</div>
+    </div>` : `<div class="p-tipo"><span class="marcas">${esNuevo(t) ? '<i class="m nuevo"></i>' : '<i class="m control"></i>'}</span>${textoTipo(t)}</div>
+    <div class="p-fechas">
+      <div><small>Última consulta</small><span class="v">${fechaCorta(t.ULTIMA_CITA)}</span></div>
+      <div><small>Debía volver el</small><span class="v"><b>${fechaCorta(t.PROXIMA_ESPERADA)}</b></span></div>
+      <div class="p-hace">hace ${diasSinVolver(t)} días que no vuelve</div>
+    </div>`}
+    ${t.PENDIENTE && !esIndicacion(t) ? `<div class="p-pend"><span class="marcas"><i class="m pend"></i></span><span><b>Procedimiento pendiente.</b> ${esc(t.PENDIENTE)}</span></div>` : ''}
+    <div class="p-tels"><small>Teléfonos</small>
+      ${tels.length
+        ? tels.map(n => `<div class="p-tel"><span class="n">${esc(n)}</span><button type="button" class="btn-linea" data-copiar="${esc(n)}">Copiar</button></div>`).join('')
+        : '<p class="p-sintel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}
+    </div>
+    ${t.USUARIO ? `<p class="p-usuario">Usuario: <b>${esc(t.USUARIO)}</b></p>` : ''}
+    ${t.N_SEGUIMIENTOS ? `<div class="p-prev">Ya se le escribió${esIndicacion(t) ? ' por esto' : ''} ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
+    <textarea id="nota" placeholder="Nota (opcional)">${esc(E.nota)}</textarea>
+    ${quePaso(t)}
+    <button type="button" class="p-ficha" id="p-ficha">Ver ficha completa →</button>`;
+  panel.hidden = false;
+}
+
+const ETIQUETA_RES = { 'NO CONTESTÓ': 'No contestó', 'LO PENSARÁ': 'Lo pensará', 'AGENDÓ CITA': 'Agendó cita', 'LO HIZO': 'Lo hizo',
+  'ALTA MÉDICA': 'Alta médica', 'NÚMERO EQUIVOCADO': 'Número equivocado', 'SE ATIENDE EN OTRO LUGAR': 'Se atiende en otro lugar',
+  'FALLECIÓ': 'Falleció', 'NO DESEA CONTINUAR': 'No desea continuar' };
+const SIGUE = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO'];
+const CIERRE = ['ALTA MÉDICA', 'NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'];
+const masDias = (n) => { const d = new Date(hoy() + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+function telsDe(t) { return String(t.TELEFONOS || '').split(' / ').filter(Boolean); }
+
+function quePaso(t) {
+  const sigue = SIGUE.filter(r => r !== 'LO HIZO' || esIndicacion(t));
+  return `<div class="qp"><small>¿Qué pasó?</small>
+    <div class="qp-grupo qp-sigue"><span>Sigue en seguimiento</span>${sigue.map((r, i) =>
+      `<button type="button" class="btn-linea" data-res="${r}">${ETIQUETA_RES[r]}<kbd>${i + 1}</kbd></button>`).join('')}</div>
+    <div class="qp-grupo qp-cierre${E.cierreAbierto || CIERRE.includes(E.paso) ? ' abierto' : ''}"><span>Cierra el seguimiento <kbd>X</kbd></span>${CIERRE.map(r =>
+      `<button type="button" class="btn-linea" data-res="${r}">${ETIQUETA_RES[r]}</button>`).join('')}</div>
+    ${E.paso ? pasoHtml(t, E.paso) : ''}</div>`;
+}
+
+function pasoHtml(t, r) {
+  const nombre = esc(t.NOMBRE);
+  const para = esIndicacion(t) ? esc(queCotizo(t)) : esc(especialidadDe(t) || t.ESPECIALIDAD);
+  const tels = telsDe(t);
+  let campos = '', aviso = '', cierre = CIERRE.includes(r);
+  if (r === 'LO PENSARÁ') campos = `<label>Volver a llamar el <input type="date" class="entrada" id="qp-fecha" value="${masDias(1)}" min="${masDias(1)}" max="${masDias(90)}"></label>`;
+  if (r === 'AGENDÓ CITA') campos = `<label>Fecha de la cita <input type="date" class="entrada" id="qp-fecha" value="${t.PROXIMA_AGENDADA || hoy()}" min="${hoy()}" max="${masDias(180)}"></label>`;
+  if (r === 'LO HIZO') campos = `<label>${t.ID_REGISTRO && t.SESIONES > 1 ? `Sesión ${t.HECHAS + 1} de ${t.SESIONES}, el` : 'Lo hizo el'} <input type="date" class="entrada" id="qp-fecha" value="${hoy()}" max="${hoy()}"></label>`;
+  if (r === 'ALTA MÉDICA') campos = `<select id="qp-doctor" class="sel" aria-label="Doctor que da el alta">${opcionesDoctor(t.MEDICO_ULTIMO)}</select>
+    ${esIndicacion(t) ? '' : `<input type="date" class="entrada" id="qp-fecha" value="${hoy()}" max="${hoy()}" aria-label="Fecha del alta">`}`;
+  if (r === 'NÚMERO EQUIVOCADO') {
+    campos = tels.map((n, i) => `<label><input type="radio" name="qp-tel" value="${esc(n)}"${n === E.telElegido || (tels.length === 1 && i === 0) ? ' checked' : ''}> ${esc(n)}</label>`).join('') || '<p class="muted">No tiene teléfonos para marcar.</p>';
+    const elegido = E.telElegido || (tels.length === 1 ? tels[0] : '');
+    const quedan = tels.filter(n => n !== elegido);
+    aviso = !elegido ? 'Elija el número equivocado.' : quedan.length ? `Le queda el ${esc(quedan[0])}: el seguimiento sigue.` : t.USUARIO ? `Le queda el usuario ${esc(t.USUARIO)}: el seguimiento sigue.` : 'No le queda otro contacto: se cerrará el seguimiento.';
+    cierre = !!elegido && !quedan.length && !t.USUARIO;
+  }
+  if (r === 'NO DESEA CONTINUAR') campos = '<input class="entrada" id="qp-motivo" placeholder="Motivo (obligatorio)">';
+  const pregunta = cierre ? `<p><b>¿Cerrar el seguimiento de ${nombre} en ${para}?</b> Motivo: ${esc(ETIQUETA_RES[r].toLowerCase())}.${r === 'FALLECIÓ' ? ' Se cerrarán todos sus seguimientos.' : ''}</p>` : '';
+  return `<div class="qp-paso${cierre ? ' cierre' : ''}">${pregunta}${campos}${aviso ? `<p class="muted" id="qp-aviso">${aviso}</p>` : ''}
+    <div><button type="button" class="btn-marca" id="qp-guardar">${cierre ? 'Cerrar el seguimiento' : 'Guardar'}</button>
+    <button type="button" class="btn-texto" id="qp-cancelar">Cancelar</button></div></div>`;
+}
+
+function abrir(k) { E.sel = k; E.abierto = k; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; pintarBandeja(); }
+function cerrar() { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; pintarBandeja(); }
+
+function mover(paso) {
+  const claves = visibles().map(clave);
+  if (!claves.length) return;
+  const i = Math.max(0, claves.indexOf(E.sel));
+  E.sel = claves[Math.min(claves.length - 1, Math.max(0, i + paso))];
+  if (E.abierto) { E.abierto = E.sel; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; }
+  pintarBandeja();
+  const f = document.querySelector(`.fila[data-k="${CSS.escape(E.sel)}"]`);
+  if (f) f.scrollIntoView({ block: 'nearest' });
+}
+
+/**
+ * Guarda lo que pasó. La fila sale de la lista al instante (salvo un número equivocado que
+ * deja otro contacto) y la selección pasa al siguiente. Si el servidor falla, vuelve a su sitio.
+ * Si el servidor la deja en Por contactar, también vuelve.
+ */
+async function guardarResultado(k, resultado, extra = {}) {
+  if (!exigirUsuario()) return;
+  const t = pacienteDe(k);
+  if (!t) return;
+  const estabaAbierto = E.abierto === k;
+  const nota = estabaAbierto ? E.nota : '';
+  const tels = telsDe(t);
+  const sigueEnLista = resultado === 'NÚMERO EQUIVOCADO' && (tels.some(n => n !== extra.telefono) || !!t.USUARIO);
+  // «Falleció» cierra todos sus seguimientos: sale de todas las listas, no solo esta tarjeta.
+  const sacar = sigueEnLista ? [] : resultado === 'FALLECIÓ' ? E.bandeja.tarjetas.filter(x => x.DNI === t.DNI) : [t];
+  const clavesSacar = sacar.map(clave);
+  const claves = visibles().map(clave);
+  const i = claves.indexOf(k);
+  const siguiente = claves.slice(i + 1).find(x => !clavesSacar.includes(x)) || claves.slice(0, i).reverse().find(x => !clavesSacar.includes(x)) || '';
+  const tarjetasAntes = E.bandeja.tarjetas.slice();
+  const pos = tarjetasAntes.indexOf(t);
+  const c = E.bandeja.contador;
+  const contadorAntes = { porAtender: c.porAtender, hechosHoy: c.hechosHoy };
+  const telsAntes = t.TELEFONOS;
+  // «Lo hizo» sobre un tratamiento registrado anota una sesión, no un seguimiento.
+  const sumaHecho = SIGUE.includes(resultado) && !(resultado === 'LO HIZO' && t.ID_REGISTRO);
+
+  if (sigueEnLista) t.TELEFONOS = tels.filter(n => n !== extra.telefono).join(' / ');
+  else {
+    E.bandeja.tarjetas = tarjetasAntes.filter(x => !sacar.includes(x));
+    c.porAtender -= sacar.length;
+    if (E.sel === k) E.sel = siguiente;
+    if (E.abierto === k) E.abierto = siguiente;
+  }
+  if (sumaHecho) c.hechosHoy++;
+  E.paso = ''; E.cierreAbierto = false; E.telElegido = '';
+  if (estabaAbierto) E.nota = '';
+  E.kpi = null; E.resumen = null;
+  pintarBandeja();
+
+  try {
+    const r = await llamar('registrarResultado', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD,
+      referencia: t.ID_REGISTRO || '', resultado, nota, fecha: extra.fecha || '', telefono: extra.telefono || '',
+      motivo: extra.motivo || '', doctor: extra.doctor || '' });
+    if (!sigueEnLista && r && r.tarjeta && r.tarjeta.COLUMNA === 'POR_CONTACTAR') {
+      // El servidor la dejó por contactar (p. ej. número equivocado con otro contacto): vuelve, sin el número marcado.
+      if (resultado === 'NÚMERO EQUIVOCADO') t.TELEFONOS = tels.filter(n => n !== extra.telefono).join(' / ');
+      E.bandeja.tarjetas.splice(Math.min(pos, E.bandeja.tarjetas.length), 0, t);
+      c.porAtender++;
+      pintarBandeja();
+    } else if (sigueEnLista && !(r && r.tarjeta && r.tarjeta.COLUMNA === 'POR_CONTACTAR')) {
+      // El servidor la cerró (p. ej. otra asesora marcó el otro número): la tarjeta ya no es de la bandeja.
+      if (E.bandeja.tarjetas.includes(t)) {
+        E.bandeja.tarjetas = E.bandeja.tarjetas.filter(x => x !== t);
+        c.porAtender--;
+        if (E.sel === k) E.sel = siguiente;
+        if (E.abierto === k) E.abierto = siguiente;
+        pintarBandeja();
+      }
+    }
+    const deshacer = r && (r.seguimiento ? ['anularResultado', r.seguimiento.ID] : r.alta ? ['anularAlta', r.alta.ID] : r.sesion ? ['anularSesion', r.sesion.ID] : null);
+    avisar(`Guardado: ${t.NOMBRE} · ${ETIQUETA_RES[resultado].toLowerCase()}`, deshacer && { texto: 'Deshacer', fn: async () => {
+      try {
+        await llamar(deshacer[0], { usuario: usuario(), id: deshacer[1], motivo: 'Deshecho al momento' });
+        avisar('Deshecho: ' + t.NOMBRE);
+      } catch (e) { avisar('No se deshizo: ' + e.message); }
+      E.kpi = null; E.resumen = null;
+      cargarBandeja();
+    } });
+  } catch (e) {
+    t.TELEFONOS = telsAntes;
+    E.bandeja.tarjetas = tarjetasAntes;
+    c.porAtender = contadorAntes.porAtender;
+    c.hechosHoy = contadorAntes.hechosHoy;
+    E.sel = k;
+    if (estabaAbierto) { E.abierto = k; E.nota = nota; }
+    avisar('No se guardó: ' + e.message);
+    pintarBandeja();
+  }
+}
+
+/** Lee el paso abierto y guarda; lo que falte lo avisa sin llamar al servidor. */
+function confirmarPaso() {
+  const r = E.paso, extra = {};
+  if ($('#qp-fecha')) extra.fecha = $('#qp-fecha').value;
+  if ($('#qp-doctor')) { extra.doctor = $('#qp-doctor').value; if (!extra.doctor) { avisar('Elija el doctor que da el alta.'); return; } }
+  if (r === 'NÚMERO EQUIVOCADO') {
+    const sel = document.querySelector('input[name="qp-tel"]:checked');
+    if (!sel) { avisar('Elija cuál teléfono está equivocado.'); return; }
+    extra.telefono = sel.value;
+  }
+  if ($('#qp-motivo')) { extra.motivo = $('#qp-motivo').value.trim(); if (!extra.motivo) { avisar('Escriba el motivo.'); return; } }
+  guardarResultado(E.abierto, r, extra);
+}
+
+/** Elegir un resultado: «No contestó» guarda directo; los demás abren su paso. */
+function elegirResultado(k, r) {
+  if (r === 'NO CONTESTÓ') { guardarResultado(k, r); return; }
+  if (E.abierto !== k) { E.sel = k; E.abierto = k; }
+  E.paso = r; E.telElegido = '';
+  pintarBandeja();
+  const f = $('#qp-doctor') || $('#qp-fecha') || $('#qp-motivo');
+  if (f) f.focus();
+  const paso = document.querySelector('.qp-paso');
+  if (paso) paso.scrollIntoView({ block: 'nearest' });
+}
+
+$('#lista').addEventListener('click', ev => {
+  if (ev.target.closest('#reintentar')) { cargarBandeja(); return; }
+  const fila = ev.target.closest('.fila');
+  if (!fila) return;
+  const copiar = ev.target.closest('[data-copiar]');
+  if (copiar) { ev.stopPropagation(); copiarDesde(copiar, copiar.dataset.copiar); return; }
+  if (ev.target.closest('.hecho')) { ev.stopPropagation(); E.sel = fila.dataset.k; guardarResultado(fila.dataset.k, 'NO CONTESTÓ'); return; }
+  abrir(fila.dataset.k);
+});
+
+$('#panel').addEventListener('input', ev => {
+  if (ev.target.id === 'nota') E.nota = ev.target.value;
+});
+
+$('#panel').addEventListener('change', ev => {
+  if (ev.target.name === 'qp-tel') { E.telElegido = ev.target.value; pintarPanel(); }
+});
+
+$('#panel').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b) return;
+  if (b.classList.contains('cerrar')) { cerrar(); return; }
+  if (b.dataset.copiar) { copiarDesde(b, b.dataset.copiar); return; }
+  if (b.dataset.res) { elegirResultado(E.abierto, b.dataset.res); return; }
+  if (b.id === 'qp-guardar') { confirmarPaso(); return; }
+  if (b.id === 'qp-cancelar') { E.paso = ''; pintarPanel(); return; }
+  if (b.id === 'p-ficha') { const t = pacienteDe(E.abierto); if (t) abrirFicha(t.DNI); }
+});
+
+/* Atajos de teclado de la bandeja. No actúan mientras se escribe en un campo. */
+document.addEventListener('keydown', ev => {
+  if ($('#v-bandeja').hidden || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (ev.key === 'Escape' && E.paso && ev.target.closest && ev.target.closest('#panel')) { ev.target.blur(); E.paso = ''; pintarPanel(); return; }
+  if (ev.target.closest && ev.target.closest('input, textarea, select')) return;
+  const tecla = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
+  if (tecla === 'ArrowDown' || tecla === 'j') { ev.preventDefault(); mover(1); return; }
+  if (tecla === 'ArrowUp' || tecla === 'k') { ev.preventDefault(); mover(-1); return; }
+  if (tecla === 'Escape') { if (E.paso) { E.paso = ''; pintarPanel(); } else if (E.abierto) cerrar(); return; }
+  if (!E.sel) return;
+  if (tecla === 'Enter') { if (!ev.target.closest || !ev.target.closest('button')) { ev.preventDefault(); abrir(E.sel); } return; }
+  if (['1', '2', '3', '4'].includes(tecla)) {
+    const t = pacienteDe(E.sel);
+    const r = SIGUE.filter(x => x !== 'LO HIZO' || (t && esIndicacion(t)))[Number(tecla) - 1];
+    if (r) elegirResultado(E.sel, r);
+    return;
+  }
+  if (tecla === 'x') { E.abierto = E.sel; E.cierreAbierto = true; E.paso = ''; pintarBandeja(); return; }
+  if (tecla === 'c') {
+    const t = pacienteDe(E.sel);
+    const tel = t && String(t.TELEFONOS || '').split(' / ').filter(Boolean)[0];
+    if (!tel) { avisar('Este paciente no tiene teléfono.'); return; }
+    const boton = document.querySelector(`.fila[data-k="${CSS.escape(E.sel)}"] [data-copiar]`) || document.querySelector('#panel [data-copiar]');
+    if (boton) copiarDesde(boton, tel); else copiarTexto(tel).then(ok => avisar(ok ? 'Copiado: ' + tel : tel));
+  }
+});
+
+/* ==========================================================================
+   REGISTRO — procedimientos, tratamientos (con sesiones) y altas médicas.
+   La asesora es la del selector «¿Quién es usted?». El servidor vuelve a
+   revisar todo (validarRegistro / validarAlta): aquí solo se ayuda a llenar.
+   ========================================================================== */
+const G = { listo: false, modo: 'indicacion', paciente: null, confirmar: false };
+let esperaDni;
+
+function opcionesSelect(sel, valores, vacio) {
+  sel.innerHTML = `<option value="">${esc(vacio)}</option>` + valores.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+}
+
+/** Opciones de doctor, con el que corresponde al médico de SOFDOC ya elegido (el primero: «Dra. Karen Matos», no el particular). */
+function opcionesDoctor(medicoSofdoc) {
+  const docs = (E.boot && E.boot.doctores) || [];
+  const propuesto = docs.find(d => d.sofdoc && norm(d.sofdoc) === norm(medicoSofdoc));
+  return '<option value="">— Doctor que da el alta —</option>' + docs.map(d =>
+    `<option value="${esc(d.doctor)}"${propuesto === d ? ' selected' : ''}>${esc(d.doctor)}</option>`).join('');
+}
+
+function iniciarRegistro() {
+  if (G.listo || !E.boot) return;
+  G.listo = true;
+  const b = E.boot;
+  opcionesSelect($('#g-doctor'), (b.doctores || []).map(x => x.doctor), '— Elija —');
+  opcionesSelect($('#g-proc'), b.procedimientos || [], 'Ninguno');
+  opcionesSelect($('#g-trat'), b.tratamientos || [], 'Ninguno');
+  $('#g-fecha').value = hoy();
+  $('#g-fecha').max = hoy();
+  pintarEspecialidades();
+  $('#g-dni').addEventListener('input', () => { clearTimeout(esperaDni); esperaDni = setTimeout(buscarDni, 350); });
+  $('#g-trat').addEventListener('change', pintarTratamiento);
+  $('#g-sesiones').addEventListener('change', () => { $('#g-otro-c').hidden = $('#g-sesiones').value !== 'otro'; });
+  document.querySelectorAll('[data-modo-reg]').forEach(x => x.addEventListener('click', () => ponerModoRegistro(x.dataset.modoReg)));
+  $('#f-reg').addEventListener('submit', ev => { ev.preventDefault(); enviarRegistro(); });
+  $('#g-dup').addEventListener('click', ev => {
+    if (ev.target.id === 'g-dup-si') { G.confirmar = true; enviarRegistro(); }
+    if (ev.target.id === 'g-dup-no') { G.confirmar = false; $('#g-dup').hidden = true; }
+  });
+  $('#g-hoy').addEventListener('click', clicRegistradosHoy);
+}
+
+function pintarTratamiento() {
+  const t = $('#g-trat').value;
+  $('#g-trat-extra').hidden = !t;
+  const marcas = ((E.boot && E.boot.marcas) || {})[norm(t)] || [];
+  $('#g-marca-c').hidden = !marcas.length;
+  opcionesSelect($('#g-marca'), marcas, '— Elija —');
+}
+
+function ponerModoRegistro(modo) {
+  G.modo = modo;
+  document.querySelectorAll('[data-modo-reg]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.modoReg === modo)));
+  document.querySelectorAll('#f-reg .solo-ind').forEach(x => { x.hidden = modo !== 'indicacion'; });
+  document.querySelectorAll('#f-reg .solo-alta').forEach(x => { x.hidden = modo !== 'alta'; });
+  $('#g-guardar').textContent = modo === 'alta' ? 'Registrar alta' : 'Registrar';
+  $('#g-dup').hidden = true;
+  G.confirmar = false;
+  pintarEspecialidades();
+}
+
+const documentoOk = v => { const d = norm(v).replace(/[\s.\-]/g, ''); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
+
+async function buscarDni() {
+  const dni = $('#g-dni').value;
+  G.paciente = null;
+  $('#g-conocido').textContent = '';
+  pintarEspecialidades();
+  if (!documentoOk(dni)) return;
+  let r;
+  try { r = await llamar('buscarPacienteRegistro', dni); } catch (e) { avisar(e.message); return; }
+  if ($('#g-dni').value !== dni) return;  // mientras tanto escribieron otro DNI
+  G.paciente = r;
+  const aviso = r.fallecido ? `<p class="g-fallecido hace">Este paciente figura como fallecido el ${fechaCorta(r.fallecido.fecha)} (${esc(r.fallecido.quien)}). Si es un error, anúlelo desde su ficha.</p>` : '';
+  if (!r.encontrado) {
+    $('#g-conocido').innerHTML = aviso + 'Todavía no está en SOFDOC. Puede registrarlo igual.';
+  } else {
+    $('#g-conocido').innerHTML = aviso + `Paciente conocido · última consulta ${esc(fechaCorta(r.ultimaFecha))} con ${esc(medicoCorto(r.ultimoMedico))}`;
+    if (!$('#g-nombre').value.trim()) $('#g-nombre').value = r.nombre;
+    if (!$('#g-contacto').value.trim() && r.telefonos.length) $('#g-contacto').value = r.telefonos[0];
+    if (!$('#g-doctor').value && r.doctor) $('#g-doctor').value = r.doctor;
+  }
+  pintarEspecialidades();
+}
+
+function pintarEspecialidades() {
+  const p = G.paciente, esps = p && p.encontrado ? p.especialidades : [];
+  $('#g-esp').innerHTML = esps.length
+    ? esps.map(e => `<option value="${esc(e.especialidad)}"${e.alta ? ' disabled' : ''}>${esc(e.especialidad)}${e.alta ? ' · ya tiene alta' : ''}</option>`).join('')
+    : '<option value="">— Escriba un DNI con consultas —</option>';
+}
+
+async function enviarRegistro() {
+  if (!exigirUsuario()) return;
+  const boton = $('#g-guardar');
+  boton.disabled = true;
+  try {
+    if (G.modo === 'alta') {
+      await llamar('darDeAlta', { usuario: usuario(), dni: $('#g-dni').value, especialidad: $('#g-esp').value,
+        doctor: $('#g-doctor').value, fecha: $('#g-fecha').value, nota: $('#g-nota-alta').value });
+      avisar(`Alta registrada: ${G.paciente && G.paciente.nombre ? G.paciente.nombre : $('#g-dni').value} · ${$('#g-esp').value}`);
+      cargarBandeja();
+    } else {
+      const trat = $('#g-trat').value;
+      const r = await llamar('guardarRegistro', { usuario: usuario(), dni: $('#g-dni').value, nombre: $('#g-nombre').value,
+        contacto: $('#g-contacto').value, fecha: $('#g-fecha').value, doctor: $('#g-doctor').value, procedimiento: $('#g-proc').value,
+        tratamiento: trat, sesiones: trat ? ($('#g-sesiones').value === 'otro' ? $('#g-otro').value : $('#g-sesiones').value) : '',
+        marca: trat ? $('#g-marca').value : '', confirmado: G.confirmar });
+      if (r.duplicado) {
+        $('#g-dup').innerHTML = `<p>Ya se registró el ${fechaCorta(r.duplicado.FECHA)} (${esc(r.duplicado.ID)}): ${esc(r.duplicado.TEXTO)}. ¿Registrar de todos modos?</p>
+          <button type="button" class="btn-marca" id="g-dup-si">Registrar de todos modos</button>
+          <button type="button" class="btn-linea" id="g-dup-no">Cancelar</button>`;
+        $('#g-dup').hidden = false;
+        return;
+      }
+      avisar(`Registrado: ${r.registros.map(x => x.TEXTO).join(' + ')} — ${r.registros[0].NOMBRE} · ${r.registros.map(x => x.ID).join(', ')}`);
+    }
+    limpiarRegistro();
+    E.kpi = null;
+    E.resumen = null;
+    cargarRegistrosHoy();
+  } catch (e) {
+    avisar('No se guardó: ' + e.message);
+  } finally {
+    boton.disabled = false;
+  }
+}
+
+/** Limpia todo menos la fecha: la asesora suele registrar varios pacientes del mismo día seguidos. */
+function limpiarRegistro() {
+  ['#g-dni', '#g-nombre', '#g-contacto', '#g-otro', '#g-nota-alta', '#g-doctor', '#g-proc', '#g-trat'].forEach(s => { $(s).value = ''; });
+  $('#g-sesiones').value = '1';
+  $('#g-otro-c').hidden = true;
+  $('#g-conocido').textContent = '';
+  $('#g-dup').hidden = true;
+  G.paciente = null;
+  G.confirmar = false;
+  pintarTratamiento();
+  pintarEspecialidades();
+}
+
+async function cargarRegistrosHoy() {
+  let lista;
+  try { lista = await llamar('getRegistrosHoy'); } catch (e) { $('#g-hoy').innerHTML = `<p class="hace">${esc(e.message)}</p>`; return; }
+  $('#g-hoy').innerHTML = lista.length ? lista.map(x => `<div class="g-item${x.ANULADO ? ' anulado' : ''}" data-id="${esc(x.ID)}">
+      <span class="num">${esc(x.HORA)}</span>
+      <span><b>${esc(x.NOMBRE)}</b> · DNI ${esc(x.DNI)}<br><span class="linea-g">${esc(x.TEXTO)} · ${esc(x.ASESORA)} · ${esc(x.ID)}</span></span>
+      ${x.ANULADO ? '<span class="muted">Anulado</span>' : `<button type="button" class="btn-texto" data-anular="${esc(x.ID)}">Anular</button>`}
+    </div>`).join('') : '<p class="muted">Todavía no hay registros hoy.</p>';
+}
+
+/** El motivo se pide en la misma fila: prompt() puede estar bloqueado dentro del iframe de Apps Script. */
+function pedirMotivo(contenedor, que, id) {
+  document.querySelectorAll('.g-motivo').forEach(x => x.remove());
+  contenedor.insertAdjacentHTML('beforeend', `<div class="g-motivo"><input class="entrada" id="g-motivo" placeholder="Motivo (obligatorio)">
+    <button type="button" class="btn-marca" data-confirmar-anular="${esc(id)}" data-que="${que}">Anular</button>
+    <button type="button" class="btn-texto" data-cancelar-anular>Cancelar</button></div>`);
+  $('#g-motivo').focus();
+}
+
+const FUNCION_ANULAR = { registro: 'anularRegistro', sesion: 'anularSesion', alta: 'anularAlta', seguimiento: 'anularResultado' };
+
+async function confirmarAnulacion(boton, alTerminar) {
+  if (!exigirUsuario()) return;
+  const motivo = $('#g-motivo').value.trim();
+  if (!motivo) { avisar('Escriba el motivo de la anulación.'); return; }
+  boton.disabled = true;
+  try {
+    await llamar(FUNCION_ANULAR[boton.dataset.que], { usuario: usuario(), id: boton.dataset.confirmarAnular, motivo });
+    avisar('Anulado: ' + boton.dataset.confirmarAnular);
+    E.kpi = null;
+    E.resumen = null;
+    alTerminar();
+  } catch (e) {
+    boton.disabled = false;
+    avisar('No se anuló: ' + e.message);
+  }
+}
+
+function clicRegistradosHoy(ev) {
+  const a = ev.target.closest('[data-anular]');
+  if (a) { pedirMotivo(a.closest('.g-item'), a.dataset.anular.startsWith('ALT-') ? 'alta' : 'registro', a.dataset.anular); return; }
+  const c = ev.target.closest('[data-confirmar-anular]');
+  if (c) { confirmarAnulacion(c, () => { cargarRegistrosHoy(); cargarBandeja(); }); return; }
+  if (ev.target.closest('[data-cancelar-anular]')) ev.target.closest('.g-motivo').remove();
+}
+
+/* ==========================================================================
+   BUSCADOR Y FICHA
+   ========================================================================== */
+let esperaBusqueda;
+$('#q').addEventListener('input', () => { clearTimeout(esperaBusqueda); esperaBusqueda = setTimeout(buscarAhora, 300); });
+
+async function buscarAhora() {
+  const q = $('#q').value.trim();
+  if (q.length < 3) { $('#resultados').innerHTML = ''; return; }
+  let r = [];
+  try { r = await llamar('buscar', q); } catch (e) { avisar(e.message); }
+  $('#resultados').innerHTML = r.length
+    ? r.map(p => `<button type="button" data-abrir="${esc(p.DNI)}">${esc(p.NOMBRE)} <span class="muted">· DNI ${esc(p.DNI)}</span></button>`).join('')
+    : '<p class="muted">Sin resultados.</p>';
+}
+
+$('#resultados').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-abrir]');
+  if (b) abrirFicha(b.dataset.abrir);
+});
+
+async function abrirFicha(dni) {
+  irA('ficha');
+  E.fichaDni = dni;
+  $('#ficha').innerHTML = '<p class="muted">Cargando…</p>';
+  try {
+    pintarFicha(await llamar('getPaciente', dni));
+  } catch (e) {
+    $('#ficha').innerHTML = `<p class="hace">${esc(e.message)}</p>`;
+  }
+}
+
+const ESTADO_BUENO = { 'AL DÍA': 1, 'RECUPERADO': 1, 'AGENDADO': 1, 'ALTA': 1 };
+// Un AGENDADO sin cita ni llamada fijada (sin respuesta, por reintentar) no es una buena noticia.
+const esBueno = s => !!ESTADO_BUENO[s.ESTADO] && !(s.ESTADO === 'AGENDADO' && s.AGENDA && !['CITA', 'LLAMAR'].includes(s.AGENDA));
+const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más de 6 meses', 'POR VENCER': 'Le toca volver pronto',
+  'AL DÍA': 'Al día', 'CONTACTADO': 'Se le escribió, esperando respuesta', 'RECUPERADO': 'Volvió tras el seguimiento',
+  'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas', 'ALTA': 'Alta médica',
+  'CERRADO': 'Seguimiento cerrado', 'FALLECIDO': 'Fallecido', 'AGENDADO': 'Agendado o por volver a llamar' };
+
+function lineaDeTiempo(citas) {
+  let n = 0;
+  return citas.map(c => {
+    const realizada = norm(c.ESTADO) === 'REALIZADO';
+    const titulo = realizada ? (n++ === 0 ? 'Primera cita' : 'Reevaluación ' + (n - 1)) : esc(c.ESTADO);
+    return `<li><b>${titulo}</b> · ${fechaCorta(c.FECHA)} · ${esc(c.MEDICO)}${c.MODALIDAD ? ' · ' + esc(c.MODALIDAD) : ''}</li>`;
+  }).join('');
+}
+
+const PARA = { HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento' };
+
+const NOMBRE_REG = { COTIZADO: 'Cotizado', 'EN CURSO': 'En curso', COMPLETO: 'Completo', ANULADO: 'Anulado' };
+
+function sesionesHtml(r) {
+  if (r.ESTADO === 'ANULADO') return '';
+  const hechas = r.sesiones || [];
+  let html = '';
+  for (let i = 1; i <= Number(r.SESIONES); i++) {
+    const s = hechas[i - 1];
+    html += s
+      ? `<li>Sesión ${i} ✓ ${fechaCorta(s.FECHA)} · ${esc(s.ASESORA)}${i === hechas.length ? ` <button type="button" class="btn-texto" data-anular-ses="${esc(s.ID)}">Anular</button>` : ''}</li>`
+      : `<li class="muted">Sesión ${i} pendiente</li>`;
+  }
+  return html;
+}
+
+function pintarFicha(p) {
+  const confirmar = p.porConfirmar.map(i => `<div class="seccion confirmar">
+      <h2>¿Es esta la misma persona?</h2>
+      <p class="muted">${esc(i.TIPO)} del ${fechaCorta(i.FECHA)} a nombre de <b>${esc(i.NOMBRE)}</b> · teléfono ${esc(i.TELEFONO)}</p>
+      <div class="opciones">${i.candidatos.map(c => `<button type="button" class="${c.dni === p.dni ? 'btn-marca' : 'btn-linea'}" data-confirmar="${esc(i.ID)}" data-dni="${esc(c.dni)}">${esc(c.nombre)} · ${esc(c.dni)}</button>`).join('')}</div>
+    </div>`).join('');
+
+  const series = p.series.map(s => {
+    const citas = p.citas.filter(c => norm(c.ESPECIALIDAD) === norm(s.ESPECIALIDAD));
+    return `<div class="seccion">
+      <h2>${esc(s.ESPECIALIDAD)}<span class="estado ${esBueno(s) ? 'bien' : 'mal'}">${esc(NOMBRE_ESTADO[s.ESTADO] || s.ESTADO)}</span>
+        ${s.ESTADO !== 'ALTA' ? `<button type="button" class="btn-texto" data-alta-esp="${esc(s.ESPECIALIDAD)}" data-medico="${esc(s.MEDICO_ULTIMO)}">Dar de alta…</button>` : ''}</h2>
+      <div class="tipo-caso"><span class="marcas">${marcas({ N_REALIZADAS: s.N_REALIZADAS })}</span>${textoTipo(s)}</div>
+      <p class="muted">Teléfonos: ${esc(s.TELEFONOS) || '—'}</p>
+      ${s.PENDIENTE ? `<div class="p-pend"><span class="marcas"><i class="m pend"></i></span><span><b>Procedimiento pendiente.</b> ${esc(s.PENDIENTE)}</span></div>` : ''}
+      <ul class="linea-tiempo">${lineaDeTiempo(citas)}
+        <li class="esperada">Debía volver el ${fechaCorta(s.PROXIMA_ESPERADA)} (plazo máximo ${fechaCorta(s.VENCE)})</li>
+      </ul>
+    </div>`;
+  }).join('');
+
+  const indicaciones = p.indicaciones.length
+    ? `<table><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Estado</th><th>Teléfono</th><th>Observaciones</th></tr>${p.indicaciones.map(i =>
+        `<tr><td>${fechaCorta(i.FECHA)}</td><td>${esc(i.TIPO)}</td><td>${esc(i.DETALLE)}${Number(i.CANTIDAD) > 1 ? ' ×' + esc(i.CANTIDAD) : ''}</td><td>${i.ESTADO === 'COTIZÓ' ? 'Cotizó, no lo hizo' : i.ESTADO === 'ACEPTÓ' ? 'Lo hizo' : esc(i.ESTADO)}</td><td>${esc(i.TELEFONO)}</td><td>${esc(i.OBSERVACIONES)}</td></tr>`).join('')}</table>`
+    : '<p class="muted">Sin procedimientos indicados.</p>';
+
+  const textoRes = s => {
+    const r = s.RESULTADO || (s.ACCION === 'HECHO' ? 'SEGUIMIENTO HECHO' : s.ACCION === 'DESCARTADO' ? 'DESCARTADO' : s.ACCION);
+    const f = esc(fechaCorta(s.FECHA_PROXIMA).slice(0, 5));
+    return ({ 'LO PENSARÁ': `lo pensará · llamar el ${f}`, 'AGENDÓ CITA': `agendó para el ${f}`, 'LO HIZO': `lo hizo el ${f}`,
+      'NÚMERO EQUIVOCADO': `número equivocado: ${esc(s.TELEFONO)}`, 'DESCARTADO': `descartado${s.MOTIVO ? ': ' + esc(s.MOTIVO.toLowerCase()) : ''}`,
+      'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || esc(String(r).toLowerCase());
+  };
+  const claveSeg = s => String(s.DNI ?? '').replace(/\D/g, '') + '|' + norm(s.ESPECIALIDAD) + '|' + String(s.REFERENCIA ?? '').trim();
+  const estaAnulado = s => norm(s.ANULADO) === 'SI';
+  const ordenados = p.seguimientos.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0);
+  const ultimoDe = {};
+  ordenados.filter(s => !estaAnulado(s)).forEach(s => { ultimoDe[claveSeg(s)] = s.ID; });
+  const seguimientos = p.seguimientos.length
+    ? `<ol class="historia">${ordenados.map(s => {
+        const anulado = estaAnulado(s);
+        const puede = !anulado && String(s.ID).startsWith('SEG-') && (s.RESULTADO === 'FALLECIÓ' || ultimoDe[claveSeg(s)] === s.ID);
+        return `<li class="${anulado ? 'anulado' : ''}"><b>${esc(fechaCorta(s.FECHA_HORA).slice(0, 5))} ${esc(s.RESPONSABLE)}:</b> ${textoRes(s)}
+          <span class="muted">· ${esc(PARA[norm(s.ESPECIALIDAD)] || 'Reevaluación · ' + s.ESPECIALIDAD)}${s.NOTA ? ' · ' + esc(s.NOTA) : ''}${anulado ? ' · anulado: ' + esc(s.MOTIVO_ANULACION) : ''}</span>
+          ${puede ? `<button type="button" class="btn-texto" data-anular-seg="${esc(s.ID)}">Anular</button>` : ''}</li>`;
+      }).join('')}</ol>`
+    : '<p class="muted">Todavía no hay seguimientos.</p>';
+
+  const registros = (p.registros || []).length ? p.registros.map(r => `<div class="reg-ficha" data-reg="${esc(r.ID)}">
+      <div><b>${esc(r.TEXTO)}</b> <span class="estado ${r.ESTADO === 'COMPLETO' ? 'bien' : 'mal'}">${esc(NOMBRE_REG[r.ESTADO] || r.ESTADO)}</span></div>
+      <div class="muted">${esc(r.ID)} · ${fechaCorta(r.FECHA)} · ${esc(r.DOCTOR)} · registró ${esc(r.ASESORA)}${r.MOTIVO_ANULACION ? ' · anulado: ' + esc(r.MOTIVO_ANULACION) : ''}</div>
+      <ol class="sesiones">${sesionesHtml(r)}</ol>
+      ${r.ESTADO === 'COTIZADO' || r.ESTADO === 'EN CURSO' ? `<div class="reg-acciones">
+        <input type="date" class="entrada" data-fecha-ses value="${hoy()}" max="${hoy()}" aria-label="Fecha de la sesión">
+        <button type="button" class="btn-marca" data-lohizo="${esc(r.ID)}">Lo hizo</button>
+        <button type="button" class="btn-texto" data-anular-reg="${esc(r.ID)}">Anular registro</button></div>` : ''}
+    </div>`).join('') : '<p class="muted">Sin registros en la plataforma.</p>';
+  const altas = (p.altas || []).length ? `<div class="seccion"><h2>Altas médicas</h2><ul class="lista-altas">${p.altas.map(a => `<li>
+      ${esc(a.ESPECIALIDAD)} · ${fechaCorta(a.FECHA)} · ${esc(a.DOCTOR || 'sin doctor')} · registró ${esc(a.REGISTRADO_POR)}
+      ${a.ANULADO ? ` · <span class="muted">anulada: ${esc(a.MOTIVO_ANULACION)}</span>` : a.VIGENTE ? ' · <b>vigente</b>' : ' · <span class="muted">cerrada: volvió después</span>'}
+      ${!a.ANULADO && String(a.ID).startsWith('ALT-') ? ` <button type="button" class="btn-texto" data-anular-alta="${esc(a.ID)}">Anular</button>` : ''}</li>`).join('')}</ul></div>` : '';
+  $('#ficha').innerHTML = `<div class="ficha-cab"><h1>${esc(p.nombre)}</h1><div class="muted">DNI ${esc(p.dni)}</div>
+    ${p.fallecido ? `<p class="hace">Figura como fallecido el ${fechaCorta(p.fallecido.fecha)} (${esc(p.fallecido.quien)}).</p>` : ''}
+    ${(p.telefonosDescartados || []).length ? `<p class="muted">Números equivocados: ${p.telefonosDescartados.map(n => `<s>${esc(n)}</s>`).join(', ')}</p>` : ''}</div>
+    ${confirmar}${series}
+    <div class="seccion"><h2>Registros (procedimientos y tratamientos)</h2>${registros}</div>
+    ${altas}
+    <div class="seccion"><h2>Procedimientos indicados antes de la plataforma</h2>${indicaciones}</div>
+    <div class="seccion"><h2>Seguimientos</h2>${seguimientos}</div>`;
+}
+
+$('#ficha').addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-confirmar]');
+  if (!b || !exigirUsuario()) return;
+  b.disabled = true;
+  try {
+    await llamar('confirmarEmparejamiento', { usuario: usuario(), id: b.dataset.confirmar, dni: b.dataset.dni });
+    avisar('Emparejamiento confirmado.');
+    abrirFicha(E.fichaDni);
+    cargarBandeja();
+  } catch (e) {
+    b.disabled = false;
+    avisar(e.message);
+  }
+});
+
+function refrescarTrasFicha() { E.kpi = null; E.resumen = null; abrirFicha(E.fichaDni); cargarBandeja(); }
+
+$('#ficha').addEventListener('click', async ev => {
+  const t = ev.target;
+  const lo = t.closest('[data-lohizo]');
+  if (lo) {
+    if (!exigirUsuario()) return;
+    lo.disabled = true;
+    try {
+      await llamar('marcarSesion', { usuario: usuario(), id: lo.dataset.lohizo, fecha: lo.closest('.reg-ficha').querySelector('[data-fecha-ses]').value, nota: '' });
+      avisar('Sesión registrada: ' + lo.dataset.lohizo);
+      refrescarTrasFicha();
+    } catch (e) { lo.disabled = false; avisar('No se guardó: ' + e.message); }
+    return;
+  }
+  const ar = t.closest('[data-anular-reg]');
+  if (ar) { pedirMotivo(ar.closest('.reg-ficha'), 'registro', ar.dataset.anularReg); return; }
+  const as = t.closest('[data-anular-ses]');
+  if (as) { pedirMotivo(as.closest('li'), 'sesion', as.dataset.anularSes); return; }
+  const aa = t.closest('[data-anular-alta]');
+  if (aa) { pedirMotivo(aa.closest('li'), 'alta', aa.dataset.anularAlta); return; }
+  const ag = t.closest('[data-anular-seg]');
+  if (ag) { pedirMotivo(ag.closest('li'), 'seguimiento', ag.dataset.anularSeg); return; }
+  const ca = t.closest('[data-confirmar-anular]');
+  if (ca) { confirmarAnulacion(ca, refrescarTrasFicha); return; }
+  if (t.closest('[data-cancelar-anular]')) { t.closest('.g-motivo').remove(); return; }
+  const al = t.closest('[data-alta-esp]');
+  if (al) {
+    document.querySelectorAll('[data-alta-form]').forEach(x => x.remove());
+    al.insertAdjacentHTML('afterend', `<div class="p-alta-form" data-alta-form>
+      <select class="sel" data-alta-doctor aria-label="Doctor que da el alta">${opcionesDoctor(al.dataset.medico)}</select>
+      <input type="date" class="entrada" data-alta-fecha value="${hoy()}" max="${hoy()}" aria-label="Fecha del alta">
+      <button type="button" class="btn-marca" data-alta-ok="${esc(al.dataset.altaEsp)}">Confirmar alta</button></div>`);
+    return;
+  }
+  const ok = t.closest('[data-alta-ok]');
+  if (ok) {
+    if (!exigirUsuario()) return;
+    const f = ok.closest('[data-alta-form]');
+    if (!f.querySelector('[data-alta-doctor]').value) { avisar('Elija el doctor que da el alta.'); return; }
+    ok.disabled = true;
+    try {
+      await llamar('darDeAlta', { usuario: usuario(), dni: E.fichaDni, especialidad: ok.dataset.altaOk,
+        doctor: f.querySelector('[data-alta-doctor]').value, fecha: f.querySelector('[data-alta-fecha]').value, nota: '' });
+      avisar('Alta registrada: ' + ok.dataset.altaOk);
+      refrescarTrasFicha();
+    } catch (e) { ok.disabled = false; avisar('No se guardó: ' + e.message); }
+  }
+});
+
+/* ==========================================================================
+   DETALLE (antes «Tablero»)
+   ========================================================================== */
+async function cargarTablero() {
+  if (E.kpi) { pintarTablero(); return; }
+  $('#tablero').innerHTML = '<p class="muted">Calculando…</p>';
+  try {
+    E.kpi = await llamar('getKpi');
+    pintarTablero();
+  } catch (e) {
+    $('#tablero').innerHTML = `<p class="hace">No se pudo calcular el detalle: ${esc(e.message)}</p>`;
+  }
+}
+
+const barra = (a, b) => `<div class="barra-p"><i style="width:${b ? Math.round(100 * a / b) : 0}%"></i></div>`;
+
+function mediana(lista) {
+  if (!lista.length) return '—';
+  const s = [...lista].sort((x, y) => x - y), m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+}
+
+/** cab: [{t, num, html?}]; filas y pie (fila de totales, opcional): arrays de HTML ya escapado. */
+function tabla(cab, filas, pie) {
+  if (!filas.length) return '<p class="muted">Sin datos con estos filtros.</p>';
+  const td = (v, i) => `<td${cab[i].num ? ' class="n"' : ''}>${v}</td>`;
+  return `<table><tr>${cab.map(c => `<th${c.num ? ' class="n"' : ''}>${c.html || esc(c.t)}</th>`).join('')}</tr>` +
+    filas.map(f => `<tr>${f.map(td).join('')}</tr>`).join('') +
+    (pie ? `<tr class="total">${pie.map(td).join('')}</tr>` : '') + '</table>';
+}
+
+function agrupar(filas, claveDe, nuevo, sumar) {
+  const m = new Map();
+  filas.forEach(f => { const k = claveDe(f); if (!m.has(k)) m.set(k, nuevo()); sumar(m.get(k), f); });
+  return [...m.entries()].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+}
+
+function opciones(id, etiqueta, valores, actual, nombre) {
+  return `<select id="${id}" class="sel"><option value="">${esc(etiqueta)}</option>` +
+    valores.map(v => `<option value="${esc(v)}"${v === actual ? ' selected' : ''}>${esc(nombre ? nombre(v) : v)}</option>`).join('') + '</select>';
+}
+
+/**
+ * El relato de la sección «¿Hasta dónde llegan…?»: lo mismo que la tabla, dicho en frases y en 100
+ * cuadritos. «De cada 100» encadena las tasas de cada etapa, así que no lo distorsionan los
+ * pacientes que aún están en plazo para la siguiente.
+ */
+function historia(t, meses, meta, fMed, fMes) {
+  const [v1, e1] = t[1], [v2, e2] = t[2], [v3, e3] = t[3];
+  if (!e1) return '<p class="muted">Todavía no hay pacientes nuevos a quienes les haya vencido el plazo con estos filtros.</p>';
+  const p1 = v1 / e1, p2 = e2 ? v2 / e2 : null, p3 = e3 ? v3 / e3 : null;
+  const r1 = Math.round(100 * p1);
+  const r2 = p2 === null ? null : Math.round(100 * p1 * p2);
+  const r3 = p2 === null || p3 === null ? null : Math.round(100 * p1 * p2 * p3);
+  const porc = x => Math.round(100 * x) + '%';
+  const quienes = 'pacientes nuevos' + (fMed ? ' del ' + medicoCorto(fMed) : '') + (fMes ? ' de ' + nombreMes(fMes) : '');
+
+  const frases = [`<p class="h-titular">De cada 100 ${esc(quienes)}, <b>${100 - r1} no vuelven nunca</b> después de su primera consulta.</p>`];
+  let camino = `${r1} vuelven a su 1.ª reevaluación`;
+  if (r2 !== null) camino += r3 !== null ? `, ${r2} llegan a la 2.ª y ${r3} a la 3.ª` : ` y ${r2} llegan a la 2.ª`;
+  frases.push(`<p>${camino}.</p>`);
+  const perdidas = [1 - p1, p2 === null ? -1 : 1 - p2, p3 === null ? -1 : 1 - p3];
+  const peor = perdidas.indexOf(Math.max(...perdidas));
+  frases.push(peor === 0
+    ? `<p>Donde más se pierden es en el primer regreso: el ${porc(1 - p1)} no vuelve después de la primera consulta.` +
+      (p2 !== null ? ` Quien vuelve una vez tiende a seguir: el ${porc(p2)} vuelve también a la 2.ª.` : '') + '</p>'
+    : `<p>Donde más se pierden es entre la ${peor}.ª y la ${peor + 1}.ª reevaluación: el ${porc(perdidas[peor])} no sigue.</p>`);
+  const comparables = meses.filter(m => m.o[1][1] >= 20).map(m => ({ c: m.c, no: 1 - m.o[1][0] / m.o[1][1] }));
+  if (!fMes && comparables.length >= 2) {
+    const orden = [...comparables].sort((a, b) => b.no - a.no);
+    const malo = orden[0], bueno = orden[orden.length - 1];
+    frases.push(`<p>El mes con más pacientes perdidos fue ${esc(nombreMes(malo.c))} (${porc(malo.no)} no volvió); el mejor, ${esc(nombreMes(bueno.c))} (${porc(bueno.no)}).</p>`);
+  }
+  const altas = t.alta ? t.alta[1] + t.alta[2] + t.alta[3] : 0;
+  if (altas) frases.push(`<p>Además, ${altas} recibieron el alta médica: no cuentan como perdidos.</p>`);
+  if (meta) frases.push(`<p>La meta es que vuelva el ${meta}%; hoy vuelve el ${porc(p1)}.</p>`);
+  if (t.curso) frases.push(`<p class="muted">Otros ${t.curso} pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo: aún no se cuentan.</p>`);
+  if (e1 < 20) frases.push(`<p class="muted">Son pocos pacientes (${e1}): tome estas cifras con cautela.</p>`);
+
+  const grupos = [100 - r1, r2 === null ? r1 : r1 - r2, r2 === null ? 0 : r3 === null ? r2 : r2 - r3, r3 === null ? 0 : r3];
+  const nombres = ['No volvió nunca', 'Volvió a 1 reevaluación', 'Volvió a 2 reevaluaciones', 'Volvió a 3 o más'];
+  const cuadros = grupos.map((n, i) => `<i class="paso${i + 1}" title="${nombres[i]}: ${n} de cada 100"></i>`.repeat(n)).join('');
+  const leyenda = grupos.map((n, i) => n ? `<li><span class="muestra paso${i + 1}"></span><b class="num">${n}</b> ${nombres[i].toLowerCase()}</li>` : '').join('');
+  return `<div class="historia">
+    <figure class="h-dibujo"><div class="waffle" role="img" aria-label="De cada 100: ${grupos.map((n, i) => n + ' ' + nombres[i].toLowerCase()).join(', ')}">${cuadros}</div>
+      <figcaption><ul>${leyenda}</ul><small class="muted">Cada cuadrito es 1 de cada 100 pacientes nuevos.</small></figcaption></figure>
+    <div class="h-texto">${frases.join('')}</div>
+  </div>`;
+}
+
+function pintarTablero() {
+  const k = E.kpi;
+  const valor = id => ($(id) ? $(id).value : '');
+  const fMes = valor('#t-mes'), fEsp = valor('#t-esp'), fMed = valor('#t-med');
+  const unicos = a => [...new Set(a.filter(Boolean))].sort();
+  const cam = k.campanas || [];
+  const meses = unicos(k.cohortes.map(r => r.COHORTE).concat(k.indicaciones.map(r => r.MES), k.recuperacion.map(r => r.MES), cam.map(r => r.MES)));
+  const esps = unicos(k.cohortes.map(r => r.ESPECIALIDAD).concat(k.recuperacion.map(r => r.ESPECIALIDAD)));
+  const meds = unicos(k.cohortes.map(r => r.MEDICO).concat(k.indicaciones.map(r => r.MEDICO), k.recuperacion.map(r => r.MEDICO), cam.map(r => r.MEDICO)));
+  const okMes = m => !fMes || m === fMes, okEsp = e => !fEsp || e === fEsp, okMed = m => !fMed || m === fMed;
+  const T = t => ({ t }), N = t => ({ t, num: true });
+
+  const coh = agrupar(k.cohortes.filter(r => okMes(r.COHORTE) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO)),
+    r => r.COHORTE, () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0, alta: { 1: 0, 2: 0, 3: 0 } }),
+    (o, r) => { o[r.ETAPA][0] += Number(r.VOLVIERON); o[r.ETAPA][1] += Number(r.ELEGIBLES); o.curso += Number(r.EN_CURSO) || 0; o.alta[r.ETAPA] += Number(r.ALTAS) || 0; });
+  // Cada paciente nuevo cuenta UNA vez, según la última reevaluación a la que llegó (volver = cualquier
+  // consulta posterior). Las partes suman los pacientes del mes a quienes ya les venció el plazo.
+  const PASOS = [
+    { t: 'No volvió nunca', c: 'paso1' }, { t: 'Volvió a 1 reevaluación', c: 'paso2' },
+    { t: 'Volvió a 2 reevaluaciones', c: 'paso3' }, { t: 'Volvió a 3 o más', c: 'paso4' }, { t: 'Aún en plazo', c: 'paso-plazo' },
+    { t: 'Alta médica', c: 'paso-alta' }
+  ];
+  // Un alta en la etapa k no es pérdida: sale de «aún en plazo» de esa etapa (o, en la 1.ª, suma al total del mes).
+  const partes = o => {
+    const [v1, e1] = o[1], [v2, e2] = o[2], [v3, e3] = o[3], al = o.alta;
+    return { total: e1 + al[1], n: [e1 - v1, e2 - v2, e3 - v3, v3, (v1 - e2 - al[2]) + (v2 - e3 - al[3]), al[1] + al[2] + al[3]] };
+  };
+  const filaCoh = (nombre, o) => {
+    const p = partes(o);
+    const celdas = p.n.map(n => n ? `${n} · ${pct(n, p.total)}` : '0');
+    const reparto = '<div class="reparto">' + p.n.map((n, i) => n
+      ? `<i class="${PASOS[i].c}" style="flex:${n}" title="${esc(PASOS[i].t)}: ${n} (${pct(n, p.total)})"></i>` : '').join('') + '</div>';
+    return [nombre, p.total, reparto].concat(celdas);
+  };
+  // Un mes en el que a nadie le venció aún el plazo no tiene nada que repartir; sus pacientes en plazo van en la línea de arriba.
+  const filasCoh = coh.filter(([, o]) => partes(o).total).map(([c, o]) => filaCoh(esc(nombreMes(c)), o));
+  const totalCoh = { 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0, alta: { 1: 0, 2: 0, 3: 0 } };
+  coh.forEach(([, o]) => { totalCoh.curso += o.curso; [1, 2, 3].forEach(e => { totalCoh[e][0] += o[e][0]; totalCoh[e][1] += o[e][1]; totalCoh.alta[e] += o.alta[e]; }); });
+  const mesesCoh = coh.filter(([, o]) => o[1][1]).map(([c, o]) => ({ c, o }));
+  const relato = historia(totalCoh, mesesCoh, k.meta, fMed, fMes);
+  const cabCoh = [T('Mes de la primera consulta'), N('Pacientes nuevos'), T('Reparto')].concat(
+    PASOS.map(x => ({ t: x.t, num: true, html: `<span class="muestra ${x.c}"></span>${esc(x.t)}` })));
+
+  const ind = k.indicaciones.filter(r => okMes(r.MES) && okMed(r.MEDICO));
+  const sumaInd = (o, r) => { o.n += Number(r.INDICADAS); o.a += Number(r.ACEPTADAS); o.c += Number(r.COMPLETADAS ?? r.ACEPTADAS) || 0; };
+  const filaInd = ([c, o]) => [esc(c), o.n, o.a, o.c, pct(o.a, o.n) + barra(o.a, o.n)];
+  const nombreInd = r => r.TIPO !== 'HIERRO' ? r.DETALLE : norm(r.DETALLE) === 'HIERRO' ? 'Hierro (Ferinject)'
+    : String(r.DETALLE).charAt(0) + String(r.DETALLE).slice(1).toLowerCase();
+  const indTipo = agrupar(ind, nombreInd, () => ({ n: 0, a: 0, c: 0 }), sumaInd).map(filaInd);
+  const indMed = agrupar(ind, r => r.MEDICO, () => ({ n: 0, a: 0, c: 0 }), sumaInd).map(filaInd);
+
+  const rec = k.recuperacion.filter(r => okMes(r.MES) && okEsp(r.ESPECIALIDAD) && okMed(r.MEDICO));
+  const sumaRec = (o, r) => { o.n++; if (Number(r.VOLVIO)) { o.v++; o.d.push(Number(r.DIAS)); } };
+  const filaRec = ([c, o]) => [esc(c), o.n, o.v, pct(o.v, o.n) + barra(o.v, o.n), mediana(o.d)];
+  const recResp = agrupar(rec, r => r.RESPONSABLE, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec);
+  const recMes = agrupar(rec, r => r.MES, () => ({ n: 0, v: 0, d: [] }), sumaRec).map(filaRec)
+    .map(f => [esc(nombreMes(f[0]))].concat(f.slice(1)));
+
+  const camF = cam.filter(r => okMes(r.MES) && okMed(r.MEDICO));
+  const sumaCam = (o, r) => { o.n += Number(r.NUEVOS); o.c += Number(r.EN_CURSO); o.v += Number(r.VOLVIERON); };
+  const filasCam = claveDe => agrupar(camF, claveDe, () => ({ n: 0, c: 0, v: 0 }), sumaCam)
+    .sort((a, b) => b[1].n - a[1].n)
+    .map(([c, o]) => [esc(c), o.n, `${pct(o.v, o.n - o.c)} <span class="muted">(${o.v}/${o.n - o.c})</span>${barra(o.v, o.n - o.c)}`, o.c]);
+
+  $('#tablero').innerHTML = `
+    <div class="filtros">
+      <label>Mes ${opciones('t-mes', 'Todos', meses, fMes, nombreMes)}</label>
+      <label>Especialidad ${opciones('t-esp', 'Todas', esps, fEsp)}</label>
+      <label>Médico ${opciones('t-med', 'Todos', meds, fMed)}</label>
+    </div>
+    <div class="seccion"><h2>¿Hasta dónde llegan los pacientes nuevos?</h2>
+      ${relato}
+      <h3>Mes por mes</h3>
+      <div class="ley-reparto">${PASOS.map(x => `<span><span class="muestra ${x.c}"></span>${esc(x.t)}</span>`).join('')}</div>
+      ${tabla(cabCoh, filasCoh, filaCoh('Total', totalCoh))}
+      <p class="muted nota-tabla">Cada paciente cuenta una sola vez, según la última reevaluación a la que llegó: las partes suman el total del mes. Solo cuentan aquellos a quienes ya les venció el plazo; un paciente atendido en dos especialidades cuenta en cada una.</p></div>
+    <div class="seccion"><h2>¿Qué campañas traen pacientes que vuelven?</h2>
+      <p class="muted">Pacientes nuevos desde que existe el CRM, según el último anuncio o canal por el que escribieron antes de su primera consulta. El filtro de especialidad no cambia esta sección.</p>
+      ${tabla([T('Canal'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CANAL))}
+      <h3>Por campaña</h3>
+      ${tabla([T('Campaña'), N('Pacientes nuevos'), N('Volvieron a su 1.ª reevaluación'), N('En curso')], filasCam(r => r.CAMPANA))}</div>
+    <div class="seccion"><h2>Procedimientos (hierro y otros)</h2>
+      <p class="muted">De lo cotizado, cuánto se empezó y cuánto se completó: todas las sesiones de un tratamiento, o el procedimiento hecho. Lo registrado hace menos de 7 días todavía no cuenta. Los procedimientos no tienen especialidad: ese filtro no los cambia.</p>
+      ${tabla([T('Procedimiento'), N('Cotizados'), N('Empezaron'), N('Completaron'), N('Empezaron (%)')], indTipo)}
+      <h3>Por médico</h3>
+      ${tabla([T('Médico'), N('Cotizados'), N('Empezaron'), N('Completaron'), N('Empezaron (%)')], indMed)}</div>
+    <div class="seccion"><h2>Recuperación</h2>
+      <p class="muted">De los seguimientos hechos, cuántos pacientes volvieron y en cuántos días (mediana).</p>
+      ${tabla([T('Responsable'), N('Seguimientos'), N('Volvieron'), N('Porcentaje'), N('Días')], recResp)}
+      <h3>Por mes</h3>
+      ${tabla([T('Mes'), N('Seguimientos'), N('Volvieron'), N('Porcentaje'), N('Días')], recMes)}</div>
+    <div class="seccion"><h2>Motivos de descarte</h2>
+      ${tabla([T('Motivo'), N('Pacientes')], k.motivos.map(m => [esc(m.MOTIVO), m.N]))}</div>
+    <div class="seccion"><h2>Procedimientos sin paciente</h2>
+      <p class="muted">No se encontró a nadie con ese nombre en SOFDOC. Revíselos a mano en la pestaña INDICACIONES.</p>
+      ${tabla([T('ID'), T('Fecha'), T('Tipo'), T('Nombre'), T('Teléfono')],
+        k.sinCandidato.map(i => [esc(i.ID), fechaCorta(i.FECHA), esc(i.TIPO), esc(i.NOMBRE), esc(i.TELEFONO)]))}</div>`;
+  ['#t-mes', '#t-esp', '#t-med'].forEach(s => $(s).addEventListener('change', pintarTablero));
+}
+
+/* ==========================================================================
+   RESUMEN (propuesta 3a) — una cifra grande, tres secundarias y el mes a mes.
+   Un paciente que no volvió cuenta en el mes de su última consulta.
+   ========================================================================== */
+const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
+  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
+
+async function cargarResumen() {
+  if (E.resumen) { pintarResumen(); return; }
+  $('#resumen').innerHTML = '<p class="muted">Calculando…</p>';
+  try {
+    E.resumen = await llamar('getResumen');
+    pintarResumen();
+  } catch (e) {
+    $('#resumen').innerHTML = `<p class="hace">No se pudo calcular el resumen: ${esc(e.message)}</p>`;
+  }
+}
+
+function sumarMes(filas, mes) {
+  const o = {};
+  CAMPOS_RESUMEN.forEach(c => { o[c] = 0; });
+  filas.filter(f => f.MES === mes).forEach(f => CAMPOS_RESUMEN.forEach(c => { o[c] += Number(f[c]) || 0; }));
+  o.REEVAL = o.NUEVOS - o.NUEVOS_CURSO - o.NUEVOS_ALTA + o.CONTROL - o.CONTROL_CURSO - o.CONTROL_ALTA;
+  o.REEVAL_NO = o.NUEVOS_NO + o.CONTROL_NO;
+  o.CURSO = o.NUEVOS_CURSO + o.CONTROL_CURSO;
+  o.ALTA = o.NUEVOS_ALTA + o.CONTROL_ALTA;
+  return o;
+}
+
+/** Nota bajo cada columna del mes a mes. */
+function notaMes(x) {
+  if (!x.REEVAL) return x.CURSO ? `a ${x.CURSO} aún no les toca volver` : 'sin pacientes con plazo vencido';
+  return x.CURSO ? `en curso · a ${x.CURSO} aún no les toca volver` : 'cerrado';
+}
+
+function pintarResumen() {
+  const R = E.resumen;
+  if (E.rMed === null) E.rMed = medicoDeUsuario(usuario(), R.medicos);
+  const filas = R.filas.filter(f => !E.rMed || f.MEDICO === E.rMed);
+  const meses = [...new Set(R.filas.map(f => f.MES))].sort().reverse();
+  if (!meses.includes(E.rMes)) E.rMes = meses[0] || '';
+  const i = meses.indexOf(E.rMes);
+  const anterior = meses[i + 1], siguiente = meses[i - 1];
+  const m = sumarMes(filas, E.rMes);
+  const quien = E.rMed ? 'sus' : 'los';
+  const meta = Number(R.meta) || 0;
+  const metrica = (a, b, clase, texto, vacio) => `<div class="r-metrica">
+      <span class="r-num num ${clase}">${pct(a, b)}</span>
+      <span class="r-etq">${texto}</span>
+      <span class="r-sub">${a} de ${b}${!b && vacio ? ' · ' + vacio : ''}</span>
+    </div>`;
+  const ALTO = matchMedia('(max-width:767px)').matches ? 95 : 150;
+  const columnas = meses.slice(0, 6).reverse().map(mes => {
+    const x = sumarMes(filas, mes), p = x.REEVAL ? x.REEVAL_NO / x.REEVAL : 0;
+    return `<button type="button" class="mm-col${mes === E.rMes ? ' actual' : ''}" data-mes="${esc(mes)}">
+      <span class="mm-area">
+        ${meta ? `<i class="mm-meta" style="bottom:${Math.round(ALTO * (100 - meta) / 100)}px"></i>` : ''}
+        <span class="mm-pct num${x.REEVAL ? '' : ' vacio'}">${pct(x.REEVAL_NO, x.REEVAL)}</span>
+        ${x.REEVAL ? `<i class="mm-barra${x.CURSO ? ' curso' : ''}" style="height:${Math.max(2, Math.round(ALTO * p))}px"></i>` : ''}
+      </span>
+      <span class="mm-mes">${esc(mesSolo(mes))}</span>
+      <span class="mm-nota">${notaMes(x)}</span>
+    </button>`;
+  }).join('');
+
+  $('#resumen').innerHTML = `
+    <div class="r-cab">
+      <h1 class="r-mes" id="r-mes-actual">${esc(nombreMes(E.rMes))}</h1>
+      <div class="r-pasos">
+        <button type="button" id="r-ant"${anterior ? '' : ' disabled'}>‹ ${anterior ? esc(mesSolo(anterior)) : ''}</button>
+        <button type="button" id="r-sig"${siguiente ? '' : ' disabled'}>${siguiente ? esc(mesSolo(siguiente)) : ''} ›</button>
+      </div>
+      <label class="r-medico">Médico ${opciones('r-med', 'Todos los médicos', R.medicos, E.rMed)}</label>
+    </div>
+    <div class="r-principal">
+      <div>
+        <div class="r-grande num">${pct(m.REEVAL_NO, m.REEVAL)}</div>
+        <p class="r-frase">de ${quien} pacientes de ${esc(mesSolo(E.rMes))} no volvieron a su reevaluación.</p>
+        <p class="r-cuenta"><b class="num">${m.REEVAL_NO} de ${m.REEVAL}</b> pacientes</p>
+        <p class="r-desglose"><span><i class="m nuevo"></i>Nuevos ${m.NUEVOS_NO} de ${m.NUEVOS - m.NUEVOS_CURSO - m.NUEVOS_ALTA}</span><span><i class="m control"></i>En control ${m.CONTROL_NO} de ${m.CONTROL - m.CONTROL_CURSO - m.CONTROL_ALTA}</span></p>
+        ${m.CURSO ? `<p class="r-nota">A ${m.CURSO} pacientes de este mes aún no les toca volver: no cuentan todavía.</p>` : ''}
+        ${m.ALTA ? `<p class="r-nota">${m.ALTA} pacientes recibieron el alta médica: no cuentan como «no volvió».</p>` : ''}
+        ${meta ? `<p class="r-meta">Meta: que vuelva el ${meta} % (que no vuelva como máximo el ${100 - meta} %).</p>` : ''}
+      </div>
+      <div class="r-metricas">
+        ${metrica(m.HIERRO_NO, m.HIERRO, 'pend', 'no siguieron el tratamiento de hierro')}
+        ${metrica(m.HIERRO_COMPLETO, m.HIERRO - m.HIERRO_NO, 'buena', 'completaron el tratamiento de hierro', 'aún sin tratamientos empezados')}
+        ${metrica(m.PROC_NO, m.PROC, 'pend', 'no siguieron otros procedimientos')}
+        ${metrica(m.RECUPERADOS, m.SEGUIMIENTOS, 'buena', 'volvieron tras el seguimiento', 'aún sin seguimientos este mes')}
+      </div>
+    </div>
+    <div class="mm">
+      <div class="mm-cab"><small>Mes a mes · % que no volvió</small>
+        <span class="mm-ley"><span><i></i>Mes cerrado</span><span><i class="rayado"></i>En curso</span>${meta ? '<span><i class="meta"></i>Meta</span>' : ''}</span>
+      </div>
+      <div class="mm-cols">${columnas}</div>
+    </div>`;
+  $('#r-ant').addEventListener('click', () => { if (anterior) { E.rMes = anterior; pintarResumen(); } });
+  $('#r-sig').addEventListener('click', () => { if (siguiente) { E.rMes = siguiente; pintarResumen(); } });
+  $('#r-med').addEventListener('change', () => { E.rMed = $('#r-med').value; pintarResumen(); });
+  document.querySelectorAll('.mm-col').forEach(b => b.addEventListener('click', () => { E.rMes = b.dataset.mes; pintarResumen(); }));
+}
+
+/** Al elegir usuario: un médico ve directamente sus pacientes (puede cambiar a «Todos»). */
+function aplicarUsuario() {
+  guardarPref('usuario', usuario());
+  $('#f-med').value = medicoDeUsuario(usuario(), E.boot ? E.boot.medicos : []);
+  E.rMed = null;
+  pintarBandeja();
+  if (E.resumen && !$('#v-resumen').hidden) pintarResumen();
+}
+
+/* ==========================================================================
+   ARRANQUE
+   ========================================================================== */
+async function iniciar() {
+  ponerModo(leerPref('modo') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro'));
+  $('#modo').addEventListener('click', () => ponerModo(document.documentElement.dataset.modo === 'oscuro' ? 'claro' : 'oscuro'));
+  document.querySelectorAll('.nav button').forEach(b => b.addEventListener('click', () => irA(b.dataset.vista)));
+  ['#f-esp', '#f-med', '#f-sintel'].forEach(s => $(s).addEventListener('change', pintarBandeja));
+  E.tipo = ['', 'REEVALUACION', 'HIERRO', 'PROCEDIMIENTO'].includes(leerPref('tipo')) ? leerPref('tipo') : '';
+  $('#tipos').addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-tipo]');
+    if (!b) return;
+    E.tipo = b.dataset.tipo;
+    guardarPref('tipo', E.tipo);
+    pintarBandeja();
+  });
+  $('#usuario').addEventListener('change', aplicarUsuario);
+  addEventListener('resize', () => { if (E.abierto) pintarPanel(); if (E.resumen && !$('#v-resumen').hidden) pintarResumen(); });
+  $('#fecha').textContent = fechaLarga(hoy());
+  try {
+    E.boot = await llamar('bootstrap');
+  } catch (e) {
+    $('#lista').innerHTML = `<p class="hace">No se pudo iniciar: ${esc(e.message)}</p>`;
+    return;
+  }
+  llenarSelect($('#usuario'), E.boot.usuarios);
+  llenarSelect($('#f-esp'), E.boot.especialidades);
+  llenarSelect($('#f-med'), E.boot.medicos);
+  const recordado = leerPref('usuario');
+  if (E.boot.usuarios.includes(recordado)) $('#usuario').value = recordado;
+  $('#f-med').value = medicoDeUsuario(usuario(), E.boot.medicos);
+  await cargarBandeja();
+  if (medicoDeUsuario(usuario(), E.boot.medicos)) irA('resumen');
+}
+
+/* ==========================================================================
+   DEMO — datos INVENTADOS para abrir este archivo en el navegador sin
+   desplegar. No lo elimine: es como se prueba la interfaz (npm run test:ui).
+   ========================================================================== */
+const DEMO = (() => {
+  const hoy = '2026-10-01';
+  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS'];
+  const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
+  const ELI = 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA', KAREN = 'Dra. KAREN DIANA MATOS PEÑA';
+  const doctores = [{ doctor: 'Dr. Elí Cabanillas', sofdoc: ELI }, { doctor: 'Dra. Karen Matos', sofdoc: KAREN },
+    { doctor: 'Dra. Karen Matos – Particular', sofdoc: '' }];
+  const registros = [{ ID: 'REG-000001', FECHA_HORA: '2026-08-05 10:00', FECHA: '2026-08-05', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas',
+    NOMBRE: 'ROSA ELENA QUISPE HUAMÁN', DNI: '40111222', CONTACTO: '987654321', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA',
+    MARCA: 'FERINJECT', SESIONES: 2, ANULADO: '', MOTIVO_ANULACION: '' }];
+  const sesiones = [{ ID: 'SES-000001', FECHA_HORA: '2026-08-05 12:00', ID_REGISTRO: 'REG-000001', NUMERO: 1, FECHA: '2026-08-05', ASESORA: 'MAGALY', ANULADO: '' }];
+  const altas = [];
+  const frase = s => { const t = String(s).toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+  const textoRegDemo = r => r.TIPO !== 'HIERRO' ? frase(r.DETALLE)
+    : frase(r.DETALLE) + (r.MARCA ? ' · ' + frase(r.MARCA) : '') + ' × ' + r.SESIONES + (Number(r.SESIONES) === 1 ? ' sesión' : ' sesiones');
+  const siguiente = (lista, prefijo) => prefijo + '-' + String(lista.length + 1).padStart(6, '0');
+  function mas(iso, n) { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+  const p = (DNI, ESPECIALIDAD, NOMBRE, TELEFONOS, MEDICO_ULTIMO, PRIMERA_CITA, ULTIMA_CITA, N_REALIZADAS, ESTADO, DIAS_ATRASO, N_SEGUIMIENTOS, ULTIMO_SEGUIMIENTO, PENDIENTE) =>
+    ({ DNI, ESPECIALIDAD, NOMBRE, TELEFONOS, MEDICO_ULTIMO, PRIMERA_CITA, ULTIMA_CITA, N_REALIZADAS,
+       PROXIMA_ESPERADA: mas(ULTIMA_CITA, 30), VENCE: mas(ULTIMA_CITA, 45), DIAS_ATRASO, PROXIMA_AGENDADA: '',
+       ESTADO, N_SEGUIMIENTOS, ULTIMO_SEGUIMIENTO, PENDIENTE });
+  const pacientes = [
+    p('40111222', 'HEMATOLOGÍA', 'ROSA ELENA QUISPE HUAMÁN', '987654321 / 912345678', ELI, '2026-06-10', '2026-08-05', 2, 'VENCIDO', 12, 0, '', 'Hierro (Ferinject) ×2: cotizó y no lo hizo'),
+    p('40222333', 'HEMATOLOGÍA', 'JORGE LUIS MENDOZA PAREDES', '', KAREN, '2026-07-18', '2026-07-18', 1, 'VENCIDO', 30, 0, '', ''),
+    p('40333444', 'REUMATOLOGÍA', 'CARMEN SOFÍA TORRES DÍAZ', '912345678 / 998877665', 'Dr. JUVENAL HANAMPA ROQUE', '2026-05-02', '2026-06-23', 2, 'VENCIDO', 55, 1, '2026-09-10', ''),
+    p('40444555', 'HEMATOLOGÍA', 'LUIS ALBERTO RAMOS VEGA', '923456789', 'Dra. ALEJANDRA LA TORRE MATUK', '2026-08-12', '2026-08-12', 1, 'VENCIDO', 5, 0, '', 'AMO + BIOPSIA: cotizó y no lo hizo'),
+    p('40555666', 'HEMATOLOGÍA', 'ANA MARÍA FLORES RÍOS', '934567890', ELI, '2026-08-20', '2026-09-20', 2, 'AL DÍA', 0, 0, '', '')
+  ];
+  const indicaciones = [
+    { ID: 'IND-0001', FECHA: '2026-08-05', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 2, ESTADO: 'COTIZÓ', TELEFONO: '987654321', OBSERVACIONES: 'VA A COORDINAR', DNI: '40111222' },
+    { ID: 'IND-0002', FECHA: '2026-08-12', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', CANTIDAD: '', ESTADO: 'COTIZÓ', TELEFONO: '923456789', OBSERVACIONES: '', DNI: '40444555' }
+  ];
+  const q = (DNI, TIPO, NOMBRE, TELEFONOS, MEDICO_ULTIMO, FECHA_COTIZACION, DETALLE, ULTIMA_CITA) => ({ DNI, ESPECIALIDAD: TIPO,
+    TIPO_SEGUIMIENTO: TIPO, NOMBRE, TELEFONOS, MEDICO_ULTIMO, ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', FECHA_COTIZACION, DETALLE,
+    DIAS: Math.round((Date.parse(hoy) - Date.parse(FECHA_COTIZACION)) / 86400000), ULTIMA_CITA, N_SEGUIMIENTOS: 0, ULTIMO_SEGUIMIENTO: '', ESTADO: 'PENDIENTE' });
+  const pendientes = [
+    q('40111222', 'HIERRO', 'ROSA ELENA QUISPE HUAMÁN', '987654321', ELI, '2026-08-05', 'Hierro (Ferinject) ×2', '2026-08-05'),
+    q('40555666', 'HIERRO', 'ANA MARÍA FLORES RÍOS', '934567890', ELI, '2026-09-15', 'Hierro (Ferinject)', '2026-09-20'),
+    q('40444555', 'PROCEDIMIENTO', 'LUIS ALBERTO RAMOS VEGA', '923456789', 'Dra. ALEJANDRA LA TORRE MATUK', '2026-08-12', 'AMO + BIOPSIA', '2026-08-12')
+  ];
+  Object.assign(pendientes[0], { ID_REGISTRO: 'REG-000001', DETALLE: 'Hierro carboximaltosa · Ferinject × 2 sesiones', SESIONES: 2, HECHAS: 1,
+    ULTIMA_SESION: '2026-08-05', ESTADO_REGISTRO: 'EN CURSO', USUARIO: '' });
+  pendientes[1].USUARIO = '@ana.flores';
+  let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
+    candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
+  const muertos = {};
+  const seguimientos = [{ ID: 'SEG-1', FECHA_HORA: '2026-09-10 11:20', DNI: '40333444', ESPECIALIDAD: 'REUMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: 'Dijo que llamará' },
+    { ID: 'SEG-0', FECHA_HORA: '2026-09-20 09:30', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: '', RESULTADO: 'NO CONTESTÓ', FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '' }];
+
+  function exigir(x, conMotivo) {
+    if (!x || !usuarios.includes(x.usuario)) throw new Error('Elija quién es usted en el selector de arriba.');
+    if (conMotivo && !motivos.includes(x.motivo)) throw new Error('Elija un motivo de descarte.');
+  }
+  const SIGUE = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO'];
+  function registrarResultado(x) {
+    exigir(x, false);
+    const pac = pacientes.concat(pendientes).find(y => y.DNI === x.dni && y.ESPECIALIDAD === x.especialidad &&
+      (x.referencia ? y.ID_REGISTRO === x.referencia : !y.ID_REGISTRO));
+    if (!pac) throw new Error('Ese paciente no está en la lista. Recargue la página.');
+    if (x.resultado === 'LO HIZO' && pac.ID_REGISTRO) return api.marcarSesion({ usuario: x.usuario, id: pac.ID_REGISTRO, fecha: x.fecha });
+    if (x.resultado === 'ALTA MÉDICA' && !pac.TIPO_SEGUIMIENTO) return api.darDeAlta({ usuario: x.usuario, dni: x.dni, especialidad: x.especialidad, doctor: x.doctor, fecha: x.fecha });
+    const s = { ID: 'SEG-' + (seguimientos.length + 1), FECHA_HORA: hoy + ' 10:00', DNI: x.dni, ESPECIALIDAD: x.especialidad, RESPONSABLE: x.usuario,
+      ACCION: SIGUE.includes(x.resultado) ? 'HECHO' : x.resultado === 'NÚMERO EQUIVOCADO' ? 'TELEFONO' : 'DESCARTADO',
+      MOTIVO: '', NOTA: x.nota || '', RESULTADO: x.resultado, FECHA_PROXIMA: x.fecha || '', TELEFONO: x.telefono || '', ANULADO: '', antes: pac.ESTADO, pac, otras: null };
+    seguimientos.push(s);
+    if (x.resultado === 'FALLECIÓ') pacientes.concat(pendientes).filter(y => y.DNI === x.dni).forEach(y => { if (y !== pac) { s.otras = (s.otras || []).concat([[y, y.ESTADO]]); y.ESTADO = 'CERRADO'; } });
+    if (x.resultado === 'NÚMERO EQUIVOCADO') pac.TELEFONOS = String(pac.TELEFONOS).split(' / ').filter(n => n !== x.telefono).join(' / ');
+    else pac.ESTADO = SIGUE.includes(x.resultado) ? 'AGENDADO' : 'CERRADO';
+    return { ok: true, seguimiento: { ID: s.ID }, tarjeta: x.resultado === 'NÚMERO EQUIVOCADO' && pac.TELEFONOS ? { COLUMNA: 'POR_CONTACTAR' } : '' };
+  }
+  const api = {
+    bootstrap: () => ({
+      hoy, usuarios, motivos,
+      resultados: ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'],
+      especialidades: [...new Set(pacientes.map(x => x.ESPECIALIDAD))].sort(),
+      medicos: [...new Set(pacientes.map(x => x.MEDICO_ULTIMO))].sort(),
+      doctores, procedimientos: ['SANGRÍA', 'AMO', 'BIOPSIA'], tratamientos: ['HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA'],
+      marcas: { 'HIERRO CARBOXIMALTOSA': ['FERINJECT', 'LIKFER'], 'HIERRO DERISOMALTOSA': ['MONOFER'] }
+    }),
+    getBandeja: () => {
+      const reeval = pacientes.filter(x => x.ESTADO === 'VENCIDO').map(x => Object.assign({ TIPO_SEGUIMIENTO: 'REEVALUACION' }, x));
+      const otros = pendientes.filter(x => x.ESTADO === 'PENDIENTE');
+      const conPend = t => t.TIPO_SEGUIMIENTO !== 'REEVALUACION' || t.PENDIENTE ? 0 : 1;
+      const dias = t => t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.DIAS_ATRASO : t.DIAS;
+      const tarjetas = reeval.concat(otros).sort((a, b) =>
+        (a.N_SEGUIMIENTOS - b.N_SEGUIMIENTOS) || (conPend(a) - conPend(b)) || (dias(a) - dias(b)) ||
+        a.DNI.localeCompare(b.DNI) || a.TIPO_SEGUIMIENTO.localeCompare(b.TIPO_SEGUIMIENTO));
+      return { tarjetas, contador: { porAtender: tarjetas.length,
+        hechosHoy: seguimientos.filter(s => s.FECHA_HORA.startsWith(hoy) && s.ACCION === 'HECHO').length, recuperadosMes: 3 } };
+    },
+    getPaciente: dni => {
+      const series = pacientes.filter(x => x.DNI === dni);
+      const citas = series.flatMap(s => {
+        const c = [{ FECHA: s.PRIMERA_CITA, ESTADO: 'REALIZADO', ESPECIALIDAD: s.ESPECIALIDAD, MEDICO: s.MEDICO_ULTIMO, MODALIDAD: 'CLÍNICA' }];
+        if (s.N_REALIZADAS > 1) c.push({ FECHA: s.ULTIMA_CITA, ESTADO: 'REALIZADO', ESPECIALIDAD: s.ESPECIALIDAD, MEDICO: s.MEDICO_ULTIMO, MODALIDAD: 'VIRTUAL' });
+        return c;
+      });
+      return { dni, nombre: series.length ? series[0].NOMBRE : '', series, citas,
+        indicaciones: indicaciones.filter(i => i.DNI === dni),
+        porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === dni)),
+        seguimientos: seguimientos.filter(s => s.DNI === dni).map(({ pac, antes, otras, ...s }) => s),
+        fallecido: muertos[dni] || null,
+        telefonosDescartados: seguimientos.filter(s => s.DNI === dni && s.RESULTADO === 'NÚMERO EQUIVOCADO' && s.ANULADO !== 'SÍ').map(s => s.TELEFONO),
+        registros: registros.filter(r => r.DNI === dni).map(r => {
+          const ss = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO).sort((a, b) => a.NUMERO - b.NUMERO);
+          const estado = r.ANULADO ? 'ANULADO' : ss.length >= r.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO' : 'COTIZADO';
+          return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegDemo(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: r.SESIONES,
+            ESTADO: estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '', sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
+        }),
+        altas: altas.filter(a => a.DNI === dni).map(a => Object.assign({}, a, { ANULADO: !!a.ANULADO, VIGENTE: !a.ANULADO })) };
+    },
+    buscar: q => {
+      const n = norm(q), d = q.trim();
+      return pacientes.filter((x, i, a) => a.findIndex(y => y.DNI === x.DNI) === i)
+        .filter(x => (/\d/.test(d) && x.DNI.startsWith(d)) || norm(x.NOMBRE).includes(n))
+        .map(x => ({ DNI: x.DNI, NOMBRE: x.NOMBRE }));
+    },
+    getKpi: () => ({
+      cohortes: [
+        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 40, VOLVIERON: 15 },
+        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 2, ELEGIBLES: 15, VOLVIERON: 8 },
+        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 3, ELEGIBLES: 8, VOLVIERON: 5 },
+        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 52, VOLVIERON: 17 },
+        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 2, ELEGIBLES: 17, VOLVIERON: 9, ALTAS: 2 },
+        { COHORTE: '2026-07', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: 'Dr. JUVENAL HANAMPA ROQUE', ETAPA: 1, ELEGIBLES: 6, VOLVIERON: 2 },
+        { COHORTE: '2026-08', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 48, VOLVIERON: 12, EN_CURSO: 20 },
+        { COHORTE: '2026-09', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 30 }
+      ],
+      indicaciones: [
+        { MES: '2026-08', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: ELI, INDICADAS: 30, ACEPTADAS: 14, COMPLETADAS: 10 },
+        { MES: '2026-08', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', MEDICO: KAREN, INDICADAS: 9, ACEPTADAS: 1, COMPLETADAS: 1 },
+        { MES: '2026-09', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: KAREN, INDICADAS: 25, ACEPTADAS: 13, COMPLETADAS: 13 }
+      ],
+      recuperacion: [
+        { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 6 },
+        { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, VOLVIO: 0, DIAS: '' },
+        { MES: '2026-09', RESPONSABLE: 'RACHEL', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: 'Dr. JUVENAL HANAMPA ROQUE', VOLVIO: 1, DIAS: 12 },
+        { MES: '2026-09', RESPONSABLE: 'DR. ELI CABANILLAS', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 9 }
+      ],
+      campanas: [
+        { MES: '2026-08', MEDICO: ELI, CANAL: 'FACEBOOK ADS', CAMPANA: 'LAB-001', NUEVOS: 20, EN_CURSO: 0, VOLVIERON: 9 },
+        { MES: '2026-08', MEDICO: KAREN, CANAL: 'FACEBOOK ADS', CAMPANA: 'Sin campaña', NUEVOS: 15, EN_CURSO: 0, VOLVIERON: 4 },
+        { MES: '2026-08', MEDICO: ELI, CANAL: 'WSSP DIRECTO', CAMPANA: 'Sin campaña', NUEVOS: 10, EN_CURSO: 0, VOLVIERON: 6 },
+        { MES: '2026-09', MEDICO: ELI, CANAL: 'GOOGLE', CAMPANA: 'Sin campaña', NUEVOS: 8, EN_CURSO: 5, VOLVIERON: 1 },
+        { MES: '2026-08', MEDICO: KAREN, CANAL: 'Sin lead en el CRM', CAMPANA: 'Sin lead en el CRM', NUEVOS: 6, EN_CURSO: 0, VOLVIERON: 2 }
+      ],
+      meta: 60,
+      motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }],
+      sinCandidato: [{ ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' }]
+    }),
+    getResumen: () => {
+      const r = (MES, MEDICO, v) => ({ MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], CONTROL: v[3], CONTROL_NO: v[4],
+        CONTROL_CURSO: v[5], HIERRO: v[6], HIERRO_NO: v[7], PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11],
+        NUEVOS_ALTA: v[12] || 0, CONTROL_ALTA: v[13] || 0, HIERRO_COMPLETO: v[14] || 0 });
+      return { hoy, meta: 60, medicos: [ELI, KAREN], filas: [
+        r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4]),
+        r('2026-08', ELI, [40, 24, 0, 30, 9, 0, 15, 6, 4, 3, 0, 0, 0, 0, 6]),
+        r('2026-08', KAREN, [35, 20, 0, 20, 6, 0, 10, 5, 2, 2, 0, 0]),
+        r('2026-07', KAREN, [38, 25, 0, 22, 8, 0, 9, 4, 5, 4, 0, 0, 2, 0, 0])
+      ] };
+    },
+    buscarPacienteRegistro: dni => {
+      const s = pacientes.filter(x => x.DNI === String(dni).trim());
+      if (!s.length) return { encontrado: false, fallecido: muertos[String(dni).trim()] || null };
+      const u = s.slice().sort((a, b) => a.ULTIMA_CITA < b.ULTIMA_CITA ? 1 : -1)[0];
+      const d = doctores.find(x => x.sofdoc === u.MEDICO_ULTIMO);
+      return { encontrado: true, fallecido: muertos[String(dni).trim()] || null, nombre: u.NOMBRE, telefonos: String(u.TELEFONOS || '').split(' / ').filter(Boolean), ultimaFecha: u.ULTIMA_CITA,
+        ultimoMedico: u.MEDICO_ULTIMO, doctor: d ? d.doctor : '', especialidades: s.map(x => ({ especialidad: x.ESPECIALIDAD, alta: x.ESTADO === 'ALTA' })) };
+    },
+    guardarRegistro: x => {
+      exigir(x, false);
+      const base = { FECHA: x.fecha, ASESORA: x.usuario, DOCTOR: x.doctor, NOMBRE: String(x.nombre).trim().toUpperCase(), DNI: x.dni,
+        CONTACTO: x.contacto, MARCA: '', ANULADO: '', MOTIVO_ANULACION: '' };
+      const filas = [];
+      if (x.procedimiento) filas.push(Object.assign({}, base, { TIPO: 'PROCEDIMIENTO', DETALLE: x.procedimiento, SESIONES: 1 }));
+      if (x.tratamiento) filas.push(Object.assign({}, base, { TIPO: 'HIERRO', DETALLE: x.tratamiento, MARCA: x.marca, SESIONES: Number(x.sesiones) }));
+      if (!filas.length) throw new Error('Elija un procedimiento, un tratamiento o ambos.');
+      if (!x.confirmado) {
+        const dup = registros.find(r => !r.ANULADO && filas.some(f => f.DNI === r.DNI && f.DETALLE === r.DETALLE));
+        if (dup) return { ok: false, duplicado: { ID: dup.ID, FECHA: dup.FECHA, TEXTO: textoRegDemo(dup) } };
+      }
+      filas.forEach(f => { f.ID = siguiente(registros, 'REG'); f.FECHA_HORA = hoy + ' 11:00'; f.TEXTO = textoRegDemo(f); registros.push(f); });
+      return { ok: true, registros: filas };
+    },
+    getRegistrosHoy: () => registros.filter(r => r.FECHA_HORA.startsWith(hoy)).map(r => ({ ID: r.ID, HORA: r.FECHA_HORA.slice(11, 16),
+      ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegDemo(r), ANULADO: !!r.ANULADO }))
+      .concat(altas.filter(a => a.FECHA_HORA.startsWith(hoy)).map(a => ({ ID: a.ID, HORA: a.FECHA_HORA.slice(11, 16), ASESORA: a.REGISTRADO_POR,
+        NOMBRE: (pacientes.find(p => p.DNI === a.DNI) || {}).NOMBRE || '', DNI: a.DNI, TEXTO: 'Alta médica · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR, ANULADO: !!a.ANULADO })))
+      .sort((a, b) => a.HORA < b.HORA ? 1 : a.HORA > b.HORA ? -1 : (a.ID < b.ID ? 1 : -1)),
+    anularRegistro: x => {
+      exigir(x, false);
+      const r = registros.find(y => y.ID === x.id);
+      r.ANULADO = 'SÍ'; r.MOTIVO_ANULACION = x.motivo;
+      pendientes.filter(p => p.ID_REGISTRO === x.id).forEach(p => { p.ESTADO = 'ANULADO'; });
+      return { ok: true };
+    },
+    darDeAlta: x => {
+      exigir(x, false);
+      if (!x.doctor) throw new Error('Elija el doctor que da el alta.');
+      const a = { ID: siguiente(altas, 'ALT'), FECHA_HORA: hoy + ' 11:30', FECHA: x.fecha, DNI: x.dni, ESPECIALIDAD: x.especialidad,
+        DOCTOR: x.doctor, REGISTRADO_POR: x.usuario, ANULADO: '', MOTIVO_ANULACION: '' };
+      altas.push(a);
+      const pac = pacientes.find(p => p.DNI === x.dni && p.ESPECIALIDAD === x.especialidad);
+      if (pac) pac.ESTADO = 'ALTA';
+      return { ok: true, alta: a };
+    },
+    anularAlta: x => {
+      exigir(x, false);
+      const a = altas.find(y => y.ID === x.id);
+      a.ANULADO = 'SÍ'; a.MOTIVO_ANULACION = x.motivo;
+      const pac = pacientes.find(p => p.DNI === a.DNI && p.ESPECIALIDAD === a.ESPECIALIDAD);
+      if (pac) pac.ESTADO = 'VENCIDO';
+      return { ok: true };
+    },
+    marcarSesion: x => {
+      exigir(x, false);
+      const r = registros.find(y => y.ID === x.id);
+      const validas = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO);
+      if (validas.length >= r.SESIONES) throw new Error('Ese tratamiento ya tiene todas sus sesiones.');
+      const idSes = siguiente(sesiones, 'SES');
+      sesiones.push({ ID: idSes, FECHA_HORA: hoy + ' 12:00', ID_REGISTRO: r.ID, NUMERO: validas.length + 1,
+        FECHA: x.fecha, ASESORA: x.usuario, ANULADO: '' });
+      const item = pendientes.find(p => p.ID_REGISTRO === r.ID);
+      const hechas = validas.length + 1;
+      if (item) Object.assign(item, { HECHAS: hechas, ULTIMA_SESION: x.fecha, ESTADO: hechas >= r.SESIONES ? 'COMPLETO' : 'EN ESPERA' });
+      return { ok: true, sesion: { ID: idSes }, completo: hechas >= r.SESIONES };
+    },
+    anularSesion: x => {
+      exigir(x, false);
+      const s = sesiones.find(y => y.ID === x.id);
+      s.ANULADO = 'SÍ';
+      const item = pendientes.find(p => p.ID_REGISTRO === s.ID_REGISTRO);
+      if (item) Object.assign(item, { HECHAS: item.HECHAS - 1, ESTADO: 'PENDIENTE' });
+      return { ok: true };
+    },
+    registrarResultado,
+    marcarFallecido: dni => { muertos[dni] = { fecha: hoy, quien: 'RACHEL' }; },
+    anularResultado: x => {
+      exigir(x, false);
+      const s = seguimientos.find(y => y.ID === x.id);
+      if (!s) throw new Error('No encontré ' + x.id + '.');
+      s.ANULADO = 'SÍ';
+      s.MOTIVO_ANULACION = x.motivo;
+      if (s.pac) s.pac.ESTADO = s.antes;
+      (s.otras || []).forEach(([y, e]) => { y.ESTADO = e; });
+      return { ok: true };
+    },
+    marcarSeguimiento: x => registrarResultado(Object.assign({}, x, { resultado: 'NO CONTESTÓ' })),
+    descartar: x => registrarResultado(Object.assign({}, x, { resultado: 'NO DESEA CONTINUAR' })),
+    confirmarEmparejamiento: x => {
+      exigir(x, false);
+      const i = porConfirmar.find(y => y.ID === x.id);
+      if (!i) throw new Error('No encontré la indicación ' + x.id + '.');
+      porConfirmar = porConfirmar.filter(y => y !== i);
+      indicaciones.push({ ID: i.ID, FECHA: i.FECHA, TIPO: i.TIPO, DETALLE: i.DETALLE, CANTIDAD: 1, ESTADO: 'COTIZÓ', TELEFONO: i.TELEFONO, OBSERVACIONES: '', DNI: x.dni });
+      const pac = pacientes.find(q => q.DNI === x.dni);
+      if (pac && !pac.TELEFONOS) pac.TELEFONOS = i.TELEFONO;
+      return { ok: true };
+    }
+  };
+  return api;
+})();
+
+iniciar();
+</script>
+</body>
+</html>

@@ -443,8 +443,119 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .altas li.anulada .a-cab{text-decoration:line-through;color:var(--muted)}
 .a-det{flex-basis:100%;font-size:12.5px;color:var(--soft)}
 
+/* Indicadores (README §6.5): cabecera con ‹ mes › y filtros, siete pestañas y un panel. */
+.ind-cab{display:flex;align-items:flex-end;justify-content:space-between;gap:14px 24px;flex-wrap:wrap}
+.ind-cab>div{display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;min-width:0}
+.mes{display:inline-flex;align-items:center;gap:2px;height:44px;padding:2px;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+.mes button{width:40px;height:38px;border:0;border-radius:999px;background:transparent;display:grid;place-items:center;color:var(--ink);transition:background-color .15s ease}
+.mes button:hover{background:var(--surface-2)}
+.mes button:disabled{opacity:.35;cursor:default;background:transparent}
+.mes span{min-width:128px;text-align:center;font-weight:600}
+.iseg{margin-top:22px}
+.ipanel{margin-top:32px;min-width:0}
+.ipanel .vacio{color:var(--muted);margin:0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ipanel h2{margin:0;font-size:17px;font-weight:600}
+.ipanel h2.t{font-size:20px}
+.ipanel h3{margin:24px 0 6px;font-size:15px;font-weight:600}
+.ipanel .intro{margin:8px 0 0;color:var(--soft);max-width:78ch}
+.ipanel .conocido{max-width:78ch;margin-top:12px}
+.i-cab{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap}
+.i-cab .chips .pill{height:36px}
+/* Resumen del mes */
+.res{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:32px 56px;align-items:end}
+.res-izq{display:flex;flex-direction:column;gap:10px;max-width:460px}
+.res-izq p{margin:0}
+.grande{font-family:var(--mono);font-size:120px;font-weight:500;letter-spacing:-.06em;line-height:.9;color:var(--accent);display:inline-block}
+.r-frase{margin-top:6px!important;font-size:19px;font-weight:500;line-height:1.3;text-wrap:balance}
+.r-cuenta{color:var(--soft)}.r-cuenta b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.r-desglose{display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--soft);font-size:13.5px}
+.r-desglose span{display:inline-flex;align-items:center;gap:6px}
+.r-desglose i{width:9px;height:9px;border-radius:2px;background:var(--w1)}
+.r-desglose i.control{background:var(--w3)}
+.r-nota{color:var(--soft);font-size:13.5px}
+.r-meta{font-size:13.5px;color:var(--soft);display:flex;gap:6px;align-items:baseline}
+.r-meta.ok{color:var(--good)}.r-meta.mal{color:var(--accent)}
+.sec{margin:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--line)}
+.sec div{padding:16px 18px 4px 0;display:flex;flex-direction:column;gap:4px;min-width:0}
+.sec dd{margin:0;font-family:var(--mono);font-size:34px;font-weight:500;letter-spacing:-.04em;line-height:1;color:var(--warn)}
+.sec dd.buena{color:var(--good)}
+.sec dt{font-size:13.5px;line-height:1.35}
+.sec span{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.mm{margin-top:48px;display:flex;flex-direction:column;gap:16px}
+.mm-cab{display:flex;align-items:baseline;justify-content:space-between;gap:8px 18px;flex-wrap:wrap}
+.mm-ley{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--soft)}
+.mm-ley span{display:inline-flex;align-items:center;gap:6px}
+.mm-ley i{width:14px;height:10px;border-radius:2px;background:var(--accent)}
+.mm-ley i.rayado,.barras button.curso span{background:repeating-linear-gradient(135deg,var(--accent) 0 2px,transparent 2px 7px);border:1.5px solid var(--accent)}
+.mm-ley i.meta{height:0;border-top:1.5px dashed var(--ink);border-radius:0;background:none}
+.barras{position:relative;height:240px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:20px;align-items:end;border-bottom:1px solid var(--line-2);padding-top:28px}
+.barras .linea{position:absolute;left:0;right:0;border-top:1.5px dashed var(--ink);opacity:.7;pointer-events:none;z-index:2}
+.barras button{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;border:0;padding:0;background:transparent;min-width:0;border-radius:4px 4px 0 0}
+.barras button span{position:relative;display:block;background:var(--accent);border-radius:4px 4px 0 0;opacity:.55;transform-origin:bottom center;transition:opacity .2s ease}
+.barras button:hover span{opacity:.8}
+.barras button[aria-pressed="true"] span{opacity:1}
+.barras button b{position:absolute;left:0;right:0;bottom:100%;padding-bottom:6px;text-align:center;font-family:var(--mono);font-size:15px;font-weight:500}
+.barras button[aria-pressed="true"] b{color:var(--accent);font-weight:600}
+.barras button.sin b{position:static;padding:0 0 6px;color:var(--muted)}
+.mesesx{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:20px;margin-top:-8px;text-align:center;font-size:13px}
+.mesesx span{display:flex;flex-direction:column;min-width:0}
+.mesesx span.sel b{color:var(--accent)}
+.mesesx small{color:var(--muted);font-size:12px}
+/* ¿Hasta dónde llegan? */
+.llegan{display:grid;grid-template-columns:minmax(260px,360px) minmax(0,1fr);gap:32px 56px;align-items:start}
+.llegan figure{margin:0;display:flex;flex-direction:column;gap:16px}
+.waffle{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;width:260px;max-width:100%}
+.waffle i{aspect-ratio:1;border-radius:3px}
+.paso1{background:var(--w1)}.paso2{background:var(--w2)}.paso3{background:var(--w3)}.paso4{background:var(--w4)}
+.paso-plazo{background:repeating-linear-gradient(135deg,var(--line-2) 0 2px,var(--surface-2) 2px 5px)}
+.paso-alta{background:var(--good)}
+.leyenda{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.leyenda li{display:flex;align-items:baseline;gap:10px}
+.leyenda li i{width:12px;height:12px;border-radius:3px;flex:0 0 12px}
+.leyenda b{font-family:var(--mono);font-size:17px;font-weight:500;min-width:26px}
+.leyenda span{color:var(--soft)}
+.llegan small,.ipanel small.nota{color:var(--muted);font-size:12.5px}
+.relato{display:flex;flex-direction:column;gap:14px;max-width:62ch}
+.relato p{margin:0;font-size:15px}
+.relato p.titular{font-size:28px;font-weight:500;letter-spacing:-.02em;line-height:1.25}
+.relato p.meta{font-weight:600}
+.relato p.suave{color:var(--soft)}
+.bloque-i{margin-top:44px;display:flex;flex-direction:column;gap:10px}
+.muestra{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+.apilada{display:flex;height:12px;border-radius:3px;overflow:hidden;gap:1px;transform-origin:left center;background:var(--line)}
+/* Tablas de Indicadores */
+.tabla{width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px}
+.tabla th{text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tabla td{padding:10px;border-bottom:1px solid var(--line)}
+.tabla tbody tr:hover td{background:var(--surface)}
+.tabla .d{text-align:right}
+.tabla td.d{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tabla td.n{font-weight:500}
+.tabla td.suave{color:var(--soft)}
+.tabla tr.total td{font-weight:600}
+.tabla tr.actual td:first-child{color:var(--accent);font-weight:600}
+.tabla .ancha{width:34%}
+.tabla .reparto{width:200px;min-width:140px}
+.tabla.chica{min-width:420px}
+.tabla.llegan-t{min-width:880px}
+.tabla.llegan-t th{white-space:normal;vertical-align:bottom}
+.valor{font-family:var(--mono);font-size:13px;text-align:right}
+.valor.cero{color:var(--muted)}
+.mini{position:relative;height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:5px}
+.mini i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;transform-origin:left center;background:var(--good)}
+.mini.warn i{background:var(--warn)}
+.mini.mal i{background:var(--accent)}
+.ver-camp{margin-top:10px;align-self:flex-start}
+.cifras{margin:22px 0 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 28px;border-top:1px solid var(--line);max-width:860px}
+.cifras div{padding-top:14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.cifras dd{margin:0;font-family:var(--mono);font-size:30px;font-weight:500;letter-spacing:-.03em;line-height:1.05}
+.cifras dd.buena{color:var(--good)}
+.cifras dt{font-size:13.5px;color:var(--soft)}
+.sec-i{max-width:1120px;display:flex;flex-direction:column;gap:12px}
+.sec-i .desplazable,.bloque-i .desplazable{max-width:100%}
+
 /* Responsivo */
-@media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}.reg{grid-template-columns:minmax(0,1fr)}.hoy{position:static}.ficha{grid-template-columns:minmax(0,1fr)}.lado{position:static}}
+@media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}.reg{grid-template-columns:minmax(0,1fr)}.hoy{position:static}.ficha{grid-template-columns:minmax(0,1fr)}.lado{position:static}.res,.llegan{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){
   .side{display:none}.topmovil{display:flex}.navmovil{display:grid}
@@ -455,6 +566,8 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
   .coltabs{display:flex}.tablero{grid-template-columns:minmax(0,1fr)}.col{min-height:0}.col:not(.movil){display:none}
   .barra-reg{bottom:64px}
   .ficha{margin-top:24px}.ficha header h2{font-size:26px}
+  .grande{font-size:84px}.sec{grid-template-columns:repeat(2,minmax(0,1fr))}.cifras{grid-template-columns:minmax(0,1fr)}
+  .barras,.mesesx{gap:8px}.barras button b{font-size:12px}.mes span{min-width:112px}.ipanel{margin-top:24px}
   .panel{width:100%}.p-volver{display:inline-flex}.p-cerrar{display:none}.p-top,.p-cuerpo{padding-left:16px;padding-right:16px}
 }
 @view-transition{navigation:auto}
@@ -535,8 +648,21 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
         </div>
       </section>
       <section class="vista" id="v-indicadores" hidden>
-        <h1>Indicadores</h1>
+        <div class="ind-cab">
+          <div>
+            <h1>Indicadores</h1>
+            <div class="mes" role="group" aria-label="Mes" id="imes-c" hidden><button type="button" id="mant" aria-label="Mes anterior"><i class="ph ph-caret-left"></i></button><span id="imes" aria-live="polite"></span><button type="button" id="msig" aria-label="Mes siguiente"><i class="ph ph-caret-right"></i></button></div>
+          </div>
+          <div id="ifiltros" hidden>
+            <label class="sel-chip"><i class="ph ph-stethoscope"></i><select id="imed" aria-label="Médico"></select><i class="ph ph-caret-down"></i></label>
+            <label class="sel-chip" id="iesp-c" hidden><i class="ph ph-heartbeat"></i><select id="iesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
+          </div>
+        </div>
         <p class="cargando" role="status">Cargando…</p>
+        <div id="ind-cuerpo" hidden>
+          <div class="seg iseg" id="iseg" role="tablist" aria-label="Secciones de indicadores"><span class="pastilla" aria-hidden="true"></span></div>
+          <div class="ipanel" id="ipanel" role="tabpanel"></div>
+        </div>
       </section>
     </main>
   </div>
@@ -612,7 +738,8 @@ const S = {
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
   fichaDni: '',     // «Ver ficha completa»: el DNI que abre Pacientes (Tarea 9)
   kpi: null,        // getKpi() en caché (Tarea 10); invalidarIndicadores() lo olvida tras cada escritura
-  resumen: null     // getResumen() en caché (Tarea 10); ídem
+  resumen: null,    // getResumen() en caché (Tarea 10); ídem
+  indGen: 0         // sube con cada invalidarIndicadores(): una respuesta pedida antes ya es vieja
 };
 
 /* ============ Adaptadores (MAPEO-SERVIDOR.md §0) ============ */
@@ -692,6 +819,9 @@ function elegirUsuario(v) {
   // La meta y el filtro propuesto se recalculan sin volver a pedir el tablero (getTablero no depende del usuario).
   proponerMedico();
   if (S.boot) pintarTablero();
+  // En Indicadores también se vuelve a proponer el filtro del médico (D2).
+  IND.medico = null;
+  if (S.seccion === 'indicadores' && IND.listo) pintarIndicadores(false);
 }
 
 /** Ningún guardado sale sin «¿Quién es usted?». */
@@ -1936,9 +2066,9 @@ VISTAS.tablero.mostrar = () => pastilla($('#seg'), true);
 /* ============ REGISTRO (README §6.3; MAPEO §1.4-§1.8) ============ */
 /**
  * Los indicadores se calculan con lo escrito: tras cualquier escritura quedan viejos.
- * La Tarea 10 los guarda en S.kpi y S.resumen; aquí solo se olvidan para que se vuelvan a pedir.
+ * Indicadores los guarda en S.kpi y S.resumen; aquí se olvidan (y sube S.indGen) para que se vuelvan a pedir.
  */
-function invalidarIndicadores() { S.kpi = null; S.resumen = null; }
+function invalidarIndicadores() { S.kpi = null; S.resumen = null; S.indGen++; }
 
 const RG = {
   listo: false, modo: 'ind',     // 'ind' (indicación) | 'alta'
@@ -2790,6 +2920,449 @@ VISTAS.pacientes.mostrar = () => {
   else if (!PA.dni && matchMedia('(min-width: 761px)').matches) $('#pq').focus({ preventScroll: true });
 };
 
+/* ============ INDICADORES (README §6.5; MAPEO §1.12 y §4) ============ */
+/*
+ * Cálculos puros copiados de la app anterior (Index-anterior.html: sumarMes, partes, historia y las sumas del
+ * detalle): son las cifras que el doctor ya conoce, y la Etapa 1 no cambia cómo se cuentan (spec §7).
+ * Quedan en el nivel superior porque el resumen para imprimir (Tarea 11) los reutiliza.
+ */
+const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre', 'octubre', 'noviembre', 'diciembre'];
+/** '2026-09' -> 'setiembre'. */
+function mesSolo(ym) { return MESES_ES[Number(String(ym).split('-')[1]) - 1] || String(ym || ''); }
+/** '2026-09' -> 'setiembre 2026'. */
+function nombreMes(ym) {
+  const [a, m] = String(ym || '').split('-');
+  return MESES_ES[Number(m) - 1] ? MESES_ES[Number(m) - 1] + ' ' + a : String(ym || '');
+}
+/** Porcentaje redondeado (0 si la base es 0). */
+const pc = (a, b) => b ? Math.round(100 * a / b) : 0;
+/** Cifra grande: «25%»; sin base, «—». */
+const pct = (a, b) => b ? pc(a, b) + '%' : '—';
+function mediana(lista) {
+  if (!lista.length) return '—';
+  const s = [...lista].sort((x, y) => x - y), m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+}
+/** [[clave, acumulado], …] ordenado por clave. */
+function agrupar(filas, claveDe, nuevo, sumar) {
+  const m = new Map();
+  filas.forEach(f => { const k = claveDe(f); if (!m.has(k)) m.set(k, nuevo()); sumar(m.get(k), f); });
+  return [...m.entries()].sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+}
+/** Más casos primero; a igual número, por nombre. */
+const porCantidad = i => (a, b) => b[1][i] - a[1][i] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0);
+
+/* ---- Resumen del mes (getResumen): un paciente que no volvió cuenta en el mes de su última consulta ---- */
+const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
+  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
+function sumarMes(filas, mes) {
+  const o = {};
+  CAMPOS_RESUMEN.forEach(c => { o[c] = 0; });
+  filas.filter(f => f.MES === mes).forEach(f => CAMPOS_RESUMEN.forEach(c => { o[c] += Number(f[c]) || 0; }));
+  o.REEVAL = o.NUEVOS - o.NUEVOS_CURSO - o.NUEVOS_ALTA + o.CONTROL - o.CONTROL_CURSO - o.CONTROL_ALTA;
+  o.REEVAL_NO = o.NUEVOS_NO + o.CONTROL_NO;
+  o.CURSO = o.NUEVOS_CURSO + o.CONTROL_CURSO;
+  o.ALTA = o.NUEVOS_ALTA + o.CONTROL_ALTA;
+  return o;
+}
+/** Las 4 cifras secundarias: [a, b, buena, texto, si no hay base]. */
+const secundarias = m => [
+  [m.HIERRO_NO, m.HIERRO, false, 'no siguieron el tratamiento de hierro', ''],
+  [m.HIERRO_COMPLETO, m.HIERRO - m.HIERRO_NO, true, 'completaron el tratamiento de hierro', 'aún sin tratamientos empezados'],
+  [m.PROC_NO, m.PROC, false, 'no siguieron otros procedimientos', ''],
+  [m.RECUPERADOS, m.SEGUIMIENTOS, true, 'volvieron tras el seguimiento', 'aún sin seguimientos este mes']];
+
+/* ---- ¿Hasta dónde llegan? (getKpi().cohortes) ---- */
+const PASOS = [
+  { t: 'No volvió nunca', c: 'paso1' }, { t: 'Volvió a 1 reevaluación', c: 'paso2' },
+  { t: 'Volvió a 2 reevaluaciones', c: 'paso3' }, { t: 'Volvió a 3 o más', c: 'paso4' }, { t: 'Aún en plazo', c: 'paso-plazo' },
+  { t: 'Alta médica', c: 'paso-alta' }
+];
+const nuevaEtapas = () => ({ 1: [0, 0], 2: [0, 0], 3: [0, 0], curso: 0, alta: { 1: 0, 2: 0, 3: 0 } });
+function sumarEtapa(o, r) {
+  const e = Number(r.ETAPA);
+  if (!o[e]) return;
+  o[e][0] += Number(r.VOLVIERON) || 0; o[e][1] += Number(r.ELEGIBLES) || 0;
+  o.curso += Number(r.EN_CURSO) || 0; o.alta[e] += Number(r.ALTAS) || 0;
+}
+/**
+ * Cada paciente nuevo cuenta UNA vez, según la última reevaluación a la que llegó. Un alta en la etapa k no es
+ * pérdida: sale de «aún en plazo» de esa etapa (o, en la 1.ª, suma al total del mes).
+ * n = [no volvió nunca, volvió a 1, volvió a 2, volvió a 3 o más, aún en plazo, alta médica]; suman total.
+ */
+const partes = o => {
+  const [v1, e1] = o[1], [v2, e2] = o[2], [v3, e3] = o[3], al = o.alta;
+  return { total: e1 + al[1], n: [e1 - v1, e2 - v2, e3 - v3, v3, (v1 - e2 - al[2]) + (v2 - e3 - al[3]), al[1] + al[2] + al[3]] };
+};
+const delMedico = m => (/^dra\b/i.test(String(m || '')) ? ' de la ' : ' del ') + medicoCorto(m);
+/**
+ * El relato: lo mismo que la tabla, dicho en frases y en 100 cuadritos. «De cada 100» encadena las tasas de cada
+ * etapa, así que no lo distorsionan los pacientes que aún están en plazo para la siguiente.
+ * Devuelve { vacio } o { grupos: [4 números que suman 100], frases: [{ html, clase }] } (html ya escapado).
+ */
+function historia(t, meses, meta, fMed, fMes) {
+  const [v1, e1] = t[1], [v2, e2] = t[2], [v3, e3] = t[3];
+  if (!e1) return { vacio: 'Todavía no hay pacientes nuevos a quienes les haya vencido el plazo con estos filtros.' };
+  const p1 = v1 / e1, p2 = e2 ? v2 / e2 : null, p3 = e3 ? v3 / e3 : null;
+  const r1 = Math.round(100 * p1);
+  const r2 = p2 === null ? null : Math.round(100 * p1 * p2);
+  const r3 = p2 === null || p3 === null ? null : Math.round(100 * p1 * p2 * p3);
+  const porc = x => Math.round(100 * x) + ' %';
+  const quienes = 'pacientes nuevos' + (fMed ? delMedico(fMed) : '') + (fMes ? ' de ' + nombreMes(fMes) : '');
+  const frases = [{ clase: 'titular', html: `De cada 100 ${esc(quienes)}, <b>${100 - r1} no vuelven nunca</b> después de su primera consulta.` }];
+  let camino = `${r1} vuelven a su 1.ª reevaluación`;
+  if (r2 !== null) camino += r3 !== null ? `, ${r2} llegan a la 2.ª y ${r3} a la 3.ª` : ` y ${r2} llegan a la 2.ª`;
+  frases.push({ clase: '', html: camino + '.' });
+  const perdidas = [1 - p1, p2 === null ? -1 : 1 - p2, p3 === null ? -1 : 1 - p3];
+  const peor = perdidas.indexOf(Math.max(...perdidas));
+  frases.push({ clase: '', html: peor === 0
+    ? `Donde más se pierden es en el primer regreso: el ${porc(1 - p1)} no vuelve después de la primera consulta.` +
+      (p2 !== null ? ` Quien vuelve una vez tiende a seguir: el ${porc(p2)} vuelve también a la 2.ª.` : '')
+    : `Donde más se pierden es entre la ${peor}.ª y la ${peor + 1}.ª reevaluación: el ${porc(perdidas[peor])} no sigue.` });
+  const comparables = meses.filter(m => m.o[1][1] >= 20).map(m => ({ c: m.c, no: 1 - m.o[1][0] / m.o[1][1] }));
+  if (!fMes && comparables.length >= 2) {
+    const orden = [...comparables].sort((a, b) => b.no - a.no);
+    const malo = orden[0], bueno = orden[orden.length - 1];
+    frases.push({ clase: '', html: `El mes con más pacientes perdidos fue ${esc(nombreMes(malo.c))} (${porc(malo.no)} no volvió); el mejor, ${esc(nombreMes(bueno.c))} (${porc(bueno.no)}).` });
+  }
+  const altas = t.alta ? t.alta[1] + t.alta[2] + t.alta[3] : 0;
+  if (altas) frases.push({ clase: '', html: `Además, ${altas} recibieron el alta médica: no cuentan como perdidos.` });
+  if (meta) frases.push({ clase: 'meta', html: `La meta es que vuelva el ${Number(meta)} %; hoy vuelve el ${porc(p1)}.` });
+  if (t.curso) frases.push({ clase: 'suave', html: `Otros ${t.curso} pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo: aún no se cuentan.` });
+  if (e1 < 20) frases.push({ clase: 'suave', html: `Son pocos pacientes (${e1}): tome estas cifras con cautela.` });
+  const grupos = [100 - r1, r2 === null ? r1 : r1 - r2, r2 === null ? 0 : r3 === null ? r2 : r2 - r3, r3 === null ? 0 : r3];
+  return { grupos, frases };
+}
+
+/* ---- Filtros: '' = todos. f = { mes, med, esp, soloMes } ---- */
+const okFiltro = (v, f) => !f || v === f;
+/** ¿Hasta dónde llegan?: { meses: [[yyyy-mm, etapas]], total: etapas, relato: historia(…) }. */
+function datosLlegan(k, f) {
+  const fMes = f.soloMes ? f.mes : '';
+  const coh = agrupar((k.cohortes || []).filter(r => okFiltro(r.COHORTE, fMes) && okFiltro(r.ESPECIALIDAD, f.esp) && okFiltro(r.MEDICO, f.med)),
+    r => r.COHORTE, nuevaEtapas, sumarEtapa);
+  const total = nuevaEtapas();
+  coh.forEach(([, o]) => { total.curso += o.curso; [1, 2, 3].forEach(e => { total[e][0] += o[e][0]; total[e][1] += o[e][1]; total.alta[e] += o.alta[e]; }); });
+  const relato = historia(total, coh.filter(([, o]) => o[1][1]).map(([c, o]) => ({ c, o })), k.meta, f.med, fMes);
+  // Un mes en el que a nadie le venció aún el plazo no tiene nada que repartir.
+  return { meses: coh.filter(([, o]) => partes(o).total), total, relato };
+}
+/** «Sin lead en el CRM» (valor del servidor) se muestra como «Sin registro en el CRM». */
+const nombreCanal = v => norm(v) === 'SIN LEAD EN EL CRM' ? 'Sin registro en el CRM' : String(v || '');
+/** Campañas por CANAL o CAMPANA: [[nombre, { n, c, v }]], más pacientes nuevos primero. Base = n - c. */
+function filasCampanas(k, f, campo) {
+  return agrupar((k.campanas || []).filter(r => okFiltro(r.MES, f.soloMes ? f.mes : '') && okFiltro(r.MEDICO, f.med)),
+    r => nombreCanal(r[campo]), () => ({ n: 0, c: 0, v: 0 }),
+    (o, r) => { o.n += Number(r.NUEVOS) || 0; o.c += Number(r.EN_CURSO) || 0; o.v += Number(r.VOLVIERON) || 0; })
+    .sort((a, b) => b[1].n - a[1].n || (a[0] < b[0] ? -1 : 1));
+}
+const nombreInd = r => r.TIPO !== 'HIERRO' ? String(r.DETALLE || '') : norm(r.DETALLE) === 'HIERRO' ? 'Hierro (Ferinject)' : frase(r.DETALLE);
+const nombreMedico = m => !m || norm(m) === 'SIN MEDICO' ? 'Sin médico' : nombreBonito(m);
+/**
+ * Procedimientos: [[nombre, { n, a, c }]] (cotizados, empezaron, completaron). vista: 'tipo' junta por GRUPO
+ * (S9: «AMO + BIOSIA» con «AMO + BIOPSIA»), 'escrito' por DETALLE tal cual, 'medico' por MEDICO.
+ */
+function filasProcs(k, f, vista) {
+  const clave = vista === 'medico' ? r => nombreMedico(r.MEDICO)
+    : vista === 'escrito' ? nombreInd : r => nombreInd({ TIPO: r.TIPO, DETALLE: r.GRUPO || r.DETALLE });
+  return agrupar((k.indicaciones || []).filter(r => okFiltro(r.MES, f.soloMes ? f.mes : '') && okFiltro(r.MEDICO, f.med)),
+    clave, () => ({ n: 0, a: 0, c: 0 }), (o, r) => {
+      o.n += Number(r.INDICADAS) || 0; o.a += Number(r.ACEPTADAS) || 0;
+      o.c += Number(r.COMPLETADAS === '' || r.COMPLETADAS == null ? r.ACEPTADAS : r.COMPLETADAS) || 0;
+    }).sort((a, b) => b[1].n - a[1].n || (a[0] < b[0] ? -1 : 1));
+}
+/** Recuperación: del mes (total y por asesora) y mes a mes. { n, v, d: [días] } por grupo. */
+function datosRecup(k, f) {
+  const rec = (k.recuperacion || []).filter(r => okFiltro(r.ESPECIALIDAD, f.esp) && okFiltro(r.MEDICO, f.med));
+  const nuevo = () => ({ n: 0, v: 0, d: [] });
+  const sumar = (o, r) => { o.n++; if (Number(r.VOLVIO)) { o.v++; o.d.push(Number(r.DIAS) || 0); } };
+  const delMes = rec.filter(r => r.MES === f.mes), total = nuevo();
+  delMes.forEach(r => sumar(total, r));
+  return {
+    total,
+    porAsesora: agrupar(delMes, r => nombreBonito(r.RESPONSABLE) || 'Sin asesora', nuevo, sumar)
+      .sort((a, b) => b[1].n - a[1].n || (a[0] < b[0] ? -1 : 1)),
+    porMes: agrupar(rec, r => r.MES, nuevo, sumar)
+  };
+}
+
+/* ---- Pantalla ---- */
+const IND_TABS = [['resumen', 'Resumen del mes'], ['llegan', '¿Hasta dónde llegan?'], ['campanas', 'Campañas'], ['procs', 'Procedimientos'],
+  ['recup', 'Recuperación'], ['motivos', 'Motivos de cierre'], ['sinpac', 'Procedimientos sin paciente']];
+/** D3: el filtro de especialidad solo aparece donde los datos la traen. */
+const CON_ESP = { llegan: 1, recup: 1 };
+/** Las pestañas que suman todos los meses (con «Solo {mes}» para mirar uno). */
+const ACUMULADAS = { llegan: 1, campanas: 1, procs: 1 };
+const IND = {
+  listo: false, pidiendo: false, error: '',
+  tab: 'resumen', mes: '', esp: '', sub: 'tipo', verCamp: false, soloMes: false,
+  medico: null      // null = proponer el del usuario médico (D2) al pintar; luego, lo que elija
+};
+
+/** Los meses de getResumen, de más antiguo a más reciente. */
+const mesesInd = () => [...new Set(((S.resumen && S.resumen.filas) || []).map(f => f.MES).filter(Boolean))].sort();
+function medicosInd() {
+  const v = new Set((S.resumen && S.resumen.medicos) || []);
+  ['cohortes', 'indicaciones', 'recuperacion', 'campanas'].forEach(c => ((S.kpi && S.kpi[c]) || []).forEach(r => { if (r.MEDICO) v.add(r.MEDICO); }));
+  return [...v].filter(m => norm(m) !== 'SIN MEDICO').sort();
+}
+const espInd = () => [...new Set(['cohortes', 'recuperacion'].flatMap(c => ((S.kpi && S.kpi[c]) || []).map(r => r.ESPECIALIDAD)).filter(Boolean))].sort();
+const filtrosInd = () => ({ mes: IND.mes, med: IND.medico || '', esp: CON_ESP[IND.tab] ? IND.esp : '', soloMes: IND.soloMes && !!ACUMULADAS[IND.tab] });
+
+/** Al entrar: pide lo que falte en el caché (S.kpi, S.resumen). invalidarIndicadores() lo vacía tras cada escritura. */
+function cargarIndicadores() {
+  if (S.kpi && S.resumen) { pintarIndicadores('entrada'); return; }
+  if (!IND.pidiendo) {
+    const gen = S.indGen;
+    IND.pidiendo = true; IND.error = '';
+    Promise.all([S.resumen || llamar('getResumen'), S.kpi || llamar('getKpi')]).then(([r, k]) => {
+      IND.pidiendo = false;
+      // Si hubo una escritura mientras tanto, esta respuesta ya es vieja: se vuelve a pedir.
+      if (gen !== S.indGen) { if (S.seccion === 'indicadores') cargarIndicadores(); return; }
+      S.resumen = r; S.kpi = k;
+      if (S.seccion === 'indicadores') pintarIndicadores(true);
+    }, e => {
+      IND.pidiendo = false;
+      if (gen !== S.indGen) { if (S.seccion === 'indicadores') cargarIndicadores(); return; }
+      IND.error = e.message;
+      if (S.seccion === 'indicadores') pintarIndicadores();
+    });
+  }
+  pintarIndicadores();
+}
+
+/**
+ * Cabecera (mes, médico, especialidad) y panel. anim: true al abrir una pestaña con el ratón (el panel sube y aparece);
+ * 'entrada' al volver a la pantalla, que ya anima la View Transition (solo barras y cuadritos); false con el teclado.
+ */
+function pintarIndicadores(anim) {
+  const P = $('#ipanel'), hay = !!(S.kpi && S.resumen);
+  $('#imes-c').hidden = $('#ifiltros').hidden = !hay;
+  if (!hay) {
+    P.removeAttribute('data-tab');
+    P.innerHTML = IND.error
+      ? `<p class="vacio">No se pudieron calcular los indicadores: ${esc(IND.error)} <button type="button" class="pill" data-reintentar><i class="ph ph-arrow-clockwise"></i>Reintentar</button></p>`
+      : '<p class="vacio" role="status">Calculando los indicadores…</p>';
+    return;
+  }
+  const meses = mesesInd();
+  if (!meses.includes(IND.mes)) IND.mes = meses[meses.length - 1] || '';
+  const i = meses.indexOf(IND.mes);
+  $('#imes').textContent = IND.mes ? nombreMes(IND.mes) : 'Sin datos';
+  $('#mant').disabled = i <= 0;
+  $('#msig').disabled = i < 0 || i >= meses.length - 1;
+  const meds = medicosInd();
+  if (IND.medico === null) IND.medico = medicoDeUsuario(S.usuario, meds);
+  if (IND.medico && !meds.includes(IND.medico)) IND.medico = '';
+  $('#imed').innerHTML = '<option value="">Todos los médicos</option>'
+    + meds.map(m => `<option value="${esc(m)}" title="${esc(m)}">${esc(medicoCorto(m))}</option>`).join('');
+  $('#imed').value = IND.medico;
+  const esps = espInd();
+  if (IND.esp && !esps.includes(IND.esp)) IND.esp = '';
+  $('#iesp').innerHTML = '<option value="">Todas las especialidades</option>' + esps.map(e => `<option value="${esc(e)}">${esc(frase(e))}</option>`).join('');
+  $('#iesp').value = IND.esp;
+  $('#iesp-c').hidden = !CON_ESP[IND.tab];
+  pintarPanelInd(anim);
+}
+
+function pintarPanelInd(anim) {
+  const P = $('#ipanel'), f = filtrosInd(), k = S.kpi, R = S.resumen;
+  const html = { resumen: htmlResumen, llegan: htmlLlegan, campanas: htmlCampanas, procs: htmlProcs, recup: htmlRecup, motivos: htmlMotivos, sinpac: htmlSinPaciente }[IND.tab];
+  P.dataset.tab = IND.tab;
+  P.setAttribute('aria-labelledby', 'itab-' + IND.tab);
+  P.innerHTML = html(k, R, f);
+  if (!anim || reducido) return;
+  if (anim === true) P.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: EASE_OUT });
+  $$('[data-barra]', P).forEach((b, n) => b.animate([{ transform: 'scaleX(0)' }, { transform: 'none' }],
+    { duration: 420, delay: Math.min(n * 18, 260), easing: EASE_OUT, fill: 'backwards' }));
+  $$('.barras button span', P).forEach((b, n) => b.animate([{ transform: 'scaleY(0)' }, { transform: 'none' }],
+    { duration: 420, delay: n * 30, easing: EASE_OUT, fill: 'backwards' }));
+  $$('.waffle i', P).forEach((q, n) => q.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }],
+    { duration: 220, delay: n * 5, easing: EASE_OUT, fill: 'backwards' }));
+}
+
+/* ---- Piezas de HTML ---- */
+const vacioInd = '<p class="vacio">Sin datos con estos filtros.</p>';
+/** cab: [[texto, clase]]; filas: [html de cada <tr>]. */
+function tablaInd(nombre, clase, cab, filas) {
+  if (!filas.length) return vacioInd;
+  return `<div class="desplazable"><table class="tabla ${clase}" data-tabla="${nombre}"><thead><tr>${cab.map(([t, c]) => `<th${c ? ` class="${c}"` : ''}>${t}</th>`).join('')}</tr></thead>`
+    + `<tbody>${filas.join('')}</tbody></table></div>`;
+}
+/** Celda con la cifra y una barra que entra con scaleX (README §7). */
+const celdaBarra = (texto, ancho, tono, cero) => `<td><div class="valor${cero ? ' cero' : ''}">${texto}</div>`
+  + `<div class="mini${tono ? ' ' + tono : ''}"><i data-barra style="width:${ancho}%"></i></div></td>`;
+const botonSoloMes = f => `<button type="button" class="pill" data-solomes aria-pressed="${f.soloMes}"><i class="ph ph-calendar-blank"></i>Solo ${esc(nombreMes(f.mes))}</button>`;
+const cabSeccion = (titulo, extra) => `<div class="i-cab"><h2 class="t">${titulo}</h2>${extra || ''}</div>`;
+
+function htmlResumen(k, R, f) {
+  const filas = (R.filas || []).filter(x => okFiltro(x.MEDICO, f.med));
+  const m = sumarMes(filas, f.mes), meta = Number(R.meta) || 0, tope = 100 - meta;
+  const p = m.REEVAL ? pc(m.REEVAL_NO, m.REEVAL) : null;
+  const nuevosBase = m.NUEVOS - m.NUEVOS_CURSO - m.NUEVOS_ALTA, controlBase = m.CONTROL - m.CONTROL_CURSO - m.CONTROL_ALTA;
+  let metaHtml = '';
+  if (meta && p === null) metaHtml = `<p class="r-meta">Meta: que vuelva el ${meta} % (que no vuelva como máximo el ${tope} %).</p>`;
+  else if (meta && p <= tope) metaHtml = `<p class="r-meta ok"><i class="ph-fill ph-check-circle"></i><span>Dentro de la meta: que vuelva el ${meta} % (no vuelve como máximo el ${tope} %).${m.CURSO ? ' El mes sigue en curso.' : ''}</span></p>`;
+  else if (meta) metaHtml = `<p class="r-meta mal"><i class="ph-fill ph-warning-circle"></i><span>Fuera de la meta por ${p - tope} puntos: la meta es que no vuelva como máximo el ${tope} %.</span></p>`;
+  // Mes a mes: seis meses; los últimos, o los que terminan en el elegido si es anterior.
+  const meses = mesesInd(), idx = meses.indexOf(f.mes);
+  const fin = idx >= meses.length - 6 ? meses.length : idx + 1, seis = meses.slice(Math.max(0, fin - 6), fin);
+  const cols = seis.map(mes => ({ mes, x: sumarMes(filas, mes) }));
+  const barras = cols.map(({ mes, x }) => {
+    const v = x.REEVAL ? pc(x.REEVAL_NO, x.REEVAL) : null, curso = x.CURSO > 0;
+    const aria = nombreMes(mes) + ': ' + (v === null ? 'sin pacientes con el plazo vencido' : v + ' % no volvió') + (curso ? ', en curso' : '');
+    return `<button type="button" data-mes="${esc(mes)}" class="${curso ? 'curso' : ''}${v === null ? ' sin' : ''}" aria-pressed="${mes === f.mes}" aria-label="${esc(aria)}">`
+      + (v === null ? '<b>—</b>' : `<span style="height:${v}%"><b>${v}%</b></span>`) + '</button>';
+  }).join('');
+  const ejes = cols.map(({ mes, x }) => `<span class="${mes === f.mes ? 'sel' : ''}"><b>${esc(mesSolo(mes).slice(0, 3))}</b>`
+    + `<small>${!x.REEVAL ? 'sin cifra aún' : x.CURSO ? 'en curso' : 'cerrado'}</small></span>`).join('');
+  const sec = secundarias(m).map(([a, b, buena, texto, vacio]) =>
+    `<div><dd class="${buena ? 'buena' : ''}">${pct(a, b)}</dd> <dt>${texto}</dt> <span>${a} de ${b}${!b && vacio ? ' · ' + vacio : ''}</span></div>`).join('');
+  return `<section class="res"><div class="res-izq">
+      <span class="grande">${pct(m.REEVAL_NO, m.REEVAL)}</span>
+      <p class="r-frase">de ${f.med ? 'sus' : 'los'} pacientes de ${esc(mesSolo(f.mes))} no volvieron a su reevaluación.</p>
+      <p class="r-cuenta"><b>${m.REEVAL_NO} de ${m.REEVAL}</b> pacientes</p>
+      <p class="r-desglose"><span><i></i>Nuevos ${m.NUEVOS_NO} de ${nuevosBase}</span> <span><i class="control"></i>En control ${m.CONTROL_NO} de ${controlBase}</span></p>
+      ${m.CURSO ? `<p class="r-nota">${m.CURSO === 1 ? 'A 1 paciente de este mes aún no le toca volver: no cuenta todavía.' : `A ${m.CURSO} pacientes de este mes aún no les toca volver: no cuentan todavía.`}</p>` : ''}
+      ${m.ALTA ? `<p class="r-nota">${m.ALTA === 1 ? '1 paciente recibió el alta médica: no cuenta' : `${m.ALTA} pacientes recibieron el alta médica: no cuentan`} como «no volvió».</p>` : ''}
+      ${metaHtml}
+    </div>
+    <dl class="sec">${sec}</dl></section>
+    <section class="mm"><div class="mm-cab"><h2>Mes a mes · % que no volvió</h2>
+      <div class="mm-ley"><span><i></i>Mes cerrado</span><span><i class="rayado"></i>En curso</span>${meta ? `<span><i class="meta"></i>Meta: no más de ${tope} %</span>` : ''}</div></div>
+      <div class="barras">${meta ? `<span class="linea" aria-hidden="true" style="bottom:calc((100% - 28px) * ${tope / 100})"></span>` : ''}${barras}</div>
+      <div class="mesesx" aria-hidden="true">${ejes}</div></section>`;
+}
+
+function htmlLlegan(k, R, f) {
+  const d = datosLlegan(k, f), h = d.relato;
+  const fila = (nombre, o, total) => {
+    const p = partes(o);
+    const reparto = p.n.map((n, i) => n > 0 ? `<i class="${PASOS[i].c}" style="flex:${n}" title="${esc(PASOS[i].t)}: ${n} (${pc(n, p.total)} %)"></i>` : '').join('');
+    return `<tr${total ? ' class="total"' : ''}><td>${esc(nombre)}</td><td class="d">${p.total}</td><td class="reparto"><div class="apilada" data-barra>${reparto}</div></td>`
+      + p.n.map(n => `<td class="d">${n ? `${n} · ${pc(n, p.total)} %` : '0'}</td>`).join('') + '</tr>';
+  };
+  const filas = d.meses.map(([c, o]) => fila(nombreMes(c), o));
+  if (filas.length) filas.push(fila('Total', d.total, true));
+  const cab = [['Mes de la primera consulta'], ['Pacientes nuevos', 'd'], ['Reparto']]
+    .concat(PASOS.map(x => [`<span class="muestra ${x.c}"></span>${esc(x.t)}`, 'd']));
+  const nombres = PASOS.slice(0, 4).map(x => x.t.toLowerCase());
+  const arriba = h.vacio ? `<p class="vacio">${esc(h.vacio)}</p>` : `<section class="llegan">
+      <figure><div class="waffle" role="img" aria-label="${esc('De cada 100 pacientes nuevos: ' + h.grupos.map((n, i) => n + ' ' + nombres[i]).join(', '))}">${h.grupos.map((n, i) => `<i class="paso${i + 1}"></i>`.repeat(Math.max(0, n))).join('')}</div>
+        <ul class="leyenda">${h.grupos.map((n, i) => n ? `<li><i class="paso${i + 1}"></i><b>${n}</b><span>${esc(nombres[i])}</span></li>` : '').join('')}</ul>
+        <small>Cada cuadrito es 1 de cada 100 pacientes nuevos a quienes ya les venció el plazo.</small></figure>
+      <div class="relato">${h.frases.map(x => `<p${x.clase ? ` class="${x.clase}"` : ''}>${x.html}</p>`).join('')}</div></section>`;
+  return `<div class="i-cab periodo">${botonSoloMes(f)}</div>${arriba}
+    <section class="bloque-i"><h2>Mes por mes</h2>${tablaInd('llegan', 'llegan-t', cab, filas)}
+      <small class="nota">Cada paciente cuenta una sola vez, según la última reevaluación a la que llegó: las partes suman el total del mes. Solo cuentan aquellos a quienes ya les venció el plazo; un paciente atendido en dos especialidades cuenta en cada una.</small></section>`;
+}
+
+function htmlCampanas(k, R, f) {
+  const tabla = (nombre, titulo, filas) => tablaInd(nombre, '', [[titulo], ['Pacientes nuevos', 'd'], ['Volvieron a su 1.ª reevaluación', 'd ancha'], ['En curso', 'd']],
+    filas.map(([c, o]) => { const base = o.n - o.c;
+      return `<tr><td class="n">${esc(c)}</td><td class="d">${o.n}</td>${celdaBarra(base ? `${pc(o.v, base)} % (${o.v}/${base})` : '— (0/0)', pc(o.v, base), '', !base)}<td class="d suave">${o.c}</td></tr>`; }));
+  const camp = filasCampanas(k, f, 'CAMPANA'), ver = IND.verCamp ? camp : camp.slice(0, 8);
+  return `<section class="sec-i">${cabSeccion('¿Qué campañas traen pacientes que vuelven?', botonSoloMes(f))}
+    <p class="intro">Pacientes nuevos desde que existe el CRM, según el último anuncio o canal por el que escribieron antes de su primera consulta. Esta sección no se separa por especialidad: los datos no la traen.</p>
+    <h3>Por canal</h3>${tabla('canal', 'Canal', filasCampanas(k, f, 'CANAL'))}
+    <h3>Por campaña</h3>${tabla('campana', 'Campaña', ver)}
+    ${camp.length > 8 ? `<button type="button" class="pill ver-camp" id="vercamp" aria-expanded="${IND.verCamp}">${IND.verCamp ? 'Ver menos' : `Ver las ${camp.length} campañas`}<i class="ph ${IND.verCamp ? 'ph-caret-up' : 'ph-caret-down'}"></i></button>` : ''}</section>`;
+}
+
+function htmlProcs(k, R, f) {
+  const vistas = [['tipo', 'Por tipo'], ['escrito', 'Como se escribió'], ['medico', 'Por médico']];
+  const filas = filasProcs(k, f, IND.sub).map(([c, o]) => `<tr><td class="n">${esc(c)}</td><td class="d">${o.n}</td><td class="d">${o.a}</td><td class="d">${o.c}</td>`
+    + celdaBarra(`${pc(o.a, o.n)} %`, pc(o.a, o.n), 'warn') + '</tr>');
+  const espera = Number(S.reglas && S.reglas.esperaCotizacion) || 7;
+  return `<section class="sec-i">${cabSeccion('Procedimientos (hierro y otros)',
+      `<div class="chips" role="group" aria-label="Cómo agrupar">${vistas.map(([v, l]) => `<button type="button" class="pill" data-sub="${v}" aria-pressed="${IND.sub === v}">${l}</button>`).join('')}</div>${botonSoloMes(f)}`)}
+    <p class="intro">De lo cotizado, cuánto se empezó y cuánto se completó: todas las sesiones de un tratamiento, o el procedimiento hecho. Lo registrado hace menos de ${espera} días todavía no cuenta. Los procedimientos no tienen especialidad.</p>
+    ${IND.sub === 'tipo' ? '<p class="conocido"><i class="ph ph-info"></i><span>Juntamos los nombres escritos de distinta forma, como «CITOMETREÍADE FLUJO» o «BIOSIA». Para ver cada fila tal como se escribió, elija «Como se escribió».</span></p>' : ''}
+    ${tablaInd('procs', '', [[IND.sub === 'medico' ? 'Médico' : 'Procedimiento'], ['Cotizados', 'd'], ['Empezaron', 'd'], ['Completaron', 'd'], ['Empezaron (%)', 'd ancha']], filas)}</section>`;
+}
+
+function htmlRecup(k, R, f) {
+  const d = datosRecup(k, f), t = d.total, med = mediana(t.d);
+  const fila = (nombre, o, actual) => `<tr${actual ? ' class="actual"' : ''}><td class="n">${esc(nombre)}</td><td class="d">${o.n}</td><td class="d">${mediana(o.d)}</td>`
+    + celdaBarra(`${pc(o.v, o.n)} % (${o.v}/${o.n})`, pc(o.v, o.n)) + '</tr>';
+  const cab = primera => [[primera], ['Seguimientos', 'd'], ['Días hasta volver', 'd'], ['Volvieron tras el seguimiento', 'd ancha']];
+  return `<section class="sec-i">${cabSeccion('Recuperación')}
+    <p class="intro">Seguimientos hechos en ${esc(nombreMes(f.mes))} y cuántos de esos pacientes volvieron después. Los días son la mediana: la mitad de los que volvieron lo hizo en ese plazo o antes.</p>
+    <dl class="cifras"><div><dd>${t.n}</dd> <dt>${t.n === 1 ? 'seguimiento hecho' : 'seguimientos hechos'}</dt></div><div><dd class="buena">${t.v}</dd> <dt>${t.v === 1 ? 'volvió' : 'volvieron'} tras el seguimiento${t.n ? ` (${pc(t.v, t.n)} %)` : ''}</dt></div><div><dd>${med}</dd> <dt>días en volver, en la mitad de los casos</dt></div></dl>
+    <h3>Por asesora</h3>${tablaInd('asesora', 'chica', cab('Asesora'), d.porAsesora.map(([c, o]) => fila(c, o)))}
+    <h3>Mes por mes</h3>${tablaInd('mes', 'chica', cab('Mes del seguimiento'), d.porMes.map(([c, o]) => fila(nombreMes(c), o, c === f.mes)))}</section>`;
+}
+
+function htmlMotivos(k) {
+  const filas = (k.motivos || []).map(m => [frase(m.MOTIVO || 'Sin motivo'), Number(m.N) || 0]).filter(x => x[1] > 0);
+  const tot = filas.reduce((a, x) => a + x[1], 0), max = Math.max(0, ...filas.map(x => x[1]));
+  return `<section class="sec-i">${cabSeccion('Motivos de cierre')}
+    <p class="intro">Por qué se cerraron los seguimientos que tuvieron un motivo: ${tot === 1 ? '1 cierre' : tot + ' cierres'} desde el inicio.</p>
+    <p class="conocido"><i class="ph ph-info"></i><span>Este cuadro todavía no se filtra por mes ni por médico, y no incluye los cierres automáticos «sin respuesta».</span></p>
+    ${tablaInd('motivos', 'chica', [['Motivo'], ['Seguimientos', 'd ancha']], filas.map(([c, n]) => `<tr><td class="n">${esc(c)}</td>${celdaBarra(`${n} · ${pc(n, tot)} %`, pc(n, max), 'mal')}</tr>`))}</section>`;
+}
+
+function htmlSinPaciente(k) {
+  const filas = (k.sinCandidato || []).map(i => `<tr><td class="mono">${esc(dmy(String(i.FECHA || '').slice(0, 10)))}</td><td>${esc(frase(i.TIPO))}</td>`
+    + `<td class="n">${esc(nombreBonito(i.NOMBRE))}</td><td class="mono">${i.TELEFONO ? esc(telBonito(i.TELEFONO)) : '<span class="valor cero">Sin teléfono</span>'}</td><td class="mono suave">${esc(i.ID)}</td></tr>`);
+  return `<section class="sec-i">${cabSeccion('Procedimientos sin paciente')}
+    <p class="intro">No se encontró a nadie con ese nombre en SOFDOC. Revíselos a mano en la pestaña INDICACIONES. Es la lista completa: los filtros no la cambian.</p>
+    ${tablaInd('sinpac', 'chica', [['Fecha'], ['Tipo'], ['Nombre'], ['Teléfono'], ['Registro']], filas)}</section>`;
+}
+
+/* ---- Eventos ---- */
+/** Tras repintar con el teclado, el foco vuelve al botón que se pulsó (el panel se reescribe entero). */
+const enfocarInd = sel => { const b = $('#ipanel ' + sel); if (b) b.focus({ preventScroll: true }); };
+function elegirPestana(k, teclado) {
+  IND.tab = k;
+  $$('#iseg [data-tab]').forEach(b => { const on = b.dataset.tab === k; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
+  pastilla($('#iseg'), teclado);
+  if (S.kpi && S.resumen) pintarIndicadores(!teclado); else cargarIndicadores();
+}
+function cambiarMes(mes, anim) {
+  if (!mes || mes === IND.mes) return;
+  IND.mes = mes;
+  pintarIndicadores(false);
+  const g = $('#ipanel .grande');
+  if (anim && g && !reducido) g.animate([{ opacity: .2, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: EASE_OUT });
+}
+function iniciarIndicadores() {
+  $('#iseg').insertAdjacentHTML('beforeend', IND_TABS.map(([k, l]) =>
+    `<button type="button" role="tab" id="itab-${k}" data-tab="${k}" aria-controls="ipanel" aria-selected="${IND.tab === k}" tabindex="${IND.tab === k ? 0 : -1}">${l}</button>`).join(''));
+  $('#iseg').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) elegirPestana(b.dataset.tab, e.detail === 0); });
+  // Patrón de pestañas: ← → Inicio Fin mueven y eligen (sin animación: es teclado).
+  $('#iseg').addEventListener('keydown', e => {
+    const i = IND_TABS.findIndex(([k]) => k === IND.tab), n = IND_TABS.length;
+    const j = { ArrowRight: (i + 1) % n, ArrowLeft: (i + n - 1) % n, Home: 0, End: n - 1 }[e.key];
+    if (j === undefined) return;
+    e.preventDefault();
+    elegirPestana(IND_TABS[j][0], true);
+    $('#itab-' + IND_TABS[j][0]).focus();
+  });
+  $('#mant').addEventListener('click', e => { const m = mesesInd(); cambiarMes(m[m.indexOf(IND.mes) - 1], e.detail !== 0); });
+  $('#msig').addEventListener('click', e => { const m = mesesInd(); cambiarMes(m[m.indexOf(IND.mes) + 1], e.detail !== 0); });
+  $('#imed').addEventListener('change', e => { IND.medico = e.target.value; pintarIndicadores(false); });
+  $('#iesp').addEventListener('change', e => { IND.esp = e.target.value; pintarIndicadores(false); });
+  $('#ipanel').addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    const anim = e.detail !== 0;
+    if (t.matches('[data-mes]')) { cambiarMes(t.dataset.mes, anim); if (!anim) enfocarInd(`[data-mes="${t.dataset.mes}"]`); }
+    else if (t.matches('[data-sub]')) { IND.sub = t.dataset.sub; pintarPanelInd(anim); if (!anim) enfocarInd(`[data-sub="${IND.sub}"]`); }
+    else if (t.id === 'vercamp') { IND.verCamp = !IND.verCamp; pintarPanelInd(anim); if (!anim) enfocarInd('#vercamp'); }
+    else if (t.matches('[data-solomes]')) { IND.soloMes = !IND.soloMes; pintarPanelInd(anim); if (!anim) enfocarInd('[data-solomes]'); }
+    else if (t.matches('[data-reintentar]')) { IND.error = ''; cargarIndicadores(); }
+  });
+  $('#v-indicadores .cargando').hidden = true;
+  $('#ind-cuerpo').hidden = false;
+  IND.listo = true;
+  if (S.seccion === 'indicadores') VISTAS.indicadores.mostrar();
+}
+VISTAS.indicadores.mostrar = () => {
+  if (!IND.listo) return;
+  pastilla($('#iseg'), true);
+  cargarIndicadores();
+};
+
 /* ============ Arranque ============ */
 async function iniciar() {
   S.modo = LS.get('seg.modo') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro');
@@ -2824,7 +3397,10 @@ async function iniciar() {
   iniciarTablero();
   iniciarRegistro();
   iniciarPacientes();
+  iniciarIndicadores();
   cargarTablero(pedidoTablero);
+  // D2: el médico entra directo a Indicadores, con su filtro propuesto (puede cambiarlo a «Todos»).
+  if (yo() && yo().rol === 'Médico') ir('indicadores', true);
 }
 
 /* ==========================================================================
@@ -3263,6 +3839,14 @@ const DEMO = (() => {
   const vigente = (dni, esp) => altas.filter(a => !a.ANULADO && a.DNI === dni && mismo(a.ESPECIALIDAD, esp)
     && !citas.some(c => c.DNI === dni && mismo(c.ESPECIALIDAD, esp) && c.ESTADO === 'REALIZADO' && c.FECHA > a.FECHA)).pop() || null;
 
+  // Filas de getKpi (Indicadores). coh: una fila por etapa, [ELEGIBLES, VOLVIERON, EN_CURSO, ALTAS].
+  const coh = (COHORTE, ESPECIALIDAD, MEDICO, etapas) => etapas.map((e, i) => ({ COHORTE, ESPECIALIDAD, MEDICO, ETAPA: i + 1,
+    ELEGIBLES: e[0], VOLVIERON: e[1], EN_CURSO: e[2] || 0, ALTAS: e[3] || 0 }));
+  const indic = (MES, TIPO, DETALLE, GRUPO, MEDICO, INDICADAS, ACEPTADAS, COMPLETADAS) => ({ MES, TIPO, DETALLE, GRUPO, MEDICO, INDICADAS, ACEPTADAS, COMPLETADAS });
+  const rec = (MES, RESPONSABLE, ESPECIALIDAD, MEDICO, DIAS, FECHA_RETORNO) => ({ MES, RESPONSABLE, ESPECIALIDAD, MEDICO,
+    VOLVIO: DIAS ? 1 : 0, DIAS: DIAS || '', FECHA_RETORNO: FECHA_RETORNO || '' });
+  const cam = (MES, MEDICO, CANAL, CAMPANA, NUEVOS, EN_CURSO, VOLVIERON) => ({ MES, MEDICO, CANAL, CAMPANA, NUEVOS, EN_CURSO, VOLVIERON });
+
   const api = {
     bootstrap: () => ({
       hoy, usuarios, motivos, resultados: ORDEN_RESULTADOS,
@@ -3513,51 +4097,86 @@ const DEMO = (() => {
       return { ok: true };
     },
 
+    // Indicadores (Tarea 10). Formas de calcularKpi y resumenPorMes; cifras inventadas, de marzo a setiembre.
     getKpi: () => ({
       cohortes: [
-        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 40, VOLVIERON: 15, EN_CURSO: 0, ALTAS: 0 },
-        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 2, ELEGIBLES: 15, VOLVIERON: 8, EN_CURSO: 0, ALTAS: 0 },
-        { COHORTE: '2026-06', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 3, ELEGIBLES: 8, VOLVIERON: 5, EN_CURSO: 0, ALTAS: 0 },
-        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 52, VOLVIERON: 17, EN_CURSO: 0, ALTAS: 0 },
-        { COHORTE: '2026-07', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 2, ELEGIBLES: 17, VOLVIERON: 9, EN_CURSO: 0, ALTAS: 2 },
-        { COHORTE: '2026-07', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: HANAMPA, ETAPA: 1, ELEGIBLES: 6, VOLVIERON: 2, EN_CURSO: 0, ALTAS: 0 },
-        { COHORTE: '2026-08', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, ETAPA: 1, ELEGIBLES: 48, VOLVIERON: 12, EN_CURSO: 20, ALTAS: 0 },
-        { COHORTE: '2026-09', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, ETAPA: 1, ELEGIBLES: 0, VOLVIERON: 0, EN_CURSO: 30, ALTAS: 0 }
-      ],
+        // Mes de la primera consulta × especialidad × médico × etapa. Quien llega a la etapa k es ELEGIBLES + ALTAS de k
+        // (y no más que VOLVIERON de k - 1); EN_CURSO solo en la 1.ª.
+        coh('2026-03', 'HEMATOLOGÍA', ELI, [[44, 15], [15, 9], [9, 6]]),
+        coh('2026-04', 'HEMATOLOGÍA', ELI, [[38, 14], [14, 7], [7, 4]]),
+        coh('2026-04', 'HEMATOLOGÍA', KAREN, [[30, 10], [9, 5, 0, 1], [5, 2]]),
+        coh('2026-05', 'HEMATOLOGÍA', KAREN, [[42, 13], [13, 6], [6, 3]]),
+        coh('2026-06', 'HEMATOLOGÍA', ELI, [[40, 15], [15, 8], [8, 5]]),
+        coh('2026-07', 'HEMATOLOGÍA', KAREN, [[52, 17], [15, 9, 0, 2], [7, 3]]),
+        coh('2026-07', 'REUMATOLOGÍA', HANAMPA, [[6, 2]]),
+        coh('2026-08', 'HEMATOLOGÍA', ELI, [[48, 12, 20]]),
+        coh('2026-08', 'REUMATOLOGÍA', HANAMPA, [[10, 3, 4]]),
+        coh('2026-09', 'HEMATOLOGÍA', KAREN, [[0, 0, 30]])
+      ].flat(),
+      // GRUPO como grupoProcedimiento (S9): las variantes mal escritas caen en el mismo grupo.
       indicaciones: [
-        { MES: '2026-08', TIPO: 'HIERRO', DETALLE: 'HIERRO', GRUPO: 'HIERRO', MEDICO: ELI, INDICADAS: 30, ACEPTADAS: 14, COMPLETADAS: 10 },
-        { MES: '2026-08', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOPSIA', GRUPO: 'AMO + BIOPSIA', MEDICO: KAREN, INDICADAS: 9, ACEPTADAS: 1, COMPLETADAS: 1 },
-        { MES: '2026-08', TIPO: 'PROCEDIMIENTO', DETALLE: 'BIOPSIA DE MÉDULA + AMO', GRUPO: 'AMO + BIOPSIA', MEDICO: ELI, INDICADAS: 4, ACEPTADAS: 2, COMPLETADAS: 2 },
-        { MES: '2026-09', TIPO: 'HIERRO', DETALLE: 'HIERRO', GRUPO: 'HIERRO', MEDICO: KAREN, INDICADAS: 25, ACEPTADAS: 13, COMPLETADAS: 13 },
-        { MES: '2026-09', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRIA', GRUPO: 'SANGRÍA', MEDICO: ELI, INDICADAS: 6, ACEPTADAS: 5, COMPLETADAS: 4 }
+        indic('2026-07', 'HIERRO', 'HIERRO', 'HIERRO', ELI, 22, 10, 8),
+        indic('2026-08', 'HIERRO', 'HIERRO', 'HIERRO', ELI, 30, 14, 10),
+        indic('2026-08', 'PROCEDIMIENTO', 'AMO + BIOPSIA', 'AMO + BIOPSIA', KAREN, 9, 1, 1),
+        indic('2026-08', 'PROCEDIMIENTO', 'AMO + BIOSIA', 'AMO + BIOPSIA', ELI, 3, 1, 1),
+        indic('2026-08', 'PROCEDIMIENTO', 'BIOPSIA DE MÉDULA + AMO', 'AMO + BIOPSIA', ELI, 4, 2, 2),
+        indic('2026-09', 'HIERRO', 'HIERRO', 'HIERRO', KAREN, 25, 13, 13),
+        indic('2026-09', 'PROCEDIMIENTO', 'AMO + BIOPSIA + CITOMETREÍADE FLUJO', 'AMO + BIOPSIA + CITOMETRÍA DE FLUJO', KAREN, 5, 1, 1),
+        indic('2026-09', 'PROCEDIMIENTO', 'AMO + BIPOSIA + CITOMETRIA', 'AMO + BIOPSIA + CITOMETRÍA DE FLUJO', ELI, 2, 0, 0),
+        indic('2026-09', 'PROCEDIMIENTO', 'BIOPSIA + CARIOTIPO + CITOMETRIA DE FLUJO + AMO', 'AMO + BIOPSIA + CITOMETRÍA DE FLUJO + CARIOTIPO', ELI, 1, 0, 0),
+        indic('2026-09', 'PROCEDIMIENTO', 'SANGRIA', 'SANGRÍA', ELI, 6, 5, 4),
+        indic('2026-09', 'PROCEDIMIENTO', 'SANGRÍA', 'SANGRÍA', 'SIN MÉDICO', 1, 1, 1)
       ],
       recuperacion: [
-        { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 6, FECHA_RETORNO: '2026-09-16' },
-        { MES: '2026-09', RESPONSABLE: 'MAGALY', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: KAREN, VOLVIO: 0, DIAS: '', FECHA_RETORNO: '' },
-        { MES: '2026-09', RESPONSABLE: 'RACHEL', ESPECIALIDAD: 'REUMATOLOGÍA', MEDICO: HANAMPA, VOLVIO: 1, DIAS: 12, FECHA_RETORNO: '2026-09-22' },
-        { MES: '2026-09', RESPONSABLE: 'DR. ELI CABANILLAS', ESPECIALIDAD: 'HEMATOLOGÍA', MEDICO: ELI, VOLVIO: 1, DIAS: 9, FECHA_RETORNO: '2026-09-30' }
+        rec('2026-07', 'MAGALY', 'HEMATOLOGÍA', ELI, 8, '2026-07-15'), rec('2026-07', 'MAGALY', 'HEMATOLOGÍA', KAREN),
+        rec('2026-07', 'RACHEL', 'HEMATOLOGÍA', ELI, 12, '2026-07-28'), rec('2026-07', 'ANA', 'REUMATOLOGÍA', HANAMPA),
+        rec('2026-08', 'MAGALY', 'HEMATOLOGÍA', ELI, 5, '2026-08-09'), rec('2026-08', 'MAGALY', 'HEMATOLOGÍA', KAREN, 9, '2026-08-20'),
+        rec('2026-08', 'RACHEL', 'HEMATOLOGÍA', KAREN), rec('2026-08', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 14, '2026-08-27'),
+        rec('2026-08', 'ANA', 'HEMATOLOGÍA', ELI),
+        rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', ELI, 6, '2026-09-16'), rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', KAREN),
+        rec('2026-09', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 12, '2026-09-22'), rec('2026-09', 'DR. ELI CABANILLAS', 'HEMATOLOGÍA', ELI, 9, '2026-09-30'),
+        rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', ELI, 3, '2026-09-25'), rec('2026-09', 'ANA', 'HEMATOLOGÍA', KAREN)
       ],
-      motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }, { MOTIVO: 'FALLECIÓ', N: 1 }],
+      motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NO DESEA CONTINUAR', N: 3 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }, { MOTIVO: 'FALLECIÓ', N: 1 }],
+      // «Sin lead en el CRM» es el valor literal del servidor (Logica.gs); la pantalla dice «Sin registro en el CRM».
       campanas: [
-        { MES: '2026-08', MEDICO: ELI, CANAL: 'FACEBOOK ADS', CAMPANA: 'LAB-001', NUEVOS: 20, EN_CURSO: 0, VOLVIERON: 9 },
-        { MES: '2026-08', MEDICO: KAREN, CANAL: 'FACEBOOK ADS', CAMPANA: 'Sin campaña', NUEVOS: 15, EN_CURSO: 0, VOLVIERON: 4 },
-        { MES: '2026-08', MEDICO: ELI, CANAL: 'WSSP DIRECTO', CAMPANA: 'Sin campaña', NUEVOS: 10, EN_CURSO: 0, VOLVIERON: 6 },
-        { MES: '2026-09', MEDICO: ELI, CANAL: 'GOOGLE', CAMPANA: 'Sin campaña', NUEVOS: 8, EN_CURSO: 5, VOLVIERON: 1 },
-        { MES: '2026-08', MEDICO: KAREN, CANAL: 'Sin lead en el CRM', CAMPANA: 'Sin lead en el CRM', NUEVOS: 6, EN_CURSO: 0, VOLVIERON: 2 }
+        cam('2026-07', ELI, 'FACEBOOK ADS', 'V-STOP ANEM1', 6, 0, 2), cam('2026-07', KAREN, 'FACEBOOK ADS', 'I-SIN ENERGIA', 4, 0, 1),
+        cam('2026-08', ELI, 'FACEBOOK ADS', 'LAB-001', 20, 0, 9), cam('2026-08', KAREN, 'FACEBOOK ADS', 'Sin campaña', 15, 0, 4),
+        cam('2026-08', ELI, 'WSSP DIRECTO', 'Sin campaña', 10, 0, 6), cam('2026-08', KAREN, 'Sin lead en el CRM', 'Sin lead en el CRM', 6, 0, 2),
+        cam('2026-08', ELI, 'TIKTOK', 'GES-001', 5, 0, 1), cam('2026-09', ELI, 'GOOGLE', 'Sin campaña', 8, 5, 1),
+        cam('2026-09', KAREN, 'FACEBOOK ADS', 'LAB-003', 4, 2, 1), cam('2026-09', ELI, 'FACEBOOK ADS', 'ANM-001', 3, 1, 0),
+        cam('2026-09', KAREN, 'INSTAGRAM', 'ANM-002', 2, 2, 0), cam('2026-09', HANAMPA, 'REFERIDO', 'CIT-001', 2, 1, 1),
+        cam('2026-09', ELI, 'FACEBOOK ADS', 'HEM-003', 1, 0, 0)
       ],
-      sinCandidato: [{ ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' }],
+      sinCandidato: [
+        { ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' },
+        { ID: 'IND-0131', FECHA: '2026-08-19', TIPO: 'PROCEDIMIENTO', NOMBRE: 'LUIS ALBERTO GÓMEZ', TELEFONO: '944123456' },
+        { ID: 'IND-0140', FECHA: '2026-09-28', TIPO: 'HIERRO', NOMBRE: 'MARÍA', TELEFONO: '' }
+      ],
       meta: reglas.metaRetorno
     }),
 
+    // Una fila por mes y médico, como resumenPorMes. Setiembre está en curso (NUEVOS_CURSO y CONTROL_CURSO).
     getResumen: () => {
       const r = (MES, MEDICO, v) => ({ MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], NUEVOS_ALTA: v[12] || 0, CONTROL: v[3],
         CONTROL_NO: v[4], CONTROL_CURSO: v[5], CONTROL_ALTA: v[13] || 0, HIERRO: v[6], HIERRO_NO: v[7], HIERRO_COMPLETO: v[14] || 0,
         PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11] });
-      return { hoy, meta: reglas.metaRetorno, medicos: [ELI, KAREN], filas: [
+      return { hoy, meta: reglas.metaRetorno, medicos: [ELI, HANAMPA, KAREN], filas: [
         r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4]),
-        r('2026-08', ELI, [40, 24, 0, 30, 9, 0, 15, 6, 4, 3, 0, 0, 0, 0, 6]),
-        r('2026-08', KAREN, [35, 20, 0, 20, 6, 0, 10, 5, 2, 2, 0, 0]),
-        r('2026-07', KAREN, [38, 25, 0, 22, 8, 0, 9, 4, 5, 4, 0, 0, 2, 0, 0])
+        r('2026-09', HANAMPA, [6, 0, 5, 4, 1, 2, 0, 0, 0, 0, 2, 1]),
+        r('2026-09', KAREN, [20, 1, 14, 15, 2, 9, 8, 3, 2, 1, 6, 2]),
+        r('2026-08', ELI, [40, 24, 0, 30, 9, 0, 15, 6, 4, 3, 12, 5, 0, 0, 6]),
+        r('2026-08', HANAMPA, [8, 4, 0, 6, 2, 0, 0, 0, 1, 1, 3, 1]),
+        r('2026-08', KAREN, [35, 20, 0, 20, 6, 0, 10, 5, 2, 2, 8, 3]),
+        r('2026-08', 'SIN MÉDICO', [3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+        r('2026-07', ELI, [38, 20, 0, 29, 9, 0, 13, 5, 5, 3, 11, 4, 0, 1, 6]),
+        r('2026-07', KAREN, [38, 25, 0, 22, 8, 0, 9, 4, 5, 4, 9, 3, 2, 0, 3]),
+        r('2026-06', ELI, [34, 17, 0, 26, 8, 0, 11, 4, 3, 1, 9, 4, 0, 0, 5]),
+        r('2026-06', KAREN, [30, 16, 0, 21, 7, 0, 10, 4, 2, 1, 8, 3, 1, 0, 4]),
+        r('2026-05', ELI, [36, 20, 0, 30, 10, 0, 14, 6, 4, 2, 10, 4, 1, 0, 6]),
+        r('2026-05', KAREN, [27, 14, 0, 20, 6, 0, 9, 3, 1, 1, 7, 3]),
+        r('2026-04', ELI, [32, 18, 0, 28, 11, 0, 12, 5, 3, 2, 8, 3, 0, 1, 5]),
+        r('2026-04', KAREN, [25, 15, 0, 18, 7, 0, 8, 4, 2, 1, 6, 2])
       ] };
     }
   };

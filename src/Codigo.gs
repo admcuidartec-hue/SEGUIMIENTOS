@@ -278,6 +278,7 @@ function bootstrap() {
     hoy: d.hoy,
     usuarios: d.catalogos.usuarios,
     motivos: d.catalogos.motivos,
+    resultados: ORDEN_RESULTADOS,
     especialidades: Object.keys(esp).sort(),
     medicos: Object.keys(med).sort(),
     doctores: d.catalogos.doctores,

@@ -44,7 +44,7 @@ test('sin elegir usuario no se puede marcar Hecho', async () => {
   } finally { await navegador.close(); }
 });
 
-test('Hecho quita la fila, suma en «hechos hoy» y no abre el panel', async () => {
+test('No contestó quita la fila, suma en «hechos hoy» y no abre el panel', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
     await pagina.selectOption('#usuario', 'MAGALY');
@@ -74,7 +74,7 @@ test('panel: clic en la fila lo abre con el detalle; oculta los teléfonos de la
   } finally { await navegador.close(); }
 });
 
-test('atajos: Enter abre, ↓ cambia de paciente, H marca hecho y pasa al siguiente', async () => {
+test('atajos: Enter abre, ↓ cambia de paciente, 1 marca no contestó y pasa al siguiente', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
     await pagina.selectOption('#usuario', 'ANA');
@@ -84,22 +84,111 @@ test('atajos: Enter abre, ↓ cambia de paciente, H marca hecho y pasa al siguie
     assert.match(await pagina.locator('#panel h2').textContent(), /LUIS ALBERTO/);
     await pagina.keyboard.press('ArrowDown');
     assert.match(await pagina.locator('#panel h2').textContent(), /ROSA ELENA/);
-    await pagina.keyboard.press('h');
+    await pagina.keyboard.press('1');
     await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 6);
     assert.match(await pagina.locator('#panel h2').textContent(), /ANA MARÍA/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
 
-test('descartar desde el panel pide motivo y no suma en «hechos hoy»', async () => {
+test('¿Qué pasó?: los dos grupos; «Lo hizo» solo en hierro y procedimientos', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await tipo(pagina, 'REEVALUACION');
+    await pagina.locator('#lista .fila').first().click();
+    const sigue = await pagina.locator('.qp-sigue button').allTextContents();
+    assert.deepEqual(sigue.map(s => s.replace(/\d$/, '')), ['No contestó', 'Lo pensará', 'Agendó cita']);
+    assert.deepEqual(await pagina.locator('.qp-cierre button').allTextContents(),
+      ['Alta médica', 'Número equivocado', 'Se atiende en otro lugar', 'Falleció', 'No desea continuar']);
+    await tipo(pagina, 'HIERRO');
+    await pagina.locator('#lista .fila').first().click();
+    assert.equal(await pagina.locator('[data-res="LO HIZO"]').count(), 1);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('¿Qué pasó?: «Lo pensará» pide fecha, saca la fila y ofrece Deshacer, que la devuelve', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'REEVALUACION');
+    const antes = await filas(pagina);
+    await pagina.locator('#lista .fila').first().click();
+    await pagina.locator('[data-res="LO PENSARÁ"]').click();
+    assert.equal(await pagina.locator('#qp-fecha').inputValue(), '2026-10-02', 'propone mañana');
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForFunction(n => document.querySelectorAll('#lista .fila').length === n - 1, antes.length);
+    assert.match(await pagina.locator('#aviso').textContent(), /Guardado/);
+    await pagina.locator('#aviso [data-deshacer]').click();
+    await pagina.waitForFunction(n => document.querySelectorAll('#lista .fila').length === n, antes.length);
+    assert.deepEqual(await filas(pagina), antes);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('¿Qué pasó?: un cierre pide confirmación en el panel; «Falleció» avisa que cierra todo', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'REEVALUACION'); // en «Todos» Luis Alberto sale dos veces (reevaluación y procedimiento)
+    await pagina.locator('#lista .fila').first().click();
+    const nombre = (await pagina.locator('#panel h2').textContent()).trim();
+    await pagina.locator('[data-res="FALLECIÓ"]').click();
+    const conf = await pagina.locator('.qp-paso').textContent();
+    assert.match(conf, /¿Cerrar el seguimiento de/);
+    assert.match(conf, /Se cerrarán todos sus seguimientos/);
+    assert.equal(await pagina.locator('#qp-guardar').textContent(), 'Cerrar el seguimiento');
+    await pagina.locator('#qp-cancelar').click();
+    assert.equal(await pagina.locator('.qp-paso').count(), 0);
+    await pagina.locator('[data-res="SE ATIENDE EN OTRO LUGAR"]').click();
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForFunction(n => ![...document.querySelectorAll('#lista .fila .nombre')].some(x => x.textContent === n), nombre);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('¿Qué pasó?: número equivocado con otro teléfono deja la fila y quita ese número', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'REEVALUACION');
+    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).first().click();
+    await pagina.locator('[data-res="NÚMERO EQUIVOCADO"]').click();
+    const tels = await pagina.locator('.qp-paso input[name="qp-tel"]').count();
+    assert.ok(tels >= 2, 'el DEMO le da a Rosa dos teléfonos');
+    await pagina.locator('.qp-paso input[name="qp-tel"]').first().check();
+    assert.match(await pagina.locator('.qp-paso').textContent(), /Le queda el/);
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForSelector('#aviso:not([hidden])');
+    assert.equal(await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).count() >= 1, true, 'sigue en la lista');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('¿Qué pasó?: si el servidor falla, la fila vuelve y no hay Deshacer', async () => {
   const { navegador, pagina } = await abrir();
   try {
-    await pagina.selectOption('#usuario', 'RACHEL');
-    await pagina.locator('.fila', { hasText: 'JORGE LUIS' }).click();
-    await pagina.locator('#p-descartar').click();
-    await pagina.locator('[data-motivo="NÚMERO EQUIVOCADO"]').click();
-    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 6);
-    assert.equal(await pagina.locator('#c-hechos').textContent(), '0');
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await pagina.evaluate(() => { DEMO.registrarResultado = () => { throw new Error('sin conexión'); }; });
+    const antes = await filas(pagina);
+    await pagina.locator('.fila button.hecho').first().click();
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso').textContent));
+    assert.deepEqual(await filas(pagina), antes);
+    assert.equal(await pagina.locator('#aviso [data-deshacer]').count(), 0);
+  } finally { await navegador.close(); }
+});
+
+test('atajos: 1 no contestó, 2 abre «lo pensará», X abre el grupo de cierre sin guardar', async () => {
+  const { navegador, pagina } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await pagina.keyboard.press('ArrowDown');
+    await pagina.keyboard.press('2');
+    assert.equal(await pagina.locator('#qp-fecha').count(), 1);
+    await pagina.keyboard.press('Escape');
+    await pagina.keyboard.press('x');
+    assert.equal(await pagina.locator('.qp-cierre.abierto').count(), 1);
+    assert.equal(await pagina.locator('.qp-paso').count(), 0, 'X no guarda ningún cierre');
   } finally { await navegador.close(); }
 });
 
@@ -271,7 +360,7 @@ test('bandeja: «Hecho» en una fila de hierro la quita solo de la lista de hier
     await tipo(pagina, 'HIERRO');
     await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).locator('button.hecho').click();
     await pagina.waitForSelector('#aviso:not([hidden])');
-    assert.match(await pagina.locator('#aviso').textContent(), /Seguimiento registrado: ROSA ELENA/);
+    assert.match(await pagina.locator('#aviso').textContent(), /Guardado: ROSA ELENA.*no contestó/);
     assert.deepEqual(await filas(pagina), ['ANA MARÍA FLORES RÍOS']);
     assert.match(await pagina.locator('.tipos button[data-tipo="HIERRO"]').textContent(), /1/);
     await tipo(pagina, 'REEVALUACION');
@@ -437,10 +526,11 @@ test('bandeja: «Lo hizo» en un tratamiento en curso lo quita de la lista y sum
     await pagina.locator('.fila', { hasText: 'ANA MARÍA' }).click();
     assert.match(await pagina.locator('#panel').innerText(), /Usuario: @ana\.flores/);
     await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).click();
-    assert.equal(await pagina.locator('#p-lohizo').textContent(), 'Lo hizo · sesión 2 de 2');
-    await pagina.locator('#p-lohizo').click();
-    await pagina.waitForFunction(() => /Sesión 2 de 2 registrada/.test(document.querySelector('#aviso').textContent));
-    assert.equal(await pagina.locator('#aviso').textContent(), 'Sesión 2 de 2 registrada: ROSA ELENA QUISPE HUAMÁN');
+    await pagina.locator('[data-res="LO HIZO"]').click();
+    assert.match(await pagina.locator('.qp-paso').textContent(), /Sesión 2 de 2/);
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForFunction(() => /Guardado/.test(document.querySelector('#aviso').textContent));
+    assert.match(await pagina.locator('#aviso').textContent(), /Guardado: ROSA ELENA QUISPE HUAMÁN · lo hizo/);
     assert.deepEqual(await filas(pagina), ['ANA MARÍA FLORES RÍOS']);
     assert.equal(await pagina.locator('#c-hechos').textContent(), '0', '«Lo hizo» no es un seguimiento');
     assert.deepEqual(errores, []);
@@ -453,12 +543,12 @@ test('bandeja: «Dar de alta» desde el panel propone el doctor y saca al pacien
     await pagina.selectOption('#usuario', 'ANA');
     await tipo(pagina, 'REEVALUACION');
     await pagina.locator('.fila', { hasText: 'JORGE LUIS' }).click();
-    assert.equal(await pagina.locator('#p-lohizo').count(), 0, 'las reevaluaciones no tienen «Lo hizo»');
-    await pagina.locator('#p-alta').click();
-    assert.equal(await pagina.inputValue('#p-alta-doctor'), 'Dra. Karen Matos');
-    await pagina.locator('#p-alta-ok').click();
-    await pagina.waitForFunction(() => /Alta registrada/.test(document.querySelector('#aviso').textContent));
-    assert.equal(await pagina.locator('#aviso').textContent(), 'Alta registrada: JORGE LUIS MENDOZA PAREDES');
+    assert.equal(await pagina.locator('[data-res="LO HIZO"]').count(), 0, 'las reevaluaciones no tienen «Lo hizo»');
+    await pagina.locator('[data-res="ALTA MÉDICA"]').click();
+    assert.equal(await pagina.inputValue('#qp-doctor'), 'Dra. Karen Matos');
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForFunction(() => /Guardado/.test(document.querySelector('#aviso').textContent));
+    assert.match(await pagina.locator('#aviso').textContent(), /Guardado: JORGE LUIS MENDOZA PAREDES · alta médica/);
     assert.ok(!(await filas(pagina)).includes('JORGE LUIS MENDOZA PAREDES'));
     assert.match(await pagina.locator('.tipos button[data-tipo="REEVALUACION"]').textContent(), /3/);
     assert.deepEqual(errores, []);

@@ -136,10 +136,6 @@ button{cursor:pointer}
 .p-acciones .btn-marca{flex:1;font-size:16px;padding:13px}
 .p-acciones .btn-linea{font-weight:500;padding:13px 18px}
 .p-acciones kbd,.btn-marca kbd{font-family:inherit;opacity:.6;margin-left:6px}
-.motivos{display:flex;flex-direction:column}
-.motivos>small{font-size:12px;color:var(--chp-muted);margin-bottom:4px}
-.motivos button{background:none;border:0;border-bottom:1px solid var(--chp-rule);text-align:left;padding:10px 0;font-size:15px}
-.motivos button:hover{color:var(--chp-accent)}
 .p-ficha{margin-top:auto;color:var(--chp-accent);text-decoration:underline;background:none;border:0;padding:0;text-align:left}
 
 /* ---------- Resumen (propuesta 3a en computadora; en celular se apila) ---------- */
@@ -264,6 +260,14 @@ td.n,th.n{text-align:right}
 .barra-p i{display:block;height:100%;background:var(--chp-accent)}
 
 .aviso{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--chp-toast);color:var(--chp-on-toast);padding:10px 18px;border-radius:2px;z-index:30;max-width:calc(100% - 32px)}
+.aviso-accion{color:var(--chp-on-toast);text-decoration:underline;margin-left:10px}
+.qp{display:grid;gap:10px}
+.qp-grupo{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.qp-grupo kbd{font-family:inherit;opacity:.6;margin-left:6px}
+.qp-grupo>span{width:100%;font-size:12px;color:var(--chp-muted)}
+.qp-cierre.abierto>span{color:var(--chp-ink);font-weight:600}
+.qp-paso{display:grid;gap:8px;padding:12px;border:1px solid var(--chp-line);border-radius:2px}
+.qp-paso.cierre{border-color:var(--chp-accent)}
 
 /* ---------- Laptops: la barra superior en una sola línea ---------- */
 @media (max-width:1599px){
@@ -304,7 +308,7 @@ td.n,th.n{text-align:right}
   kbd{display:none}
   .fila .hecho{min-height:44px}
   #panel{position:fixed;inset:0;width:auto;max-height:none;border-left:0;z-index:20;padding:20px 16px 28px}
-  .p-acciones .btn-marca,.p-acciones .btn-linea,.motivos button,.p-tel .btn-linea{min-height:44px}
+  .p-acciones .btn-marca,.p-acciones .btn-linea,.qp-grupo button,.qp-paso button,.p-tel .btn-linea{min-height:44px}
   .r-mes{font-size:40px}
   .r-medico{margin-left:0;width:100%}
   .r-principal{padding-top:24px}
@@ -367,7 +371,7 @@ td.n,th.n{text-align:right}
         <label>Especialidad <select id="f-esp" class="sel"><option value="">Todas</option></select></label>
         <label>Médico <select id="f-med" class="sel"><option value="">Todos</option></select></label>
         <label><input type="checkbox" id="f-sintel"> Solo sin teléfono</label>
-        <span class="atajos">↑ ↓ · <b>Enter</b> abrir · <b>C</b> copiar · <b>H</b> hecho · <b>D</b> descartar</span>
+        <span class="atajos">↑ ↓ · <b>Enter</b> abrir · <b>C</b> copiar · <b>1</b>–<b>4</b> qué pasó · <b>X</b> cierre</span>
       </div>
       <div class="cuerpo" id="cuerpo">
         <div id="lista" aria-live="polite"></div>
@@ -429,7 +433,7 @@ td.n,th.n{text-align:right}
     </section>
   </main>
 </div>
-<div class="aviso" id="aviso" role="status" hidden></div>
+<div class="aviso" id="aviso" role="status" hidden><span id="aviso-texto"></span></div>
 
 <script>
 /* ==========================================================================
@@ -449,7 +453,7 @@ function llamar(fn, ...args) {
 
 const E = {
   boot: null, bandeja: null, error: '', fichaDni: '', kpi: null, resumen: null, rMed: null, rMes: '',
-  sel: '', abierto: '', descartando: false, tipo: ''
+  sel: '', abierto: '', paso: '', cierreAbierto: false, telElegido: '', tipo: ''
 };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -500,13 +504,22 @@ function medicoCorto(m) {
   return (titulo ? titulo + ' ' : '') + bonito;
 }
 
-function avisar(texto) {
+/** Aviso abajo. Con `accion` ({ texto, fn }) muestra un botón y dura 8 segundos. */
+function avisar(texto, accion) {
   const a = $('#aviso');
-  a.textContent = texto;
+  a.innerHTML = `<span id="aviso-texto">${esc(texto)}</span>${accion ? ` <button type="button" class="btn-texto aviso-accion" data-deshacer>${esc(accion.texto)}</button>` : ''}`;
   a.hidden = false;
+  avisar.accion = accion || null;
   clearTimeout(avisar.t);
-  avisar.t = setTimeout(() => { a.hidden = true; }, 3500);
+  avisar.t = setTimeout(() => { a.hidden = true; avisar.accion = null; }, accion ? 8000 : 3500);
 }
+$('#aviso').addEventListener('click', ev => {
+  if (!ev.target.closest('[data-deshacer]') || !avisar.accion) return;
+  const fn = avisar.accion.fn;
+  avisar.accion = null;
+  $('#aviso').hidden = true;
+  fn();
+});
 
 function leerPref(k) { try { return localStorage.getItem('seg.' + k) || ''; } catch (e) { return ''; } }
 function guardarPref(k, v) { try { localStorage.setItem('seg.' + k, v); } catch (e) { /* sin almacenamiento: no pasa nada */ } }
@@ -653,7 +666,7 @@ function filaHtml(t) {
     <span class="tel">${tel
       ? `<button type="button" class="copiar-fila" data-copiar="${esc(tel)}"><span class="n">${esc(tel)}</span><small>Copiar</small></button>`
       : '<span class="sin-tel">Sin teléfono</span>'}</span>
-    <button type="button" class="btn-marca hecho">Hecho</button>
+    <button type="button" class="btn-marca hecho">No contestó</button>
     <span class="chev" aria-hidden="true">›</span>
   </div>`;
 }
@@ -675,7 +688,7 @@ function pintarBandeja() {
   const lista = visibles();
   const claves = lista.map(clave);
   if (!claves.includes(E.sel)) E.sel = claves[0] || '';
-  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.descartando = false; E.dandoAlta = false; }
+  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; }
 
   if (!lista.length) {
     $('#lista').innerHTML = E.tipo
@@ -703,7 +716,6 @@ function pintarPanel() {
   if (!t) { panel.hidden = true; panel.innerHTML = ''; return; }
   const tels = String(t.TELEFONOS || '').split(' / ').filter(Boolean);
   const celular = matchMedia('(max-width:767px)').matches;
-  const motivos = (E.boot ? E.boot.motivos : []);
   panel.innerHTML = `
     <div class="p-cab"><span>PACIENTE</span><button type="button" class="btn-texto cerrar">${celular ? '‹ Volver' : 'Cerrar  Esc'}</button></div>
     <div>
@@ -730,80 +742,153 @@ function pintarPanel() {
     </div>
     ${t.USUARIO ? `<p class="p-usuario">Usuario: <b>${esc(t.USUARIO)}</b></p>` : ''}
     ${t.N_SEGUIMIENTOS ? `<div class="p-prev">Ya se le escribió${esIndicacion(t) ? ' por esto' : ''} ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
-    ${t.ID_REGISTRO ? `<div class="p-sesion">
-      <input type="date" class="entrada" id="p-fecha-ses" value="${hoy()}" max="${hoy()}" aria-label="Fecha de la sesión">
-      <button type="button" class="btn-marca" id="p-lohizo">Lo hizo${t.SESIONES > 1 ? ` · sesión ${t.HECHAS + 1} de ${t.SESIONES}` : ''}</button>
-    </div>` : ''}
     <textarea id="nota" placeholder="Nota (opcional)"></textarea>
-    <div class="p-acciones">
-      <button type="button" class="btn-marca" id="p-hecho">Seguimiento hecho<kbd>H</kbd></button>
-      <button type="button" class="btn-linea" id="p-descartar">Descartar<kbd>D</kbd></button>
-    </div>
-    ${E.descartando ? `<div class="motivos"><small>Motivo (obligatorio)</small>${motivos.map(m => `<button type="button" data-motivo="${esc(m)}">${esc(m.charAt(0) + m.slice(1).toLowerCase())}</button>`).join('')}</div>` : ''}
-    ${!esIndicacion(t) ? `<button type="button" class="btn-texto" id="p-alta">Dar de alta…</button>
-      ${E.dandoAlta ? `<div class="p-alta-form"><select id="p-alta-doctor" class="sel" aria-label="Doctor que da el alta">${opcionesDoctor(t.MEDICO_ULTIMO)}</select>
-        <input type="date" class="entrada" id="p-alta-fecha" value="${hoy()}" max="${hoy()}" aria-label="Fecha del alta">
-        <button type="button" class="btn-marca" id="p-alta-ok">Confirmar alta</button></div>` : ''}` : ''}
+    ${quePaso(t)}
     <button type="button" class="p-ficha" id="p-ficha">Ver ficha completa →</button>`;
   panel.hidden = false;
 }
 
-function abrir(k) { E.sel = k; E.abierto = k; E.descartando = false; E.dandoAlta = false; pintarBandeja(); }
-function cerrar() { E.abierto = ''; E.descartando = false; E.dandoAlta = false; pintarBandeja(); }
+const ETIQUETA_RES = { 'NO CONTESTÓ': 'No contestó', 'LO PENSARÁ': 'Lo pensará', 'AGENDÓ CITA': 'Agendó cita', 'LO HIZO': 'Lo hizo',
+  'ALTA MÉDICA': 'Alta médica', 'NÚMERO EQUIVOCADO': 'Número equivocado', 'SE ATIENDE EN OTRO LUGAR': 'Se atiende en otro lugar',
+  'FALLECIÓ': 'Falleció', 'NO DESEA CONTINUAR': 'No desea continuar' };
+const SIGUE = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO'];
+const CIERRE = ['ALTA MÉDICA', 'NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'];
+const masDias = (n) => { const d = new Date(hoy() + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+function telsDe(t) { return String(t.TELEFONOS || '').split(' / ').filter(Boolean); }
+
+function quePaso(t) {
+  const sigue = SIGUE.filter(r => r !== 'LO HIZO' || esIndicacion(t));
+  return `<div class="qp"><small>¿Qué pasó?</small>
+    <div class="qp-grupo qp-sigue"><span>Sigue en seguimiento</span>${sigue.map((r, i) =>
+      `<button type="button" class="btn-linea" data-res="${r}">${ETIQUETA_RES[r]}<kbd>${i + 1}</kbd></button>`).join('')}</div>
+    <div class="qp-grupo qp-cierre${E.cierreAbierto || CIERRE.includes(E.paso) ? ' abierto' : ''}"><span>Cierra el seguimiento <kbd>X</kbd></span>${CIERRE.map(r =>
+      `<button type="button" class="btn-linea" data-res="${r}">${ETIQUETA_RES[r]}</button>`).join('')}</div>
+    ${E.paso ? pasoHtml(t, E.paso) : ''}</div>`;
+}
+
+function pasoHtml(t, r) {
+  const nombre = esc(t.NOMBRE);
+  const para = esIndicacion(t) ? esc(queCotizo(t)) : esc(especialidadDe(t) || t.ESPECIALIDAD);
+  const tels = telsDe(t);
+  let campos = '', aviso = '', cierre = CIERRE.includes(r);
+  if (r === 'LO PENSARÁ') campos = `<label>Volver a llamar el <input type="date" class="entrada" id="qp-fecha" value="${masDias(1)}" min="${masDias(1)}" max="${masDias(90)}"></label>`;
+  if (r === 'AGENDÓ CITA') campos = `<label>Fecha de la cita <input type="date" class="entrada" id="qp-fecha" value="${t.PROXIMA_AGENDADA || hoy()}" min="${hoy()}" max="${masDias(180)}"></label>`;
+  if (r === 'LO HIZO') campos = `<label>${t.ID_REGISTRO && t.SESIONES > 1 ? `Sesión ${t.HECHAS + 1} de ${t.SESIONES}, el` : 'Lo hizo el'} <input type="date" class="entrada" id="qp-fecha" value="${hoy()}" max="${hoy()}"></label>`;
+  if (r === 'ALTA MÉDICA') campos = `<select id="qp-doctor" class="sel" aria-label="Doctor que da el alta">${opcionesDoctor(t.MEDICO_ULTIMO)}</select>
+    ${esIndicacion(t) ? '' : `<input type="date" class="entrada" id="qp-fecha" value="${hoy()}" max="${hoy()}" aria-label="Fecha del alta">`}`;
+  if (r === 'NÚMERO EQUIVOCADO') {
+    campos = tels.map((n, i) => `<label><input type="radio" name="qp-tel" value="${esc(n)}"${n === E.telElegido || (tels.length === 1 && i === 0) ? ' checked' : ''}> ${esc(n)}</label>`).join('') || '<p class="muted">No tiene teléfonos para marcar.</p>';
+    const elegido = E.telElegido || (tels.length === 1 ? tels[0] : '');
+    const quedan = tels.filter(n => n !== elegido);
+    aviso = !elegido ? 'Elija el número equivocado.' : quedan.length ? `Le queda el ${esc(quedan[0])}: el seguimiento sigue.` : t.USUARIO ? `Le queda el usuario ${esc(t.USUARIO)}: el seguimiento sigue.` : 'No le queda otro contacto: se cerrará el seguimiento.';
+    cierre = !!elegido && !quedan.length && !t.USUARIO;
+  }
+  if (r === 'NO DESEA CONTINUAR') campos = '<input class="entrada" id="qp-motivo" placeholder="Motivo (obligatorio)">';
+  const pregunta = cierre ? `<p><b>¿Cerrar el seguimiento de ${nombre} en ${para}?</b> Motivo: ${esc(ETIQUETA_RES[r].toLowerCase())}.${r === 'FALLECIÓ' ? ' Se cerrarán todos sus seguimientos.' : ''}</p>` : '';
+  return `<div class="qp-paso${cierre ? ' cierre' : ''}">${pregunta}${campos}${aviso ? `<p class="muted" id="qp-aviso">${aviso}</p>` : ''}
+    <div><button type="button" class="btn-marca" id="qp-guardar">${cierre ? 'Cerrar el seguimiento' : 'Guardar'}</button>
+    <button type="button" class="btn-texto" id="qp-cancelar">Cancelar</button></div></div>`;
+}
+
+function abrir(k) { E.sel = k; E.abierto = k; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; pintarBandeja(); }
+function cerrar() { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; pintarBandeja(); }
 
 function mover(paso) {
   const claves = visibles().map(clave);
   if (!claves.length) return;
   const i = Math.max(0, claves.indexOf(E.sel));
   E.sel = claves[Math.min(claves.length - 1, Math.max(0, i + paso))];
-  if (E.abierto) { E.abierto = E.sel; E.descartando = false; E.dandoAlta = false; }
+  if (E.abierto) { E.abierto = E.sel; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; }
   pintarBandeja();
   const f = document.querySelector(`.fila[data-k="${CSS.escape(E.sel)}"]`);
   if (f) f.scrollIntoView({ block: 'nearest' });
 }
 
 /**
- * Hecho o descartado: el paciente sale de la lista al instante y la selección
- * pasa al siguiente. Si el servidor falla, vuelve a su sitio con un aviso.
+ * Guarda lo que pasó. La fila sale de la lista al instante (salvo un número equivocado que
+ * deja otro contacto) y la selección pasa al siguiente. Si el servidor falla, vuelve a su sitio.
+ * Si el servidor la deja en Por contactar, también vuelve.
  */
-async function resolver(k, accion, motivo, extra = {}) {
+async function guardarResultado(k, resultado, extra = {}) {
   if (!exigirUsuario()) return;
   const t = pacienteDe(k);
   if (!t) return;
   const nota = E.abierto === k && $('#nota') ? $('#nota').value : '';
+  const tels = telsDe(t);
+  const sigueEnLista = resultado === 'NÚMERO EQUIVOCADO' && (tels.some(n => n !== extra.telefono) || !!t.USUARIO);
   const claves = visibles().map(clave);
   const i = claves.indexOf(k);
   const siguiente = claves[i + 1] || claves[i - 1] || '';
   const pos = E.bandeja.tarjetas.indexOf(t);
   const c = E.bandeja.contador;
-  const estabaAbierto = E.abierto === k;
+  const telsAntes = t.TELEFONOS;
+  // «Lo hizo» sobre un tratamiento registrado anota una sesión, no un seguimiento.
+  const sumaHecho = SIGUE.includes(resultado) && !(resultado === 'LO HIZO' && t.ID_REGISTRO);
 
-  E.bandeja.tarjetas.splice(pos, 1);
-  c.porAtender--;
-  if (accion === 'HECHO') c.hechosHoy++;
-  if (E.sel === k) E.sel = siguiente;
-  if (estabaAbierto) E.abierto = siguiente;
-  E.descartando = false;
-  E.dandoAlta = false;
-  E.kpi = null;
-  E.resumen = null;
+  if (sigueEnLista) t.TELEFONOS = tels.filter(n => n !== extra.telefono).join(' / ');
+  else {
+    E.bandeja.tarjetas.splice(pos, 1);
+    c.porAtender--;
+    if (E.sel === k) E.sel = siguiente;
+    if (E.abierto === k) E.abierto = siguiente;
+  }
+  if (sumaHecho) c.hechosHoy++;
+  E.paso = ''; E.cierreAbierto = false; E.telElegido = '';
+  E.kpi = null; E.resumen = null;
   pintarBandeja();
 
   try {
-    const datos = { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, referencia: t.ID_REGISTRO || '', nota };
-    if (accion === 'HECHO') await llamar('marcarSeguimiento', datos);
-    else if (accion === 'DESCARTADO') await llamar('descartar', Object.assign(datos, { motivo }));
-    else if (accion === 'SESION') await llamar('marcarSesion', { usuario: usuario(), id: t.ID_REGISTRO, fecha: extra.fecha, nota });
-    else await llamar('darDeAlta', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD, doctor: extra.doctor, fecha: extra.fecha, nota });
-    avisar({ HECHO: 'Seguimiento registrado: ', DESCARTADO: 'Descartado: ', ALTA: 'Alta registrada: ',
-      SESION: `Sesión ${t.HECHAS + 1} de ${t.SESIONES} registrada: ` }[accion] + t.NOMBRE);
+    const r = await llamar('registrarResultado', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD,
+      referencia: t.ID_REGISTRO || '', resultado, nota, fecha: extra.fecha || '', telefono: extra.telefono || '',
+      motivo: extra.motivo || '', doctor: extra.doctor || '' });
+    if (!sigueEnLista && r.tarjeta && r.tarjeta.COLUMNA === 'POR_CONTACTAR') {
+      E.bandeja.tarjetas.splice(pos, 0, t);
+      c.porAtender++;
+      pintarBandeja();
+    }
+    const deshacer = r.seguimiento ? ['anularResultado', r.seguimiento.ID] : r.alta ? ['anularAlta', r.alta.ID] : r.sesion ? ['anularSesion', r.sesion.ID] : null;
+    avisar(`Guardado: ${t.NOMBRE} · ${ETIQUETA_RES[resultado].toLowerCase()}`, deshacer && { texto: 'Deshacer', fn: async () => {
+      try {
+        await llamar(deshacer[0], { usuario: usuario(), id: deshacer[1], motivo: 'Deshecho al momento' });
+        avisar('Deshecho: ' + t.NOMBRE);
+      } catch (e) { avisar('No se deshizo: ' + e.message); }
+      E.kpi = null; E.resumen = null;
+      cargarBandeja();
+    } });
   } catch (e) {
-    E.bandeja.tarjetas.splice(pos, 0, t);
-    c.porAtender++;
-    if (accion === 'HECHO') c.hechosHoy--;
+    if (sigueEnLista) t.TELEFONOS = telsAntes;
+    else { E.bandeja.tarjetas.splice(pos, 0, t); c.porAtender++; }
+    if (sumaHecho) c.hechosHoy--;
     avisar('No se guardó: ' + e.message);
     pintarBandeja();
   }
+}
+
+/** Lee el paso abierto y guarda; lo que falte lo avisa sin llamar al servidor. */
+function confirmarPaso() {
+  const r = E.paso, extra = {};
+  if ($('#qp-fecha')) extra.fecha = $('#qp-fecha').value;
+  if ($('#qp-doctor')) { extra.doctor = $('#qp-doctor').value; if (!extra.doctor) { avisar('Elija el doctor que da el alta.'); return; } }
+  if (r === 'NÚMERO EQUIVOCADO') {
+    const sel = document.querySelector('input[name="qp-tel"]:checked');
+    if (!sel) { avisar('Elija cuál teléfono está equivocado.'); return; }
+    extra.telefono = sel.value;
+  }
+  if ($('#qp-motivo')) { extra.motivo = $('#qp-motivo').value.trim(); if (!extra.motivo) { avisar('Escriba el motivo.'); return; } }
+  guardarResultado(E.abierto, r, extra);
+}
+
+/** Elegir un resultado: «No contestó» guarda directo; los demás abren su paso. */
+function elegirResultado(k, r) {
+  if (r === 'NO CONTESTÓ') { guardarResultado(k, r); return; }
+  if (E.abierto !== k) { E.sel = k; E.abierto = k; }
+  E.paso = r; E.telElegido = '';
+  pintarBandeja();
+  const f = $('#qp-fecha') || $('#qp-motivo');
+  if (f) f.focus();
+  const paso = document.querySelector('.qp-paso');
+  if (paso) paso.scrollIntoView({ block: 'nearest' });
 }
 
 $('#lista').addEventListener('click', ev => {
@@ -812,8 +897,12 @@ $('#lista').addEventListener('click', ev => {
   if (!fila) return;
   const copiar = ev.target.closest('[data-copiar]');
   if (copiar) { ev.stopPropagation(); copiarDesde(copiar, copiar.dataset.copiar); return; }
-  if (ev.target.closest('.hecho')) { ev.stopPropagation(); E.sel = fila.dataset.k; resolver(fila.dataset.k, 'HECHO'); return; }
+  if (ev.target.closest('.hecho')) { ev.stopPropagation(); E.sel = fila.dataset.k; guardarResultado(fila.dataset.k, 'NO CONTESTÓ'); return; }
   abrir(fila.dataset.k);
+});
+
+$('#panel').addEventListener('change', ev => {
+  if (ev.target.name === 'qp-tel') { E.telElegido = ev.target.value; pintarPanel(); }
 });
 
 $('#panel').addEventListener('click', ev => {
@@ -821,31 +910,30 @@ $('#panel').addEventListener('click', ev => {
   if (!b) return;
   if (b.classList.contains('cerrar')) { cerrar(); return; }
   if (b.dataset.copiar) { copiarDesde(b, b.dataset.copiar); return; }
-  if (b.id === 'p-hecho') { resolver(E.abierto, 'HECHO'); return; }
-  if (b.id === 'p-descartar') { E.descartando = !E.descartando; pintarPanel(); return; }
-  if (b.dataset.motivo) { resolver(E.abierto, 'DESCARTADO', b.dataset.motivo); return; }
-  if (b.id === 'p-lohizo') { resolver(E.abierto, 'SESION', '', { fecha: $('#p-fecha-ses').value }); return; }
-  if (b.id === 'p-alta') { E.dandoAlta = !E.dandoAlta; pintarPanel(); return; }
-  if (b.id === 'p-alta-ok') {
-    if (!$('#p-alta-doctor').value) { avisar('Elija el doctor que da el alta.'); return; }
-    resolver(E.abierto, 'ALTA', '', { doctor: $('#p-alta-doctor').value, fecha: $('#p-alta-fecha').value });
-    return;
-  }
+  if (b.dataset.res) { elegirResultado(E.abierto, b.dataset.res); return; }
+  if (b.id === 'qp-guardar') { confirmarPaso(); return; }
+  if (b.id === 'qp-cancelar') { E.paso = ''; pintarPanel(); return; }
   if (b.id === 'p-ficha') { const t = pacienteDe(E.abierto); if (t) abrirFicha(t.DNI); }
 });
 
 /* Atajos de teclado de la bandeja. No actúan mientras se escribe en un campo. */
 document.addEventListener('keydown', ev => {
   if ($('#v-bandeja').hidden || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  if (ev.key === 'Escape' && E.paso && ev.target.closest && ev.target.closest('#panel')) { ev.target.blur(); E.paso = ''; pintarPanel(); return; }
   if (ev.target.closest && ev.target.closest('input, textarea, select')) return;
   const tecla = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key;
   if (tecla === 'ArrowDown' || tecla === 'j') { ev.preventDefault(); mover(1); return; }
   if (tecla === 'ArrowUp' || tecla === 'k') { ev.preventDefault(); mover(-1); return; }
-  if (tecla === 'Escape') { if (E.abierto) cerrar(); return; }
+  if (tecla === 'Escape') { if (E.paso) { E.paso = ''; pintarPanel(); } else if (E.abierto) cerrar(); return; }
   if (!E.sel) return;
   if (tecla === 'Enter') { if (!ev.target.closest || !ev.target.closest('button')) { ev.preventDefault(); abrir(E.sel); } return; }
-  if (tecla === 'h') { resolver(E.sel, 'HECHO'); return; }
-  if (tecla === 'd') { E.abierto = E.sel; E.descartando = true; pintarBandeja(); return; }
+  if (['1', '2', '3', '4'].includes(tecla)) {
+    const t = pacienteDe(E.sel);
+    const r = SIGUE.filter(x => x !== 'LO HIZO' || (t && esIndicacion(t)))[Number(tecla) - 1];
+    if (r) elegirResultado(E.sel, r);
+    return;
+  }
+  if (tecla === 'x') { E.abierto = E.sel; E.cierreAbierto = true; E.paso = ''; pintarBandeja(); return; }
   if (tecla === 'c') {
     const t = pacienteDe(E.sel);
     const tel = t && String(t.TELEFONOS || '').split(' / ').filter(Boolean)[0];
@@ -1582,7 +1670,7 @@ const DEMO = (() => {
        PROXIMA_ESPERADA: mas(ULTIMA_CITA, 30), VENCE: mas(ULTIMA_CITA, 45), DIAS_ATRASO, PROXIMA_AGENDADA: '',
        ESTADO, N_SEGUIMIENTOS, ULTIMO_SEGUIMIENTO, PENDIENTE });
   const pacientes = [
-    p('40111222', 'HEMATOLOGÍA', 'ROSA ELENA QUISPE HUAMÁN', '987654321', ELI, '2026-06-10', '2026-08-05', 2, 'VENCIDO', 12, 0, '', 'Hierro (Ferinject) ×2: cotizó y no lo hizo'),
+    p('40111222', 'HEMATOLOGÍA', 'ROSA ELENA QUISPE HUAMÁN', '987654321 / 912345678', ELI, '2026-06-10', '2026-08-05', 2, 'VENCIDO', 12, 0, '', 'Hierro (Ferinject) ×2: cotizó y no lo hizo'),
     p('40222333', 'HEMATOLOGÍA', 'JORGE LUIS MENDOZA PAREDES', '', KAREN, '2026-07-18', '2026-07-18', 1, 'VENCIDO', 30, 0, '', ''),
     p('40333444', 'REUMATOLOGÍA', 'CARMEN SOFÍA TORRES DÍAZ', '912345678 / 998877665', 'Dr. JUVENAL HANAMPA ROQUE', '2026-05-02', '2026-06-23', 2, 'VENCIDO', 55, 1, '2026-09-10', ''),
     p('40444555', 'HEMATOLOGÍA', 'LUIS ALBERTO RAMOS VEGA', '923456789', 'Dra. ALEJANDRA LA TORRE MATUK', '2026-08-12', '2026-08-12', 1, 'VENCIDO', 5, 0, '', 'AMO + BIOPSIA: cotizó y no lo hizo'),
@@ -1611,19 +1699,26 @@ const DEMO = (() => {
     if (!x || !usuarios.includes(x.usuario)) throw new Error('Elija quién es usted en el selector de arriba.');
     if (conMotivo && !motivos.includes(x.motivo)) throw new Error('Elija un motivo de descarte.');
   }
-  function registrar(x, accion) {
-    exigir(x, accion === 'DESCARTADO');
-    seguimientos.push({ ID: 'SEG-' + (seguimientos.length + 1), FECHA_HORA: hoy + ' 10:00', DNI: x.dni, ESPECIALIDAD: x.especialidad,
-      RESPONSABLE: x.usuario, ACCION: accion, MOTIVO: x.motivo || '', NOTA: x.nota || '' });
+  const SIGUE = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO'];
+  function registrarResultado(x) {
+    exigir(x, false);
     const pac = pacientes.concat(pendientes).find(y => y.DNI === x.dni && y.ESPECIALIDAD === x.especialidad &&
       (x.referencia ? y.ID_REGISTRO === x.referencia : !y.ID_REGISTRO));
     if (!pac) throw new Error('Ese paciente no está en la lista. Recargue la página.');
-    pac.ESTADO = accion === 'HECHO' ? 'CONTACTADO' : 'DESCARTADO';
-    return { ok: true };
+    if (x.resultado === 'LO HIZO' && pac.ID_REGISTRO) return api.marcarSesion({ usuario: x.usuario, id: pac.ID_REGISTRO, fecha: x.fecha });
+    if (x.resultado === 'ALTA MÉDICA' && !pac.TIPO_SEGUIMIENTO) return api.darDeAlta({ usuario: x.usuario, dni: x.dni, especialidad: x.especialidad, doctor: x.doctor, fecha: x.fecha });
+    const s = { ID: 'SEG-' + (seguimientos.length + 1), FECHA_HORA: hoy + ' 10:00', DNI: x.dni, ESPECIALIDAD: x.especialidad, RESPONSABLE: x.usuario,
+      ACCION: SIGUE.includes(x.resultado) ? 'HECHO' : x.resultado === 'NÚMERO EQUIVOCADO' ? 'TELEFONO' : 'DESCARTADO',
+      MOTIVO: '', NOTA: x.nota || '', RESULTADO: x.resultado, FECHA_PROXIMA: x.fecha || '', TELEFONO: x.telefono || '', ANULADO: '', antes: pac.ESTADO, pac };
+    seguimientos.push(s);
+    if (x.resultado === 'NÚMERO EQUIVOCADO') pac.TELEFONOS = String(pac.TELEFONOS).split(' / ').filter(n => n !== x.telefono).join(' / ');
+    else pac.ESTADO = SIGUE.includes(x.resultado) ? 'AGENDADO' : 'CERRADO';
+    return { ok: true, seguimiento: { ID: s.ID }, tarjeta: x.resultado === 'NÚMERO EQUIVOCADO' && pac.TELEFONOS ? { COLUMNA: 'POR_CONTACTAR' } : '' };
   }
-  return {
+  const api = {
     bootstrap: () => ({
       hoy, usuarios, motivos,
+      resultados: ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'],
       especialidades: [...new Set(pacientes.map(x => x.ESPECIALIDAD))].sort(),
       medicos: [...new Set(pacientes.map(x => x.MEDICO_ULTIMO))].sort(),
       doctores, procedimientos: ['SANGRÍA', 'AMO', 'BIOPSIA'], tratamientos: ['HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA'],
@@ -1650,7 +1745,7 @@ const DEMO = (() => {
       return { dni, nombre: series.length ? series[0].NOMBRE : '', series, citas,
         indicaciones: indicaciones.filter(i => i.DNI === dni),
         porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === dni)),
-        seguimientos: seguimientos.filter(s => s.DNI === dni),
+        seguimientos: seguimientos.filter(s => s.DNI === dni).map(({ pac, antes, ...s }) => s),
         registros: registros.filter(r => r.DNI === dni).map(r => {
           const ss = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO).sort((a, b) => a.NUMERO - b.NUMERO);
           const estado = r.ANULADO ? 'ANULADO' : ss.length >= r.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO' : 'COTIZADO';
@@ -1767,12 +1862,13 @@ const DEMO = (() => {
       const r = registros.find(y => y.ID === x.id);
       const validas = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO);
       if (validas.length >= r.SESIONES) throw new Error('Ese tratamiento ya tiene todas sus sesiones.');
-      sesiones.push({ ID: siguiente(sesiones, 'SES'), FECHA_HORA: hoy + ' 12:00', ID_REGISTRO: r.ID, NUMERO: validas.length + 1,
+      const idSes = siguiente(sesiones, 'SES');
+      sesiones.push({ ID: idSes, FECHA_HORA: hoy + ' 12:00', ID_REGISTRO: r.ID, NUMERO: validas.length + 1,
         FECHA: x.fecha, ASESORA: x.usuario, ANULADO: '' });
       const item = pendientes.find(p => p.ID_REGISTRO === r.ID);
       const hechas = validas.length + 1;
       if (item) Object.assign(item, { HECHAS: hechas, ULTIMA_SESION: x.fecha, ESTADO: hechas >= r.SESIONES ? 'COMPLETO' : 'EN ESPERA' });
-      return { ok: true, completo: hechas >= r.SESIONES };
+      return { ok: true, sesion: { ID: idSes }, completo: hechas >= r.SESIONES };
     },
     anularSesion: x => {
       exigir(x, false);
@@ -1782,8 +1878,18 @@ const DEMO = (() => {
       if (item) Object.assign(item, { HECHAS: item.HECHAS - 1, ESTADO: 'PENDIENTE' });
       return { ok: true };
     },
-    marcarSeguimiento: x => registrar(x, 'HECHO'),
-    descartar: x => registrar(x, 'DESCARTADO'),
+    registrarResultado,
+    anularResultado: x => {
+      exigir(x, false);
+      const s = seguimientos.find(y => y.ID === x.id);
+      if (!s) throw new Error('No encontré ' + x.id + '.');
+      s.ANULADO = 'SÍ';
+      s.MOTIVO_ANULACION = x.motivo;
+      if (s.pac) s.pac.ESTADO = s.antes;
+      return { ok: true };
+    },
+    marcarSeguimiento: x => registrarResultado(Object.assign({}, x, { resultado: 'NO CONTESTÓ' })),
+    descartar: x => registrarResultado(Object.assign({}, x, { resultado: 'NO DESEA CONTINUAR' })),
     confirmarEmparejamiento: x => {
       exigir(x, false);
       const i = porConfirmar.find(y => y.ID === x.id);
@@ -1795,6 +1901,7 @@ const DEMO = (() => {
       return { ok: true };
     }
   };
+  return api;
 })();
 
 iniciar();

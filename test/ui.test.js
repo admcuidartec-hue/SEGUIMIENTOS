@@ -171,9 +171,12 @@ test('¿Qué pasó?: si el servidor falla, la fila vuelve y no hay Deshacer', as
     await pagina.selectOption('#usuario', 'MAGALY');
     await pagina.evaluate(() => { DEMO.registrarResultado = () => { throw new Error('sin conexión'); }; });
     const antes = await filas(pagina);
+    const cuentas = async () => [await pagina.locator('#c-hechos').textContent(), await pagina.locator('#c-atender').textContent()];
+    const c0 = await cuentas();
     await pagina.locator('.fila button.hecho').first().click();
     await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso').textContent));
     assert.deepEqual(await filas(pagina), antes);
+    assert.deepEqual(await cuentas(), c0, 'los contadores vuelven');
     assert.equal(await pagina.locator('#aviso [data-deshacer]').count(), 0);
   } finally { await navegador.close(); }
 });
@@ -612,6 +615,40 @@ test('detalle: procedimientos con cotizados, empezaron y completaron', async () 
     assert.deepEqual((await s.locator('table').first().locator('th').allInnerTexts()).map(x => x.trim()),
       ['Procedimiento', 'Cotizados', 'Empezaron', 'Completaron', 'Empezaron (%)']);
     assert.match((await s.locator('tr', { hasText: 'Hierro (Ferinject)' }).first().innerText()).replace(/\s+/g, ' '), /Hierro \(Ferinject\) 55 27 23 49%/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('¿Qué pasó?: la nota escrita antes de elegir el resultado se guarda', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await pagina.locator('#lista .fila').first().click();
+    await pagina.locator('#nota').fill('Pidió que la llamen por la tarde');
+    await pagina.locator('[data-res="LO PENSARÁ"]').click();
+    assert.equal(await pagina.locator('#nota').inputValue(), 'Pidió que la llamen por la tarde', 'la nota sobrevive al repintado');
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForSelector('#aviso [data-deshacer]');
+    const guardada = await pagina.evaluate(() => DEMO.getPaciente('40444555').seguimientos.map(s => s.NOTA));
+    assert.ok(guardada.includes('Pidió que la llamen por la tarde'), 'el seguimiento lleva la nota');
+    assert.equal(await pagina.locator('#nota').inputValue(), '', 'el siguiente paciente empieza sin nota');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('¿Qué pasó?: «Falleció» saca al paciente de todas las listas', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    const luis = pagina.locator('.fila', { hasText: 'LUIS ALBERTO RAMOS VEGA' });
+    assert.equal(await luis.count(), 2);
+    await luis.first().click();
+    await pagina.locator('[data-res="FALLECIÓ"]').click();
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForSelector('#aviso [data-deshacer]');
+    assert.equal(await luis.count(), 0);
+    await pagina.locator('#aviso [data-deshacer]').click();
+    await pagina.waitForFunction(() => document.querySelectorAll('#lista .fila').length === 7);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

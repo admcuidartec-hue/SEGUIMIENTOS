@@ -371,7 +371,7 @@ td.n,th.n{text-align:right}
         <label>Especialidad <select id="f-esp" class="sel"><option value="">Todas</option></select></label>
         <label>Médico <select id="f-med" class="sel"><option value="">Todos</option></select></label>
         <label><input type="checkbox" id="f-sintel"> Solo sin teléfono</label>
-        <span class="atajos">↑ ↓ · <b>Enter</b> abrir · <b>C</b> copiar · <b>1</b>–<b>4</b> qué pasó · <b>X</b> cierre</span>
+        <span class="atajos">↑ ↓ · <b>Enter</b> abrir · <b>C</b> copiar · <span id="atajo-res"><b>1</b>–<b>3</b> qué pasó</span> · <b>X</b> cierre</span>
       </div>
       <div class="cuerpo" id="cuerpo">
         <div id="lista" aria-live="polite"></div>
@@ -453,7 +453,7 @@ function llamar(fn, ...args) {
 
 const E = {
   boot: null, bandeja: null, error: '', fichaDni: '', kpi: null, resumen: null, rMed: null, rMes: '',
-  sel: '', abierto: '', paso: '', cierreAbierto: false, telElegido: '', tipo: ''
+  sel: '', abierto: '', paso: '', cierreAbierto: false, telElegido: '', nota: '', tipo: ''
 };
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -688,7 +688,7 @@ function pintarBandeja() {
   const lista = visibles();
   const claves = lista.map(clave);
   if (!claves.includes(E.sel)) E.sel = claves[0] || '';
-  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; }
+  if (E.abierto && !claves.includes(E.abierto)) { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; }
 
   if (!lista.length) {
     $('#lista').innerHTML = E.tipo
@@ -704,6 +704,8 @@ function pintarBandeja() {
         del.map(filaHtml).join('');
     }).join('');
   }
+  const ts = pacienteDe(E.sel);
+  $('#atajo-res').innerHTML = `<b>1</b>–<b>${ts && esIndicacion(ts) ? 4 : 3}</b> qué pasó`;
   $('#cuerpo').classList.toggle('con-panel', !!E.abierto);
   pintarPanel();
 }
@@ -742,7 +744,7 @@ function pintarPanel() {
     </div>
     ${t.USUARIO ? `<p class="p-usuario">Usuario: <b>${esc(t.USUARIO)}</b></p>` : ''}
     ${t.N_SEGUIMIENTOS ? `<div class="p-prev">Ya se le escribió${esIndicacion(t) ? ' por esto' : ''} ${t.N_SEGUIMIENTOS === 1 ? '1 vez' : t.N_SEGUIMIENTOS + ' veces'} · la última el ${fechaCorta(t.ULTIMO_SEGUIMIENTO)}</div>` : ''}
-    <textarea id="nota" placeholder="Nota (opcional)"></textarea>
+    <textarea id="nota" placeholder="Nota (opcional)">${esc(E.nota)}</textarea>
     ${quePaso(t)}
     <button type="button" class="p-ficha" id="p-ficha">Ver ficha completa →</button>`;
   panel.hidden = false;
@@ -791,15 +793,15 @@ function pasoHtml(t, r) {
     <button type="button" class="btn-texto" id="qp-cancelar">Cancelar</button></div></div>`;
 }
 
-function abrir(k) { E.sel = k; E.abierto = k; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; pintarBandeja(); }
-function cerrar() { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; pintarBandeja(); }
+function abrir(k) { E.sel = k; E.abierto = k; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; pintarBandeja(); }
+function cerrar() { E.abierto = ''; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; pintarBandeja(); }
 
 function mover(paso) {
   const claves = visibles().map(clave);
   if (!claves.length) return;
   const i = Math.max(0, claves.indexOf(E.sel));
   E.sel = claves[Math.min(claves.length - 1, Math.max(0, i + paso))];
-  if (E.abierto) { E.abierto = E.sel; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; }
+  if (E.abierto) { E.abierto = E.sel; E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = ''; }
   pintarBandeja();
   const f = document.querySelector(`.fila[data-k="${CSS.escape(E.sel)}"]`);
   if (f) f.scrollIntoView({ block: 'nearest' });
@@ -814,27 +816,33 @@ async function guardarResultado(k, resultado, extra = {}) {
   if (!exigirUsuario()) return;
   const t = pacienteDe(k);
   if (!t) return;
-  const nota = E.abierto === k && $('#nota') ? $('#nota').value : '';
+  const estabaAbierto = E.abierto === k;
+  const nota = estabaAbierto ? E.nota : '';
   const tels = telsDe(t);
   const sigueEnLista = resultado === 'NÚMERO EQUIVOCADO' && (tels.some(n => n !== extra.telefono) || !!t.USUARIO);
+  // «Falleció» cierra todos sus seguimientos: sale de todas las listas, no solo esta tarjeta.
+  const sacar = sigueEnLista ? [] : resultado === 'FALLECIÓ' ? E.bandeja.tarjetas.filter(x => x.DNI === t.DNI) : [t];
+  const clavesSacar = sacar.map(clave);
   const claves = visibles().map(clave);
   const i = claves.indexOf(k);
-  const siguiente = claves[i + 1] || claves[i - 1] || '';
-  const pos = E.bandeja.tarjetas.indexOf(t);
+  const siguiente = claves.slice(i + 1).find(x => !clavesSacar.includes(x)) || claves.slice(0, i).reverse().find(x => !clavesSacar.includes(x)) || '';
+  const tarjetasAntes = E.bandeja.tarjetas.slice();
+  const pos = tarjetasAntes.indexOf(t);
   const c = E.bandeja.contador;
+  const contadorAntes = { porAtender: c.porAtender, hechosHoy: c.hechosHoy };
   const telsAntes = t.TELEFONOS;
   // «Lo hizo» sobre un tratamiento registrado anota una sesión, no un seguimiento.
   const sumaHecho = SIGUE.includes(resultado) && !(resultado === 'LO HIZO' && t.ID_REGISTRO);
 
   if (sigueEnLista) t.TELEFONOS = tels.filter(n => n !== extra.telefono).join(' / ');
   else {
-    E.bandeja.tarjetas.splice(pos, 1);
-    c.porAtender--;
+    E.bandeja.tarjetas = tarjetasAntes.filter(x => !sacar.includes(x));
+    c.porAtender -= sacar.length;
     if (E.sel === k) E.sel = siguiente;
     if (E.abierto === k) E.abierto = siguiente;
   }
   if (sumaHecho) c.hechosHoy++;
-  E.paso = ''; E.cierreAbierto = false; E.telElegido = '';
+  E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = '';
   E.kpi = null; E.resumen = null;
   pintarBandeja();
 
@@ -842,12 +850,14 @@ async function guardarResultado(k, resultado, extra = {}) {
     const r = await llamar('registrarResultado', { usuario: usuario(), dni: t.DNI, especialidad: t.ESPECIALIDAD,
       referencia: t.ID_REGISTRO || '', resultado, nota, fecha: extra.fecha || '', telefono: extra.telefono || '',
       motivo: extra.motivo || '', doctor: extra.doctor || '' });
-    if (!sigueEnLista && r.tarjeta && r.tarjeta.COLUMNA === 'POR_CONTACTAR') {
-      E.bandeja.tarjetas.splice(pos, 0, t);
+    if (!sigueEnLista && r && r.tarjeta && r.tarjeta.COLUMNA === 'POR_CONTACTAR') {
+      // El servidor la dejó por contactar (p. ej. número equivocado con otro contacto): vuelve, sin el número marcado.
+      if (resultado === 'NÚMERO EQUIVOCADO') t.TELEFONOS = tels.filter(n => n !== extra.telefono).join(' / ');
+      E.bandeja.tarjetas.splice(Math.min(pos, E.bandeja.tarjetas.length), 0, t);
       c.porAtender++;
       pintarBandeja();
     }
-    const deshacer = r.seguimiento ? ['anularResultado', r.seguimiento.ID] : r.alta ? ['anularAlta', r.alta.ID] : r.sesion ? ['anularSesion', r.sesion.ID] : null;
+    const deshacer = r && (r.seguimiento ? ['anularResultado', r.seguimiento.ID] : r.alta ? ['anularAlta', r.alta.ID] : r.sesion ? ['anularSesion', r.sesion.ID] : null);
     avisar(`Guardado: ${t.NOMBRE} · ${ETIQUETA_RES[resultado].toLowerCase()}`, deshacer && { texto: 'Deshacer', fn: async () => {
       try {
         await llamar(deshacer[0], { usuario: usuario(), id: deshacer[1], motivo: 'Deshecho al momento' });
@@ -857,9 +867,12 @@ async function guardarResultado(k, resultado, extra = {}) {
       cargarBandeja();
     } });
   } catch (e) {
-    if (sigueEnLista) t.TELEFONOS = telsAntes;
-    else { E.bandeja.tarjetas.splice(pos, 0, t); c.porAtender++; }
-    if (sumaHecho) c.hechosHoy--;
+    t.TELEFONOS = telsAntes;
+    E.bandeja.tarjetas = tarjetasAntes;
+    c.porAtender = contadorAntes.porAtender;
+    c.hechosHoy = contadorAntes.hechosHoy;
+    E.sel = k;
+    if (estabaAbierto) { E.abierto = k; E.nota = nota; }
     avisar('No se guardó: ' + e.message);
     pintarBandeja();
   }
@@ -885,7 +898,7 @@ function elegirResultado(k, r) {
   if (E.abierto !== k) { E.sel = k; E.abierto = k; }
   E.paso = r; E.telElegido = '';
   pintarBandeja();
-  const f = $('#qp-fecha') || $('#qp-motivo');
+  const f = $('#qp-doctor') || $('#qp-fecha') || $('#qp-motivo');
   if (f) f.focus();
   const paso = document.querySelector('.qp-paso');
   if (paso) paso.scrollIntoView({ block: 'nearest' });
@@ -899,6 +912,10 @@ $('#lista').addEventListener('click', ev => {
   if (copiar) { ev.stopPropagation(); copiarDesde(copiar, copiar.dataset.copiar); return; }
   if (ev.target.closest('.hecho')) { ev.stopPropagation(); E.sel = fila.dataset.k; guardarResultado(fila.dataset.k, 'NO CONTESTÓ'); return; }
   abrir(fila.dataset.k);
+});
+
+$('#panel').addEventListener('input', ev => {
+  if (ev.target.id === 'nota') E.nota = ev.target.value;
 });
 
 $('#panel').addEventListener('change', ev => {
@@ -1709,8 +1726,9 @@ const DEMO = (() => {
     if (x.resultado === 'ALTA MÉDICA' && !pac.TIPO_SEGUIMIENTO) return api.darDeAlta({ usuario: x.usuario, dni: x.dni, especialidad: x.especialidad, doctor: x.doctor, fecha: x.fecha });
     const s = { ID: 'SEG-' + (seguimientos.length + 1), FECHA_HORA: hoy + ' 10:00', DNI: x.dni, ESPECIALIDAD: x.especialidad, RESPONSABLE: x.usuario,
       ACCION: SIGUE.includes(x.resultado) ? 'HECHO' : x.resultado === 'NÚMERO EQUIVOCADO' ? 'TELEFONO' : 'DESCARTADO',
-      MOTIVO: '', NOTA: x.nota || '', RESULTADO: x.resultado, FECHA_PROXIMA: x.fecha || '', TELEFONO: x.telefono || '', ANULADO: '', antes: pac.ESTADO, pac };
+      MOTIVO: '', NOTA: x.nota || '', RESULTADO: x.resultado, FECHA_PROXIMA: x.fecha || '', TELEFONO: x.telefono || '', ANULADO: '', antes: pac.ESTADO, pac, otras: null };
     seguimientos.push(s);
+    if (x.resultado === 'FALLECIÓ') pacientes.concat(pendientes).filter(y => y.DNI === x.dni).forEach(y => { if (y !== pac) { s.otras = (s.otras || []).concat([[y, y.ESTADO]]); y.ESTADO = 'CERRADO'; } });
     if (x.resultado === 'NÚMERO EQUIVOCADO') pac.TELEFONOS = String(pac.TELEFONOS).split(' / ').filter(n => n !== x.telefono).join(' / ');
     else pac.ESTADO = SIGUE.includes(x.resultado) ? 'AGENDADO' : 'CERRADO';
     return { ok: true, seguimiento: { ID: s.ID }, tarjeta: x.resultado === 'NÚMERO EQUIVOCADO' && pac.TELEFONOS ? { COLUMNA: 'POR_CONTACTAR' } : '' };
@@ -1745,7 +1763,7 @@ const DEMO = (() => {
       return { dni, nombre: series.length ? series[0].NOMBRE : '', series, citas,
         indicaciones: indicaciones.filter(i => i.DNI === dni),
         porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === dni)),
-        seguimientos: seguimientos.filter(s => s.DNI === dni).map(({ pac, antes, ...s }) => s),
+        seguimientos: seguimientos.filter(s => s.DNI === dni).map(({ pac, antes, otras, ...s }) => s),
         registros: registros.filter(r => r.DNI === dni).map(r => {
           const ss = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO).sort((a, b) => a.NUMERO - b.NUMERO);
           const estado = r.ANULADO ? 'ANULADO' : ss.length >= r.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO' : 'COTIZADO';
@@ -1886,6 +1904,7 @@ const DEMO = (() => {
       s.ANULADO = 'SÍ';
       s.MOTIVO_ANULACION = x.motivo;
       if (s.pac) s.pac.ESTADO = s.antes;
+      (s.otras || []).forEach(([y, e]) => { y.ESTADO = e; });
       return { ok: true };
     },
     marcarSeguimiento: x => registrarResultado(Object.assign({}, x, { resultado: 'NO CONTESTÓ' })),

@@ -96,11 +96,121 @@ html.con-vt .vista{animation:none}
 .aviso.ver{transform:translate(-50%,0);opacity:1;pointer-events:auto}
 .aviso button{height:44px;padding:0 12px;border:0;background:transparent;color:var(--toast-ink);font-weight:600;text-decoration:underline;text-underline-offset:3px}
 
+/* Controles comunes del tablero */
+.btn{height:44px;padding:0 18px;border:0;border-radius:var(--r-s);font-weight:600;display:inline-flex;align-items:center;gap:8px;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .16s var(--ease-out)}
+.btn:active{transform:scale(.97)}
+.btn-p{background:var(--accent);color:var(--accent-ink)}
+.btn-p:hover{background:var(--accent-hover)}
+.pill{height:44px;padding:0 14px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--soft);font-weight:500;font-size:13.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;transition:background-color .15s ease,border-color .15s ease,color .15s ease}
+.pill[aria-pressed="true"],.pill[aria-selected="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.pill .mono{font-size:12px;opacity:.8}
+.sel-chip{position:relative;display:inline-flex;align-items:center;max-width:100%}
+.sel-chip i{position:absolute;pointer-events:none;color:var(--muted)}
+.sel-chip i:first-child{left:13px;font-size:16px}
+.sel-chip i:last-child{right:13px}
+.sel-chip select{appearance:none;-webkit-appearance:none;height:44px;max-width:250px;min-width:0;padding:0 34px 0 36px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px}
+.kbd{font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;color:var(--muted);background:var(--surface);white-space:nowrap}
+.tag{font-size:11px;font-weight:600;line-height:1;padding:4px 8px;border-radius:999px;white-space:nowrap;max-width:50%;overflow:hidden;text-overflow:ellipsis}
+.t-reev{background:var(--info-soft);color:var(--info)}
+.t-hier{background:var(--warn-soft);color:var(--warn)}
+.t-proc{background:var(--accent-soft);color:var(--accent)}
+
+/* Tablero */
+.cab{display:flex;align-items:flex-end;justify-content:space-between;gap:16px 24px;flex-wrap:wrap}
+.meta-dia{display:flex;align-items:center;gap:10px;margin-top:6px;font-size:12.5px;color:var(--soft)}
+.meta-dia .barra{width:120px;height:6px;border-radius:3px;background:var(--line);overflow:hidden;flex:0 0 auto}
+.meta-dia .barra i{display:block;height:100%;width:100%;transform-origin:left center;transform:scaleX(0);background:var(--accent);border-radius:3px;transition:transform .5s var(--ease-out),background-color .3s ease}
+.meta-dia.ok{color:var(--good);font-weight:600}.meta-dia.ok .barra i{background:var(--good)}
+.meta-dia.sin{color:var(--muted)}
+.buscar{display:flex;align-items:center;gap:8px;height:44px;padding:0 6px 0 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);width:300px;max-width:100%;color:var(--muted)}
+.buscar>i{font-size:17px}
+.buscar input{flex:1;min-width:0;height:100%;border:0;background:none;outline:none;font-size:14px;color:var(--ink)}
+.kpis{margin:22px 0 0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden}
+.kpis>div{padding:14px 18px;display:flex;flex-direction:column;gap:2px;box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line);min-width:0}
+.kpis dt{font-size:12.5px;color:var(--muted)}
+.kpis dd{margin:0;font-family:var(--mono);font-size:28px;font-weight:500;letter-spacing:-.03em;line-height:1.15}
+.kpis span{font-size:12px;color:var(--muted)}
+.kpis span.mal{color:var(--accent)}
+.enlace{border:0;padding:0;background:none;color:var(--accent);font:inherit;text-decoration:underline;text-underline-offset:2px;min-height:24px}
+.enlace:hover{color:var(--accent-hover)}
+.cerrados{margin-top:12px;padding:14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.cerrados header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.cerrados h2{margin:0;font-size:13.5px;font-weight:600}
+.cerrados ul{list-style:none;margin:8px 0 0;padding:0}
+.cerrados li{display:flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:13px}
+.cerrados li b{font-weight:600;flex:1 1 200px;min-width:0}
+.cerrados li span{color:var(--soft)}
+.cerrados li .mono{color:var(--muted);font-size:12px}
+.cerrados .cerrar{width:44px;height:44px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface-2);color:var(--soft);display:grid;place-items:center;font-size:16px}
+.filtros{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:22px}
+.filtros .relleno{flex:1}
+.atajos{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:12px;color:var(--muted)}
+.atajos span{display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.coltabs{display:none;gap:6px;margin-top:16px;overflow-x:auto;scrollbar-width:none}
+.coltabs button{flex:0 0 auto}
+.tablero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;align-items:start;margin-top:16px}
+.col{background:var(--col);border-radius:var(--r);padding:10px;min-height:320px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.col.fija{position:sticky;top:16px}
+.col h2{display:flex;align-items:center;gap:8px;margin:4px 6px 2px;font-size:13.5px;font-weight:600}
+.col h2 i{font-size:17px}
+.col[data-col="1"] h2 i{color:var(--accent)}.col[data-col="2"] h2 i{color:var(--info)}
+.col[data-col="3"] h2 i{color:var(--warn)}.col[data-col="4"] h2 i{color:var(--good)}
+.col h2 .n{margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 9px}
+.col h3{display:flex;align-items:baseline;gap:8px;margin:6px 6px 0;font-size:12.5px;font-weight:600}
+.col h3 span{font-weight:400;color:var(--muted)}
+.col h3 .n{margin-left:auto;font-family:var(--mono);font-size:12px}
+.vermas{height:44px;border:1px dashed var(--line-2);border-radius:var(--r-s);background:transparent;color:var(--soft);font-weight:500;font-size:13px;display:flex;align-items:center;justify-content:center;gap:6px}
+.vermas:hover{background:var(--surface);color:var(--ink)}
+.vacio{padding:26px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;color:var(--soft);font-size:13px}
+.vacio i{font-size:24px;color:var(--muted)}
+.tarjeta{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);padding:12px 12px 11px;box-shadow:var(--shadow);cursor:pointer;outline:none;display:flex;flex-direction:column;gap:5px;min-width:0;transition:border-color .15s ease,box-shadow .15s ease,transform .16s var(--ease-out)}
+.tarjeta:hover{border-color:var(--line-2)}
+.tarjeta:active{transform:scale(.985)}
+.tarjeta.sel{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-ring)}
+.t1{display:flex;align-items:flex-start;gap:8px}
+.t1 b{flex:1;min-width:0;font-weight:600;font-size:13.5px;line-height:1.3;text-wrap:pretty}
+.t2{font-size:12.5px;color:var(--muted);line-height:1.35}
+.etq{font-size:12.5px;color:var(--soft);line-height:1.35}
+.etq.mal{color:var(--accent);font-weight:500}
+.prog{display:flex;gap:4px;margin-top:3px}
+.prog i{flex:1;height:5px;border-radius:3px;background:var(--line)}
+.prog i.si{background:var(--warn)}
+.t3{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:3px;font-size:12.5px;min-width:0}
+.t3 .izq{display:inline-flex;align-items:center;gap:5px;color:var(--soft);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t3 .izq.sin{color:var(--muted)}
+.t3 .izq.ok{color:var(--good);font-weight:600;white-space:normal}
+.t3 .der{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--soft);white-space:nowrap}
+.chip-fecha{display:inline-flex;align-items:center;gap:5px;background:var(--info-soft);color:var(--info);border-radius:6px;padding:3px 8px;font-weight:600;white-space:nowrap}
+.chip-fecha.mal{background:var(--accent-soft);color:var(--accent)}
+.skel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);padding:12px;display:flex;flex-direction:column;gap:9px}
+.skel i{display:block;height:10px;border-radius:4px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel-2) 50%,var(--skel) 75%);background-size:200% 100%;animation:brillo 1.4s linear infinite}
+.skel i:nth-child(1){width:70%;height:12px}.skel i:nth-child(2){width:50%}.skel i:nth-child(3){width:38%;margin-top:4px}
+@keyframes brillo{0%{background-position:100% 0}100%{background-position:-100% 0}}
+.error{margin-top:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--accent);border-radius:var(--r);background:var(--accent-soft)}
+.error>i{font-size:24px;color:var(--accent)}
+.error div{flex:1;min-width:220px}
+.error b{display:block;font-weight:600}
+
+/* Panel mínimo (Tarea 5): solo el nombre. La Tarea 6 lo reemplaza por el panel «¿Qué pasó?». */
+.velo{position:fixed;inset:0;background:var(--velo);opacity:0;pointer-events:none;transition:opacity .3s ease;z-index:50}
+.velo.abierto{opacity:1;pointer-events:auto}
+.panel{position:fixed;top:0;right:0;bottom:0;width:460px;max-width:100%;background:var(--surface);border-left:1px solid var(--line);transform:translateX(100%);visibility:hidden;transition:transform .3s var(--ease-drawer),visibility 0s linear .3s;z-index:51;display:flex;flex-direction:column;outline:none}
+.panel.abierto{transform:none;visibility:visible;box-shadow:var(--shadow-lg);transition:transform .4s var(--ease-drawer),visibility 0s}
+.panel.instantaneo,.velo.instantaneo{transition:none}
+.p-top{padding:18px 24px 16px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;gap:12px}
+.p-top h2{flex:1;margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.2;text-wrap:balance}
+.p-cerrar{width:44px;height:44px;flex:0 0 auto;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface-2);color:var(--soft);display:grid;place-items:center;font-size:18px}
+
 /* Responsivo */
+@media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}}
+@media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){
   .side{display:none}.topmovil{display:flex}.navmovil{display:grid}
   main{padding:18px 14px 96px}h1{font-size:23px}
   .aviso{bottom:80px}
+  .buscar{width:100%}.atajos,.kbd{display:none}
+  .filtros .relleno{display:none}
+  .coltabs{display:flex}.tablero{grid-template-columns:minmax(0,1fr)}.col{min-height:0}.col:not(.movil){display:none}
 }
 @view-transition{navigation:auto}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
@@ -131,8 +241,33 @@ html.con-vt .vista{animation:none}
     </header>
     <main id="vista">
       <section class="vista" id="v-tablero">
-        <h1 id="saludo">Buenos días</h1>
+        <div class="cab">
+          <div>
+            <h1 id="saludo">Buenos días</h1>
+            <p class="sub" id="subtit" hidden></p>
+            <div class="meta-dia" id="metadia" hidden><span class="barra" aria-hidden="true"><i></i></span><span></span></div>
+          </div>
+          <label class="buscar" id="buscar" hidden><i class="ph ph-magnifying-glass"></i><input id="q" type="search" autocomplete="off" placeholder="Buscar por nombre o DNI" aria-label="Buscar por nombre o DNI"><span class="kbd">/</span></label>
+        </div>
         <p class="cargando" role="status">Cargando…</p>
+        <div id="tab-cuerpo" hidden>
+          <dl class="kpis" id="kpis"></dl>
+          <section class="cerrados" id="cerrados" hidden aria-labelledby="cerrados-t">
+            <header><h2 id="cerrados-t">Cerrados este mes</h2><button type="button" class="cerrar" id="cerrar-cerrados" aria-label="Cerrar la lista"><i class="ph ph-x"></i></button></header>
+            <ul></ul>
+          </section>
+          <div class="filtros">
+            <div class="seg" id="seg" role="group" aria-label="Tipo de seguimiento (cuántos por contactar)"><span class="pastilla" aria-hidden="true"></span></div>
+            <span class="relleno"></span>
+            <label class="sel-chip"><i class="ph ph-stethoscope"></i><select id="fmed" aria-label="Médico"></select><i class="ph ph-caret-down"></i></label>
+            <label class="sel-chip"><i class="ph ph-heartbeat"></i><select id="fesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
+            <button type="button" class="pill" id="fsin" aria-pressed="false"><i class="ph ph-phone-slash"></i>Solo sin teléfono</button>
+          </div>
+          <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓ ← →</span><span class="kbd">j k</span>moverse</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span></div>
+          <div id="err"></div>
+          <div class="coltabs" id="coltabs" role="tablist" aria-label="Columnas"></div>
+          <section class="tablero" id="tablero" aria-label="Tablero de seguimientos"></section>
+        </div>
       </section>
       <section class="vista" id="v-registro" hidden>
         <h1>Registro</h1>
@@ -156,6 +291,10 @@ html.con-vt .vista{animation:none}
   <button type="button" data-sec="pacientes"><i class="ph ph-users-three"></i>Pacientes</button>
   <button type="button" data-sec="indicadores"><i class="ph ph-chart-line-up"></i>Indicadores</button>
 </nav>
+<div class="velo" id="velo"></div>
+<aside class="panel" id="panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="panel-t">
+  <div class="p-top"><h2 id="panel-t"></h2><button type="button" class="p-cerrar" id="panel-cerrar" aria-label="Cerrar"><i class="ph ph-x"></i></button></div>
+</aside>
 <div class="aviso" id="aviso" role="status" aria-live="polite"><span></span><button type="button" hidden></button></div>
 
 <script>
@@ -208,7 +347,14 @@ const S = {
   usuario: '',      // texto exacto del catálogo ('MAGALY'); '' = sin elegir
   modo: 'claro',
   seccion: 'tablero',
-  tablero: null     // getTablero()
+  tablero: null,    // getTablero() tal cual llegó
+  pacientes: [],    // adaptarTarjeta() de cada tarjeta de las cuatro columnas
+  cerrados: [],     // getTablero().cerrados
+  fase: 'cargando', // 'cargando' | 'listo' | 'error'
+  tipo: '',         // '' | 'REEVALUACION' | 'HIERRO' | 'PROCEDIMIENTO' (seg.tipo, como la app anterior)
+  medico: '', medicoPropuesto: '', esp: '', sinTel: false, q: '',
+  lim: { rec: 6, mes: 4, ant: 3 },
+  colMovil: 1
 };
 
 /* ============ Adaptadores (MAPEO-SERVIDOR.md §0) ============ */
@@ -285,6 +431,9 @@ function elegirUsuario(v) {
   LS.set('seg.usuario', v);
   $$('.js-usuario').forEach(sel => { sel.value = v; });
   pintarSaludo();
+  // La meta y el filtro propuesto se recalculan sin volver a pedir el tablero (getTablero no depende del usuario).
+  proponerMedico();
+  if (S.boot) pintarTablero();
 }
 
 /** Ningún guardado sale sin «¿Quién es usted?». */
@@ -302,6 +451,7 @@ function ir(sec, sinAnim) {
   if (!VISTAS[sec]) sec = 'tablero';
   const cambiar = () => {
     S.seccion = sec;
+    cerrarPanel(true);
     $$('[data-sec]').forEach(b => { if (b.dataset.sec === sec) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     Object.keys(VISTAS).forEach(k => { $('#v-' + k).hidden = k !== sec; });
     if (VISTAS[sec].mostrar) VISTAS[sec].mostrar();
@@ -363,6 +513,401 @@ async function copiar(texto) {
   return ok;
 }
 
+/* ============ Fechas: ISO a mediodía UTC, como el servidor (nunca medianoche) ============ */
+const diaUTC = iso => new Date(String(iso).slice(0, 10) + 'T12:00:00Z');
+const masDias = (iso, n) => { const d = diaUTC(iso); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const diasEntre = (a, b) => Math.round((diaUTC(b) - diaUTC(a)) / 864e5);
+const dm = iso => iso ? String(iso).slice(8, 10) + '/' + String(iso).slice(5, 7) : '';
+const dmy = iso => iso ? dm(iso) + '/' + String(iso).slice(0, 4) : '';
+const DSEM = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const DSEM_LARGO = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const diaSem = iso => DSEM[diaUTC(iso).getUTCDay()] || '';
+const frase = s => { const t = String(s || '').trim().toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+const plural = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+
+/* ============ TABLERO ============ */
+const COLUMNAS = { POR_CONTACTAR: 1, AGENDADO: 2, EN_TRATAMIENTO: 3, COMPLETADO: 4 };
+const TIPO_CORTO = { REEVALUACION: 'reev', HIERRO: 'hier', PROCEDIMIENTO: 'proc' };
+const TIPO_TEXTO = { REEVALUACION: 'Reevaluación', HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento' };
+const AGENDA_CORTA = { CITA: 'cita', LLAMAR: 'llamar', REINTENTAR: 'reintentar', 'SIN RESPUESTA': 'sinrespuesta' };
+const COLS = [
+  { id: 1, t: 'Por contactar', i: 'ph-fill ph-phone-call', vacio: 'No hay pacientes por contactar.', vi: 'ph ph-check-circle' },
+  { id: 2, t: 'Agendado', i: 'ph-fill ph-calendar-check', vacio: 'Sin citas ni llamadas agendadas.', vi: 'ph ph-calendar-blank' },
+  { id: 3, t: 'En tratamiento', i: 'ph-fill ph-drop', vacio: 'Nadie en tratamiento.', vi: 'ph ph-drop' },
+  { id: 4, t: 'Completado / Alta', i: 'ph-fill ph-check-circle', vacio: 'Todavía no hay cierres este mes.', vi: 'ph ph-flag' }
+];
+// Por contactar: el orden es el del servidor (ordenarBandeja); aquí solo se agrupa por días.
+const GRUPOS = [
+  { k: 'rec', t: 'Recientes', r: '30 días o menos', f: d => d <= 30 },
+  { k: 'mes', t: 'Hace 1 a 2 meses', r: '31 a 60 días', f: d => d > 30 && d <= 60 },
+  { k: 'ant', t: 'Más antiguos', r: 'más de 60 días', f: d => d > 60 }
+];
+// Los valores son los de la app anterior, para que seg.tipo recordado siga sirviendo.
+const TIPOS = [['', 'Todos'], ['REEVALUACION', 'Reevaluaciones'], ['HIERRO', 'Hierro'], ['PROCEDIMIENTO', 'Procedimientos']];
+
+/** Estado de teclado: la tarjeta seleccionada y la del panel abierto ('' = ninguna). Ambas son CLAVE (texto). */
+const seleccion = { id: '', panel: '' };
+let orden = {};   // { col: [id, …] } en el orden de pantalla; lo usan las flechas
+
+/**
+ * Tarjeta de getTablero (MAPEO §1.2) -> la forma de la referencia. `id` es la CLAVE como texto.
+ * La columna sale de COLUMNA y la línea, de ETIQUETA: el cliente no las recalcula. `raw` guarda la tarjeta tal cual.
+ */
+function adaptarTarjeta(t) {
+  const n = x => Number(x) || 0;
+  const tipo = t.TIPO_SEGUIMIENTO || 'REEVALUACION', reev = tipo === 'REEVALUACION', col = COLUMNAS[t.COLUMNA] || 0;
+  return {
+    id: String(t.CLAVE), n: nombreBonito(t.NOMBRE), dni: String(t.DNI || ''),
+    tipo, t: TIPO_CORTO[tipo] || 'reev', col,
+    // En hierro y procedimiento ESPECIALIDAD vale 'HIERRO' o 'PROCEDIMIENTO': la de la consulta es otra columna.
+    esp: String((reev ? t.ESPECIALIDAD : t.ESPECIALIDAD_CONSULTA) || ''),
+    med: String(t.MEDICO_ULTIMO || ''),
+    // Reevaluación: desde «debía volver» (no DIAS_ATRASO, que cuenta desde VENCE). Hierro y procedimiento: DIAS.
+    dias: reev ? (t.PROXIMA_ESPERADA ? Math.max(0, diasEntre(t.PROXIMA_ESPERADA, S.hoy)) : 0) : n(t.DIAS),
+    tel: String(t.TELEFONOS || '').split(' / ').map(x => x.trim()).filter(Boolean),
+    malos: Array.isArray(t.TELEFONOS_DESCARTADOS) ? t.TELEFONOS_DESCARTADOS.map(String) : [],
+    usuario: String(t.USUARIO || '').trim(),
+    sinContacto: t.SIN_CONTACTO === true,
+    intentos: n(t.N_SEGUIMIENTOS),
+    perfil: reev ? (n(t.N_REALIZADAS) <= 1 ? 'Paciente nuevo' : 'En control') : '',
+    ultima: t.ULTIMA_CITA || '', debia: t.PROXIMA_ESPERADA || '', cotizo: t.FECHA_COTIZACION || '',
+    proc: tipo === 'PROCEDIMIENTO' ? String(t.DETALLE || '') : '',
+    trat: tipo === 'HIERRO' ? { nombre: String(t.TRATAMIENTO || 'Hierro'), marca: String(t.MARCA || ''), n: n(t.SESIONES), k: n(t.HECHAS),
+      ultima: t.ULTIMA_SESION || '', prox: col === 3 ? t.FECHA_CLAVE || '' : '', atr: n(t.ATRASO) } : null,
+    cita: col === 2 ? { tipo: AGENDA_CORTA[t.AGENDA] || 'cita', f: t.FECHA_AGENDA || t.PROXIMA_AGENDADA || t.FECHA_CLAVE || '' } : null,
+    fin: col === 4 ? String(t.ETIQUETA || '') : '',
+    etiqueta: String(t.ETIQUETA || ''), fechaClave: t.FECHA_CLAVE || '', atraso: n(t.ATRASO), agenda: t.AGENDA || '', intento: n(t.INTENTO),
+    idRegistro: t.ID_REGISTRO || '',
+    oculto: false,
+    raw: t
+  };
+}
+function adaptarTablero(r) {
+  S.tablero = r || null;
+  const cols = (r && r.columnas) || {};
+  S.pacientes = Object.keys(COLUMNAS).flatMap(c => (cols[c] || []).map(adaptarTarjeta));
+  S.cerrados = (r && Array.isArray(r.cerrados)) ? r.cerrados : [];
+}
+
+const activos = p => p.tel.filter(x => !p.malos.includes(x));
+const nombreDe = p => p.n || 'DNI ' + p.dni;
+function tagDe(p) {
+  if (p.t === 'reev') return 'Reevaluación';
+  if (p.t === 'proc') return p.proc || 'Procedimiento';
+  const tr = p.trat, entre = /\(([^)]+)\)/.exec(tr.nombre);
+  const corto = tr.marca || (entre ? entre[1] : frase(tr.nombre.replace(/^hierro\s*/i, '')) || 'Hierro');
+  return corto + (tr.n ? ' × ' + tr.n : '');
+}
+function contactoHtml(p, clase) {
+  const tel = activos(p)[0];
+  if (tel) return `<span class="${clase}"><i class="ph ph-phone"></i><span class="mono">${esc(telBonito(tel))}</span></span>`;
+  if (p.usuario) return `<span class="${clase}"><i class="ph ph-at"></i>${esc(p.usuario)}</span>`;
+  return `<span class="${clase} sin"><i class="ph ph-phone-slash"></i>Sin teléfono</span>`;
+}
+function chipDe(p) {
+  const f = p.cita.f, k = p.cita.tipo;
+  const txt = k === 'llamar' ? `Llamar ${diaSem(f)} ${dm(f)}` : k === 'reintentar' ? `Reintentar ${dm(f)}`
+    : k === 'sinrespuesta' ? `Se cierra ${dm(f)}` : `Cita ${diaSem(f)} ${dm(f)}`;
+  const ic = k === 'llamar' ? 'ph-phone-call' : k === 'reintentar' ? 'ph-arrow-clockwise' : k === 'sinrespuesta' ? 'ph-phone-x' : 'ph-calendar-blank';
+  return `<span class="chip-fecha${k === 'sinrespuesta' ? ' mal' : ''}"><i class="ph ${ic}"></i>${esc(txt)}</span>`;
+}
+function tarjetaHtml(p) {
+  const tag = tagDe(p);
+  const sub = [medicoCorto(p.med), p.t === 'reev' ? p.perfil : p.t === 'hier' ? p.trat.nombre : 'Procedimiento',
+    p.col === 1 && p.intentos ? plural(p.intentos, 'intento', 'intentos') : ''].filter(Boolean).join(' · ');
+  const mal = p.atraso > 0 || p.agenda === 'SIN RESPUESTA';
+  const etq = p.col !== 4 && p.etiqueta ? `<div class="etq${mal ? ' mal' : ''}">${esc(p.etiqueta)}</div>` : '';
+  const prog = p.col === 3 && p.trat && p.trat.n
+    ? `<div class="prog" aria-hidden="true">${Array.from({ length: p.trat.n }, (_, i) => `<i class="${i < p.trat.k ? 'si' : ''}"></i>`).join('')}</div>` : '';
+  let pie;
+  if (p.col === 2) pie = chipDe(p) + contactoHtml(p, 'der');
+  else if (p.col === 4) pie = `<span class="izq ok"><i class="ph-fill ph-check-circle"></i>${esc(p.fin)}</span>`;
+  else pie = contactoHtml(p, 'izq');
+  return `<article class="tarjeta${seleccion.id === p.id ? ' sel' : ''}" data-card="${esc(p.id)}" tabindex="0" role="button" aria-label="${esc(nombreDe(p))}, ${esc(tag)}">`
+    + `<div class="t1"><b>${esc(nombreDe(p))}</b><span class="tag t-${p.t}">${esc(tag)}</span></div><div class="t2">${esc(sub)}</div>${prog}${etq}<div class="t3">${pie}</div></article>`;
+}
+
+/** Filtros de la pantalla. conTipo = false da la base de los números del segmentado. */
+function filtrados(conTipo) {
+  const palabras = norm(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '');
+  return S.pacientes.filter(p => !p.oculto
+    && (!S.medico || norm(p.med) === norm(S.medico))
+    && (!S.esp || norm(p.esp) === norm(S.esp))
+    && (!S.sinTel || p.sinContacto)
+    && (!palabras.length || (digitos && p.dni.includes(digitos)) || palabras.every(w => norm(p.n).includes(w)))
+    && (!conTipo || !S.tipo || p.tipo === S.tipo));
+}
+const hayFiltros = () => !!(S.tipo || S.medico || S.esp || S.sinTel || S.q.trim());
+
+/** Al médico se le propone su filtro; puede cambiarlo a «Todos» (D2). Si deja de serlo, se quita lo propuesto. */
+function proponerMedico() {
+  const u = yo();
+  if (u && u.med) { S.medico = u.med; S.medicoPropuesto = u.med; }
+  else if (S.medicoPropuesto) { if (S.medico === S.medicoPropuesto) S.medico = ''; S.medicoPropuesto = ''; }
+}
+
+/** Meta del día: lo que registró HOY quien usa la app (hechosHoyPor), no el total del equipo (hechosHoy). */
+function pintarMeta() {
+  const md = $('#metadia'), meta = Number(S.reglas && S.reglas.metaDiaria) || 0;
+  md.hidden = !meta;
+  if (!meta) return;
+  const barra = md.querySelector('.barra i'), texto = md.lastElementChild;
+  if (!S.usuario) {
+    md.className = 'meta-dia sin';
+    barra.style.transform = 'scaleX(0)';
+    texto.textContent = 'Elija quién es usted';
+    return;
+  }
+  const por = (S.tablero && S.tablero.cifras && S.tablero.cifras.hechosHoyPor) || {};
+  const k = Object.keys(por).find(x => x === S.usuario) || Object.keys(por).find(x => norm(x) === norm(S.usuario));
+  const hechos = k ? Number(por[k]) || 0 : 0, sabe = S.fase === 'listo', ok = sabe && hechos >= meta;
+  md.className = 'meta-dia' + (ok ? ' ok' : '');
+  barra.style.transform = `scaleX(${sabe ? Math.min(1, hechos / meta) : 0})`;
+  texto.textContent = ok ? `Meta del día cumplida · ${hechos} seguimientos` : `Hoy: ${sabe ? hechos : '—'} de ${meta} seguimientos`;
+}
+
+function pintarCerrados() {
+  $('#cerrados ul').innerHTML = S.cerrados.length ? S.cerrados.map(c => `<li><b>${esc(nombreBonito(c.NOMBRE) || 'DNI ' + c.DNI)}</b>`
+    + `<span>${esc(TIPO_TEXTO[c.TIPO_SEGUIMIENTO] || 'Todos sus seguimientos')}</span><span>${esc(frase(c.CIERRE))}</span>`
+    + `<span class="mono">${esc(dmy(String(c.FECHA_CIERRE || '').slice(0, 10)))}</span></li>`).join('') : '<li>No hay cierres este mes.</li>';
+}
+function verCerrados(ver) {
+  $('#cerrados').hidden = !ver;
+  const b = $('#ver-cerrados');
+  if (b) b.setAttribute('aria-expanded', String(ver));
+  if (ver) pintarCerrados();
+}
+
+let tableroIniciado = false;
+/** Una vez, tras bootstrap: llena los selectores, arma el segmentado y las pestañas, y conecta los eventos. */
+function iniciarTablero() {
+  const t = LS.get('seg.tipo');
+  S.tipo = TIPOS.some(([k]) => k === t) ? t : '';
+  proponerMedico();
+  $('#fmed').innerHTML = '<option value="">Todos los médicos</option>'
+    + S.boot.medicos.map(m => `<option value="${esc(m.k)}" title="${esc(m.full)}">${esc(m.short)}</option>`).join('');
+  $('#fesp').innerHTML = '<option value="">Todas las especialidades</option>'
+    + S.boot.especialidades.map(e => `<option value="${esc(e)}">${esc(frase(e))}</option>`).join('');
+  $('#seg').insertAdjacentHTML('beforeend', TIPOS.map(([k, l]) => `<button type="button" data-tipo="${k}" aria-pressed="false">${l} <span class="n">—</span></button>`).join(''));
+  $('#coltabs').innerHTML = COLS.map(c => `<button type="button" class="pill" role="tab" data-ct="${c.id}" aria-selected="false">${c.t} <span class="mono">—</span></button>`).join('');
+  $('#seg').addEventListener('click', e => {
+    const b = e.target.closest('[data-tipo]'); if (!b) return;
+    S.tipo = b.dataset.tipo; LS.set('seg.tipo', S.tipo); pintarTablero();
+  });
+  $('#coltabs').addEventListener('click', e => { const b = e.target.closest('[data-ct]'); if (b) { S.colMovil = Number(b.dataset.ct); pintarTablero(); } });
+  $('#fmed').addEventListener('change', e => { S.medico = e.target.value; pintarTablero(); });
+  $('#fesp').addEventListener('change', e => { S.esp = e.target.value; pintarTablero(); });
+  $('#fsin').addEventListener('click', () => { S.sinTel = !S.sinTel; pintarTablero(); });
+  $('#q').addEventListener('input', e => { S.q = e.target.value; pintarTablero(); });
+  $('#kpis').addEventListener('click', e => { if (e.target.closest('#ver-cerrados')) verCerrados($('#cerrados').hidden); });
+  $('#cerrar-cerrados').addEventListener('click', () => { verCerrados(false); const b = $('#ver-cerrados'); if (b) b.focus(); });
+  $('#err').addEventListener('click', e => { if (e.target.closest('#reint')) cargarTablero(); });
+  $('#tablero').addEventListener('click', e => {
+    const mas = e.target.closest('[data-mas]');
+    if (mas) { S.lim[mas.dataset.mas] += 10; pintarTablero(); return; }
+    if (e.target.closest('.js-quitar')) {
+      Object.assign(S, { tipo: '', medico: '', esp: '', sinTel: false, q: '' });
+      LS.set('seg.tipo', '');
+      $('#q').value = '';
+      pintarTablero();
+    }
+  });
+  ['#subtit', '#metadia', '#buscar', '#tab-cuerpo'].forEach(s => { $(s).hidden = false; });
+  $('#v-tablero .cargando').hidden = true;
+  tableroIniciado = true;
+  pintarTablero();
+  pastilla($('#seg'), true);
+}
+
+/** Pide getTablero (o usa el pedido del arranque) y pinta. Solo vale la última respuesta. */
+async function cargarTablero(pedido) {
+  const n = cargarTablero.n = (cargarTablero.n || 0) + 1;
+  S.fase = 'cargando';
+  pintarTablero();
+  try {
+    const r = await (pedido || llamar('getTablero'));
+    if (n !== cargarTablero.n) return;
+    adaptarTablero(r);
+    S.fase = 'listo';
+  } catch (e) {
+    if (n !== cargarTablero.n) return;
+    S.fase = 'error';
+  }
+  pintarTablero();
+  // Cascada solo en la primera carga, y nunca con movimiento reducido.
+  if (S.fase === 'listo' && !cargarTablero.ya && !reducido) {
+    $$('#tablero .tarjeta').forEach((el, i) => el.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+      { duration: 260, delay: Math.min(i * 30, 240), easing: 'cubic-bezier(.23,1,.32,1)', fill: 'backwards' }));
+  }
+  if (S.fase === 'listo') cargarTablero.ya = true;
+}
+
+function pintarTablero() {
+  if (!tableroIniciado) return;
+  const cargando = S.fase === 'cargando', listo = S.fase === 'listo';
+  const vis = listo ? filtrados(true) : [], base = listo ? filtrados(false) : [];
+  const enCol = c => vis.filter(p => p.col === c);
+  const nCol = c => listo ? enCol(c).length : '—';
+  const u = yo(), soloSuyos = !!(u && u.med && S.medico === u.med);
+  const d = diaUTC(S.hoy).getUTCDay();
+  $('#subtit').textContent = `${DSEM_LARGO[d] || ''} ${dmy(S.hoy)}${listo ? ' · ' + nCol(1) + ' por contactar' : ''}${soloSuyos ? ' · solo sus pacientes' : ''}`;
+  pintarMeta();
+
+  // Cifras: siguen a los filtros, como las columnas.
+  const hoy6 = masDias(S.hoy, 6);
+  const nunca = enCol(1).filter(p => !p.intentos).length;
+  const semana = enCol(2).filter(p => p.agenda === 'CITA' && p.cita.f && p.cita.f <= hoy6).length;
+  const atr = enCol(1).filter(p => p.atraso > 0).length;   // las sesiones atrasadas están en Por contactar
+  const nc = S.cerrados.length;
+  const enlace = listo && nc ? ` · <button type="button" class="enlace" id="ver-cerrados" aria-controls="cerrados" aria-expanded="${!$('#cerrados').hidden}">${plural(nc, 'cerrado', 'cerrados')} este mes</button>` : '';
+  $('#kpis').innerHTML = [
+    ['Por contactar', nCol(1), listo ? esc(`${nunca} sin ningún intento`) : ''],
+    ['Agendados', nCol(2), listo ? esc(`${plural(semana, 'cita', 'citas')} esta semana`) : ''],
+    ['En tratamiento', nCol(3), listo ? (atr ? esc(plural(atr, 'sesión atrasada', 'sesiones atrasadas')) : 'ninguna atrasada') : '', listo && atr],
+    ['Completados en el mes', nCol(4), listo ? 'volvieron, completaron o alta' + enlace : '']
+  ].map(([l, v, s, mal]) => `<div><dt>${l}</dt><dd>${v}</dd><span class="${mal ? 'mal' : ''}">${s || '&nbsp;'}</span></div>`).join('');
+  if (!listo) verCerrados(false);
+  else if (!$('#cerrados').hidden) pintarCerrados();
+
+  // Filtros
+  const c1 = base.filter(p => p.col === 1);
+  $$('#seg [data-tipo]').forEach(b => {
+    const k = b.dataset.tipo;
+    b.setAttribute('aria-pressed', String(S.tipo === k));
+    b.querySelector('.n').textContent = listo ? (k ? c1.filter(p => p.tipo === k).length : c1.length) : '—';
+  });
+  pastilla($('#seg'));
+  $('#fmed').value = S.medico;
+  if ($('#fmed').value !== S.medico) S.medico = $('#fmed').value;   // un médico que no está en la lista: sin filtro
+  $('#fesp').value = S.esp;
+  $('#fsin').setAttribute('aria-pressed', String(S.sinTel));
+  if ($('#q').value !== S.q) $('#q').value = S.q;
+
+  $('#err').innerHTML = S.fase === 'error' ? '<div class="error" role="alert"><i class="ph ph-warning-circle"></i><div><b>No se pudo cargar el tablero.</b>'
+    + 'Revise la conexión e intente de nuevo. Lo que ya registró está guardado.</div>'
+    + '<button type="button" class="btn btn-p" id="reint"><i class="ph ph-arrow-clockwise"></i>Reintentar</button></div>' : '';
+  $$('#coltabs [data-ct]').forEach(b => {
+    b.setAttribute('aria-selected', String(S.colMovil === Number(b.dataset.ct)));
+    b.querySelector('.mono').textContent = nCol(Number(b.dataset.ct));
+  });
+
+  // Columnas
+  const foco = document.activeElement && document.activeElement.closest && document.activeElement.closest('#tablero [data-card]');
+  const T = $('#tablero');
+  T.hidden = S.fase === 'error';
+  $('#coltabs').hidden = S.fase === 'error';
+  orden = {};
+  T.innerHTML = COLS.map(c => {
+    const L = enCol(c.id), ids = [];
+    const pintar = lista => { lista.forEach(p => ids.push(p.id)); return lista.map(tarjetaHtml).join(''); };
+    let html = '';
+    if (cargando) html = '<div class="skel" aria-hidden="true"><i></i><i></i><i></i></div>'.repeat(c.id === 1 ? 3 : 2);
+    else if (!L.length) {
+      html = `<div class="vacio"><i class="${c.vi}"></i><span>${hayFiltros() ? 'Nadie con estos filtros.' : c.vacio}</span>`
+        + `${hayFiltros() ? '<button type="button" class="pill js-quitar">Quitar filtros</button>' : ''}</div>`;
+    } else if (c.id === 1) {
+      html = GRUPOS.map(g => {
+        const todos = L.filter(p => g.f(p.dias));
+        if (!todos.length) return '';
+        const vistos = todos.slice(0, S.lim[g.k]), resto = todos.length - vistos.length;
+        return `<h3 data-grupo="${g.k}">${g.t}<span>${g.r}</span><span class="n">${todos.length}</span></h3>${pintar(vistos)}`
+          + (resto > 0 ? `<button type="button" class="vermas" data-mas="${g.k}">Ver ${Math.min(resto, 10)} más de ${resto}<i class="ph ph-caret-down"></i></button>` : '');
+      }).join('');
+    } else if (c.id === 2) {
+      const pronto = L.filter(p => !p.fechaClave || p.fechaClave <= hoy6), luego = L.filter(p => p.fechaClave && p.fechaClave > hoy6);
+      html = [['semana', 'Esta semana', pronto], ['despues', 'Más adelante', luego]].filter(g => g[2].length)
+        .map(([k, t, lista]) => `<h3 data-grupo="${k}">${t}<span class="n">${lista.length}</span></h3>${pintar(lista)}`).join('');
+    } else html = pintar(L);
+    orden[c.id] = ids;
+    return `<div class="col${c.id !== 1 ? ' fija' : ''}${S.colMovil === c.id ? ' movil' : ''}" data-col="${c.id}" role="region" aria-label="${c.t}">`
+      + `<h2><i class="${c.i}"></i>${c.t}<span class="n">${nCol(c.id)}</span></h2>${html}</div>`;
+  }).join('');
+  if (foco) { const el = tarjetaEl(seleccion.id); if (el) el.focus({ preventScroll: true }); }
+}
+
+/* ============ Selección y teclado ============ */
+const tarjetaEl = id => $$('#tablero [data-card]').find(el => el.dataset.card === id) || null;
+function seleccionar(id, enfocar) {
+  seleccion.id = id;
+  $$('#tablero .tarjeta.sel').forEach(x => { if (x.dataset.card !== id) x.classList.remove('sel'); });
+  const el = tarjetaEl(id);
+  if (el) { el.classList.add('sel'); if (enfocar) el.focus(); }
+}
+document.addEventListener('focusin', e => { const c = e.target.closest && e.target.closest('#tablero [data-card]'); if (c && c.dataset.card !== seleccion.id) seleccionar(c.dataset.card); });
+document.addEventListener('click', e => { const c = e.target.closest('#tablero [data-card]'); if (c) { seleccionar(c.dataset.card); abrirPanel(c.dataset.card); } });
+
+/** C: copia el primer teléfono vigente (sin espacios) o el usuario @. */
+function copiarContacto(p) {
+  if (!p) return;
+  const c = activos(p)[0] || p.usuario;
+  if (c) copiar(c); else avisar(nombreDe(p) + ' no tiene teléfono registrado.');
+}
+
+document.addEventListener('keydown', e => {
+  if (!tableroIniciado) return;
+  const tag = e.target.tagName, enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || e.target.isContentEditable;
+  if (e.key === 'Escape') {
+    if (seleccion.panel) { e.preventDefault(); cerrarPanel(false, true); } else if (enCampo) e.target.blur();
+    return;
+  }
+  if (enCampo || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (seleccion.panel) {
+    if (e.key === 'c' || e.key === 'C') copiarContacto(S.pacientes.find(p => p.id === seleccion.panel));
+    return;
+  }
+  if (S.seccion !== 'tablero' || S.fase !== 'listo') return;
+  if (e.key === '/') { e.preventDefault(); $('#q').focus(); return; }
+  if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+  // Solo columnas que se ven (en el celular, la de la pestaña).
+  const cols = Object.keys(orden).map(Number).filter(c => orden[c].length && tarjetaEl(orden[c][0]) && tarjetaEl(orden[c][0]).offsetParent);
+  if (!cols.length) return;
+  let ci = -1, ii = -1;
+  cols.forEach(c => { const i = orden[c].indexOf(seleccion.id); if (i >= 0) { ci = c; ii = i; } });
+  const mover = id => { e.preventDefault(); seleccionar(id, true); };
+  const abajo = e.key === 'ArrowDown' || e.key === 'j', arriba = e.key === 'ArrowUp' || e.key === 'k';
+  if (abajo || arriba || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    if (ci < 0) return mover(orden[cols[0]][0]);
+    const L = orden[ci];
+    if (abajo) return mover(L[Math.min(ii + 1, L.length - 1)]);
+    if (arriba) return mover(L[Math.max(ii - 1, 0)]);
+    const pos = cols.indexOf(ci) + (e.key === 'ArrowRight' ? 1 : -1);
+    if (pos < 0 || pos >= cols.length) return e.preventDefault();
+    const N = orden[cols[pos]];
+    return mover(N[Math.min(ii, N.length - 1)]);
+  }
+  if (ci < 0) return;
+  if (e.key === 'Enter') { e.preventDefault(); abrirPanel(seleccion.id, true); }
+  else if (e.key === 'c' || e.key === 'C') copiarContacto(S.pacientes.find(p => p.id === seleccion.id));
+});
+
+/* ============ Panel mínimo (Tarea 5): solo el nombre. Lo reemplaza el panel «¿Qué pasó?» de la Tarea 6 ============ */
+/** Abre el panel de la tarjeta `id`. Con el teclado aparece al instante (sin animación). */
+function abrirPanel(id, teclado) {
+  const p = S.pacientes.find(x => x.id === id);
+  if (!p) return;
+  seleccion.panel = id;
+  const inst = !!teclado || reducido;
+  $('#panel').classList.toggle('instantaneo', inst);
+  $('#velo').classList.toggle('instantaneo', inst);
+  $('#panel-t').textContent = nombreDe(p);
+  $('#panel').classList.add('abierto');
+  $('#velo').classList.add('abierto');
+  $('#panel').focus({ preventScroll: true });
+}
+/** Cierra el panel. silencio: no devuelve el foco a la tarjeta (al cambiar de pantalla). */
+function cerrarPanel(silencio, teclado) {
+  if (!seleccion.panel) return;
+  const id = seleccion.panel;
+  seleccion.panel = '';
+  if (teclado) { $('#panel').classList.add('instantaneo'); $('#velo').classList.add('instantaneo'); }
+  $('#panel').classList.remove('abierto');
+  $('#velo').classList.remove('abierto');
+  if (!silencio) { const el = tarjetaEl(id); if (el) el.focus({ preventScroll: true }); }
+}
+$('#velo').addEventListener('click', () => cerrarPanel());
+$('#panel-cerrar').addEventListener('click', () => cerrarPanel());
+VISTAS.tablero.mostrar = () => pastilla($('#seg'), true);
+
 /* ============ Arranque ============ */
 async function iniciar() {
   S.modo = LS.get('seg.modo') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro');
@@ -376,6 +921,9 @@ async function iniciar() {
   addEventListener('resize', () => $$('.seg').forEach(s => pastilla(s)));
   if (document.fonts) document.fonts.ready.then(() => $$('.seg').forEach(s => pastilla(s, true)));
   ir('tablero', true);
+  // bootstrap y getTablero en paralelo: getTablero no depende del usuario.
+  const pedidoTablero = llamar('getTablero');
+  pedidoTablero.catch(() => { /* lo atiende cargarTablero */ });
   let b;
   try {
     b = await llamar('bootstrap');
@@ -391,6 +939,8 @@ async function iniciar() {
   S.usuario = S.boot.usuarios.some(u => u.v === recordado) ? recordado : '';
   pintarUsuarios();
   pintarSaludo();
+  iniciarTablero();
+  cargarTablero(pedidoTablero);
 }
 
 /* ==========================================================================
@@ -579,6 +1129,15 @@ const DEMO = (() => {
     reev({ DNI: '41999000', NOMBRE: 'ROSA AMELIA CÁRDENAS RÍOS', TELEFONOS: '933999000', ULTIMA_CITA: '2026-07-02', ESTADO: 'CERRADO',
       CIERRE: 'FALLECIÓ', FECHA_CIERRE: '2026-09-24' })
   ];
+  // Relleno (Tarea 5): 14 reevaluaciones vencidas hace 15 a 28 días, para que «Recientes» tenga más de las 6 que
+  // muestra y aparezca «Ver 10 más de N». Nombres inventados; cada una debía volver hace 15 + i días.
+  const RELLENO = ['ADRIANA BEATRIZ SOTO LEÓN', 'BRUNO ALEJANDRO PAZ RIVAS', 'CECILIA MARTA QUISPE ORTIZ', 'DANIEL ERNESTO VILCA RAMOS',
+    'ESTHER JULIA MAMANI CRUZ', 'FERNANDO JOSÉ TAPIA LUNA', 'GABRIELA INÉS ROJAS MEZA', 'HUGO RENATO CHÁVEZ SALAS', 'IRMA LUCÍA FLORES VEGA',
+    'JAVIER ANDRÉS POMA DÍAZ', 'KARINA ELENA RÍOS CANO', 'LORENZO PABLO HUAMÁN GIL', 'MÓNICA ROSA ARIAS TELLO', 'NÉSTOR IVÁN CUEVA PRADO'];
+  const relleno = RELLENO.map((NOMBRE, i) => reev({ DNI: String(42000101 + i), NOMBRE, TELEFONOS: String(951000101 + i),
+    ESPECIALIDAD: i % 4 === 3 ? 'REUMATOLOGÍA' : 'HEMATOLOGÍA', MEDICO_ULTIMO: i % 4 === 3 ? HANAMPA : i % 2 ? KAREN : ELI,
+    ULTIMA_CITA: mas(hoy, -(45 + i)), N_REALIZADAS: i % 3 ? 2 : 1 }));
+  series.push(...relleno);
   const serie = (dni, esp) => series.find(s => s.DNI === dni && mismo(s.ESPECIALIDAD, esp));
 
   /* ---- Indicaciones antiguas (INDICACIONES) y sus filas de seguimiento ---- */
@@ -632,7 +1191,7 @@ const DEMO = (() => {
   delete T.elena.TELEFONOS;
   T.elena.SIN_CONTACTO = false;
   T.carmen.TELEFONOS_DESCARTADOS = ['998877665'];
-  const tarjetas = Object.keys(T).map(k => T[k]);
+  const tarjetas = Object.keys(T).map(k => T[k]).concat(relleno.map(f => ubicar(f, 'POR_CONTACTAR')));
   const cerrados = [
     { CLAVE: '41888999|REUMATOLOGÍA', DNI: '41888999', NOMBRE: 'HÉCTOR MANUEL SILVA PRADO', TIPO_SEGUIMIENTO: 'REEVALUACION', CIERRE: 'SE ATIENDE EN OTRO LUGAR', FECHA_CIERRE: '2026-09-20' },
     { CLAVE: '41999000', DNI: '41999000', NOMBRE: 'ROSA AMELIA CÁRDENAS RÍOS', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: '2026-09-24' }

@@ -390,7 +390,7 @@ td.n,th.n{text-align:right}
       <form id="f-reg" class="form-reg" autocomplete="off" novalidate>
         <fieldset><legend>1 · Paciente</legend>
           <label class="campo">DNI o carné de extranjería <input id="g-dni" class="entrada" maxlength="12"></label>
-          <p id="g-conocido" class="muted" aria-live="polite"></p>
+          <div id="g-conocido" class="muted" aria-live="polite"></div>
           <label class="campo solo-ind">Nombres y apellidos <input id="g-nombre" class="entrada"></label>
           <label class="campo solo-ind">Teléfono o usuario <input id="g-contacto" class="entrada"></label>
           <label class="campo">Fecha <input id="g-fecha" class="entrada" type="date"></label>
@@ -1040,7 +1040,7 @@ async function buscarDni() {
   if (!r.encontrado) {
     $('#g-conocido').innerHTML = aviso + 'Todavía no está en SOFDOC. Puede registrarlo igual.';
   } else {
-    $('#g-conocido').innerHTML = aviso + `Paciente conocido · última consulta ${fechaCorta(r.ultimaFecha)} con ${medicoCorto(r.ultimoMedico)}`;
+    $('#g-conocido').innerHTML = aviso + `Paciente conocido · última consulta ${esc(fechaCorta(r.ultimaFecha))} con ${esc(medicoCorto(r.ultimoMedico))}`;
     if (!$('#g-nombre').value.trim()) $('#g-nombre').value = r.nombre;
     if (!$('#g-contacto').value.trim() && r.telefonos.length) $('#g-contacto').value = r.telefonos[0];
     if (!$('#g-doctor').value && r.doctor) $('#g-doctor').value = r.doctor;
@@ -1248,10 +1248,11 @@ function pintarFicha(p) {
       'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || esc(String(r).toLowerCase());
   };
   const claveSeg = s => s.DNI + '|' + s.ESPECIALIDAD + '|' + (s.REFERENCIA || '');
+  const ordenados = p.seguimientos.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : 1);
   const ultimoDe = {};
-  p.seguimientos.filter(s => s.ANULADO !== 'SÍ').forEach(s => { ultimoDe[claveSeg(s)] = s.ID; });
+  ordenados.filter(s => s.ANULADO !== 'SÍ').forEach(s => { ultimoDe[claveSeg(s)] = s.ID; });
   const seguimientos = p.seguimientos.length
-    ? `<ol class="historia">${p.seguimientos.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : 1).map(s => {
+    ? `<ol class="historia">${ordenados.map(s => {
         const anulado = s.ANULADO === 'SÍ';
         const puede = !anulado && String(s.ID).startsWith('SEG-') && (s.RESULTADO === 'FALLECIÓ' || ultimoDe[claveSeg(s)] === s.ID);
         return `<li class="${anulado ? 'anulado' : ''}"><b>${fechaCorta(s.FECHA_HORA).slice(0, 5)} ${esc(s.RESPONSABLE)}:</b> ${textoRes(s)}

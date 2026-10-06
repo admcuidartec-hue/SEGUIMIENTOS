@@ -666,6 +666,7 @@ test('ficha: la historia dice qué pasó, tacha lo anulado y deja anular el últ
     await pagina.waitForSelector('.historia li');
     const linea = await pagina.locator('.historia li').last().textContent();
     assert.match(linea, /MAGALY: lo pensará · llamar el 02\/10/);
+    assert.equal(await pagina.locator('.historia li:not(:last-child) [data-anular-seg]').count(), 0, 'solo el último resultado se puede anular');
     await pagina.locator('.historia [data-anular-seg]').last().click();
     await pagina.fill('#g-motivo', 'me equivoqué');
     await pagina.locator('[data-confirmar-anular]').click();

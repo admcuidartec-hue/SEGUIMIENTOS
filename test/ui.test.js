@@ -1090,3 +1090,92 @@ test('panel: el alta de hierro o procedimiento no pide fecha; «Agendó cita» p
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+/** Arrastra con el ratón una tarjeta hasta el centro de una columna. soltar:false deja el botón pulsado. */
+async function arrastrar(pagina, id, col, opciones = {}) {
+  const o = await pagina.evaluate(([id, col]) => {
+    const el = [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id);
+    el.scrollIntoView({ block: 'center' });   // el ratón de Playwright no desplaza la página
+    const t = el.getBoundingClientRect(), c = document.querySelector(`#tablero [data-col="${col}"]`).getBoundingClientRect();
+    return { x: t.left + t.width / 2, y: t.top + 20, cx: c.left + c.width / 2, cy: Math.min(Math.max(c.top + 40, 60), innerHeight - 60) };
+  }, [id, col]);
+  await pagina.mouse.move(o.x, o.y);
+  await pagina.mouse.down();
+  await pagina.mouse.move(o.x + 3, o.y + 2);   // menos de 6 px: aún no arranca
+  if (opciones.alMedio) await opciones.alMedio();
+  await pagina.mouse.move(o.cx, o.cy, { steps: 8 });
+  if (opciones.sinSoltar) return;
+  await pagina.mouse.up();
+}
+const panelAbierto = pagina => pagina.evaluate(() => document.getElementById('panel').classList.contains('abierto'));
+
+test('arrastrar: soltar una reevaluación en Agendado abre «Agendó cita» y no guarda nada', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const antes = await llamadas(pagina, 'registrarResultado');
+    await arrastrar(pagina, LUIS, 2, { alMedio: async () => {
+      assert.equal(await pagina.locator('.tarjeta.fantasma').count(), 0, 'a menos de 6 px no hay copia');
+    } });
+    await pagina.waitForFunction(() => document.getElementById('panel').classList.contains('abierto'));
+    assert.equal(await pagina.evaluate(() => P.paso && P.paso.k), 'agendo');
+    assert.match(await pagina.locator('#panel .paso').textContent(), /Agendó cita/);
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
+    assert.equal(await colPintada(pagina, LUIS), '1', 'la tarjeta sigue en su columna hasta confirmar');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), antes, 'soltar no guarda');
+    assert.equal(await pagina.locator('.col.puede, .col.no, .col.sobre').count(), 0);
+    // Reevaluación a Completado: «Alta médica». Procedimiento: «Lo hizo». Hierro con sesiones pendientes a Completado: no vale.
+    await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
+    await arrastrar(pagina, LUIS, 4);
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'alta');
+    await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
+    await arrastrar(pagina, PEDRO, 4);
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
+    await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
+    // Hierro con sesiones pendientes a En tratamiento: abre «Lo hizo».
+    await arrastrar(pagina, ROSA, 3);
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), antes);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('arrastrar: una columna no válida devuelve la copia y avisa; Completado no se arrastra', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await arrastrar(pagina, LUIS, 3, { sinSoltar: true });
+    assert.equal(await pagina.locator('.tarjeta.fantasma').count(), 1);
+    assert.equal(await pagina.locator('.col[data-col="3"].no').count(), 1, 'En tratamiento sale atenuada');
+    assert.equal(await pagina.locator('.col[data-col="2"].puede').count(), 1);
+    await pagina.mouse.up();
+    assert.equal(await aviso(pagina), 'En tratamiento es solo para hierro con sesiones pendientes.');
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'), null, { timeout: 2000 });
+    assert.equal(await colPintada(pagina, LUIS), '1');
+    assert.equal(await panelAbierto(pagina), false);
+    // Hierro en su sesión 2 de 3 (Sofía, En tratamiento) hacia Completado: no vale (faltan sesiones).
+    await arrastrar(pagina, SOFIA, 4);
+    assert.equal(await panelAbierto(pagina), false);
+    // Por contactar nunca es válida.
+    await arrastrar(pagina, SOFIA, 1);
+    assert.match(await aviso(pagina), /Vuelve sola a «Por contactar»/);
+    // Completado: sin copia.
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
+    await arrastrar(pagina, TERESA, 2, { sinSoltar: true });
+    assert.equal(await pagina.locator('.tarjeta.fantasma').count(), 0);
+    await pagina.mouse.up();
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('arrastrar: a 390 px no hay arrastre', async () => {
+  const { navegador, pagina, errores } = await abrirTablero({ viewport: { width: 390, height: 844 } });
+  try {
+    const o = await pagina.evaluate(() => { const r = document.querySelector('#tablero .col.movil [data-card]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 20 }; });
+    await pagina.mouse.move(o.x, o.y); await pagina.mouse.down();
+    await pagina.mouse.move(o.x + 60, o.y + 80, { steps: 6 });
+    assert.equal(await pagina.locator('.tarjeta.fantasma').count(), 0);
+    await pagina.mouse.up();
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

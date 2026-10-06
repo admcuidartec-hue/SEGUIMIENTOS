@@ -284,6 +284,13 @@ html.con-vt .vista{animation:none}
 .chispa{position:fixed;width:6px;height:6px;z-index:90;pointer-events:none}
 .chispa.c0{background:var(--good)}.chispa.c1{background:var(--warn);border-radius:50%}.chispa.c2{background:var(--accent)}.chispa.c3{background:var(--info);border-radius:50%}
 
+.col.puede{box-shadow:inset 0 0 0 1.5px var(--line-2)}
+.col.sobre{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
+.col.no{opacity:.55}
+.tarjeta.fantasma{position:fixed;margin:0;z-index:80;pointer-events:none;box-shadow:var(--shadow-lg);will-change:transform;cursor:grabbing}
+.tarjeta.fantasma::after{display:none}
+body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
+
 /* Responsivo */
 @media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -347,7 +354,7 @@ html.con-vt .vista{animation:none}
             <label class="sel-chip"><i class="ph ph-heartbeat"></i><select id="fesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
             <button type="button" class="pill" id="fsin" aria-pressed="false"><i class="ph ph-phone-slash"></i>Solo sin teléfono</button>
           </div>
-          <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓ ← →</span><span class="kbd">j k</span>moverse</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">1–4</span>qué pasó</span><span><span class="kbd">X</span>cerrar seguimiento</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span></div>
+          <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓ ← →</span><span class="kbd">j k</span>moverse</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">1–4</span>qué pasó</span><span><span class="kbd">X</span>cerrar seguimiento</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span><span>o arrastre una tarjeta a otra columna</span></div>
           <div id="err"></div>
           <div class="coltabs" id="coltabs" role="tablist" aria-label="Columnas"></div>
           <section class="tablero" id="tablero" aria-label="Tablero de seguimientos"></section>
@@ -925,6 +932,82 @@ function seleccionar(id, enfocar) {
 }
 document.addEventListener('focusin', e => { const c = e.target.closest && e.target.closest('#tablero [data-card]'); if (c && c.dataset.card !== seleccion.id) seleccionar(c.dataset.card); });
 document.addEventListener('click', e => { const c = e.target.closest('#tablero [data-card]'); if (c) { seleccionar(c.dataset.card); abrirPanel(c.dataset.card); } });
+
+/* ---- Arrastrar y soltar (README §8): solo abre el paso, nunca guarda ---- */
+/**
+ * Qué paso abre soltar la tarjeta `p` en la columna `col`, o { aviso } si no es válida, o null si no pasa nada.
+ * Las reglas son las de MAPEO §3 E; el servidor las vuelve a validar al confirmar.
+ */
+function accionDrop(p, col) {
+  if (!p || !col || col === p.col || p.col === 4) return null;
+  if (col === 1) return { aviso: 'Vuelve sola a «Por contactar» si pasa la fecha sin cita.' };
+  if (col === 2) return { paso: 'agendo' };
+  if (col === 3) {
+    if (p.t === 'hier' && p.idRegistro && p.trat && p.trat.k + 1 < p.trat.n) return { paso: 'lohizo' };
+    return { aviso: 'En tratamiento es solo para hierro con sesiones pendientes.' };
+  }
+  if (p.t === 'reev') return { paso: 'alta' };
+  if (p.t === 'proc') return { paso: 'lohizo' };
+  if (!p.idRegistro || (p.trat && p.trat.k + 1 >= p.trat.n)) return { paso: 'lohizo' };   // cotización antigua o última sesión
+  return { aviso: 'Completado llega con la última sesión del tratamiento.' };
+}
+let arrastre = null, arrastrando = false;
+const ARRASTRE_MIN = 760, ARRASTRE_UMBRAL = 6;
+function limpiarArrastre(d) {
+  if (d.g) d.g.remove();
+  if (d.el) d.el.style.opacity = '';
+  document.body.classList.remove('arrastrando');
+  $$('#tablero .col').forEach(c => c.classList.remove('puede', 'no', 'sobre'));
+}
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || e.pointerType === 'touch' || innerWidth < ARRASTRE_MIN || seleccion.panel) return;
+  if (e.target.closest('button, a, input, select, textarea')) return;
+  const c = e.target.closest('#tablero [data-card]'); if (!c) return;
+  const p = S.pacientes.find(x => x.id === c.dataset.card); if (!p || p.col === 4) return;
+  arrastre = { p, el: c, x: e.clientX, y: e.clientY, on: false, col: 0, g: null };
+});
+document.addEventListener('pointermove', e => {
+  const d = arrastre; if (!d) return;
+  const dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if (!d.on) {
+    if (Math.hypot(dx, dy) < ARRASTRE_UMBRAL) return;
+    d.on = true;
+    const r = d.el.getBoundingClientRect(), g = d.el.cloneNode(true);
+    g.removeAttribute('data-card'); g.removeAttribute('tabindex'); g.classList.remove('sel');
+    g.classList.add('fantasma'); g.setAttribute('aria-hidden', 'true');
+    Object.assign(g.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px' });
+    document.body.appendChild(g);
+    d.g = g; d.el.style.opacity = '.35'; document.body.classList.add('arrastrando');
+    $$('#tablero .col').forEach(c => {
+      const n = Number(c.dataset.col), a = accionDrop(d.p, n);
+      c.classList.toggle('puede', !!(a && a.paso));
+      c.classList.toggle('no', n !== d.p.col && !(a && a.paso));
+    });
+  }
+  d.g.style.transform = `translate(${dx}px,${dy}px) rotate(1.5deg) scale(1.02)`;
+  const t = document.elementsFromPoint(e.clientX, e.clientY).find(n => n.dataset && n.dataset.col && n.closest('#tablero'));
+  d.col = t ? Number(t.dataset.col) : 0;
+  const a = accionDrop(d.p, d.col);
+  $$('#tablero .col').forEach(c => c.classList.toggle('sobre', Number(c.dataset.col) === d.col && !!(a && a.paso)));
+});
+document.addEventListener('pointerup', () => {
+  const d = arrastre; arrastre = null; if (!d || !d.on) return;
+  arrastrando = true; setTimeout(() => { arrastrando = false; }, 60);
+  const a = accionDrop(d.p, d.col);
+  if (a && a.paso) {
+    // Siempre se abre el paso. Nada se guarda sin confirmar.
+    const fin = () => limpiarArrastre(d);
+    if (reducido) fin(); else d.g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, fill: 'forwards' }).onfinish = fin;
+    seleccionar(d.p.id);
+    abrirPanel(d.p.id, false, { paso: a.paso });
+  } else {
+    d.g.style.transition = 'transform .22s var(--ease-out)'; d.g.style.transform = 'none';
+    setTimeout(() => limpiarArrastre(d), 230);
+    if (a && a.aviso) avisar(a.aviso);
+  }
+});
+document.addEventListener('pointercancel', () => { const d = arrastre; arrastre = null; if (d && d.on) limpiarArrastre(d); });
+document.addEventListener('click', e => { if (arrastrando) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
 
 /** C: copia el primer teléfono vigente (sin espacios) o el usuario @. */
 function copiarContacto(p) {

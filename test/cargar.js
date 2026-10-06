@@ -6,7 +6,7 @@ const vm = require('vm');
  * Carga los .gs indicados en un contexto vm, como hace Apps Script: todas las
  * declaraciones de nivel superior quedan como propiedades del contexto.
  */
-function cargar(archivos = ['Logica.gs']) {
+function cargar(archivos = ['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs']) {
   const ctx = {};
   vm.createContext(ctx);
   for (const a of archivos) {

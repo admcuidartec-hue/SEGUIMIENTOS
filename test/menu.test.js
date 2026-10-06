@@ -200,14 +200,14 @@ test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita A
   const reg = hojaFalsa([['ESPECIALIDAD', 'ESPERADO_DIAS', 'VENCE_DIAS', '', 'PARAMETRO', 'VALOR'], ['*', 30, 45, '', 'MAX_SEGUIMIENTOS', 2]]);
   ctx.ss_ = () => ({ getSheetByName: n => ({ SEGUIMIENTOS: seg, CATALOGOS: cat, REGLAS: reg })[n] || null });
   const cambios = [...ctx.ampliarHojas_()];
-  assert.deepEqual(seg.v[0].slice(8), ['REFERENCIA']);
+  assert.deepEqual(seg.v[0].slice(8), ['REFERENCIA', 'RESULTADO', 'FECHA_PROXIMA', 'TELEFONO', 'ANULADO', 'MOTIVO_ANULACION']);
   assert.deepEqual(seg.v[1].slice(0, 8), ['S-1', '', '1', 'H', 'M', 'HECHO', '', 'n'], 'no toca las filas');
   assert.deepEqual(cat.v[0], ['USUARIOS', 'MOTIVOS_DESCARTE', 'DOCTOR', 'DOCTOR_SOFDOC', 'PROCEDIMIENTOS', 'TRATAMIENTOS', 'MARCAS']);
   assert.equal(cat.v[1][2], 'Dr. Elí Cabanillas');
   assert.equal(cat.v[6][3], '', 'el particular sin nombre SOFDOC');
   assert.equal(cat.v[2][1], '', 'ALTA MÉDICA quitado');
-  assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7]]);
-  assert.equal(cambios.length, 5, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los dos parámetros');
+  assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2]]);
+  assert.equal(cambios.length, 6, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los tres parámetros');
   assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
 });
 

@@ -46,7 +46,7 @@ var CATALOGO_REGISTRO_INICIAL = {
   MARCAS: ['HIERRO CARBOXIMALTOSA | FERINJECT', 'HIERRO CARBOXIMALTOSA | LIKFER', 'HIERRO DERISOMALTOSA | MONOFER']
 };
 
-var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7]];
+var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2]];
 
 /** Encabezado de la fila 1 sin las celdas vacías del final. */
 function encabezado_(sh) {
@@ -368,7 +368,7 @@ function verificar() {
     var planV = encabezadoAmpliable(encabezado_(sgV), COLUMNAS_SEGUIMIENTOS);
     lineas.push(planV.error ? '✗ SEGUIMIENTOS: ' + planV.error
       : planV.agregar.length ? '✗ A SEGUIMIENTOS le falta la columna ' + planV.agregar.join(', ') + '. Use «Preparar hojas».'
-      : '✓ SEGUIMIENTOS tiene la columna REFERENCIA.');
+      : '✓ SEGUIMIENTOS tiene todas sus columnas.');
   }
   if (ss.getSheetByName('CATALOGOS')) revisarCatalogos(catalogos_()).forEach(function (l) { lineas.push(l); });
   try {

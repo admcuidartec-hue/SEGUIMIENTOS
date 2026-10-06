@@ -17,7 +17,7 @@ test('reglas: especialidad con o sin tilde es la misma', () => {
 
 test('reglas: sin filas se usan los valores por defecto', () => {
   const r = L.reglasDesdeFilas(['ESPECIALIDAD'], []);
-  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60, esperaCotizacion: 7, diasEntreSesiones: 7 });
+  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60, esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2 });
 });
 
 test('reglas: VENCE nunca queda antes que ESPERADO', () => {
@@ -95,4 +95,20 @@ test('especialidades separadas: nutrición no cuenta como reevaluación de hemat
 
 test('una serie solo con citas anuladas queda SIN ATENCIÓN', () => {
   assert.equal(est([cita({ fecha: '2026-07-01', estado: 'ANULADO' })], [], '2026-10-01'), 'SIN ATENCIÓN');
+});
+
+test('reglas: GRACIA_AGENDA_DIAS se lee de REGLAS', () => {
+  const r = L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], [['GRACIA_AGENDA_DIAS', 3]]);
+  assert.equal(r.graciaAgenda, 3);
+});
+
+test('COLUMNAS_SEGUIMIENTOS y COLUMNAS_PACIENTES crecen solo al final', () => {
+  const C = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs']);
+  assert.deepEqual(plano(C.COLUMNAS_SEGUIMIENTOS), ['ID', 'FECHA_HORA', 'DNI', 'ESPECIALIDAD', 'RESPONSABLE', 'ACCION', 'MOTIVO', 'NOTA',
+    'REFERENCIA', 'RESULTADO', 'FECHA_PROXIMA', 'TELEFONO', 'ANULADO', 'MOTIVO_ANULACION']);
+  assert.deepEqual(plano(L.COLUMNAS_PACIENTES).slice(16), ['CIERRE', 'FECHA_CIERRE', 'AGENDA', 'FECHA_AGENDA', 'INTENTO']);
+  assert.equal(C.COLUMNAS_FECHA.FECHA_PROXIMA, 1);
+  assert.equal(C.COLUMNAS_FECHA.FECHA_AGENDA, 1);
+  assert.equal(C.COLUMNAS_FECHA.FECHA_CIERRE, 1);
+  assert.equal(C.COLUMNAS_NUMERICAS.INTENTO, 1);
 });

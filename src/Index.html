@@ -1232,7 +1232,7 @@ function prepararPaso(p, k, teclado) {
 function htmlPaso(p) {
   const ps = P.paso, k = ps.k, act = activos(p), para = p.t === 'reev' ? frase(p.esp) : p.t === 'hier' ? 'Hierro' : frase(p.proc) || 'Procedimiento';
   let t = '', icon = 'ph ph-calendar-plus', aviso = '', campos = '', boton = 'Confirmar', deshab = false;
-  let cierre = ['otrolugar', 'fallecio', 'otro'].includes(k);
+  let cierre = ['alta', 'otrolugar', 'fallecio', 'otro'].includes(k);   // el alta también cierra el seguimiento
   const fecha = l => `<label class="campo">${l}<input type="date" id="pf" value="${esc(ps.f)}"${ps.rango.min ? ` min="${esc(ps.rango.min)}"` : ''} max="${esc(ps.rango.max)}"></label>`;
   if (k === 'agendo') { t = 'Agendó cita'; campos = fecha('Fecha de la cita'); boton = 'Pasar a Agendado'; aviso = 'Si la fecha pasa sin cita realizada en SOFDOC, vuelve a «Por contactar».'; }
   if (k === 'pensara') { t = 'Lo pensará'; icon = 'ph ph-clock-countdown'; campos = fecha('Volver a llamar el'); boton = 'Guardar fecha'; aviso = 'Sale de «Por contactar» hasta ese día.'; }
@@ -1247,7 +1247,7 @@ function htmlPaso(p) {
     else { t = `Se hizo ${frase(p.proc)}`; campos = fecha('Fecha en que se lo hizo'); boton = 'Marcar como completado'; aviso = 'El procedimiento pasa a Completado.'; }
   }
   if (k === 'alta') {
-    t = 'Alta médica'; icon = 'ph ph-seal-check i-ok'; boton = 'Confirmar alta';
+    t = 'Alta médica'; icon = 'ph ph-seal-check'; boton = 'Confirmar alta';
     aviso = `Cierra el seguimiento de ${para}. No cuenta como «no volvió».`;
     const docs = (S.boot && S.boot.doctores) || [];
     campos = `<label class="campo">Doctor que da el alta<select id="pd"><option value="">Elija el doctor</option>${docs.map(d =>
@@ -1275,7 +1275,7 @@ function htmlPaso(p) {
     aviso = 'Escriba el motivo. Se cierra el seguimiento.';
     deshab = !ps.motivo.trim();
   }
-  if (cierre && k !== 'numero') boton = 'Cerrar el seguimiento';
+  if (cierre && k !== 'numero' && k !== 'alta') boton = 'Cerrar el seguimiento';
   const pregunta = cierre ? `<p><b>¿Cerrar el seguimiento de ${esc(nombreDe(p))} (${esc(para)})?</b>${k === 'fallecio' ? ' Se cerrarán todos sus seguimientos.' : ''}</p>` : '';
   return `<section class="paso${cierre ? ' cierre' : ''}${ps.visto ? ' instantaneo' : ''}" aria-labelledby="paso-t">`
     + '<button type="button" class="ghost volver" data-volverpaso><i class="ph ph-caret-left"></i>Cambiar respuesta</button>'
@@ -1467,10 +1467,15 @@ async function guardarResultado(clave, resultado, extra) {
     if (plan.cerrado) S.cerrados = S.cerrados.filter(x => x !== plan.cerrado);
     sumarMeta(cifras, quien, -1);
     repintar({ llega: clave, sinAnim: teclado });
-    if (!seleccion.panel) seleccionar(clave, true);
     avisar('No se guardó: ' + e.message);
-    // Si se guardaba desde el panel, vuelve a abrirse con la nota escrita.
-    if (enPanel && (!seleccion.panel || seleccion.panel === clave) && S.pacientes.some(x => x.id === clave)) {
+    if (seleccion.panel === clave) { P.nota = nota; pintarPanel(); return; }   // el panel siguió abierto (número equivocado)
+    // Si nadie se fue a otra parte, la selección vuelve a la tarjeta y, si se guardaba desde el panel, este se reabre
+    // con la nota escrita. Si abrió otro panel o está en otro campo o pantalla, no se le quita el foco.
+    const a = document.activeElement;
+    const quieto = !seleccion.panel && S.seccion === 'tablero' && (!a || a === document.body || !!(a.closest && a.closest('#tablero, #panel')));
+    if (!quieto) return;
+    seleccionar(clave, true);
+    if (enPanel && S.pacientes.some(x => x.id === clave)) {
       abrirPanel(clave, true);
       P.nota = nota;
       pintarPanel();
@@ -1504,6 +1509,9 @@ async function deshacer(fn, id, quien, nombre) {
     avisar('Deshecho: ' + nombre + '.');
   } catch (e) { avisar('No se deshizo: ' + e.message); }
   await cargarTablero(null, true);
+  // Si el panel sigue abierto (p. ej. número equivocado), su historia ya no es la de antes.
+  const pa = seleccion.panel && S.pacientes.find(x => x.id === seleccion.panel);
+  if (pa) cargarHistoria(pa);
 }
 
 /* ---- Historia (getPaciente al abrir el panel) ---- */

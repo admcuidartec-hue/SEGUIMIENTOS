@@ -439,10 +439,20 @@ test('tablero: el filtro por tipo cambia los números y se recuerda; «Solo sin 
     assert.deepEqual(await seg(), [`Todos ${n('')}`, `Reevaluaciones ${n('REEVALUACION')}`, `Hierro ${n('HIERRO')}`, `Procedimientos ${n('PROCEDIMIENTO')}`]);
     const cifra = () => pagina.locator('#kpis > div:first-child dd').textContent();
     assert.equal(await cifra(), String(n('')));
+    // Chromium sobre file://: a veces el PRIMER documento de un contexto nuevo tiene un localStorage que nunca se
+    // guarda (otra página del mismo contexto lee null, y tras reload() también). Se vio en ~1 de 7 corridas y nunca
+    // en un segundo documento (0 de 60). Por eso se recarga una vez antes de probar que la preferencia se recuerda.
+    await pagina.reload();
+    await pagina.waitForSelector('#tablero .tarjeta');
     await pagina.locator('#seg button', { hasText: 'Hierro' }).click();
     assert.equal(await cifra(), String(n('HIERRO')));
     assert.deepEqual(await seg(), [`Todos ${n('')}`, `Reevaluaciones ${n('REEVALUACION')}`, `Hierro ${n('HIERRO')}`, `Procedimientos ${n('PROCEDIMIENTO')}`], 'los números del segmentado no dependen del tipo');
     assert.equal(await pagina.evaluate(() => localStorage.getItem('seg.tipo')), 'HIERRO');
+    // Otra página del mismo contexto ve el valor: quedó guardado de verdad antes de recargar.
+    const otra = await pagina.context().newPage();
+    await otra.goto('file://' + ARCHIVO, { waitUntil: 'domcontentloaded' });
+    await otra.waitForFunction(() => localStorage.getItem('seg.tipo') === 'HIERRO', null, { timeout: 5000 });
+    await otra.close();
     const ids = (await pintadas(pagina, '1')).map(v => v.id);
     assert.deepEqual(ids.slice().sort(), pc.filter(t => t.TIPO_SEGUIMIENTO === 'HIERRO').map(t => t.CLAVE).sort());
     // Se recuerda al recargar.
@@ -725,6 +735,9 @@ test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corres
     // Alta de una reevaluación: anularAlta.
     await abrirPanelDe(pagina, LUIS);
     await pagina.locator('#panel [data-acc="alta"]').click();
+    assert.ok(await pagina.locator('#panel .paso.cierre').isVisible(), 'el alta cierra el seguimiento: borde de acento');
+    assert.match(await pagina.locator('#panel .paso').textContent(), /¿Cerrar el seguimiento de Luis Alberto Ramos Vega/);
+    assert.equal((await pagina.locator('#panel [data-confirmar]').textContent()).trim(), 'Confirmar alta');
     assert.equal(await pagina.locator('#panel #pd').inputValue(), 'Dra. Alejandra La Torre', 'propone el doctor de la tarjeta');
     assert.equal(await pagina.locator('#panel #pf').inputValue(), '2026-10-01', 'en reevaluación pide la fecha');
     await confirmarPaso(pagina);
@@ -817,6 +830,21 @@ test('panel: «Número equivocado» con dos teléfonos deja la tarjeta y tacha e
     await esperarEstable(pagina);
     assert.equal((await ultimo(pagina, 'registrarResultado')).telefono, '014332210');
     assert.equal(await colPintada(pagina, ROSA), '1', 'la tarjeta sigue');
+    assert.equal(await pagina.evaluate(() => seleccion.panel), ROSA, 'el panel sigue abierto');
+    await pagina.waitForFunction(() => /número equivocado: 014332210/.test((document.querySelector('#panel .historia') || {}).textContent || ''));
+    // Deshacer con el panel abierto: la historia se vuelve a pedir y ya no trae ese número.
+    const hist = await llamadas(pagina, 'getPaciente');
+    await pagina.locator('#aviso button').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularResultado === 1);
+    await pagina.waitForFunction(n => DEMO._llamadas.getPaciente > n, hist);
+    await pagina.waitForFunction(() => document.querySelector('#panel .historia li.anulado'));
+    assert.match(await pagina.locator('#panel .historia li.anulado').first().textContent(), /número equivocado: 014332210.*anulado: Deshecho al momento/);
+    assert.equal(await pagina.locator('#panel .contacto.malo').count(), 0, 'el número vuelve a estar vigente');
+    // Se marca otra vez, para seguir.
+    await pagina.locator('#panel [data-acc="numero"]').click();
+    await pagina.locator('#panel input[name="pn"][value="014332210"]').check();
+    await pagina.locator('#panel [data-confirmar]').click();
+    await esperarEstable(pagina);
     await pagina.keyboard.press('Escape');
     await pagina.waitForFunction(() => !seleccion.panel);
     await abrirPanelDe(pagina, ROSA);
@@ -994,6 +1022,71 @@ test('panel: una tarjeta de Completado abre el panel de solo lectura, sin «¿Qu
     await abrirPanelDe(pagina, 'REG-000003');
     assert.match(await pagina.locator('#panel .contacto').first().textContent(), /Usuario.*@ana\.flores/);
     assert.equal(await pagina.locator('#panel [data-acc="numero"]').count(), 0, 'sin teléfono no hay «Número equivocado»');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: si «Falleció» falla, vuelven todas las tarjetas del DNI y la cuenta de cerrados', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => { DEMO._fallar.registrarResultado = 'Sin conexión con el servidor.'; DEMO._demora.registrarResultado = 300; });
+    await abrirPanelDe(pagina, CARMEN);
+    await pagina.locator('#panel [data-acc="fallecio"]').click();
+    await pagina.locator('#panel [data-confirmar]').click();
+    await esperarCol(pagina, CARMEN, '');
+    await esperarCol(pagina, CARMEN_H, '');
+    assert.match(await pagina.locator('#kpis').textContent(), /3 cerrados este mes/);
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    await esperarCol(pagina, CARMEN, '1');
+    await esperarCol(pagina, CARMEN_H, '1');
+    assert.match(await pagina.locator('#kpis').textContent(), /2 cerrados este mes/);
+    assert.equal(await pagina.evaluate(() => S.cerrados.length), 2);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: si el servidor falla y la asesora ya está en otra cosa, el panel no se le vuelve a abrir', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => { DEMO._fallar.registrarResultado = 'Sin conexión con el servidor.'; DEMO._demora.registrarResultado = 400; });
+    await abrirPanelDe(pagina, LUIS);
+    await pagina.locator('#panel [data-acc="pensara"]').click();
+    await confirmarPaso(pagina, '2026-10-08');
+    await pagina.waitForFunction(() => !seleccion.panel);
+    await pagina.locator('#q').focus();   // se fue al buscador
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    await esperarCol(pagina, LUIS, '1');
+    assert.equal(await pagina.evaluate(() => seleccion.panel), '', 'no se reabre');
+    assert.equal(await pagina.evaluate(() => document.activeElement.id), 'q', 'no le quita el foco');
+    // Si sigue en el tablero, sí se reabre con la nota.
+    await abrirPanelDe(pagina, LUIS);
+    await pagina.locator('#panel #nota').fill('Volver a intentar');
+    await pagina.locator('#panel [data-acc="pensara"]').click();
+    await confirmarPaso(pagina, '2026-10-08');
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent) && seleccion.panel);
+    assert.equal(await pagina.evaluate(() => seleccion.panel), LUIS);
+    assert.equal(await pagina.locator('#panel #nota').inputValue(), 'Volver a intentar');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: el alta de hierro o procedimiento no pide fecha; «Agendó cita» propone PROXIMA_AGENDADA', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    for (const id of [PEDRO, ROSA]) {
+      await abrirPanelDe(pagina, id);
+      await pagina.locator('#panel [data-acc="alta"]').click();
+      assert.equal(await pagina.locator('#panel #pd').count(), 1, `${id}: pide el doctor`);
+      assert.equal(await pagina.locator('#panel #pf').count(), 0, `${id}: sin fecha`);
+      assert.ok(await pagina.locator('#panel .paso.cierre').isVisible());
+      await pagina.keyboard.press('Escape');
+      await pagina.keyboard.press('Escape');
+      await pagina.waitForFunction(() => !seleccion.panel);
+    }
+    // María (Agendado) tiene PROXIMA_AGENDADA 2026-10-05: es la fecha propuesta.
+    await abrirPanelDe(pagina, '40777888|HEMATOLOGÍA');
+    await pagina.locator('#panel [data-acc="agendo"]').click();
+    assert.equal(await pagina.locator('#panel #pf').inputValue(), '2026-10-05');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

@@ -206,8 +206,8 @@ test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita A
   assert.equal(cat.v[1][2], 'Dr. Elí Cabanillas');
   assert.equal(cat.v[6][3], '', 'el particular sin nombre SOFDOC');
   assert.equal(cat.v[2][1], '', 'ALTA MÉDICA quitado');
-  assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2]]);
-  assert.equal(cambios.length, 6, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los tres parámetros');
+  assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15]]);
+  assert.equal(cambios.length, 7, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los cuatro parámetros');
   assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
 });
 

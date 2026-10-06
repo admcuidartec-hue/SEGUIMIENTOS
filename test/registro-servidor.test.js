@@ -77,13 +77,13 @@ test('darDeAlta: valida y escribe ALT-…', () => {
 
 test('getRegistrosHoy: registros y altas de hoy, lo más reciente primero', () => {
   const ayer = Object.assign({}, REG4, { ID: 'REG-000003', FECHA_HORA: '2026-10-04 18:00' });
-  const hoy1 = Object.assign({}, REG4, { ID: 'REG-000005', FECHA_HORA: '2026-10-05 09:15', ANULADO: 'SÍ' });
+  const hoy1 = Object.assign({}, REG4, { ID: 'REG-000005', FECHA_HORA: '2026-10-05 09:15', ANULADO: 'SÍ', MOTIVO_ANULACION: 'Error de digitación' });
   const alta = { ID: 'ALT-000001', FECHA_HORA: '2026-10-05 11:00', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA',
     DOCTOR: 'Dra. Karen Matos', REGISTRADO_POR: 'MAGALY', ANULADO: '' };
   const { ctx } = servidor({ registros: [ayer, hoy1], altas: [alta] });
   assert.deepEqual(plano(ctx.getRegistrosHoy()), [
-    { ID: 'ALT-000001', HORA: '11:00', ASESORA: 'MAGALY', NOMBRE: 'ROSA ELENA QUISPE HUAMAN', DNI: '40111222', TEXTO: 'Alta médica · HEMATOLOGÍA · Dra. Karen Matos', ANULADO: false },
-    { ID: 'REG-000005', HORA: '09:15', ASESORA: 'MAGALY', NOMBRE: 'ROSA QUISPE', DNI: '40111222', TEXTO: 'Sangría', ANULADO: true }]);
+    { ID: 'ALT-000001', HORA: '11:00', ASESORA: 'MAGALY', NOMBRE: 'ROSA ELENA QUISPE HUAMAN', DNI: '40111222', TEXTO: 'Alta médica · HEMATOLOGÍA · Dra. Karen Matos', ANULADO: false, MOTIVO_ANULACION: '' },
+    { ID: 'REG-000005', HORA: '09:15', ASESORA: 'MAGALY', NOMBRE: 'ROSA QUISPE', DNI: '40111222', TEXTO: 'Sangría', ANULADO: true, MOTIVO_ANULACION: 'Error de digitación' }]);
 });
 
 test('buscarPacienteRegistro: datos del paciente conocido y propuesta de doctor', () => {

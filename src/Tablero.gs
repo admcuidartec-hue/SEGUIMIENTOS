@@ -92,8 +92,19 @@ function tarjeta_(t, columna, reglas, hoy, fechaClave, etiqueta) {
   return o;
 }
 
+function hechosHoyPor_(d) {
+  var out = {}, hoy = d.hoy;
+  function sumar(quien) { quien = textoLimpio_(quien); if (quien) out[quien] = (out[quien] || 0) + 1; }
+  (d.seguimientos || []).forEach(function (s) { var r = resultadoDe(s); if (r && r.fecha === hoy) sumar(s.RESPONSABLE); });
+  (d.sesiones || []).forEach(function (s) { if (!anulado_(s) && fechaIso(s.FECHA_HORA) === hoy) sumar(s.ASESORA); });
+  (d.altas || []).forEach(function (a) { if (!anulado_(a) && fechaIso(a.FECHA_HORA) === hoy) sumar(a.REGISTRADO_POR); });
+  return out;
+}
+
 function armarTablero(d) {
   var reglas = d.reglas, hoy = d.hoy, mes = mesDe(hoy);
+  var nombrePorDni = {};
+  (d.citas || []).slice().sort(porFecha).forEach(function (c) { if (c.NOMBRE) nombrePorDni[c.DNI] = c.NOMBRE; });
   var col = { POR_CONTACTAR: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] }, cerrados = [];
   var reeval = (d.pacientes || []).map(function (p) { return conTipo_(p, 'REEVALUACION'); });
   var todas = reeval.concat(d.pendientes || []);
@@ -109,7 +120,7 @@ function armarTablero(d) {
     if (t.ESTADO === 'COMPLETADO') {
       var f = t.ULTIMA_SESION && t.ESTADO_REGISTRO === 'COMPLETO' ? t.ULTIMA_SESION : t.FECHA_LOHIZO;
       if (mesDe(f) === mes) col.COMPLETADO.push(tarjeta_(t, 'COMPLETADO', reglas, hoy, f,
-        t.ESTADO_REGISTRO === 'COMPLETO' ? 'Completó el tratamiento' : 'Lo hizo el ' + dm_(f)));
+        t.ESTADO_REGISTRO === 'COMPLETO' ? (t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm_(f) : 'Completó el tratamiento') : 'Lo hizo el ' + dm_(f)));
     }
     if (t.ESTADO === 'CERRADO' && mesDe(t.FECHA_CIERRE) === mes) {
       if (t.CIERRE === 'ALTA MÉDICA') col.COMPLETADO.push(tarjeta_(t, 'COMPLETADO', reglas, hoy, t.FECHA_CIERRE, 'Alta médica'));
@@ -119,7 +130,7 @@ function armarTablero(d) {
   Object.keys(d.vigentes || {}).forEach(function (k) {
     var a = d.vigentes[k];
     if (mesDe(a.FECHA) !== mes) return;
-    var p = reeval.filter(function (x) { return claveSerie(x.DNI, x.ESPECIALIDAD) === k; })[0] || { DNI: a.DNI, ESPECIALIDAD: a.ESPECIALIDAD, NOMBRE: '' };
+    var p = reeval.filter(function (x) { return claveSerie(x.DNI, x.ESPECIALIDAD) === k; })[0] || { DNI: a.DNI, ESPECIALIDAD: a.ESPECIALIDAD, NOMBRE: nombrePorDni[a.DNI] || '' };
     col.COMPLETADO.push(tarjeta_(conTipo_(p, 'REEVALUACION'), 'COMPLETADO', reglas, hoy, a.FECHA, 'Alta médica' + (a.DOCTOR ? ' · ' + a.DOCTOR : '')));
   });
   retornosDelMes(d.seguimientos, d.citas, hoy).forEach(function (r) {
@@ -127,7 +138,7 @@ function armarTablero(d) {
   });
   var muertos = fallecidos(d.seguimientos);
   Object.keys(muertos).forEach(function (dni) {
-    if (mesDe(muertos[dni].fecha) === mes) cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: '', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: muertos[dni].fecha });
+    if (mesDe(muertos[dni].fecha) === mes) cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: nombrePorDni[dni] || '', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: muertos[dni].fecha });
   });
 
   // Deduplicate COMPLETADO by CLAVE, keeping the card with latest FECHA_CLAVE
@@ -159,6 +170,6 @@ function armarTablero(d) {
     columnas: col,
     cerrados: cerrados,
     cifras: { porContactar: col.POR_CONTACTAR.length, agendados: col.AGENDADO.length, enTratamiento: col.EN_TRATAMIENTO.length,
-      completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length, hechosHoy: hechosHoy }
+      completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length, hechosHoy: hechosHoy, hechosHoyPor: hechosHoyPor_(d) }
   };
 }

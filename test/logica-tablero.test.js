@@ -52,7 +52,7 @@ test('armarTablero: reparte, ordena y cuenta', () => {
   assert.deepEqual(t.columnas.AGENDADO.map(x => x.DNI), ['4', '3'], 'la fecha más cercana primero');
   assert.deepEqual(t.columnas.EN_TRATAMIENTO.map(x => x.CLAVE), ['REG-000001']);
   assert.deepEqual(t.columnas.COMPLETADO.map(x => [x.CLAVE, x.ETIQUETA]), [['REG-000002', 'Completó el tratamiento']], 'solo lo de este mes');
-  assert.deepEqual(t.cifras, { porContactar: 1, agendados: 2, enTratamiento: 1, completadosMes: 1, cerradosMes: 1, hechosHoy: 0 });
+  assert.deepEqual(t.cifras, { porContactar: 1, agendados: 2, enTratamiento: 1, completadosMes: 1, cerradosMes: 1, hechosHoy: 0, hechosHoyPor: {} });
   assert.deepEqual(t.cerrados.map(x => [x.DNI, x.CIERRE]), [['5', 'SE ATIENDE EN OTRO LUGAR']]);
 });
 
@@ -89,4 +89,26 @@ test('cada tarjeta lleva TELEFONOS_DESCARTADOS y SIN_CONTACTO; sin d.telefonos n
   assert.deepEqual([t.TELEFONOS_DESCARTADOS, t.SIN_CONTACTO], [['987654321'], false]);
   const u = tablero({ pacientes: [Object.assign(p1, { USUARIO: 'Madre' })] }).columnas.POR_CONTACTAR[0];
   assert.equal(u.SIN_CONTACTO, false);
+});
+
+test('armarTablero: hechosHoyPor cuenta por persona resultados, sesiones y altas de hoy, sin anulados', () => {
+  const segs = [Object.assign(seg({ dni: '1', fecha: HOY, quien: 'MAGALY' }), { RESULTADO: 'NO CONTESTÓ' }),
+    Object.assign(seg({ dni: '2', fecha: HOY, quien: 'MAGALY' }), { RESULTADO: 'FALLECIÓ', ACCION: 'DESCARTADO' }),
+    Object.assign(seg({ dni: '3', fecha: HOY, quien: 'RACHEL' }), { RESULTADO: 'LO PENSARÁ', ANULADO: 'SÍ' }),
+    seg({ dni: '4', fecha: '2026-10-05', quien: 'RACHEL' })];
+  const sesiones = [{ ID: 'SES-1', FECHA_HORA: HOY + ' 09:00', ASESORA: 'RACHEL', ANULADO: '' }];
+  const altas = [{ ID: 'ALT-1', FECHA_HORA: HOY + ' 10:00', REGISTRADO_POR: 'MAGALY', ANULADO: '' }];
+  assert.deepEqual(tablero({ seguimientos: segs, sesiones, altas }).cifras.hechosHoyPor, { MAGALY: 3, RACHEL: 1 });
+});
+
+test('armarTablero: nombre en cerrados de fallecidos y en altas sin serie; procedimiento completo «Se hizo el …»', () => {
+  const citas = [cita({ dni: '11', fecha: '2026-09-01', nombre: 'ANA PRUEBA UNO' }), cita({ dni: '12', fecha: '2026-09-02', nombre: 'LUIS PRUEBA DOS' })];
+  const segs = [seg({ dni: '11', fecha: '2026-10-05', accion: 'DESCARTADO', motivo: 'FALLECIÓ' })];
+  const vigentes = { '12|NUTRICION': { ID: 'ALT-2', FECHA: '2026-10-04', DNI: '12', ESPECIALIDAD: 'NUTRICIÓN', DOCTOR: '' } };
+  const proc = reg({ ID_REGISTRO: 'REG-000009', DNI: '13', ESPECIALIDAD: 'PROCEDIMIENTO', TIPO_SEGUIMIENTO: 'PROCEDIMIENTO',
+    ESTADO: 'COMPLETADO', ESTADO_REGISTRO: 'COMPLETO', SESIONES: 1, HECHAS: 1, ULTIMA_SESION: '2026-10-03' });
+  const t = tablero({ citas, seguimientos: segs, vigentes, pendientes: [proc] });
+  assert.equal(t.cerrados.find(x => x.DNI === '11').NOMBRE, 'ANA PRUEBA UNO');
+  assert.equal(t.columnas.COMPLETADO.find(x => x.DNI === '12').NOMBRE, 'LUIS PRUEBA DOS');
+  assert.equal(t.columnas.COMPLETADO.find(x => x.DNI === '13').ETIQUETA, 'Se hizo el 03/10');
 });

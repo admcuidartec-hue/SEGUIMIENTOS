@@ -284,7 +284,10 @@ function bootstrap() {
     doctores: d.catalogos.doctores,
     procedimientos: d.catalogos.procedimientos,
     tratamientos: d.catalogos.tratamientos,
-    marcas: d.catalogos.marcas
+    marcas: d.catalogos.marcas,
+    reglas: { espera: d.reglas.espera, maxSeguimientos: d.reglas.maxSeguimientos, graciaAgenda: d.reglas.graciaAgenda,
+      diasEntreSesiones: d.reglas.diasEntreSesiones, esperaCotizacion: d.reglas.esperaCotizacion,
+      metaRetorno: d.reglas.metaRetorno, metaDiaria: d.reglas.metaDiaria }
   });
 }
 
@@ -339,6 +342,7 @@ function getPaciente(dni) {
         ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', VIGENTE: !!(v && v.ID === a.ID) };
     }),
     fallecido: fallecidos(d.seguimientos)[k] || null,
+    telefonos: d.telefonos[k] || [],
     telefonosDescartados: telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos)[k] || []
   });
 }

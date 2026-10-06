@@ -287,7 +287,7 @@ html.con-vt .vista{animation:none}
 .col.puede{box-shadow:inset 0 0 0 1.5px var(--line-2)}
 .col.sobre{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
 .col.no{opacity:.55}
-.tarjeta.fantasma{position:fixed;margin:0;z-index:80;pointer-events:none;box-shadow:var(--shadow-lg);will-change:transform;cursor:grabbing}
+.tarjeta.fantasma{position:fixed;margin:0;z-index:80;pointer-events:none;box-shadow:var(--shadow);will-change:transform;cursor:grabbing}
 .tarjeta.fantasma::after{display:none}
 body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 
@@ -952,15 +952,29 @@ function accionDrop(p, col) {
   return { aviso: 'Completado llega con la última sesión del tratamiento.' };
 }
 let arrastre = null, arrastrando = false;
-const ARRASTRE_MIN = 760, ARRASTRE_UMBRAL = 6;
+const ARRASTRE_UMBRAL = 6, MULTICOL = matchMedia('(min-width: 761px)');   // la misma consulta que deja el tablero en una sola columna
+/** Quita lo de UN arrastre. Las clases de las columnas solo se limpian si no hay otro arrastre en curso. */
 function limpiarArrastre(d) {
   if (d.g) d.g.remove();
   if (d.el) d.el.style.opacity = '';
+  if (arrastre && arrastre !== d) return;
   document.body.classList.remove('arrastrando');
   $$('#tablero .col').forEach(c => c.classList.remove('puede', 'no', 'sobre'));
 }
+/** La copia vuelve a su sitio (220 ms; al instante con movimiento reducido) y se limpia. */
+function devolverCopia(d) {
+  if (!d.g || reducido) { limpiarArrastre(d); return; }
+  d.g.style.transition = 'transform .22s var(--ease-out)'; d.g.style.transform = 'none';
+  setTimeout(() => limpiarArrastre(d), 230);
+}
+/** Un solo camino para abandonar el arrastre: no abre paso ni guarda nada. */
+function cancelarArrastre() {
+  const d = arrastre; arrastre = null;
+  if (d && d.on) devolverCopia(d);
+}
 document.addEventListener('pointerdown', e => {
-  if (e.button !== 0 || e.pointerType === 'touch' || innerWidth < ARRASTRE_MIN || seleccion.panel) return;
+  cancelarArrastre();
+  if (e.button !== 0 || e.pointerType === 'touch' || !MULTICOL.matches || seleccion.panel) return;
   if (e.target.closest('button, a, input, select, textarea')) return;
   const c = e.target.closest('#tablero [data-card]'); if (!c) return;
   const p = S.pacientes.find(x => x.id === c.dataset.card); if (!p || p.col === 4) return;
@@ -968,6 +982,7 @@ document.addEventListener('pointerdown', e => {
 });
 document.addEventListener('pointermove', e => {
   const d = arrastre; if (!d) return;
+  if (e.buttons === 0) { cancelarArrastre(); return; }   // el botón se soltó fuera de la ventana
   const dx = e.clientX - d.x, dy = e.clientY - d.y;
   if (!d.on) {
     if (Math.hypot(dx, dy) < ARRASTRE_UMBRAL) return;
@@ -1001,12 +1016,18 @@ document.addEventListener('pointerup', () => {
     seleccionar(d.p.id);
     abrirPanel(d.p.id, false, { paso: a.paso });
   } else {
-    d.g.style.transition = 'transform .22s var(--ease-out)'; d.g.style.transform = 'none';
-    setTimeout(() => limpiarArrastre(d), 230);
+    devolverCopia(d);
     if (a && a.aviso) avisar(a.aviso);
   }
 });
-document.addEventListener('pointercancel', () => { const d = arrastre; arrastre = null; if (d && d.on) limpiarArrastre(d); });
+document.addEventListener('pointercancel', cancelarArrastre);
+document.addEventListener('lostpointercapture', cancelarArrastre);
+window.addEventListener('blur', cancelarArrastre);
+document.addEventListener('visibilitychange', () => { if (document.hidden) cancelarArrastre(); });
+// Esc durante el arrastre lo cancela y no llega al panel ni al tablero.
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && arrastre && arrastre.on) { e.preventDefault(); e.stopImmediatePropagation(); cancelarArrastre(); }
+}, true);
 document.addEventListener('click', e => { if (arrastrando) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
 
 /** C: copia el primer teléfono vigente (sin espacios) o el usuario @. */

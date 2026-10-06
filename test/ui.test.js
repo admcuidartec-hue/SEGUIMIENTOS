@@ -1179,3 +1179,51 @@ test('arrastrar: a 390 px no hay arrastre', async () => {
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('arrastrar: Completado con hierro (última sesión o cotización antigua) abre «Lo hizo»; con sesiones pendientes avisa', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await arrastrar(pagina, ROSA, 4);   // sesión 2 de 3 en el DEMO: faltan sesiones
+    assert.equal(await aviso(pagina), 'Completado llega con la última sesión del tratamiento.');
+    assert.equal(await panelAbierto(pagina), false);
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
+    await pagina.evaluate(id => { const p = S.pacientes.find(x => x.id === id); p.trat.k = p.trat.n - 1; }, ROSA);
+    await arrastrar(pagina, ROSA, 4);
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
+    await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
+    await arrastrar(pagina, CARMEN_H, 4);   // cotización antigua de hierro, sin registro
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('arrastrar: Esc y pointercancel cancelan sin abrir paso ni guardar, y no dejan copia ni clases', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const limpio = () => pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma') && !document.querySelector('.col.puede, .col.no, .col.sobre') && !document.body.classList.contains('arrastrando'));
+    await arrastrar(pagina, LUIS, 2, { sinSoltar: true });
+    assert.equal(await pagina.locator('.tarjeta.fantasma').count(), 1);
+    await pagina.keyboard.press('Escape');
+    await limpio();
+    await pagina.mouse.up();
+    assert.equal(await panelAbierto(pagina), false);
+    assert.equal(await colPintada(pagina, LUIS), '1');
+    await arrastrar(pagina, LUIS, 2, { sinSoltar: true });
+    await pagina.evaluate(() => document.dispatchEvent(new PointerEvent('pointercancel')));
+    await limpio();
+    await pagina.mouse.up();
+    assert.equal(await panelAbierto(pagina), false);
+    // Un arrastre nuevo no hereda la limpieza diferida del anterior.
+    await arrastrar(pagina, LUIS, 2, { sinSoltar: true });
+    await pagina.keyboard.press('Escape');
+    await arrastrar(pagina, LUIS, 2, { sinSoltar: true });
+    await pagina.waitForTimeout(300);
+    assert.equal(await pagina.locator('.tarjeta.fantasma').count(), 1);
+    assert.equal(await pagina.locator('.col[data-col="2"].puede').count(), 1);
+    await pagina.mouse.up();
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'agendo');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

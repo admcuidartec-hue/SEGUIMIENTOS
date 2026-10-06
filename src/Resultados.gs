@@ -46,6 +46,52 @@ function resultadoDe(s) {
   return null;
 }
 
+/** Números marcados como equivocados, por paciente: { dni: { telefono: fecha de la última marca } }. */
+function marcasTelefono(seguimientos) {
+  var out = {};
+  (seguimientos || []).forEach(function (s) {
+    var r = resultadoDe(s);
+    if (!r || r.resultado !== 'NÚMERO EQUIVOCADO' || !r.telefono) return;
+    var dni = normDni(s.DNI);
+    out[dni] = out[dni] || {};
+    if (!out[dni][r.telefono] || r.fecha > out[dni][r.telefono]) out[dni][r.telefono] = r.fecha;
+  });
+  return out;
+}
+
+/** Los marcados que ya no están entre los teléfonos vigentes: la ficha los muestra tachados. */
+function telefonosDescartados(marcas, telefonos) {
+  var out = {};
+  Object.keys(marcas || {}).forEach(function (dni) {
+    var quedan = (telefonos || {})[dni] || [];
+    var fuera = Object.keys(marcas[dni]).filter(function (t) { return quedan.indexOf(t) < 0; });
+    if (fuera.length) out[dni] = fuera;
+  });
+  return out;
+}
+
+/**
+ * Fecha de la última marca si el paciente se quedó sin ningún contacto por marcas de
+ * «número equivocado»; '' si le queda un teléfono o un usuario, o si nunca se marcó nada.
+ */
+function sinContacto_(dni, marcas, telefonos, usuario) {
+  var m = (marcas || {})[dni];
+  if (!m || ((telefonos || {})[dni] || []).length || textoLimpio_(usuario)) return '';
+  return Object.keys(m).reduce(function (a, t) { return m[t] > a ? m[t] : a; }, '');
+}
+
+/** Pacientes con un «falleció» vigente (nuevo o antiguo): { dni: { fecha, quien, id } }. */
+function fallecidos(seguimientos) {
+  var out = {};
+  (seguimientos || []).forEach(function (s) {
+    var r = resultadoDe(s);
+    if (!r || r.resultado !== 'FALLECIÓ') return;
+    var dni = normDni(s.DNI);
+    if (!out[dni] || r.fecha > out[dni].fecha) out[dni] = { fecha: r.fecha, quien: r.quien, id: r.id };
+  });
+  return out;
+}
+
 /**
  * Lee los seguimientos de UN ciclo: los posteriores a la última consulta, a la
  * cotización o a la última sesión, según el tipo. Gana el último resultado que

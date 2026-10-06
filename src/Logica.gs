@@ -531,17 +531,23 @@ var COLUMNAS_PACIENTES = ['DNI', 'ESPECIALIDAD', 'NOMBRE', 'TELEFONOS', 'MEDICO_
   'N_REALIZADAS', 'PROXIMA_ESPERADA', 'VENCE', 'DIAS_ATRASO', 'PROXIMA_AGENDADA', 'ESTADO', 'N_SEGUIMIENTOS',
   'ULTIMO_SEGUIMIENTO', 'PENDIENTE', 'CIERRE', 'FECHA_CIERRE', 'AGENDA', 'FECHA_AGENDA', 'INTENTO'];
 
-/** Teléfonos de cada paciente: primero los de hierro y procedimientos, luego los del CRM, sin repetir. */
-function telefonosPorDni(indicaciones, contactos) {
-  var out = {};
-  function sumar(dni, telefono) {
+/**
+ * Teléfonos de cada paciente: primero los de hierro y procedimientos, luego los del CRM, sin repetir.
+ * Sin los marcados como «número equivocado»; uno marcado vuelve solo si llega de nuevo
+ * por un registro posterior a la marca (alguien lo confirmó con el paciente).
+ */
+function telefonosPorDni(indicaciones, contactos, seguimientos) {
+  var out = {}, marcas = marcasTelefono(seguimientos);
+  function sumar(dni, telefono, fecha) {
     var t = normTelefono(telefono);
     if (!dni || !t) return;
+    var m = marcas[dni] && marcas[dni][t];
+    if (m && !(fecha && fecha > m)) return;
     out[dni] = out[dni] || [];
     if (out[dni].indexOf(t) < 0) out[dni].push(t);
   }
-  (indicaciones || []).forEach(function (i) { sumar(i.DNI, i.TELEFONO); });
-  (contactos || []).forEach(function (c) { sumar(c.DNI_PACIENTE, c.TELEFONO); });
+  (indicaciones || []).forEach(function (i) { sumar(i.DNI, i.TELEFONO, i.ORIGEN === 'REGISTROS' ? i.FECHA : ''); });
+  (contactos || []).forEach(function (c) { sumar(c.DNI_PACIENTE, c.TELEFONO, ''); });
   return out;
 }
 

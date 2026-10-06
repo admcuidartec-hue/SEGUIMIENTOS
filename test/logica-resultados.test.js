@@ -73,3 +73,37 @@ test('leerCiclo: cierre, lo hizo, y el número equivocado no decide', () => {
   const nd = res('2026-10-01', 'NO DESEA CONTINUAR', { ACCION: 'DESCARTADO', MOTIVO: 'NO DESEA CONTINUAR' });
   assert.equal(L.leerCiclo([nd], R, '2026-10-05').cierre.motivo, 'NO DESEA CONTINUAR');
 });
+
+const equivocado = (fecha, tel, dni) => res(fecha, 'NÚMERO EQUIVOCADO', { TELEFONO: tel, ACCION: 'TELEFONO', DNI: dni || '40111222' });
+
+test('telefonosPorDni: quita el número marcado; vuelve si llega por un registro posterior', () => {
+  const inds = [{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-09-01' }, { DNI: '40111222', TELEFONO: '912345678', FECHA: '2026-09-01' }];
+  const contactos = [{ DNI_PACIENTE: '40111222', TELEFONO: '51987654321' }];
+  const segs = [equivocado('2026-10-01', '987654321')];
+  assert.deepEqual(plano(L.telefonosPorDni(inds, contactos, segs)), { 40111222: ['912345678'] });
+  assert.deepEqual(plano(L.telefonosPorDni(inds, contactos)), { 40111222: ['987654321', '912345678'] }, 'sin seguimientos, como antes');
+  const nuevo = inds.concat([{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-10-03', ORIGEN: 'REGISTROS' }]);
+  assert.deepEqual(plano(L.telefonosPorDni(nuevo, [], segs))['40111222'], ['912345678', '987654321']);
+  const anulado = [Object.assign(equivocado('2026-10-01', '987654321'), { ANULADO: 'SÍ' })];
+  assert.deepEqual(plano(L.telefonosPorDni(inds, [], anulado))['40111222'], ['987654321', '912345678']);
+});
+
+test('sinContacto_ y telefonosDescartados', () => {
+  const marcas = L.marcasTelefono([equivocado('2026-09-20', '987654321'), equivocado('2026-10-01', '912345678')]);
+  assert.deepEqual(plano(marcas), { 40111222: { 987654321: '2026-09-20', 912345678: '2026-10-01' } });
+  assert.equal(L.sinContacto_('40111222', marcas, {}, ''), '2026-10-01');
+  assert.equal(L.sinContacto_('40111222', marcas, { 40111222: ['955555555'] }, ''), '', 'le queda otro');
+  assert.equal(L.sinContacto_('40111222', marcas, {}, '@rosa.q'), '', 'le queda el usuario');
+  assert.equal(L.sinContacto_('40999888', marcas, {}, ''), '', 'nunca tuvo teléfono: no es «sin contacto»');
+  assert.deepEqual(plano(L.telefonosDescartados(marcas, { 40111222: ['912345678'] })), { 40111222: ['987654321'] });
+});
+
+test('fallecidos: filas nuevas y antiguas; la anulada no cuenta', () => {
+  const nueva = res('2026-10-01', 'FALLECIÓ', { ACCION: 'DESCARTADO', MOTIVO: 'FALLECIÓ', ID: 'SEG-9', RESPONSABLE: 'RACHEL' });
+  const antigua = seg({ dni: '40333444', fecha: '2026-08-01', accion: 'DESCARTADO', motivo: 'FALLECIÓ' });
+  const anulada = Object.assign(res('2026-10-02', 'FALLECIÓ', { DNI: '40555666' }), { ANULADO: 'SÍ' });
+  assert.deepEqual(plano(L.fallecidos([nueva, antigua, anulada])), {
+    40111222: { fecha: '2026-10-01', quien: 'RACHEL', id: 'SEG-9' },
+    40333444: { fecha: '2026-08-01', quien: 'MAGALY', id: antigua.ID }
+  });
+});

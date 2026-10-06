@@ -66,6 +66,14 @@ test('grupoProcedimiento junta las variantes escritas a mano', () => {
   assert.equal(g('Sangria'), 'SANGRÍA');
   assert.equal(g('TRANSFUSION'), 'TRANSFUSION', 'lo desconocido queda normalizado tal cual');
   assert.equal(g(''), '');
+  // Fix round 1: tightened prefixes
+  assert.equal(g('BIOQUIMICA'), 'BIOQUIMICA', 'BIOQUIM no coincide con BIOPS/BIOSI/BIPOS');
+  assert.equal(g('BIOMETRIA HEMATICA'), 'BIOMETRIA HEMATICA', 'BIOM no coincide con BIOPS/BIOSI/BIPOS');
+  assert.equal(g('CITOMEGALOVIRUS'), 'CITOMEGALOVIRUS', 'CITOMEG se excluye de CITOM');
+  assert.equal(g('AMOXICILINA'), 'AMOXICILINA', 'AMO como word boundary, no AMOX');
+  assert.equal(g('AMO, BIOSIA'), 'AMO + BIOPSIA', 'split on ,');
+  assert.equal(g('AMO + AMO'), 'AMO', 'deduplication');
+  assert.equal(g('biopsia de hueso'), 'BIOPSIA', 'qualifiers dropped by design');
 });
 
 test('kpiIndicaciones agrega GRUPO sin cambiar las filas', () => {

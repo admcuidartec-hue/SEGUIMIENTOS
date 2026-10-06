@@ -766,15 +766,50 @@ function limpiarParaEnvio(v) {
 
 /** Variantes escritas a mano → nombre canónico. Se reconocen por el comienzo, sin tildes. */
 var GRUPOS_PROC = [
-  ['AMO', 'AMO'], ['BIO', 'BIOPSIA'], ['BIP', 'BIOPSIA'],
+  ['BIOPS', 'BIOPSIA'], ['BIOSI', 'BIOPSIA'], ['BIPOS', 'BIOPSIA'],
   ['CITOM', 'CITOMETRÍA DE FLUJO'], ['CITOG', 'CITOGENÉTICA'], ['CARIO', 'CARIOTIPO'], ['SANGR', 'SANGRÍA']
 ];
 var ORDEN_GRUPOS = ['AMO', 'BIOPSIA', 'CITOMETRÍA DE FLUJO', 'CARIOTIPO', 'CITOGENÉTICA', 'SANGRÍA'];
 
 function grupoProcedimiento(detalle) {
-  var partes = normTexto(detalle).split('+').map(function (x) { return x.trim(); }).filter(Boolean).map(function (x) {
-    for (var i = 0; i < GRUPOS_PROC.length; i++) if (x.indexOf(GRUPOS_PROC[i][0]) === 0) return GRUPOS_PROC[i][1];
-    return x;
+  var partes_sin_procesar = normTexto(detalle).split(/[\+,\/]/);
+  var partes = [];
+  partes_sin_procesar.forEach(function(parte) {
+    parte = parte.trim();
+    if (!parte) return;
+    var palabras = parte.split(/\s+/);
+    var resultado_palabras = [];
+    var encontrado_prefijo = false;
+    for (var i = 0; i < palabras.length; i++) {
+      var palabra = palabras[i];
+      if (PALABRAS_VACIAS[palabra]) continue;
+      if (!encontrado_prefijo) {
+        if (palabra === 'AMO') {
+          resultado_palabras.push('AMO');
+          encontrado_prefijo = true;
+          break;
+        } else {
+          var prefijo_coincide = false;
+          for (var j = 0; j < GRUPOS_PROC.length; j++) {
+            var prefijo = GRUPOS_PROC[j][0];
+            if (prefijo === 'CITOM' && palabra.indexOf('CITOMEG') === 0) continue;
+            if (palabra.indexOf(prefijo) === 0) {
+              resultado_palabras.push(GRUPOS_PROC[j][1]);
+              encontrado_prefijo = true;
+              prefijo_coincide = true;
+              break;
+            }
+          }
+          if (!prefijo_coincide) {
+            for (var k = 0; k < palabras.length; k++) {
+              if (!PALABRAS_VACIAS[palabras[k]]) resultado_palabras.push(palabras[k]);
+            }
+            break;
+          }
+        }
+      }
+    }
+    if (resultado_palabras.length > 0) partes.push(resultado_palabras.join(' '));
   });
   var unicas = partes.filter(function (x, i) { return partes.indexOf(x) === i; });
   return unicas.sort(function (a, b) {

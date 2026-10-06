@@ -764,6 +764,27 @@ function limpiarParaEnvio(v) {
    INDICADORES (diseño §7.3)
    ========================================================================== */
 
+/** Variantes escritas a mano → nombre canónico. Se reconocen por el comienzo, sin tildes. */
+var GRUPOS_PROC = [
+  ['AMO', 'AMO'], ['BIO', 'BIOPSIA'], ['BIP', 'BIOPSIA'],
+  ['CITOM', 'CITOMETRÍA DE FLUJO'], ['CITOG', 'CITOGENÉTICA'], ['CARIO', 'CARIOTIPO'], ['SANGR', 'SANGRÍA']
+];
+var ORDEN_GRUPOS = ['AMO', 'BIOPSIA', 'CITOMETRÍA DE FLUJO', 'CARIOTIPO', 'CITOGENÉTICA', 'SANGRÍA'];
+
+function grupoProcedimiento(detalle) {
+  var partes = normTexto(detalle).split('+').map(function (x) { return x.trim(); }).filter(Boolean).map(function (x) {
+    for (var i = 0; i < GRUPOS_PROC.length; i++) if (x.indexOf(GRUPOS_PROC[i][0]) === 0) return GRUPOS_PROC[i][1];
+    return x;
+  });
+  var unicas = partes.filter(function (x, i) { return partes.indexOf(x) === i; });
+  return unicas.sort(function (a, b) {
+    var ia = ORDEN_GRUPOS.indexOf(a), ib = ORDEN_GRUPOS.indexOf(b);
+    if (ia < 0) ia = 99;
+    if (ib < 0) ib = 99;
+    return ia - ib || (a < b ? -1 : a > b ? 1 : 0);
+  }).join(' + ');
+}
+
 function compararCampos_(campos) {
   return function (a, b) {
     for (var i = 0; i < campos.length; i++) {
@@ -828,7 +849,7 @@ function kpiIndicaciones(indicaciones, citas) {
     var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
     var medico = i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO';
     var clave = [mesDe(i.FECHA), i.TIPO, i.DETALLE, medico].join('|');
-    if (!acc[clave]) acc[clave] = { MES: mesDe(i.FECHA), TIPO: i.TIPO, DETALLE: i.DETALLE, MEDICO: medico, INDICADAS: 0, ACEPTADAS: 0, COMPLETADAS: 0 };
+    if (!acc[clave]) acc[clave] = { MES: mesDe(i.FECHA), TIPO: i.TIPO, DETALLE: i.DETALLE, GRUPO: grupoProcedimiento(i.DETALLE), MEDICO: medico, INDICADAS: 0, ACEPTADAS: 0, COMPLETADAS: 0 };
     acc[clave].INDICADAS++;
     if (i.ESTADO === 'ACEPTÓ') acc[clave].ACEPTADAS++;
     if (i.ESTADO === 'ACEPTÓ' && i.COMPLETO !== 'NO') acc[clave].COMPLETADAS++;

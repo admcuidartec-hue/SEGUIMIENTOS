@@ -28,8 +28,8 @@ test('indicaciones: sin médico solicitante se usa el de la última cita anterio
     Object.assign({ FECHA: '2026-07-20', ESTADO: 'COTIZÓ', DNI: '' }, base)
   ];
   assert.deepEqual(plano(L.kpiIndicaciones(inds, citas)), [
-    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: 'Dr. A', INDICADAS: 2, ACEPTADAS: 1, COMPLETADAS: 1 },
-    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', MEDICO: 'SIN MÉDICO', INDICADAS: 1, ACEPTADAS: 0, COMPLETADAS: 0 }
+    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', GRUPO: 'HIERRO', MEDICO: 'Dr. A', INDICADAS: 2, ACEPTADAS: 1, COMPLETADAS: 1 },
+    { MES: '2026-07', TIPO: 'HIERRO', DETALLE: 'HIERRO', GRUPO: 'HIERRO', MEDICO: 'SIN MÉDICO', INDICADAS: 1, ACEPTADAS: 0, COMPLETADAS: 0 }
   ]);
 });
 
@@ -54,6 +54,26 @@ test('calcularKpi lista las indicaciones sin candidato', () => {
     EMPAREJAMIENTO: 'SIN CANDIDATO', DNI: '', ESTADO: 'COTIZÓ', MEDICO_SOLICITANTE: '' }];
   const k = plano(L.calcularKpi([], inds, [], reglas(L), '2026-10-01'));
   assert.deepEqual(k.sinCandidato, [{ ID: 'IND-1', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' }]);
+});
+
+test('grupoProcedimiento junta las variantes escritas a mano', () => {
+  const g = L.grupoProcedimiento;
+  assert.equal(g('AMO + BIOSIA'), 'AMO + BIOPSIA');
+  assert.equal(g('biposia+amo'), 'AMO + BIOPSIA');
+  assert.equal(g('CITOMETREÍADE FLUJO'), 'CITOMETRÍA DE FLUJO');
+  assert.equal(g('Citomateria de flujo + cariotipo'), 'CITOMETRÍA DE FLUJO + CARIOTIPO');
+  assert.equal(g('citogenetica'), 'CITOGENÉTICA');
+  assert.equal(g('Sangria'), 'SANGRÍA');
+  assert.equal(g('TRANSFUSION'), 'TRANSFUSION', 'lo desconocido queda normalizado tal cual');
+  assert.equal(g(''), '');
+});
+
+test('kpiIndicaciones agrega GRUPO sin cambiar las filas', () => {
+  const inds = [{ FECHA: '2026-09-01', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO + BIOSIA', ESTADO: 'COTIZÓ', DNI: '' }];
+  const k = plano(L.kpiIndicaciones(inds, []));
+  assert.equal(k.length, 1);
+  assert.equal(k[0].DETALLE, 'AMO + BIOSIA');
+  assert.equal(k[0].GRUPO, 'AMO + BIOPSIA');
 });
 
 test('filasHojaKpi: todas las filas tienen 7 columnas y la tasa es una fracción', () => {

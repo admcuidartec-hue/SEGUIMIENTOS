@@ -63,7 +63,7 @@ test('el menú cambia de pantalla y marca el ítem con aria-current', async () =
       await pagina.locator(`.menu [data-sec="${sec}"]`).click();
       await pagina.waitForSelector(`#v-${sec}`, { state: 'visible' });
       for (const otra of SECCIONES.filter(s => s !== sec)) assert.equal(await visible(pagina, `#v-${otra}`), false, `${sec}: ${otra} oculta`);
-      if (sec !== 'tablero') assert.match(await pagina.locator(`#v-${sec}`).textContent(), /Cargando…/);
+      if (sec !== 'tablero' && sec !== 'registro') assert.match(await pagina.locator(`#v-${sec}`).textContent(), /Cargando…/);
       assert.deepEqual(await pagina.locator('.menu [aria-current="page"]').evaluateAll(l => l.map(x => x.dataset.sec)), [sec]);
     }
     assert.equal(await pagina.locator('#v-registro h1').textContent(), 'Registro');
@@ -1224,6 +1224,298 @@ test('arrastrar: Esc y pointercancel cancelan sin abrir paso ni guardar, y no de
     await pagina.mouse.up();
     await pagina.waitForFunction(() => P.paso && P.paso.k === 'agendo');
     assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ============ Registro (Tarea 8) ============ */
+
+/** Abre Registro (con seg.usuario = 'MAGALY', salvo que `usuario` sea '') y espera «Registrados hoy». */
+async function abrirRegistro(opciones = {}) {
+  const usuario = 'usuario' in opciones ? opciones.usuario : 'MAGALY';
+  const r = await abrir(Object.assign({}, opciones, usuario ? { guardado: { 'seg.usuario': usuario } } : {}));
+  try {
+    await r.pagina.locator('.menu [data-sec="registro"]').click();
+    await r.pagina.waitForSelector('#rform #rdni', { state: 'visible' });
+    await r.pagina.waitForSelector('#lhoy li[data-reg]');
+  } catch (e) { await r.navegador.close(); throw e; }
+  return r;
+}
+const falta = pagina => pagina.locator('#rfalta').textContent();
+const filaHoy = (pagina, id) => pagina.locator(`#lhoy li[data-reg="${id}"]`);
+/** Llena lo mínimo de una indicación (sin DNI ni contacto, que cada prueba pone). */
+async function llenarIndicacion(pagina, o = {}) {
+  if (o.nombre) await pagina.locator('#rnom').fill(o.nombre);
+  if (o.contacto) await pagina.locator('#rtel').fill(o.contacto);
+  if (o.doctor) await pagina.locator('#rmed').selectOption(o.doctor);
+  for (const p of o.procs || []) await pagina.locator(`#rprocs [data-proc="${p}"]`).click();
+}
+
+test('registro: un DNI conocido completa nombre, contacto y doctor y muestra «Paciente conocido»', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    assert.equal(await pagina.locator('#v-registro .cargando').isVisible(), false);
+    // Los catálogos salen de bootstrap: procedimientos, tratamientos y doctores.
+    assert.deepEqual(await pagina.locator('#rprocs [data-proc]').evaluateAll(l => l.map(b => b.dataset.proc)),
+      ['AMO', 'BIOPSIA', 'CITOMETRÍA DE FLUJO', 'CARIOTIPO', 'SANGRÍA']);
+    assert.deepEqual(await pagina.locator('[data-trat]').evaluateAll(l => l.map(b => b.dataset.trat)),
+      ['', 'HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA']);
+    assert.deepEqual(await pagina.locator('#rmed option').evaluateAll(l => l.map(o => o.value)),
+      ['', 'Dr. Elí Cabanillas', 'Dra. Karen Matos', 'Dra. Alejandra La Torre', 'Dr. Juvenal Hanampa', 'Dra. Karen Matos – Particular']);
+    assert.equal(await pagina.locator('#rfec').inputValue(), '2026-10-01');
+    await pagina.locator('#rdni').fill('40444555');
+    await pagina.waitForSelector('#rcon .conocido');
+    assert.equal((await pagina.locator('#rcon .conocido').textContent()).trim(), 'Paciente conocido · última consulta 12/08/2026 con Dra. La Torre');
+    assert.equal(await ultimo(pagina, 'buscarPacienteRegistro'), '40444555');
+    assert.equal(await pagina.locator('#rnom').inputValue(), 'LUIS ALBERTO RAMOS VEGA');
+    assert.equal(await pagina.locator('#rtel').inputValue(), '923 456 789');
+    assert.equal(await pagina.locator('#rmed').inputValue(), 'Dra. Alejandra La Torre');
+    assert.equal(await pagina.locator('#rcon .fallecido').count(), 0);
+    // Otro DNI conocido reemplaza lo que se completó solo.
+    await pagina.locator('#rdni').fill('40333444');
+    await pagina.waitForFunction(() => document.querySelector('#rnom').value === 'CARMEN SOFÍA TORRES DÍAZ');
+    assert.equal(await pagina.locator('#rmed').inputValue(), 'Dr. Juvenal Hanampa');
+    // Un DNI incompleto quita el aviso.
+    await pagina.locator('#rdni').fill('4033');
+    await pagina.waitForFunction(() => !document.querySelector('#rcon .conocido'));
+    assert.match(await falta(pagina), /^Falta: DNI/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: un DNI de fallecido muestra el aviso y deja registrar', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('41999000');
+    await pagina.waitForSelector('#rcon .fallecido');
+    assert.match(await pagina.locator('#rcon .fallecido').textContent(), /Este paciente figura como fallecido el 24\/09\/2026 \(Ana\)/);
+    assert.match(await pagina.locator('#rcon .conocido').textContent(), /Paciente conocido · última consulta 02\/07\/2026 con Dr\. Cabanillas/);
+    await llenarIndicacion(pagina, { procs: ['SANGRÍA'] });
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false, 'el aviso no bloquea');
+    assert.equal(await falta(pagina), 'Se creará 1 registro.');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
+    assert.equal(await aviso(pagina), 'Registrado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000008');
+    const p = await ultimo(pagina, 'guardarRegistro');
+    assert.equal(p.dni, '41999000');
+    assert.equal(p.contacto, '933999000', 'el teléfono va sin espacios');
+    assert.equal(p.doctor, 'Dr. Elí Cabanillas');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: el carné de extranjería AB123456X se acepta y no pierde las letras', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('AB12');
+    assert.equal(await pagina.locator('#rdni').inputValue(), 'AB12');
+    assert.match(await falta(pagina), /^Falta: DNI/);
+    await pagina.locator('#rdni').fill('ab123456x');
+    assert.equal(await pagina.locator('#rdni').inputValue(), 'AB123456X');
+    await pagina.waitForSelector('#rcon .nuevo');
+    assert.equal(await ultimo(pagina, 'buscarPacienteRegistro'), 'AB123456X');
+    await llenarIndicacion(pagina, { nombre: 'Juan Carlos Pérez Rojas', contacto: '@juan.perez', doctor: 'Dra. Karen Matos', procs: ['AMO'] });
+    assert.doesNotMatch(await falta(pagina), /DNI/);
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
+    const p = await ultimo(pagina, 'guardarRegistro');
+    assert.equal(p.dni, 'AB123456X');
+    assert.equal(p.contacto, '@juan.perez');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: dos procedimientos y un tratamiento con sesiones y marca crean tres REG y «Registrados hoy» los lista', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    assert.equal(await pagina.locator('#nhoy').textContent(), '1');
+    await pagina.locator('#rdni').fill('45678901');
+    await pagina.waitForSelector('#rcon .nuevo');
+    await llenarIndicacion(pagina, { nombre: 'Juana Pérez Soto', contacto: '987 111 333', doctor: 'Dra. Karen Matos', procs: ['AMO', 'BIOPSIA'] });
+    assert.equal(await pagina.locator('#rprocs [data-proc="AMO"]').getAttribute('aria-pressed'), 'true');
+    await pagina.locator('[data-trat="HIERRO CARBOXIMALTOSA"]').click();
+    assert.deepEqual(await pagina.locator('#rses [data-marca]').evaluateAll(l => l.map(b => b.dataset.marca)), ['FERINJECT', 'LIKFER']);
+    assert.equal(await falta(pagina), 'Falta: sesiones, marca.');
+    await pagina.locator('#rses [data-ses="2"]').click();
+    await pagina.locator('#rses [data-marca="FERINJECT"]').click();
+    assert.equal(await falta(pagina), 'Se crearán 3 registros.');
+    // La derisomaltosa trae su única marca elegida; el sacarato no lleva marca.
+    await pagina.locator('[data-trat="HIERRO DERISOMALTOSA"]').click();
+    assert.equal(await pagina.locator('#rses [data-marca="MONOFER"]').getAttribute('aria-pressed'), 'true');
+    await pagina.locator('[data-trat="HIERRO SACARATO"]').click();
+    assert.match(await pagina.locator('#rses').textContent(), /El sacarato no lleva marca\./);
+    await pagina.locator('[data-trat="HIERRO CARBOXIMALTOSA"]').click();
+    await pagina.locator('#rses [data-ses="2"]').click();
+    await pagina.locator('#rses [data-marca="FERINJECT"]').click();
+    await pagina.evaluate(() => { S.kpi = { viejo: 1 }; S.resumen = { viejo: 1 }; });
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000010"]');
+    assert.deepEqual(await ultimo(pagina, 'guardarRegistro'), { usuario: 'MAGALY', dni: '45678901', nombre: 'Juana Pérez Soto', contacto: '987111333',
+      fecha: '2026-10-01', doctor: 'Dra. Karen Matos', procedimientos: ['AMO', 'BIOPSIA'], tratamiento: 'HIERRO CARBOXIMALTOSA', sesiones: 2, marca: 'FERINJECT' });
+    assert.equal(await aviso(pagina),
+      'Registrado: Amo + Biopsia + Hierro carboximaltosa · Ferinject × 2 sesiones · Juana Pérez Soto · REG-000008, REG-000009, REG-000010');
+    for (const id of ['REG-000008', 'REG-000009', 'REG-000010']) assert.match(await filaHoy(pagina, id).textContent(), /JUANA PÉREZ SOTO/);
+    assert.match(await filaHoy(pagina, 'REG-000010').textContent(), /Hierro carboximaltosa · Ferinject × 2 sesiones/);
+    assert.match(await filaHoy(pagina, 'REG-000010').textContent(), /REG-000010 · registró Magaly/);
+    assert.equal(await pagina.locator('#nhoy').textContent(), '4');
+    // El formulario se limpia, salvo la fecha; los indicadores se vuelven a pedir.
+    assert.equal(await pagina.locator('#rdni').inputValue(), '');
+    assert.equal(await pagina.locator('#rnom').inputValue(), '');
+    assert.equal(await pagina.locator('#rprocs [aria-pressed="true"]').count(), 0);
+    assert.equal(await pagina.locator('#rfec').inputValue(), '2026-10-01');
+    assert.deepEqual(await pagina.evaluate(() => [S.kpi, S.resumen]), [null, null]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: «Posible duplicado» del servidor; «Revisar» la cierra y «Registrar de todos modos» registra', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const llenar = async () => {
+      await pagina.locator('#rdni').fill('45678902');
+      await pagina.waitForSelector('#rcon .nuevo');
+      await llenarIndicacion(pagina, { nombre: 'Pedro Gómez Ruiz', contacto: '987222444', doctor: 'Dr. Elí Cabanillas', procs: ['SANGRÍA'] });
+    };
+    await llenar();
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
+    await llenar();
+    const antes = await llamadas(pagina, 'guardarRegistro');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#rdup .dup');
+    assert.match(await pagina.locator('#rdup').textContent(), /Posible duplicado/);
+    assert.match(await pagina.locator('#rdup').textContent(), /Ya se registró el 01\/10\/2026 \(REG-000008\): Sangría\./);
+    assert.equal(await filaHoy(pagina, 'REG-000009').count(), 0);
+    assert.equal((await ultimo(pagina, 'guardarRegistro')).confirmado, undefined);
+    await pagina.locator('#rrevisar').click();
+    assert.equal(await pagina.locator('#rdup .dup').count(), 0);
+    assert.equal(await pagina.locator('#rnom').inputValue(), 'Pedro Gómez Ruiz', '«Revisar» no borra el formulario');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#rdup .dup');
+    await pagina.locator('#rforzar').click();
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), antes + 3);
+    assert.equal((await ultimo(pagina, 'guardarRegistro')).confirmado, true);
+    assert.match(await aviso(pagina), /REG-000009$/);
+    assert.equal(await pagina.locator('#rdup .dup').count(), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: sin contacto «Registrar» está deshabilitado y la barra dice qué falta; sin usuario no se guarda', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro({ usuario: '' });
+  try {
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await falta(pagina), 'Falta: DNI, nombres, teléfono o usuario, doctor, un procedimiento o tratamiento.');
+    await pagina.locator('#rdni').fill('45678903');
+    await pagina.waitForSelector('#rcon .nuevo');
+    await llenarIndicacion(pagina, { nombre: 'Rita Salas Paz', doctor: 'Dr. Elí Cabanillas', procs: ['CARIOTIPO'] });
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await falta(pagina), 'Falta: teléfono o usuario.');
+    await pagina.locator('#rtel').fill('   ');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    await pagina.locator('#rtel').fill('987333555');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.equal(await falta(pagina), 'Se creará 1 registro.');
+    // Sin «¿Quién es usted?» no sale nada.
+    await pagina.locator('#rgo').click();
+    assert.equal(await aviso(pagina), 'Elija quién es usted.');
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 0);
+    // Un error del servidor se avisa y el formulario queda como estaba.
+    await pagina.locator('.side .js-usuario').selectOption('RACHEL');
+    await pagina.evaluate(() => { DEMO._fallar.guardarRegistro = 'Elija el doctor de la lista.'; });
+    await pagina.locator('#rgo').click();
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'No se guardó: Elija el doctor de la lista.');
+    assert.equal(await pagina.locator('#rnom').inputValue(), 'Rita Salas Paz');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: alta médica con las especialidades del paciente; la que ya tiene alta está deshabilitada', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rseg [data-rmodo="alta"]').click();
+    await pagina.waitForSelector('#adni');
+    assert.match(await pagina.locator('#rgo').textContent(), /Registrar alta/);
+    // Un DNI sin consultas no tiene alta.
+    await pagina.locator('#adni').fill('45678904');
+    await pagina.waitForFunction(() => /No encontramos ese DNI/.test(document.querySelector('#acon').textContent));
+    assert.equal((await pagina.locator('#acon').textContent()).trim(), 'No encontramos ese DNI. El alta solo se registra para pacientes que ya tienen consultas.');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    await pagina.locator('#adni').fill('41666777');
+    await pagina.waitForSelector('#aesps [data-esp]');
+    assert.equal(await pagina.locator('#aesps [data-esp="HEMATOLOGÍA"]').isDisabled(), true);
+    assert.match(await pagina.locator('#aesps [data-esp="HEMATOLOGÍA"]').textContent(), /ya tiene alta/);
+    assert.equal(await pagina.locator('#aesps [data-esp="REUMATOLOGÍA"]').isDisabled(), false);
+    assert.equal(await pagina.locator('#amed').inputValue(), 'Dr. Juvenal Hanampa', 'propone el doctor de la última consulta');
+    assert.equal(await falta(pagina), 'Falta: especialidad.');
+    await pagina.locator('#aesps [data-esp="REUMATOLOGÍA"]').click();
+    await pagina.locator('#anota').fill('Controles en otra sede');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#lhoy li[data-reg="ALT-000002"]');
+    assert.deepEqual(await ultimo(pagina, 'darDeAlta'), { usuario: 'MAGALY', dni: '41666777', especialidad: 'REUMATOLOGÍA',
+      doctor: 'Dr. Juvenal Hanampa', fecha: '2026-10-01', nota: 'Controles en otra sede' });
+    assert.equal(await aviso(pagina), 'Alta médica registrada: Teresa del Pilar Rojas Vargas · Reumatología · ALT-000002');
+    assert.match(await filaHoy(pagina, 'ALT-000002').textContent(), /Alta médica · REUMATOLOGÍA · Dr\. Juvenal Hanampa/);
+    assert.equal(await pagina.locator('#adni').inputValue(), '', 'el formulario se limpia');
+    // Su anulación va por anularAlta.
+    await filaHoy(pagina, 'ALT-000002').locator('[data-anular]').click();
+    await filaHoy(pagina, 'ALT-000002').locator('.anula input').fill('Especialidad equivocada');
+    await filaHoy(pagina, 'ALT-000002').locator('[data-confirmar-anular]').click();
+    await pagina.waitForSelector('#lhoy li.anulado[data-reg="ALT-000002"]');
+    assert.deepEqual(await ultimo(pagina, 'anularAlta'), { usuario: 'MAGALY', id: 'ALT-000002', motivo: 'Especialidad equivocada' });
+    assert.equal(await llamadas(pagina, 'anularRegistro'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: «Anular» pide motivo en la fila, espera al servidor y deja la fila tachada con su motivo', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    // La anulada del DEMO ya muestra su motivo.
+    assert.match(await filaHoy(pagina, 'REG-000007').textContent(), /anulado: Registrado dos veces/);
+    assert.equal(await filaHoy(pagina, 'REG-000007').locator('[data-anular]').count(), 0);
+    const fila = filaHoy(pagina, 'REG-000003');
+    await fila.locator('[data-anular]').click();
+    const motivo = fila.locator('.anula input'), ok = fila.locator('[data-confirmar-anular]');
+    assert.ok(await motivo.evaluate(el => el === document.activeElement), 'el foco va al motivo');
+    assert.equal(await ok.isDisabled(), true, 'sin motivo no se puede');
+    await motivo.fill('   ');
+    assert.equal(await ok.isDisabled(), true);
+    await motivo.press('Enter');
+    assert.equal(await llamadas(pagina, 'anularRegistro'), 0);
+    // «Cancelar» cierra el motivo; Esc también.
+    await fila.locator('[data-cancelar-anular]').click();
+    assert.equal(await fila.locator('.anula input').count(), 0);
+    await fila.locator('[data-anular]').click();
+    await motivo.press('Escape');
+    assert.equal(await fila.locator('.anula input').count(), 0);
+    // Si el servidor falla, la fila no se tacha.
+    await pagina.evaluate(() => { DEMO._fallar.anularRegistro = 'Sin conexión con el servidor.'; });
+    await fila.locator('[data-anular]').click();
+    await motivo.fill('Paciente equivocado');
+    await ok.click();
+    await pagina.waitForFunction(() => /No se anuló/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'No se anuló: Sin conexión con el servidor.');
+    assert.equal(await fila.getAttribute('class'), '');
+    assert.equal(await ok.isDisabled(), false);
+    // Con el servidor bien, se espera su respuesta antes de tachar.
+    await pagina.evaluate(() => { delete DEMO._fallar.anularRegistro; DEMO._demora.anularRegistro = 400; });
+    await ok.click();
+    await pagina.waitForTimeout(150);
+    assert.equal(await pagina.locator('#lhoy li.anulado[data-reg="REG-000003"]').count(), 0, 'no se tacha antes de la respuesta');
+    await pagina.waitForSelector('#lhoy li.anulado[data-reg="REG-000003"]');
+    assert.deepEqual(await ultimo(pagina, 'anularRegistro'), { usuario: 'MAGALY', id: 'REG-000003', motivo: 'Paciente equivocado' });
+    assert.equal(await llamadas(pagina, 'anularAlta'), 0);
+    assert.equal(await pagina.locator('#lhoy li[data-reg="REG-000003"] .tx').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
+    assert.match(await filaHoy(pagina, 'REG-000003').textContent(), /anulado: Paciente equivocado/);
+    assert.match(await filaHoy(pagina, 'REG-000003').textContent(), /Anulado/);
+    assert.equal(await pagina.locator('#nhoy').textContent(), '0');
+    assert.equal(await aviso(pagina), 'Anulado: REG-000003.');
+    // El tablero se actualiza: la tarjeta de ese registro sale.
+    await pagina.waitForFunction(() => !S.pacientes.some(p => p.id === 'REG-000003'));
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

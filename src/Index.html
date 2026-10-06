@@ -291,8 +291,72 @@ html.con-vt .vista{animation:none}
 .tarjeta.fantasma::after{display:none}
 body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 
+/* Registro (README §6.3): formulario de 600 px y «Registrados hoy» fija al lado. */
+.reg{display:grid;grid-template-columns:minmax(0,600px) minmax(0,1fr);gap:32px 48px;align-items:start;margin-top:24px}
+.reg form{display:flex;flex-direction:column;gap:28px;min-width:0}
+.reg fieldset{border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;min-width:0}
+.reg legend{padding:0;margin-bottom:12px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600}
+.reg legend .k{font-family:var(--mono);font-size:13px;color:var(--accent)}
+.reg legend small{font-size:13px;font-weight:400;color:var(--muted)}
+.seg-reg{margin-top:22px}
+.dos{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{height:40px;padding:0 14px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);color:var(--soft);font-weight:500;font-size:13.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .16s var(--ease-out)}
+.chip:active{transform:scale(.97)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.chip.cuadro{border-radius:var(--r-s);height:44px;min-width:44px;justify-content:center}
+.chip:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.chip small{font-size:12px;color:var(--muted)}
+.campo input.dni{height:48px;font-family:var(--mono);font-size:18px;letter-spacing:.04em}
+.campo input.otro{width:96px;font-family:var(--mono)}
+.conocido,.nuevo,.fallecido{margin:0;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:var(--r-s);font-size:13.5px;animation:subir .22s var(--ease-out)}
+.conocido{background:var(--info-soft);color:var(--ink)}
+.conocido i{font-size:18px;color:var(--info)}
+.nuevo{background:var(--surface-2);color:var(--soft)}
+.fallecido{background:var(--warn-soft);color:var(--ink)}
+.fallecido i{font-size:18px;color:var(--warn)}
+.avisos-dni{display:flex;flex-direction:column;gap:8px}
+.avisos-dni:empty{display:none}
+.caja{display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);animation:subir .22s var(--ease-out)}
+.caja.quieta{animation:none}
+.caja .rot{display:flex;flex-direction:column;gap:8px}
+.caja .rot>span:first-child{font-size:12.5px;color:var(--muted)}
+.sin-marca{color:var(--soft)}
+.dup{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--warn);border-radius:var(--r);background:var(--warn-soft);animation:subir .22s var(--ease-out)}
+.dup .fila{display:flex;gap:10px}
+.dup .fila i{font-size:20px;color:var(--warn)}
+.dup b{display:block}
+.dup .botones{display:flex;gap:8px;flex-wrap:wrap}
+.barra-reg{display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;bottom:0;padding:12px 0;background:var(--bg);z-index:2}
+.barra-reg .btn{height:48px;font-size:15px}
+.barra-reg span{font-size:13px;color:var(--muted)}
+.vacio{margin:0;padding:20px 0;color:var(--muted)}
+.hoy{position:sticky;top:24px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.hoy h2{margin:0;font-size:17px;font-weight:600}
+.hoy h2 .mono{font-size:13px;color:var(--muted);font-weight:500}
+.hoy ol{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.hoy li{position:relative;display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:4px 12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.hoy li>*{position:relative}
+/* La fila nueva se tiñe un momento: se anima solo la opacidad de esta capa. */
+.hoy li::before{content:'';position:absolute;inset:0;border-radius:var(--r-s);background:var(--accent-soft);opacity:0;pointer-events:none}
+.hoy li .hora{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.hoy li .det{display:flex;flex-direction:column;gap:3px;min-width:0}
+.hoy li .det b .mono{font-weight:400;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.hoy li .det .texto{font-size:13.5px;color:var(--soft);overflow-wrap:anywhere}
+.hoy li .det .quien{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.hoy li .marca-anulado{font-size:12px;font-weight:600;color:var(--accent)}
+.hoy li .ghost{height:36px}
+.hoy li.anulado{opacity:.6}
+.hoy li.anulado .tx{text-decoration:line-through}
+.anula{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;animation:subir .2s var(--ease-out)}
+.anula:empty{display:none}
+.anula input{flex:1;min-width:160px}
+.hoy .hist-skel{padding:16px 0}
+.hoy li.sin-fila{display:block;padding:0;border-bottom:0}
+.nota-chips{color:var(--muted)}
+
 /* Responsivo */
-@media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}}
+@media (max-width:1180px){.tablero{grid-template-columns:repeat(2,minmax(0,1fr))}.col.fija{position:static}.reg{grid-template-columns:minmax(0,1fr)}.hoy{position:static}}
 @media (max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media (max-width:760px){
   .side{display:none}.topmovil{display:flex}.navmovil{display:grid}
@@ -301,6 +365,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
   .buscar{width:100%}.atajos,.kbd{display:none}
   .filtros .relleno{display:none}
   .coltabs{display:flex}.tablero{grid-template-columns:minmax(0,1fr)}.col{min-height:0}.col:not(.movil){display:none}
+  .barra-reg{bottom:64px}
   .panel{width:100%}.p-volver{display:inline-flex}.p-cerrar{display:none}.p-top,.p-cuerpo{padding-left:16px;padding-right:16px}
 }
 @view-transition{navigation:auto}
@@ -364,6 +429,13 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
         <h1>Registro</h1>
         <p class="sub">Lo que indica el doctor: procedimientos, tratamientos y altas médicas.</p>
         <p class="cargando" role="status">Cargando…</p>
+        <div id="reg-cuerpo" hidden>
+          <div class="seg seg-reg" id="rseg" role="tablist" aria-label="Qué se registra"><span class="pastilla" aria-hidden="true"></span><button type="button" role="tab" aria-selected="true" data-rmodo="ind"><i class="ph ph-prescription"></i>Indicación</button><button type="button" role="tab" aria-selected="false" data-rmodo="alta"><i class="ph ph-seal-check"></i>Alta médica</button></div>
+          <div class="reg">
+            <form id="rform" novalidate></form>
+            <section class="hoy" aria-labelledby="hoyt"><h2 id="hoyt">Registrados hoy <span class="mono" id="nhoy"></span></h2><ol id="lhoy"></ol></section>
+          </div>
+        </div>
       </section>
       <section class="vista" id="v-pacientes" hidden>
         <h1>Pacientes</h1>
@@ -445,7 +517,9 @@ const S = {
   lim: { rec: 6, mes: 4, ant: 3 },
   colMovil: 1,
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
-  fichaDni: ''      // «Ver ficha completa»: el DNI que abre Pacientes (Tarea 9)
+  fichaDni: '',     // «Ver ficha completa»: el DNI que abre Pacientes (Tarea 9)
+  kpi: null,        // getKpi() en caché (Tarea 10); invalidarIndicadores() lo olvida tras cada escritura
+  resumen: null     // getResumen() en caché (Tarea 10); ídem
 };
 
 /* ============ Adaptadores (MAPEO-SERVIDOR.md §0) ============ */
@@ -1587,6 +1661,7 @@ async function guardarResultado(clave, resultado, extra) {
     return;
   }
   S.enVuelo.delete(clave);
+  invalidarIndicadores();
   // Manda el servidor: r.tarjeta es la tarjeta recalculada, o '' si salió del tablero.
   const actual = S.pacientes.find(x => x.id === clave), t = r && r.tarjeta;
   if (t) {
@@ -1610,6 +1685,7 @@ const deshacerDe = r => r && (r.seguimiento && r.seguimiento.ID ? ['anularResult
 async function deshacer(fn, id, quien, nombre) {
   try {
     await llamar(fn, { usuario: quien, id, motivo: 'Deshecho al momento' });
+    invalidarIndicadores();
     avisar('Deshecho: ' + nombre + '.');
   } catch (e) { avisar('No se deshizo: ' + e.message); }
   await cargarTablero(null, true);
@@ -1695,6 +1771,7 @@ async function confirmarAnulacion(boton) {
     await llamar(ANULAR[fila.anular.que], { usuario: S.usuario, id: fila.anular.id, motivo });
   } catch (e) { boton.disabled = false; avisar('No se anuló: ' + e.message); return; }
   avisar('Anulado: ' + fila.anular.id + '.');
+  invalidarIndicadores();
   P.anulando = '';
   const p = S.pacientes.find(x => x.id === seleccion.panel);
   if (p) cargarHistoria(p);
@@ -1738,6 +1815,402 @@ $('#panel').addEventListener('change', e => {
 $('#velo').addEventListener('click', () => cerrarPanel());
 VISTAS.tablero.mostrar = () => pastilla($('#seg'), true);
 
+/* ============ REGISTRO (README §6.3; MAPEO §1.4-§1.8) ============ */
+/**
+ * Los indicadores se calculan con lo escrito: tras cualquier escritura quedan viejos.
+ * La Tarea 10 los guarda en S.kpi y S.resumen; aquí solo se olvidan para que se vuelvan a pedir.
+ */
+function invalidarIndicadores() { S.kpi = null; S.resumen = null; }
+
+const RG = {
+  listo: false, modo: 'ind',     // 'ind' (indicación) | 'alta'
+  procs: [], trat: '', ses: 0, otro: '', marca: '',
+  dni: '', pac: null,            // el último DNI pedido y lo que devolvió buscarPacienteRegistro
+  auto: {},                      // lo que se completó solo, por campo: se reemplaza si cambia el DNI
+  aEsp: '', enviando: false, teclado: false,
+  hoy: null, anulando: '', motivo: ''
+};
+/** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres (documentoValido del servidor). Nunca borra letras. */
+const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '').slice(0, 12);
+const documentoOk = v => { const d = dniLimpio(v); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
+/** Un teléfono se envía sin espacios; un usuario (@…) tal cual. */
+const contactoEnvio = v => { const t = String(v || '').trim(); return /^[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t; };
+const marcasDe = t => (S.boot && S.boot.marcas && S.boot.marcas[norm(t)]) || [];
+const PARTICULAS_CAT = { DE: 1, DEL: 1, LA: 1, EL: 1, LOS: 1, LAS: 1, Y: 1, EN: 1, CON: 1, SIN: 1 };
+/** 'CITOMETRÍA DE FLUJO' -> 'Citometría de flujo'; las siglas cortas (AMO) quedan en mayúsculas. Solo para mostrar. */
+function etiquetaCat(t) {
+  return String(t || '').trim().split(/\s+/).map((w, i) => w.length <= 3 && !PARTICULAS_CAT[norm(w)] && w === w.toUpperCase() ? w
+    : i ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+}
+const sinMarca = t => 'El ' + etiquetaCat(t).replace(/^hierro\s+/i, '').toLowerCase() + ' no lleva marca.';
+const sesionesElegidas = () => RG.ses === 'otro' ? Number(RG.otro) : RG.ses;
+const opcionesDoctores = () => '<option value="">— Elija —</option>'
+  + ((S.boot && S.boot.doctores) || []).map(d => `<option value="${esc(d.doctor)}">${esc(d.doctor)}</option>`).join('');
+
+/** Una vez, tras bootstrap. Los contenedores son fijos: los eventos se conectan aquí y el contenido se repinta. */
+function iniciarRegistro() {
+  const f = $('#rform');
+  f.addEventListener('submit', e => e.preventDefault());
+  f.addEventListener('input', cambioRegistro);
+  f.addEventListener('change', cambioRegistro);
+  f.addEventListener('click', clicRegistro);
+  $('#rseg').addEventListener('click', e => {
+    const b = e.target.closest('[data-rmodo]');
+    if (!b || b.dataset.rmodo === RG.modo) return;
+    RG.modo = b.dataset.rmodo;
+    $$('#rseg [data-rmodo]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+    pastilla($('#rseg'));
+    limpiarRegistro(e.detail !== 0);
+  });
+  $('#lhoy').addEventListener('click', clicHoy);
+  $('#lhoy').addEventListener('input', e => {
+    if (!e.target.matches('.anula input')) return;
+    RG.motivo = e.target.value;
+    const ok = e.target.parentNode.querySelector('[data-confirmar-anular]');
+    if (ok) ok.disabled = !RG.motivo.trim();
+  });
+  $('#lhoy').addEventListener('keydown', e => {
+    if (!e.target.matches('.anula input')) return;
+    if (e.key === 'Enter') { e.preventDefault(); confirmarAnulacionHoy(e.target.parentNode.querySelector('[data-confirmar-anular]')); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelarAnulacionHoy(); }
+  });
+  $('#v-registro .cargando').hidden = true;
+  $('#reg-cuerpo').hidden = false;
+  RG.listo = true;
+  pintarFormRegistro();
+  if (S.seccion === 'registro') VISTAS.registro.mostrar();
+}
+VISTAS.registro.mostrar = () => {
+  if (!RG.listo) return;
+  pastilla($('#rseg'), true);
+  cargarRegistrosHoy();
+};
+
+/* ---- Formulario ---- */
+function pintarFormRegistro(anim) {
+  const f = $('#rform'), hoy = esc(S.hoy), doc = opcionesDoctores();
+  const dni = id => `<label class="campo">DNI o carné de extranjería<input id="${id}" class="dni" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="8 dígitos"></label>`;
+  if (RG.modo === 'ind') f.innerHTML = `
+    <fieldset><legend><span class="k">1</span>Paciente</legend>
+      ${dni('rdni')}<div class="avisos-dni" id="rcon" aria-live="polite"></div>
+      <label class="campo">Nombres y apellidos<input id="rnom" autocomplete="off"></label>
+      <div class="dos"><label class="campo">Teléfono o usuario<input id="rtel" class="mono" autocomplete="off" placeholder="987 654 321 o @usuario"></label>
+        <label class="campo">Fecha<input id="rfec" type="date" value="${hoy}" max="${hoy}"></label></div>
+    </fieldset>
+    <fieldset><legend><span class="k">2</span>Doctor</legend><label class="campo"><select id="rmed" aria-label="Doctor">${doc}</select></label></fieldset>
+    <fieldset><legend><span class="k">3</span>Procedimiento<small>si aplica, puede elegir varios</small></legend>
+      <div class="chips" id="rprocs">${((S.boot && S.boot.procedimientos) || []).map(p => `<button type="button" class="chip" data-proc="${esc(p)}" aria-pressed="false"><i class="ph ph-plus"></i>${esc(etiquetaCat(p))}</button>`).join('')}</div></fieldset>
+    <fieldset><legend><span class="k">4</span>Tratamiento<small>si aplica</small></legend>
+      <div class="chips" id="rtrats">${[''].concat((S.boot && S.boot.tratamientos) || []).map(t => `<button type="button" class="chip" data-trat="${esc(t)}" aria-pressed="${t === RG.trat}">${t ? esc(etiquetaCat(t)) : 'Ninguno'}</button>`).join('')}</div>
+      <div id="rses"></div></fieldset>
+    <div id="rdup"></div>
+    <div class="barra-reg"><button type="button" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar</button><span id="rfalta" aria-live="polite"></span></div>`;
+  else f.innerHTML = `
+    <fieldset><legend><span class="k">1</span>Paciente</legend>${dni('adni')}<div class="avisos-dni" id="acon" aria-live="polite"></div></fieldset>
+    <fieldset><legend><span class="k">2</span>Especialidad del alta<small>solo las que tiene</small></legend><div class="chips" id="aesps"></div></fieldset>
+    <fieldset><legend><span class="k">3</span>Doctor y fecha</legend>
+      <div class="dos"><label class="campo">Doctor que da el alta<select id="amed">${doc}</select></label>
+        <label class="campo">Fecha del alta<input id="afec" type="date" value="${hoy}" max="${hoy}"></label></div></fieldset>
+    <label class="campo">Nota (opcional)<textarea id="anota" rows="2"></textarea></label>
+    <div class="barra-reg"><button type="button" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar alta</button><span id="rfalta" aria-live="polite"></span></div>`;
+  if (RG.modo === 'alta') pintarEspecialidades();
+  if (anim && !reducido) f.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: EASE_OUT });
+  validarRegistro();
+}
+
+/** Deja el formulario vacío, salvo la fecha: se suelen registrar varios pacientes del mismo día seguidos. */
+function limpiarRegistro(anim, enfocarDni) {
+  const fecha = ($('#rfec') || $('#afec') || {}).value;
+  Object.assign(RG, { procs: [], trat: '', ses: 0, otro: '', marca: '', dni: '', pac: null, auto: {}, aEsp: '' });
+  clearTimeout(RG.espera);
+  pintarFormRegistro(anim);
+  const f = $('#rfec') || $('#afec');
+  if (fecha && f) f.value = fecha;
+  validarRegistro();
+  if (enfocarDni) ($('#rdni') || $('#adni')).focus({ preventScroll: true });
+}
+
+function cambioRegistro(e) {
+  const id = e.target.id;
+  if (id === 'rdni' || id === 'adni') cambioDni(e.target);
+  if (id === 'rsesotro') RG.otro = e.target.value;
+  if (e.type === 'input' && $('#rdup')) $('#rdup').innerHTML = '';
+  validarRegistro();
+}
+
+function cambioDni(el) {
+  const v = dniLimpio(el.value);
+  if (el.value !== v) el.value = v;
+  if (v === RG.dni) return;
+  RG.dni = v;
+  RG.pac = null;
+  RG.aEsp = '';
+  pintarConocido();
+  clearTimeout(RG.espera);
+  if (documentoOk(v)) RG.espera = setTimeout(() => buscarDniRegistro(v), 300);
+}
+
+/** buscarPacienteRegistro (MAPEO §1.7). Si mientras tanto escribieron otro DNI, la respuesta se descarta. */
+async function buscarDniRegistro(v) {
+  let r;
+  try { r = await llamar('buscarPacienteRegistro', v); } catch (e) { if (RG.dni === v) avisar('No se pudo buscar el DNI: ' + e.message); return; }
+  if (RG.dni !== v) return;
+  RG.pac = r;
+  const ok = !!r.encontrado;
+  if (RG.modo === 'ind') {
+    completar('#rnom', ok ? r.nombre : '');
+    completar('#rtel', ok && r.telefonos && r.telefonos.length ? telBonito(r.telefonos[0]) : '');
+    completar('#rmed', ok ? r.doctor : '');
+  } else completar('#amed', ok ? r.doctor : '');
+  pintarConocido();
+  validarRegistro();
+}
+/** Completa un campo vacío, o uno que se había completado solo con otro DNI. Lo que escribió la asesora no se toca. */
+function completar(sel, valor) {
+  const el = $(sel);
+  if (!el) return;
+  if (el.tagName === 'SELECT' && valor && !Array.from(el.options).some(o => o.value === valor)) valor = '';
+  if (el.value.trim() && el.value !== RG.auto[sel]) return;
+  el.value = valor || '';
+  RG.auto[sel] = el.value;
+}
+
+function pintarConocido() {
+  const box = $(RG.modo === 'ind' ? '#rcon' : '#acon');
+  if (!box) return;
+  const p = RG.pac;
+  let h = '';
+  if (p && p.fallecido) {
+    h += `<p class="fallecido"><i class="ph ph-warning"></i><span>Este paciente figura como fallecido el ${esc(dmy(String(p.fallecido.fecha || '').slice(0, 10)))}`
+      + `${p.fallecido.quien ? ' (' + esc(nombreBonito(p.fallecido.quien)) + ')' : ''}. Si es un error, anúlelo desde su ficha.</span></p>`;
+  }
+  if (p && p.encontrado) {
+    h += RG.modo === 'ind'
+      ? `<p class="conocido"><i class="ph ph-user-check"></i><span>Paciente conocido · última consulta ${esc(dmy(p.ultimaFecha))} con ${esc(medicoCorto(p.ultimoMedico))}</span></p>`
+      : `<p class="conocido"><i class="ph ph-user-check"></i><span>${esc(nombreBonito(p.nombre))} · última consulta ${esc(dmy(p.ultimaFecha))}</span></p>`;
+  } else if (p) {
+    h += RG.modo === 'ind'
+      ? '<p class="nuevo"><i class="ph ph-user-plus"></i><span>Paciente nuevo: todavía no tiene consultas. Puede registrarlo igual.</span></p>'
+      : '<p class="sin-tel">No encontramos ese DNI. El alta solo se registra para pacientes que ya tienen consultas.</p>';
+  }
+  box.innerHTML = h;
+  if (RG.modo === 'alta') pintarEspecialidades();
+}
+
+/** Alta: solo las especialidades del paciente; las que ya tienen alta vigente, deshabilitadas (como la app anterior). */
+function pintarEspecialidades() {
+  const box = $('#aesps');
+  if (!box) return;
+  const esps = RG.pac && RG.pac.encontrado ? RG.pac.especialidades || [] : [];
+  box.innerHTML = esps.length ? esps.map(e => `<button type="button" class="chip cuadro" data-esp="${esc(e.especialidad)}" aria-pressed="${RG.aEsp === e.especialidad}"`
+    + `${e.alta ? ' disabled' : ''}>${esc(frase(e.especialidad))}${e.alta ? '<small>· ya tiene alta</small>' : ''}</button>`).join('')
+    : '<span class="nota-chips">Escriba un DNI para ver sus especialidades.</span>';
+}
+
+function pintarSesiones() {
+  const box = $('#rses');
+  if (!box) return;
+  if (!RG.trat) { box.innerHTML = ''; return; }
+  const nuevo = !box.innerHTML, marcas = marcasDe(RG.trat);
+  box.innerHTML = `<div class="caja${nuevo ? '' : ' quieta'}">
+    <div class="rot"><span>¿Cuántas sesiones?</span><div class="chips">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="chip cuadro mono" data-ses="${n}" aria-pressed="${RG.ses === n}">${n}</button>`).join('')}`
+    + `<button type="button" class="chip cuadro" data-ses="otro" aria-pressed="${RG.ses === 'otro'}">Otro</button>`
+    + `${RG.ses === 'otro' ? `<label class="campo"><input id="rsesotro" class="otro" type="number" min="6" max="20" placeholder="6" aria-label="Sesiones (6 a 20)" value="${esc(RG.otro)}"></label>` : ''}</div></div>
+    <div class="rot"><span>Marca</span>${marcas.length ? `<div class="chips">${marcas.map(m => `<button type="button" class="chip cuadro" data-marca="${esc(m)}" aria-pressed="${RG.marca === m}">${esc(etiquetaCat(m))}</button>`).join('')}</div>`
+      : `<span class="sin-marca">${esc(sinMarca(RG.trat))}</span>`}</div></div>`;
+}
+
+function clicRegistro(e) {
+  const t = e.target.closest('button');
+  if (!t || t.disabled) return;
+  const d = t.dataset, teclado = e.detail === 0;
+  if (d.proc != null) {
+    const p = d.proc;
+    RG.procs = RG.procs.includes(p) ? RG.procs.filter(x => x !== p) : RG.procs.concat(p);
+    t.setAttribute('aria-pressed', String(RG.procs.includes(p)));
+    t.querySelector('i').className = RG.procs.includes(p) ? 'ph ph-check' : 'ph ph-plus';
+  } else if (d.trat != null) {
+    RG.trat = d.trat;
+    const m = marcasDe(RG.trat);
+    RG.marca = m.length === 1 ? m[0] : '';
+    if (!RG.trat) { RG.ses = 0; RG.otro = ''; }
+    $$('#rtrats [data-trat]').forEach(x => x.setAttribute('aria-pressed', String(x === t)));
+    pintarSesiones();
+  } else if (d.ses) {
+    RG.ses = d.ses === 'otro' ? 'otro' : Number(d.ses);
+    pintarSesiones();
+    if (RG.ses === 'otro') $('#rsesotro').focus();
+  } else if (d.marca) {
+    RG.marca = d.marca;
+    pintarSesiones();
+  } else if (d.esp) {
+    RG.aEsp = d.esp;
+    $$('#aesps [data-esp]').forEach(x => x.setAttribute('aria-pressed', String(x === t)));
+  } else if (t.id === 'rgo') { registrar(false, teclado); return; }
+  else if (t.id === 'rforzar') { registrar(true, teclado); return; }
+  else if (t.id === 'rrevisar') { $('#rdup').innerHTML = ''; ($('#rnom') || $('#rdni')).focus(); return; }
+  else return;
+  // Cambió lo que se va a registrar: el aviso de duplicado ya no vale.
+  if ($('#rdup') && !d.esp) $('#rdup').innerHTML = '';
+  validarRegistro();
+}
+
+function faltanRegistro() {
+  const f = [], v = s => ($(s) ? $(s).value.trim() : '');
+  if (RG.modo === 'ind') {
+    if (!documentoOk(v('#rdni'))) f.push('DNI');
+    if (!v('#rnom')) f.push('nombres');
+    if (!v('#rtel')) f.push('teléfono o usuario');
+    if (!v('#rfec')) f.push('fecha');
+    if (!v('#rmed')) f.push('doctor');
+    if (!RG.procs.length && !RG.trat) f.push('un procedimiento o tratamiento');
+    if (RG.trat) {
+      const n = sesionesElegidas();
+      if (!(Number.isInteger(n) && n >= (RG.ses === 'otro' ? 6 : 1) && n <= 20)) f.push('sesiones');
+      if (marcasDe(RG.trat).length && !RG.marca) f.push('marca');
+    }
+  } else {
+    if (!(RG.pac && RG.pac.encontrado)) f.push('DNI de un paciente');
+    if (!RG.aEsp) f.push('especialidad');
+    if (!v('#amed')) f.push('doctor');
+    if (!v('#afec')) f.push('fecha');
+  }
+  return f;
+}
+function validarRegistro() {
+  const b = $('#rgo');
+  if (!b) return;
+  const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0);
+  b.disabled = f.length > 0 || RG.enviando;
+  $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.`
+    : RG.modo === 'ind' ? (n === 1 ? 'Se creará 1 registro.' : `Se crearán ${n} registros.`) : 'Cierra el seguimiento de esa especialidad.';
+}
+
+/** guardarRegistro (MAPEO §1.4) o darDeAlta (§1.8). Los ID son los que devuelve el servidor. */
+async function registrar(forzar, teclado) {
+  if (RG.enviando || faltanRegistro().length) return;
+  if (!exigirUsuario()) return;
+  RG.enviando = true;
+  validarRegistro();
+  try {
+    if (RG.modo === 'ind') {
+      const datos = { usuario: S.usuario, dni: dniLimpio($('#rdni').value), nombre: $('#rnom').value.trim(), contacto: contactoEnvio($('#rtel').value),
+        fecha: $('#rfec').value, doctor: $('#rmed').value, procedimientos: RG.procs.slice(), tratamiento: RG.trat,
+        sesiones: RG.trat ? sesionesElegidas() : '', marca: RG.trat ? RG.marca : '' };
+      if (forzar) datos.confirmado = true;
+      const r = await llamar('guardarRegistro', datos);
+      if (!r.ok && r.duplicado) { pintarDuplicado(r.duplicado); return; }
+      const regs = r.registros || [];
+      avisar(`Registrado: ${regs.map(x => x.TEXTO).join(' + ')} · ${nombreBonito(regs.length ? regs[0].NOMBRE : datos.nombre)} · ${regs.map(x => x.ID).join(', ')}`);
+      trasEscribirRegistro(regs.map(x => x.ID), teclado);
+    } else {
+      const nombre = RG.pac && RG.pac.nombre, esp = RG.aEsp;
+      const r = await llamar('darDeAlta', { usuario: S.usuario, dni: dniLimpio($('#adni').value), especialidad: esp,
+        doctor: $('#amed').value, fecha: $('#afec').value, nota: $('#anota').value.trim() });
+      avisar(`Alta médica registrada: ${nombreBonito(nombre)} · ${frase(esp)} · ${r.alta.ID}`);
+      trasEscribirRegistro([r.alta.ID], teclado);
+    }
+  } catch (e) {
+    avisar('No se guardó: ' + e.message);
+  } finally {
+    RG.enviando = false;
+    validarRegistro();
+  }
+}
+function pintarDuplicado(d) {
+  $('#rdup').innerHTML = `<div class="dup" role="alert"><div class="fila"><i class="ph ph-copy-simple"></i><div><b>Posible duplicado</b>`
+    + `Ya se registró el ${esc(dmy(d.FECHA))} (${esc(d.ID)}): ${esc(d.TEXTO)}. ¿Registrar de todos modos?</div></div>`
+    + '<div class="botones"><button type="button" class="btn btn-s" id="rforzar">Registrar de todos modos</button><button type="button" class="ghost" id="rrevisar">Revisar</button></div></div>';
+}
+/** Tras escribir: formulario limpio, indicadores viejos, «Registrados hoy» y el tablero al día. */
+function trasEscribirRegistro(ids, teclado) {
+  RG.enviando = false;
+  limpiarRegistro(false, true);
+  invalidarIndicadores();
+  cargarRegistrosHoy(teclado ? null : ids);
+  if (S.fase === 'listo') cargarTablero(null, true);
+}
+
+/* ---- Registrados hoy (getRegistrosHoy; anular con anularRegistro o anularAlta según el prefijo) ---- */
+async function cargarRegistrosHoy(nuevos) {
+  const n = cargarRegistrosHoy.n = (cargarRegistrosHoy.n || 0) + 1;
+  if (!RG.hoy) $('#lhoy').innerHTML = '<li class="sin-fila" aria-hidden="true"><div class="hist-skel"><i></i><i></i><i></i></div></li>';
+  let lista;
+  try {
+    lista = await llamar('getRegistrosHoy');
+  } catch (e) {
+    if (n !== cargarRegistrosHoy.n) return;
+    if (RG.hoy) { avisar('No se pudo actualizar «Registrados hoy»: ' + e.message); return; }
+    $('#lhoy').innerHTML = `<li class="sin-fila"><p class="vacio">No se pudo cargar: ${esc(e.message)} <button type="button" class="enlace" data-rehoy>Reintentar</button></p></li>`;
+    return;
+  }
+  if (n !== cargarRegistrosHoy.n) return;
+  RG.hoy = lista || [];
+  if (RG.anulando && !RG.hoy.some(x => x.ID === RG.anulando && !x.ANULADO)) RG.anulando = '';
+  pintarHoy(nuevos);
+}
+function pintarHoy(nuevos) {
+  const L = RG.hoy || [];
+  $('#nhoy').textContent = L.filter(x => !x.ANULADO).length;
+  $('#lhoy').innerHTML = L.length ? L.map(x => {
+    const anulado = !!x.ANULADO, abierto = !anulado && RG.anulando === x.ID;
+    return `<li class="${anulado ? 'anulado' : ''}" data-reg="${esc(x.ID)}"><span class="hora">${esc(x.HORA)}</span>
+      <div class="det"><b class="tx">${esc(x.NOMBRE)}<span class="mono"> · DNI ${esc(x.DNI)}</span></b><span class="tx texto">${esc(x.TEXTO)}</span>
+        <span class="quien">${esc(x.ID)} · ${anulado ? 'anulado' + (x.MOTIVO_ANULACION ? ': ' + esc(x.MOTIVO_ANULACION) : '') : 'registró ' + esc(nombreBonito(x.ASESORA))}</span>
+        <div class="anula">${abierto ? `<input class="ctl" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(RG.motivo)}">`
+          + `<button type="button" class="btn btn-p" data-confirmar-anular${RG.motivo.trim() ? '' : ' disabled'}>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button>` : ''}</div></div>
+      ${anulado ? '<span class="marca-anulado">Anulado</span>' : `<button type="button" class="ghost" data-anular="${esc(x.ID)}">Anular</button>`}</li>`;
+  }).join('') : '<li class="sin-fila"><p class="vacio">Todavía no hay registros hoy.</p></li>';
+  if (nuevos && !reducido) nuevos.forEach(id => {
+    const el = $$('#lhoy [data-reg]').find(x => x.dataset.reg === id);
+    if (!el) return;
+    el.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT });
+    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1400, easing: 'ease-out', pseudoElement: '::before' });
+  });
+}
+const filaHoyEl = id => $$('#lhoy [data-reg]').find(x => x.dataset.reg === id);
+function clicHoy(e) {
+  const t = e.target.closest('button');
+  if (!t) return;
+  if (t.hasAttribute('data-rehoy')) { cargarRegistrosHoy(); return; }
+  if (t.dataset.anular) {
+    RG.anulando = t.dataset.anular;
+    RG.motivo = '';
+    pintarHoy();
+    const el = filaHoyEl(RG.anulando);
+    if (el) el.querySelector('.anula input').focus();
+  } else if (t.hasAttribute('data-cancelar-anular')) cancelarAnulacionHoy();
+  else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacionHoy(t);
+}
+function cancelarAnulacionHoy() {
+  const id = RG.anulando;
+  RG.anulando = '';
+  RG.motivo = '';
+  pintarHoy();
+  const el = id && filaHoyEl(id), b = el && el.querySelector('[data-anular]');
+  if (b) b.focus();
+}
+/** Anula con su motivo (obligatorio). La fila se tacha solo cuando el servidor respondió que sí. */
+async function confirmarAnulacionHoy(boton) {
+  const id = RG.anulando, motivo = RG.motivo.trim();
+  if (!id || !boton || (boton.disabled && motivo)) return;   // sin motivo avisa; con él, deshabilitado = ya en vuelo
+  if (!motivo) { avisar('Escriba el motivo de la anulación.'); return; }
+  if (!exigirUsuario()) return;
+  boton.disabled = true;
+  try {
+    await llamar(id.indexOf('ALT-') === 0 ? 'anularAlta' : 'anularRegistro', { usuario: S.usuario, id, motivo });
+  } catch (e) { boton.disabled = false; avisar('No se anuló: ' + e.message); return; }
+  RG.anulando = '';
+  RG.motivo = '';
+  const x = (RG.hoy || []).find(y => y.ID === id);
+  if (x) { x.ANULADO = true; x.MOTIVO_ANULACION = motivo; }
+  pintarHoy();
+  avisar('Anulado: ' + id + '.');
+  invalidarIndicadores();
+  cargarRegistrosHoy();
+  if (S.fase === 'listo') cargarTablero(null, true);
+}
+
 /* ============ Arranque ============ */
 async function iniciar() {
   S.modo = LS.get('seg.modo') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro');
@@ -1770,6 +2243,7 @@ async function iniciar() {
   pintarUsuarios();
   pintarSaludo();
   iniciarTablero();
+  iniciarRegistro();
   cargarTablero(pedidoTablero);
 }
 
@@ -1957,7 +2431,10 @@ const DEMO = (() => {
     reev({ DNI: '41888999', ESPECIALIDAD: 'REUMATOLOGÍA', NOMBRE: 'HÉCTOR MANUEL SILVA PRADO', TELEFONOS: '955888999', MEDICO_ULTIMO: HANAMPA,
       ULTIMA_CITA: '2026-06-30', ESTADO: 'CERRADO', CIERRE: 'SE ATIENDE EN OTRO LUGAR', FECHA_CIERRE: '2026-09-20' }),
     reev({ DNI: '41999000', NOMBRE: 'ROSA AMELIA CÁRDENAS RÍOS', TELEFONOS: '933999000', ULTIMA_CITA: '2026-07-02', ESTADO: 'CERRADO',
-      CIERRE: 'FALLECIÓ', FECHA_CIERRE: '2026-09-24' })
+      CIERRE: 'FALLECIÓ', FECHA_CIERRE: '2026-09-24' }),
+    // Tarea 8: Teresa tiene además reumatología, al día y sin alta, para dar de alta una especialidad junto a otra que ya la tiene.
+    reev({ DNI: '41666777', ESPECIALIDAD: 'REUMATOLOGÍA', NOMBRE: 'TERESA DEL PILAR ROJAS VARGAS', TELEFONOS: '944666777', MEDICO_ULTIMO: HANAMPA,
+      PRIMERA_CITA: '2026-09-25', ULTIMA_CITA: '2026-09-25', N_REALIZADAS: 1, ESTADO: 'AL DÍA' })
   ];
   // Relleno (Tarea 5): 14 reevaluaciones vencidas hace 15 a 28 días, para que «Recientes» tenga más de las 6 que
   // muestra y aparezca «Ver 10 más de N». Nombres inventados; cada una debía volver hace 15 + i días.

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+[data-tema]{--ease-out:cubic-bezier(.23,1,.32,1);--ease-in-out:cubic-bezier(.77,0,.175,1);--mono:'Geist Mono',ui-monospace,monospace}
+[data-tema="clara"]{--bg:#F4F5F7;--side:#FFFFFF;--surface:#FFFFFF;--surface-2:#F8F9FB;--line:#E4E6EB;--line-2:#CDD1D9;--ink:#15171C;--soft:#41464F;--muted:#636976;--accent:#8C1D18;--accent-hover:#741612;--accent-ink:#FFFFFF;--accent-soft:#F7E9E8;--good:#1E7A4C;--good-soft:#E6F4EC;--warn:#985B00;--warn-soft:#FBF0DE;--info:#2F5BD3;--info-soft:#E8EEFC;--toast:#1B1E25;--toast-ink:#F4F5F7;--shadow:0 1px 2px rgb(21 23 28 / .06),0 4px 14px rgb(21 23 28 / .05);--shadow-lg:0 12px 40px rgb(21 23 28 / .12)}
+[data-tema="oscura"]{--bg:#0E1015;--side:#12151B;--surface:#171B22;--surface-2:#1D222B;--line:#272D38;--line-2:#3A4250;--ink:#ECEEF1;--soft:#C3C8D1;--muted:#98A0AD;--accent:#EC7B71;--accent-hover:#F39489;--accent-ink:#1A0908;--accent-soft:#2E1816;--good:#5CC98F;--good-soft:#132A1F;--warn:#E7A94B;--warn-soft:#2D2312;--info:#8AABFF;--info-soft:#18213A;--toast:#ECEEF1;--toast-ink:#12151B;--shadow:0 1px 0 rgb(255 255 255 / .03) inset,0 6px 20px rgb(4 5 8 / .35);--shadow-lg:0 12px 40px rgb(4 5 8 / .5)}
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+::view-transition-new(root){animation-name:vt-entra}
+@keyframes vt-entra{from{opacity:0;transform:translateY(6px)}}
+::view-transition-group(menu),::view-transition-group(menu-movil){animation-duration:0s}
+@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+html,body{margin:0}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent-soft);color:var(--ink)}
+a{color:var(--accent)}a:hover{color:var(--accent-hover)}
+@keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:1ms!important;animation-duration:1ms!important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" data-tema="{{ tema }}" style="font-family:'Geist',sans-serif;font-size:14px;line-height:1.45;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased;transition:background-color .3s ease,color .3s ease">
+  <sc-if value="{{ notNarrow }}" hint-placeholder-val="{{ true }}">
+    <aside style="view-transition-name:menu;width:232px;flex:0 0 232px;background:var(--side);border-right:1px solid var(--line);padding:22px 14px 16px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 6px">
+        <span style="width:36px;height:36px;flex:0 0 36px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:12.5px;letter-spacing:.02em">CHP</span>
+        <span style="display:flex;flex-direction:column;min-width:0"><b style="font-size:15px;font-weight:600;letter-spacing:-.01em">Seguimientos</b><small style="font-size:11.5px;color:var(--muted);line-height:1.3">Centro Hematológico del Perú</small></span>
+      </div>
+      <nav aria-label="Secciones" style="display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ menu }}" as="it" hint-placeholder-count="4">
+          <a href="{{ it.href }}" aria-current="{{ it.current }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border-radius:8px;background:{{ it.bg }};color:{{ it.fg }};font-weight:500;text-decoration:none;transition:background-color .15s ease,color .15s ease" style-hover="background:{{ it.hoverBg }};color:{{ it.hoverFg }}"><i class="{{ it.icon }}" style="font-size:18px"></i>{{ it.label }}</a>
+        </sc-for>
+      </nav>
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);padding:0 2px">¿Quién es usted?
+          <select value="{{ usuario }}" onChange="{{ onUsuario }}" style="height:44px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:14px;cursor:pointer"><sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for></select>
+        </label>
+        <button onClick="{{ toggleTema }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--soft);font-weight:500;cursor:pointer" style-hover="background:var(--surface-2);color:var(--ink)"><i class="{{ temaIcon }}" style="font-size:18px"></i>{{ temaTxt }}</button>
+      </div>
+    </aside>
+  </sc-if>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+      <header style="position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--side);border-bottom:1px solid var(--line)">
+        <span style="width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:11px">CHP</span>
+        <b style="font-size:15px;font-weight:600">Seguimientos</b>
+        <select aria-label="¿Quién es usted?" value="{{ usuario }}" onChange="{{ onUsuario }}" style="margin-left:auto;height:44px;max-width:150px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px"><sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for></select>
+        <button onClick="{{ toggleTema }}" aria-label="{{ temaTxt }}" style="width:44px;height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:grid;place-items:center;font-size:18px;cursor:pointer"><i class="{{ temaIcon }}"></i></button>
+      </header>
+    </sc-if>
+
+    <main style="padding:{{ mainPad }};flex:1;min-width:0;width:100%;max-width:1400px">
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:640px">
+        <h1 style="margin:0;font-size:{{ h1Size }};font-weight:600;letter-spacing:-.025em;line-height:1.15">Pacientes</h1>
+        <div style="position:relative">
+          <label style="display:flex;align-items:center;gap:10px;height:52px;padding:0 14px;background:var(--surface);border:1px solid var(--line-2);border-radius:8px;color:var(--muted);cursor:text">
+            <i class="ph ph-magnifying-glass" style="font-size:19px"></i>
+            <input ref="{{ qRef }}" value="{{ q }}" onInput="{{ onQ }}" onKeyDown="{{ onQKey }}" placeholder="DNI o nombre (mínimo 3 letras)" aria-label="Buscar por DNI o nombre" autocomplete="off" style="flex:1;min-width:0;height:100%;border:0;background:none;outline:none;font-size:16px;color:var(--ink)">
+            <sc-if value="{{ hayQ }}"><button onClick="{{ limpiar }}" aria-label="Borrar búsqueda" style="width:36px;height:36px;border:0;border-radius:6px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer" style-hover="background:var(--surface-2);color:var(--ink)"><i class="ph ph-x"></i></button></sc-if>
+          </label>
+          <sc-if value="{{ verResultados }}">
+            <ul role="listbox" style="position:absolute;z-index:10;left:0;right:0;top:58px;list-style:none;margin:0;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);animation:entra .18s var(--ease-out)">
+              <sc-for list="{{ resultados }}" as="r">
+                <li role="option" aria-selected="{{ r.sel }}"><button onClick="{{ r.go }}" style="width:100%;display:flex;align-items:center;gap:12px;min-height:48px;padding:6px 10px;border:0;border-radius:8px;background:{{ r.bg }};text-align:left;cursor:pointer" style-hover="background:var(--surface-2)"><span style="flex:1;min-width:0;font-weight:500">{{ r.n }}</span><span style="font-family:var(--mono);font-size:12.5px;color:var(--muted)">{{ r.dni }}</span></button></li>
+              </sc-for>
+              <sc-if value="{{ sinResultados }}"><li style="padding:14px 10px;color:var(--muted)">Ningún paciente coincide con «{{ q }}».</li></sc-if>
+            </ul>
+          </sc-if>
+        </div>
+      </div>
+
+      <sc-if value="{{ sinFicha }}" hint-placeholder-val="{{ false }}">
+        <section style="margin-top:32px;display:flex;flex-direction:column;gap:10px;max-width:640px">
+          <h2 style="margin:0;font-size:12.5px;font-weight:600;color:var(--muted)">Vistos hace poco</h2>
+          <div style="display:flex;flex-direction:column;border-top:1px solid var(--line)">
+            <sc-for list="{{ recientes }}" as="r">
+              <button onClick="{{ r.go }}" style="display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 6px;border:0;border-bottom:1px solid var(--line);background:transparent;text-align:left;cursor:pointer;transition:background-color .15s ease" style-hover="background:var(--surface)"><span style="flex:1;min-width:0;display:flex;flex-direction:column"><b style="font-weight:600">{{ r.n }}</b><span style="font-size:12.5px;color:var(--muted)">{{ r.sub }}</span></span><span style="font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;background:{{ r.tagBg }};color:{{ r.tagFg }};white-space:nowrap">{{ r.estado }}</span><i class="ph ph-caret-right" style="color:var(--muted)"></i></button>
+            </sc-for>
+          </div>
+        </section>
+      </sc-if>
+
+      <sc-if value="{{ hayFicha }}" hint-placeholder-val="{{ false }}">
+        <article ref="{{ fichaRef }}" style="margin-top:32px;display:flex;flex-direction:column;gap:28px">
+          <header style="display:flex;flex-direction:column;gap:4px;padding-bottom:20px;border-bottom:1px solid var(--line)">
+            <h2 style="margin:0;font-size:{{ nombreSize }};font-weight:600;letter-spacing:-.03em;line-height:1.1;text-wrap:balance">{{ f.n }}</h2>
+            <span style="font-family:var(--mono);color:var(--muted)">DNI {{ f.dni }}</span>
+          </header>
+
+          <div style="display:grid;grid-template-columns:{{ fichaCols }};gap:36px 48px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:36px;min-width:0">
+              <section style="display:flex;flex-direction:column;gap:20px">
+                <h3 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em">Especialidades</h3>
+                <sc-for list="{{ f.esps }}" as="e">
+                  <div style="display:flex;flex-direction:column;gap:10px;padding-bottom:20px;border-bottom:1px solid var(--line)">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                      <h4 style="margin:0;font-size:16px;font-weight:600">{{ e.esp }}</h4>
+                      <span style="font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;background:{{ e.tagBg }};color:{{ e.tagFg }}">{{ e.estado }}</span>
+                      <sc-if value="{{ e.puedeAlta }}"><button onClick="{{ e.abrirAlta }}" style="margin-left:auto;height:36px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--soft);font-weight:500;cursor:pointer" style-hover="background:var(--surface);color:var(--accent)">Dar de alta…</button></sc-if>
+                    </div>
+                    <p style="margin:0;color:var(--soft)">{{ e.perfil }}</p>
+                    <sc-if value="{{ e.hayPend }}"><p style="margin:0;display:flex;gap:8px;align-items:flex-start;color:var(--ink)"><i class="ph-fill ph-warning" style="color:var(--warn);font-size:16px;margin-top:2px"></i><span><b style="font-weight:600">Procedimiento pendiente.</b> {{ e.pend }}</span></p></sc-if>
+                    <ol style="list-style:none;margin:6px 0 0 5px;padding:2px 0 0 16px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:10px">
+                      <sc-for list="{{ e.consultas }}" as="c">
+                        <li style="position:relative;line-height:1.4"><span style="position:absolute;left:-23px;top:5px;width:10px;height:10px;border-radius:50%;background:{{ c.dotBg }};border:2px solid {{ c.dot }}"></span><b style="font-weight:600">{{ c.tipo }}</b> <span style="font-family:var(--mono);font-size:13px">{{ c.f }}</span><span style="color:var(--soft)"> · {{ c.det }}</span></li>
+                      </sc-for>
+                    </ol>
+                    <sc-if value="{{ e.altaAbierta }}">
+                      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:14px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);animation:entra .2s var(--ease-out)">
+                        <b style="width:100%;font-weight:600">Alta médica de {{ e.esp }}</b>
+                        <select aria-label="Doctor" value="{{ altaMed }}" onChange="{{ onAltaMed }}" style="flex:1;min-width:180px;height:44px;padding:0 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink)"><sc-for list="{{ medOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+                        <input type="date" aria-label="Fecha del alta" value="{{ altaFecha }}" onChange="{{ onAltaFecha }}" style="height:44px;padding:0 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);color-scheme:{{ colorScheme }}">
+                        <button onClick="{{ e.confirmarAlta }}" style="height:44px;padding:0 16px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer" style-hover="background:var(--accent-hover)">Confirmar alta</button>
+                        <button onClick="{{ cerrarAlta }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;cursor:pointer">Cancelar</button>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </section>
+
+              <section style="display:flex;flex-direction:column;gap:16px">
+                <h3 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em">Tratamientos y procedimientos registrados</h3>
+                <sc-if value="{{ f.sinTrats }}"><p style="margin:0;color:var(--muted)">No tiene registros en la plataforma.</p></sc-if>
+                <sc-for list="{{ f.trats }}" as="t">
+                  <div style="display:flex;flex-direction:column;gap:10px;padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:var(--surface);opacity:{{ t.op }}">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-weight:600;font-size:15px;text-decoration:{{ t.deco }}">{{ t.titulo }}</b><span style="font-size:12px;font-weight:600;padding:4px 9px;border-radius:999px;background:{{ t.tagBg }};color:{{ t.tagFg }}">{{ t.estado }}</span></div>
+                    <span style="font-size:12.5px;color:var(--muted)">{{ t.meta }}</span>
+                    <sc-if value="{{ t.hayProg }}"><div aria-hidden="true" style="display:flex;gap:4px;max-width:320px"><sc-for list="{{ t.prog }}" as="sg"><i style="flex:1;height:6px;border-radius:3px;background:{{ sg.bg }};transition:background-color .3s ease"></i></sc-for></div></sc-if>
+                    <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px">
+                      <sc-for list="{{ t.sesiones }}" as="x">
+                        <li style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:36px">
+                          <i class="{{ x.icon }}" style="font-size:17px;color:{{ x.color }}"></i>
+                          <span style="color:{{ x.txtColor }}">{{ x.txt }}</span>
+                          <sc-if value="{{ x.puedeAnular }}"><button onClick="{{ x.anular }}" style="height:32px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--soft);font-size:13px;font-weight:500;cursor:pointer" style-hover="color:var(--accent);background:var(--surface-2)">Anular sesión</button></sc-if>
+                          <sc-if value="{{ x.esSiguiente }}">
+                            <span style="display:flex;gap:8px;align-items:center;margin-left:auto">
+                              <input type="date" aria-label="Fecha de la sesión" value="{{ sesFecha }}" onChange="{{ onSesFecha }}" style="height:40px;padding:0 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);color-scheme:{{ colorScheme }}">
+                              <button onClick="{{ x.lohizo }}" style="height:40px;padding:0 14px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer;white-space:nowrap;transition:background-color .15s ease,transform .16s var(--ease-out)" style-hover="background:var(--accent-hover)" style-active="transform:scale(.97)">Lo hizo</button>
+                            </span>
+                          </sc-if>
+                        </li>
+                      </sc-for>
+                    </ol>
+                    <sc-if value="{{ t.puedeAnularReg }}"><button onClick="{{ t.anularReg }}" style="align-self:flex-start;height:36px;padding:0 8px;margin-left:-8px;border:0;border-radius:6px;background:transparent;color:var(--soft);font-size:13px;font-weight:500;cursor:pointer" style-hover="color:var(--accent);background:var(--surface-2)">Anular registro</button></sc-if>
+                    <sc-if value="{{ t.anulandoReg }}">
+                      <div style="display:flex;gap:8px;flex-wrap:wrap;animation:entra .2s var(--ease-out)">
+                        <input value="{{ motivo }}" onInput="{{ onMotivo }}" placeholder="Motivo de la anulación" aria-label="Motivo" style="flex:1;min-width:160px;height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink)">
+                        <button onClick="{{ t.confirmarAnula }}" disabled="{{ sinMotivo }}" style="height:44px;padding:0 14px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer;opacity:{{ motivoOp }}">Anular registro</button>
+                        <button onClick="{{ cancelarAnula }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;cursor:pointer">Cancelar</button>
+                      </div>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </section>
+
+              <section style="display:flex;flex-direction:column;gap:10px;min-width:0">
+                <h3 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em">Procedimientos indicados antes de la plataforma</h3>
+                <sc-if value="{{ f.sinPrevios }}"><p style="margin:0;color:var(--muted)">Ninguno.</p></sc-if>
+                <sc-if value="{{ f.hayPrevios }}">
+                  <div style="overflow-x:auto">
+                    <table style="width:100%;min-width:560px;border-collapse:collapse;font-size:13.5px">
+                      <thead><tr><th style="text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 12px 8px 0;border-bottom:1px solid var(--line)">Fecha</th><th style="text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 12px 8px 0;border-bottom:1px solid var(--line)">Detalle</th><th style="text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 12px 8px 0;border-bottom:1px solid var(--line)">Estado</th><th style="text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 12px 8px 0;border-bottom:1px solid var(--line)">Observaciones</th></tr></thead>
+                      <tbody><sc-for list="{{ f.previos }}" as="r"><tr><td style="padding:10px 12px 10px 0;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:13px">{{ r.f }}</td><td style="padding:10px 12px 10px 0;border-bottom:1px solid var(--line)">{{ r.det }}</td><td style="padding:10px 12px 10px 0;border-bottom:1px solid var(--line)">{{ r.estado }}</td><td style="padding:10px 12px 10px 0;border-bottom:1px solid var(--line);color:var(--soft)">{{ r.obs }}</td></tr></sc-for></tbody>
+                    </table>
+                  </div>
+                </sc-if>
+              </section>
+            </div>
+
+            <aside style="position:{{ asidePos }};top:24px;display:flex;flex-direction:column;gap:28px;min-width:0">
+              <section style="display:flex;flex-direction:column;gap:8px">
+                <h3 style="margin:0;font-size:12.5px;font-weight:600;color:var(--muted)">Contacto</h3>
+                <sc-for list="{{ f.tels }}" as="t">
+                  <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:5px 5px 5px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface)">
+                    <span style="flex:1;min-width:0;display:flex;flex-direction:column"><small style="font-size:11.5px;color:var(--muted)">{{ t.label }}</small><span style="font-family:var(--mono);font-size:17px;font-weight:500">{{ t.txt }}</span></span>
+                    <button onClick="{{ t.copiar }}" style="height:44px;padding:0 14px;border:1px solid {{ t.btnBorde }};border-radius:8px;background:{{ t.btnBg }};color:{{ t.btnFg }};font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:background-color .15s ease,color .15s ease,border-color .15s ease,transform .16s var(--ease-out)" style-active="transform:scale(.97)"><i class="{{ t.btnIcon }}"></i>{{ t.btnTxt }}</button>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ f.sinTel }}"><p style="margin:0;padding:12px 14px;border:1px dashed var(--line-2);border-radius:8px;color:var(--soft)"><b style="color:var(--ink);font-weight:600">Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p></sc-if>
+              </section>
+              <section style="display:flex;flex-direction:column;gap:8px">
+                <h3 style="margin:0;font-size:12.5px;font-weight:600;color:var(--muted)">Altas médicas</h3>
+                <sc-if value="{{ f.sinAltas }}"><p style="margin:0;color:var(--muted)">Ninguna.</p></sc-if>
+                <sc-for list="{{ f.altas }}" as="a"><p style="margin:0;display:flex;gap:8px;align-items:flex-start"><i class="ph-fill ph-seal-check" style="color:var(--good);font-size:17px;margin-top:1px"></i><span><b style="font-weight:600">{{ a.esp }}</b> · <span style="font-family:var(--mono);font-size:13px">{{ a.f }}</span><br><span style="color:var(--soft);font-size:13px">{{ a.det }}</span></span></p></sc-for>
+              </section>
+              <section style="display:flex;flex-direction:column;gap:12px">
+                <h3 style="margin:0;font-size:12.5px;font-weight:600;color:var(--muted)">Historia de seguimientos</h3>
+                <sc-if value="{{ f.sinHist }}"><p style="margin:0;color:var(--muted)">Todavía no hay seguimientos.</p></sc-if>
+                <ol style="list-style:none;margin:0 0 0 5px;padding:2px 0 0 14px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:12px">
+                  <sc-for list="{{ f.hist }}" as="h"><li style="position:relative;font-size:13px;color:var(--soft);line-height:1.4"><span style="position:absolute;left:-21px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--bg);border:2px solid {{ h.dot }}"></span><b style="color:var(--ink);font-weight:600;font-family:var(--mono);font-size:12.5px">{{ h.f }}</b> · {{ h.txt }}</li></sc-for>
+                </ol>
+                <a href="Tablero Seguimientos.dc.html" style="display:inline-flex;align-items:center;gap:6px;min-height:44px;font-weight:600;text-decoration:none">Ver en el tablero<i class="ph ph-arrow-right"></i></a>
+              </section>
+            </aside>
+          </div>
+        </article>
+      </sc-if>
+    </main>
+  </div>
+
+  <div role="status" aria-live="polite" style="position:fixed;left:50%;bottom:{{ toastBottom }};transform:{{ toastX }};opacity:{{ toastOp }};pointer-events:none;transition:transform .3s var(--ease-out),opacity .3s ease;z-index:60;width:max-content;max-width:calc(100% - 28px);padding:12px 16px;background:var(--toast);color:var(--toast-ink);border-radius:10px;box-shadow:var(--shadow);font-weight:500">{{ toastTxt }}</div>
+
+  <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+    <nav aria-label="Secciones" style="view-transition-name:menu-movil;position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);height:64px;background:var(--side);border-top:1px solid var(--line)">
+      <sc-for list="{{ menu }}" as="it"><a href="{{ it.href }}" aria-current="{{ it.current }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;font-weight:500;color:{{ it.navFg }};text-decoration:none"><i class="{{ it.icon }}" style="font-size:21px"></i>{{ it.label }}</a></sc-for>
+    </nav>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const HOY = '2026-10-06';
+const dmy = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : '';
+const norm = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const LS = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const MEDS = [['cab', 'Dr. Elí Cabanillas'], ['lat', 'Dra. Alejandra La Torre'], ['sem', 'Dr. Víctor Seminario'], ['vil', 'Dr. Álvaro Villanueva'], ['mat', 'Dra. Karen Matos'], ['matp', 'Dra. Karen Matos – Particular'], ['pac', 'Dr. Iván Pacheco']];
+const MED = k => (MEDS.find(m => m[0] === k) || ['', ''])[1];
+const USERS = [{ v: 'Magaly', l: 'Magaly' }, { v: 'Ana', l: 'Ana' }, { v: 'Rachel', l: 'Rachel' }, { v: 'cab', l: 'Dr. Elí Cabanillas' }];
+const SECC = [['tablero', 'Tablero', 'ph ph-kanban', 'Tablero Seguimientos.dc.html'], ['registro', 'Registro', 'ph ph-note-pencil', 'Registro.dc.html'], ['pacientes', 'Pacientes', 'ph ph-users-three', 'Pacientes.dc.html'], ['indicadores', 'Indicadores', 'ph ph-chart-line-up', 'Indicadores.dc.html']];
+const ESTADO = { 'No volvió': ['var(--accent-soft)', 'var(--accent)'], 'Al día': ['var(--good-soft)', 'var(--good)'], 'Alta médica': ['var(--info-soft)', 'var(--info)'], 'En curso': ['var(--warn-soft)', 'var(--warn)'], 'Completado': ['var(--good-soft)', 'var(--good)'], 'Anulado': ['var(--surface-2)', 'var(--muted)'], 'Pendiente': ['var(--warn-soft)', 'var(--warn)'] };
+
+const DB = [
+  { dni: '40111222', n: 'Rosa Elena Quispe Huamán', tels: ['987 654 321'],
+    esps: [{ esp: 'Hematología', estado: 'No volvió', perfil: 'En control · faltó a su 2.ª reevaluación', pend: 'Hierro (Ferinject) × 2: cotizó y no lo hizo.',
+      consultas: [['Primera cita', '2026-06-10', 'Dr. Elí Cabanillas · clínica'], ['Reevaluación 1', '2026-08-05', 'Dr. Elí Cabanillas · virtual']], debia: '2026-09-04', plazo: '2026-09-19' }],
+    trats: [{ id: 'REG-000001', titulo: 'Hierro carboximaltosa · Ferinject × 2 sesiones', f: '2026-08-05', med: 'cab', quien: 'Magaly', n: 2, sesiones: [{ f: '2026-08-05', quien: 'Magaly' }] }],
+    altas: [], previos: [{ f: '05/08/2026', det: 'Hierro × 2', estado: 'Cotizó, no lo hizo', obs: 'Va a coordinar' }],
+    hist: [{ f: '01/10', txt: 'Magaly: no contestó (intento 1 de 2)' }] },
+  { dni: '40222333', n: 'Jorge Luis Mendoza Paredes', tels: ['912 345 678'],
+    esps: [{ esp: 'Hematología', estado: 'No volvió', perfil: 'Paciente nuevo · no volvió a su 1.ª reevaluación', consultas: [['Primera cita', '2026-07-18', 'Dra. Karen Matos · clínica']], debia: '2026-08-17', plazo: '2026-09-01' }],
+    trats: [{ id: 'REG-000002', titulo: 'Sangría', f: HOY, med: 'mat', quien: 'Magaly', n: 1, sesiones: [] }, { id: 'REG-000003', titulo: 'Hierro carboximaltosa · Ferinject × 3 sesiones', f: HOY, med: 'mat', quien: 'Magaly', n: 3, sesiones: [] }],
+    altas: [], previos: [], hist: [] },
+  { dni: '40333444', n: 'Ana María Flores Ríos', usuario: '@ana.flores', tels: [],
+    esps: [{ esp: 'Hematología', estado: 'Al día', perfil: 'En control · próxima reevaluación hasta el 07/11/2026', consultas: [['Primera cita', '2026-03-02', 'Dr. Elí Cabanillas · clínica'], ['Reevaluación 1', '2026-05-12', 'Dr. Elí Cabanillas · clínica'], ['Reevaluación 2', '2026-09-23', 'Dr. Elí Cabanillas · virtual']] },
+      { esp: 'Reumatología', estado: 'Alta médica', perfil: 'Alta el 01/10/2026', consultas: [['Primera cita', '2026-04-20', 'Dra. Alejandra La Torre · clínica'], ['Reevaluación 1', '2026-07-01', 'Dra. Alejandra La Torre · clínica']] }],
+    trats: [{ id: 'REG-000006', titulo: 'Hierro carboximaltosa · Ferinject × 1 sesión', f: '2026-09-20', med: 'cab', quien: 'Ana', n: 1, sesiones: [] }],
+    altas: [{ esp: 'Reumatología', f: '01/10/2026', det: 'Dra. Alejandra La Torre · registró Rachel' }], previos: [],
+    hist: [{ f: '01/10', txt: 'Rachel: alta médica en Reumatología' }, { f: '28/09', txt: 'Ana: lo pensará; llamar el 06/10' }] },
+  { dni: '40987123', n: 'Elena Cárdenas Lima', tels: ['976 120 448'],
+    esps: [{ esp: 'Hematología', estado: 'Al día', perfil: 'En control · en tratamiento de hierro', consultas: [['Primera cita', '2026-08-14', 'Dr. Elí Cabanillas · clínica'], ['Reevaluación 1', '2026-09-18', 'Dr. Elí Cabanillas · clínica']] }],
+    trats: [{ id: 'REG-000004', titulo: 'Hierro carboximaltosa · Ferinject × 3 sesiones', f: '2026-09-18', med: 'cab', quien: 'Rachel', n: 3, sesiones: [{ f: '2026-09-25', quien: 'Rachel' }, { f: '2026-10-02', quien: 'Magaly' }] }],
+    altas: [], previos: [], hist: [{ f: '02/10', txt: 'Magaly: lo hizo · sesión 2 de 3' }, { f: '25/09', txt: 'Rachel: lo hizo · sesión 1 de 3' }] },
+  { dni: '42230876', n: 'Raúl Pinto Mamani', tels: ['951 336 207', '01 422 7781'],
+    esps: [{ esp: 'Hematología', estado: 'Al día', perfil: 'En control · sesión 2 de 2 atrasada 3 días', consultas: [['Primera cita', '2026-05-05', 'Dra. Karen Matos · clínica'], ['Reevaluación 1', '2026-07-20', 'Dra. Karen Matos · clínica'], ['Reevaluación 2', '2026-09-19', 'Dra. Karen Matos · virtual']] }],
+    trats: [{ id: 'REG-000005', titulo: 'Hierro derisomaltosa · Monofer × 2 sesiones', f: '2026-09-19', med: 'mat', quien: 'Ana', n: 2, sesiones: [{ f: '2026-09-26', quien: 'Ana' }] }],
+    altas: [], previos: [{ f: '12/03/2026', det: 'Transfusión', estado: 'Lo hizo', obs: '—' }], hist: [{ f: '26/09', txt: 'Ana: lo hizo · sesión 1 de 2' }] },
+  { dni: '40765432', n: 'Teresa Vilca Rojas', tels: ['947 209 336'],
+    esps: [{ esp: 'Hematología', estado: 'Al día', perfil: 'En control · volvió el 02/10/2026', consultas: [['Primera cita', '2026-05-11', 'Dr. Elí Cabanillas · clínica'], ['Reevaluación 1', '2026-07-20', 'Dr. Elí Cabanillas · clínica'], ['Reevaluación 2', '2026-10-02', 'Dr. Elí Cabanillas · clínica']] }],
+    trats: [], altas: [], previos: [], hist: [{ f: '02/10', txt: 'SOFDOC: volvió a su reevaluación' }, { f: '25/09', txt: 'Magaly: agendó cita para el 02/10' }] }
+];
+
+class Component extends DCLogic {
+  rootRef = React.createRef(); qRef = React.createRef(); fichaRef = React.createRef();
+  state = (() => {
+    let dni = null;
+    try { dni = new URLSearchParams(location.search).get('dni'); } catch (e) {}
+    return {
+      tema: LS.get('chp-tema', 'clara'), usuario: LS.get('chp-usuario', 'Magaly'), w: typeof window !== 'undefined' ? window.innerWidth : 1440,
+      db: JSON.parse(JSON.stringify(DB)), q: '', abiertoQ: false, activo: 0, dni: DB.some(p => p.dni === dni) ? dni : null,
+      altaEsp: null, altaMed: '', altaFecha: HOY, sesFecha: HOY, anulando: null, motivo: '', copiado: null, toast: null
+    };
+  })();
+  componentDidMount() {
+    this.medir = () => { const r = this.rootRef.current; const w = Math.round((r && r.getBoundingClientRect().width) || innerWidth); if (w !== this.state.w) this.setState({ w }); };
+    addEventListener('resize', this.medir); requestAnimationFrame(this.medir); setTimeout(this.medir, 300);
+    this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.onDoc = e => { if (!e.target.closest || !e.target.closest('[role="listbox"]') && e.target !== this.qRef.current) this.setState({ abiertoQ: false }); };
+    document.addEventListener('pointerdown', this.onDoc);
+    this.onKey = e => { if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) { e.preventDefault(); this.qRef.current && this.qRef.current.focus(); } };
+    document.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { removeEventListener('resize', this.medir); document.removeEventListener('pointerdown', this.onDoc); document.removeEventListener('keydown', this.onKey); }
+  componentDidUpdate() {
+    const prev = { dni: this._prevDni === undefined ? this.state.dni : this._prevDni };
+    this._prevDni = this.state.dni;
+    if (prev.dni !== this.state.dni && this.state.dni && this.fichaRef.current && !this.reduced)
+      this.fichaRef.current.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.23,1,.32,1)' });
+  }
+  aviso(txt) { clearTimeout(this._tt); this.setState({ toast: txt }); this._tt = setTimeout(() => this.setState({ toast: null }), 2800); }
+  quien() { const u = USERS.find(x => x.v === this.state.usuario); return u.v === 'cab' ? 'Dr. Cabanillas' : u.l; }
+  abrir(dni) { this.setState({ dni, q: '', abiertoQ: false, altaEsp: null, anulando: null }); try { history.replaceState(null, '', '?dni=' + dni); } catch (e) {} }
+  mutar(fn) { const db = JSON.parse(JSON.stringify(this.state.db)); const p = db.find(x => x.dni === this.state.dni); fn(p); this.setState({ db }); }
+  copiar(txt, key) {
+    const fin = () => { this.setState({ copiado: key }); clearTimeout(this._tc); this._tc = setTimeout(() => this.setState({ copiado: null }), 1600); this.aviso('Copiado: ' + txt); };
+    try { navigator.clipboard.writeText(txt).then(fin, fin); } catch (e) { fin(); }
+  }
+  resultados() {
+    const q = norm(this.state.q); if (q.length < 3) return [];
+    return this.state.db.filter(p => norm(p.n).includes(q) || p.dni.includes(q)).slice(0, 6);
+  }
+
+  renderVals() {
+    const s = this.state, narrow = s.w < 760, wide = s.w >= 1100;
+    const res = this.resultados();
+    const p = s.dni ? s.db.find(x => x.dni === s.dni) : null;
+    const tag = e => ESTADO[e] || ESTADO['Al día'];
+    let f = {};
+    if (p) {
+      f = {
+        n: p.n, dni: p.dni,
+        esps: p.esps.map(e => {
+          const cons = e.consultas.map(([tipo, fe, det]) => ({ tipo, f: dmy(fe), det, dot: 'var(--ink)', dotBg: 'var(--ink)' }));
+          if (e.debia) cons.push({ tipo: 'Debía volver el', f: dmy(e.debia), det: `plazo máximo ${dmy(e.plazo)}`, dot: 'var(--accent)', dotBg: 'var(--bg)' });
+          return {
+            esp: e.esp, estado: e.estado, tagBg: tag(e.estado)[0], tagFg: tag(e.estado)[1], perfil: e.perfil, hayPend: !!e.pend, pend: e.pend || '', consultas: cons,
+            puedeAlta: e.estado !== 'Alta médica' && s.altaEsp !== e.esp, altaAbierta: s.altaEsp === e.esp,
+            abrirAlta: () => this.setState({ altaEsp: e.esp, altaMed: '', altaFecha: HOY }),
+            confirmarAlta: () => {
+              if (!s.altaMed) { this.aviso('Elija el doctor que da el alta.'); return; }
+              this.mutar(x => { const ee = x.esps.find(y => y.esp === e.esp); ee.estado = 'Alta médica'; ee.perfil = `Alta el ${dmy(s.altaFecha)}`; ee.debia = null; ee.pend = null; x.altas.unshift({ esp: e.esp, f: dmy(s.altaFecha), det: `${MED(s.altaMed)} · registró ${this.quien()}` }); x.hist.unshift({ f: dmy(HOY).slice(0, 5), txt: `${this.quien()}: alta médica en ${e.esp}`, nuevo: true }); });
+              this.setState({ altaEsp: null }); this.aviso(`Alta médica registrada en ${e.esp}.`);
+            }
+          };
+        }),
+        trats: p.trats.map(t => {
+          const k = t.sesiones.length, completo = k >= t.n, estado = t.anulado ? 'Anulado' : completo ? 'Completado' : k ? 'En curso' : 'Pendiente';
+          const ses = [];
+          for (let i = 0; i < t.n; i++) {
+            const x = t.sesiones[i];
+            if (x) ses.push({ icon: 'ph-fill ph-check-circle', color: 'var(--good)', txtColor: 'var(--ink)', txt: `${t.n > 1 ? 'Sesión ' + (i + 1) : 'Realizado'} · ${dmy(x.f)} · ${x.quien}`, puedeAnular: !t.anulado && i === k - 1, esSiguiente: false,
+              anular: () => { this.mutar(y => { y.trats.find(z => z.id === t.id).sesiones.pop(); }); this.aviso(`Sesión ${i + 1} anulada.`); } });
+            else ses.push({ icon: 'ph ph-circle-dashed', color: 'var(--muted)', txtColor: 'var(--soft)', txt: `${t.n > 1 ? 'Sesión ' + (i + 1) : 'Realizado'} · pendiente`, puedeAnular: false, esSiguiente: !t.anulado && i === k,
+              lohizo: () => { this.mutar(y => { y.trats.find(z => z.id === t.id).sesiones.push({ f: s.sesFecha, quien: this.quien() }); y.hist.unshift({ f: dmy(HOY).slice(0, 5), txt: `${this.quien()}: lo hizo · ${t.n > 1 ? `sesión ${i + 1} de ${t.n}` : t.titulo}` }); }); this.aviso(i + 1 >= t.n ? 'Tratamiento completado.' : `Sesión ${i + 1} de ${t.n} registrada.`); } });
+          }
+          return {
+            titulo: t.titulo, estado, tagBg: tag(estado)[0], tagFg: tag(estado)[1], deco: t.anulado ? 'line-through' : 'none', op: t.anulado ? .65 : 1,
+            meta: `${t.id} · ${dmy(t.f)} · ${MED(t.med)} · registró ${t.quien}${t.anulado ? ` · anulado: ${t.motivo}` : ''}`,
+            hayProg: t.n > 1, prog: Array.from({ length: t.n }, (_, i) => ({ bg: i < k ? 'var(--warn)' : 'var(--line)' })), sesiones: ses,
+            puedeAnularReg: !t.anulado && s.anulando !== t.id, anulandoReg: s.anulando === t.id,
+            anularReg: () => this.setState({ anulando: t.id, motivo: '' }),
+            confirmarAnula: () => { if (!s.motivo.trim()) return; this.mutar(y => { const z = y.trats.find(w => w.id === t.id); z.anulado = true; z.motivo = s.motivo.trim(); }); this.setState({ anulando: null }); this.aviso(`${t.id} anulado.`); }
+          };
+        }),
+        sinTrats: !p.trats.length, previos: p.previos, hayPrevios: p.previos.length > 0, sinPrevios: !p.previos.length,
+        tels: p.tels.map(t => ({ label: 'Teléfono', txt: t })).concat(p.usuario ? [{ label: 'Usuario', txt: p.usuario }] : []).map(t => {
+          const key = p.dni + t.txt, ok = s.copiado === key;
+          return Object.assign(t, { copiar: () => this.copiar(t.txt, key), btnTxt: ok ? 'Copiado' : 'Copiar', btnIcon: ok ? 'ph ph-check' : 'ph ph-copy', btnBg: ok ? 'var(--good-soft)' : 'var(--surface)', btnFg: ok ? 'var(--good)' : 'var(--ink)', btnBorde: ok ? 'var(--good)' : 'var(--line-2)' });
+        }),
+        sinTel: !p.tels.length && !p.usuario, altas: p.altas, sinAltas: !p.altas.length,
+        hist: p.hist.map((h, i) => ({ f: h.f, txt: h.txt, dot: i === 0 ? 'var(--accent)' : 'var(--line-2)' })), sinHist: !p.hist.length
+      };
+    }
+    return {
+      tema: s.tema, colorScheme: s.tema === 'oscura' ? 'dark' : 'light', rootRef: this.rootRef, qRef: this.qRef, fichaRef: this.fichaRef,
+      narrow, notNarrow: !narrow, mainPad: narrow ? '18px 14px 96px' : '28px 32px 56px', h1Size: narrow ? '23px' : '28px', nombreSize: narrow ? '26px' : '36px',
+      menu: SECC.map(([k, l, i, href]) => { const on = k === 'pacientes'; return { label: l, href, icon: on ? i.replace('ph ', 'ph-fill ') : i, current: on ? 'page' : undefined, bg: on ? 'var(--accent-soft)' : 'transparent', fg: on ? 'var(--accent)' : 'var(--soft)', hoverBg: on ? 'var(--accent-soft)' : 'var(--surface-2)', hoverFg: on ? 'var(--accent)' : 'var(--ink)', navFg: on ? 'var(--accent)' : 'var(--muted)' }; }),
+      usuarios: USERS, usuario: s.usuario, onUsuario: e => { LS.set('chp-usuario', e.target.value); this.setState({ usuario: e.target.value }); },
+      toggleTema: () => { const t = s.tema === 'clara' ? 'oscura' : 'clara'; LS.set('chp-tema', t); this.setState({ tema: t }); },
+      temaIcon: s.tema === 'clara' ? 'ph ph-moon' : 'ph ph-sun', temaTxt: s.tema === 'clara' ? 'Modo oscuro' : 'Modo claro',
+      q: s.q, hayQ: !!s.q, onQ: e => this.setState({ q: e.target.value, abiertoQ: true, activo: 0 }), limpiar: () => this.setState({ q: '', abiertoQ: false }),
+      onQKey: e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ activo: Math.min(s.activo + 1, res.length - 1) }); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ activo: Math.max(s.activo - 1, 0) }); }
+        else if (e.key === 'Enter' && res[s.activo]) { e.preventDefault(); this.abrir(res[s.activo].dni); }
+        else if (e.key === 'Escape') this.setState({ abiertoQ: false });
+      },
+      verResultados: s.abiertoQ && norm(s.q).length >= 3, sinResultados: !res.length,
+      resultados: res.map((r, i) => ({ n: r.n, dni: 'DNI ' + r.dni, sel: String(i === s.activo), bg: i === s.activo ? 'var(--surface-2)' : 'transparent', go: () => this.abrir(r.dni) })),
+      sinFicha: !p, hayFicha: !!p,
+      recientes: s.db.slice(0, 5).map(r => { const e = r.esps[0]; return { n: r.n, sub: `DNI ${r.dni} · ${r.esps.map(x => x.esp).join(', ')}`, estado: e.estado, tagBg: tag(e.estado)[0], tagFg: tag(e.estado)[1], go: () => this.abrir(r.dni) }; }),
+      f, fichaCols: wide ? 'minmax(0,1.7fr) minmax(280px,1fr)' : 'minmax(0,1fr)', asidePos: wide ? 'sticky' : 'static',
+      medOpts: [{ v: '', l: '— Doctor —' }].concat(MEDS.map(([v, l]) => ({ v, l }))), altaMed: s.altaMed, onAltaMed: e => this.setState({ altaMed: e.target.value }),
+      altaFecha: s.altaFecha, onAltaFecha: e => this.setState({ altaFecha: e.target.value || HOY }), cerrarAlta: () => this.setState({ altaEsp: null }),
+      sesFecha: s.sesFecha, onSesFecha: e => this.setState({ sesFecha: e.target.value || HOY }),
+      motivo: s.motivo, onMotivo: e => this.setState({ motivo: e.target.value }), sinMotivo: !s.motivo.trim(), motivoOp: s.motivo.trim() ? 1 : .45, cancelarAnula: () => this.setState({ anulando: null }),
+      toastTxt: s.toast || '', toastOp: s.toast ? 1 : 0, toastX: s.toast ? 'translate(-50%,0)' : 'translate(-50%,16px)', toastBottom: narrow ? '80px' : '24px'
+    };
+  }
+}
+</script>
+</body>
+</html>

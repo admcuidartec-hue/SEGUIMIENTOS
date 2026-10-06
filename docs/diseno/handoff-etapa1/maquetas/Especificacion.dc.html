@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#F4F5F7}*{box-sizing:border-box}a{color:#8C1D18}a:hover{color:#741612}</style>
+</helmet>
+<div style="font-family:'Geist',sans-serif;color:#15171C;background:#F4F5F7;min-height:100vh;padding:48px 32px 80px;font-size:14px;line-height:1.5">
+  <div style="max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:40px">
+    <header style="display:flex;flex-direction:column;gap:6px">
+      <span style="font-size:12.5px;color:#636976">Seguimientos CHP · Etapas 1 y 2</span>
+      <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-.025em">Especificación: tokens y movimiento</h1>
+      <p style="margin:0;color:#41464F;max-width:62ch">Acompaña a <a href="Tablero Seguimientos.dc.html">Tablero Seguimientos</a>. Todos los colores viven en tokens CSS dentro de <code style="font-family:'Geist Mono',monospace">[data-tema="clara"]</code> y <code style="font-family:'Geist Mono',monospace">[data-tema="oscura"]</code>; el resto de la hoja solo usa <code style="font-family:'Geist Mono',monospace">var(--…)</code>.</p>
+    </header>
+
+    <section style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:600">Color</h2>
+      <div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr) minmax(0,2fr);font-size:13px;border-top:1px solid #E4E6EB">
+        <b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Token</b><b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Claro</b><b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Oscuro</b><b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Uso</b>
+        <sc-for list="{{ tokens }}" as="t">
+          <code style="padding:8px 0;font-family:'Geist Mono',monospace;border-bottom:1px solid #E4E6EB">{{ t.k }}</code>
+          <span style="padding:8px 0;display:flex;gap:8px;align-items:center;font-family:'Geist Mono',monospace;border-bottom:1px solid #E4E6EB"><i style="width:14px;height:14px;border-radius:4px;border:1px solid #CDD1D9;background:{{ t.c }}"></i>{{ t.c }}</span>
+          <span style="padding:8px 0;display:flex;gap:8px;align-items:center;font-family:'Geist Mono',monospace;border-bottom:1px solid #E4E6EB"><i style="width:14px;height:14px;border-radius:4px;border:1px solid #CDD1D9;background:{{ t.o }}"></i>{{ t.o }}</span>
+          <span style="padding:8px 0;color:#41464F;border-bottom:1px solid #E4E6EB">{{ t.u }}</span>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:32px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h2 style="margin:0;font-size:18px;font-weight:600">Tipografía</h2>
+        <p style="margin:0;color:#41464F">Geist 400/500/600 para todo el texto; Geist Mono 500 para cifras, fechas, DNI y teléfonos (alineación tabular).</p>
+        <p style="margin:0;font-family:'Geist Mono',monospace;font-size:12.5px;color:#41464F">28 título · 22 nombre en panel · 19 alerta · 16 «¿Qué pasó?» · 14 base · 13,5 tarjeta · 12,5 apoyo · 11 etiqueta</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <h2 style="margin:0;font-size:18px;font-weight:600">Forma y espacio</h2>
+        <p style="margin:0;color:#41464F">Radio 12 en columnas, cifras y pasos; 8 en tarjetas y controles; pastilla en filtros y etiquetas. Controles de 44 px de alto (40 dentro del filtro segmentado). Espacios en múltiplos de 4: 8 entre tarjetas, 14 entre columnas, 22–26 entre bloques.</p>
+      </div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:12px">
+      <h2 style="margin:0;font-size:18px;font-weight:600">Movimiento</h2>
+      <p style="margin:0;color:#41464F;max-width:70ch">Curvas: <code style="font-family:'Geist Mono',monospace">--ease-out cubic-bezier(.23,1,.32,1)</code> para entradas, <code style="font-family:'Geist Mono',monospace">--ease-in-out cubic-bezier(.77,0,.175,1)</code> para lo que se desplaza en pantalla, <code style="font-family:'Geist Mono',monospace">--ease-drawer cubic-bezier(.32,.72,0,1)</code> para el panel. Sustituyen a la curva única del brief, que era demasiado suave para entradas cortas. Nada rebota.</p>
+      <div style="display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,2fr) minmax(0,1fr) minmax(0,1.2fr);font-size:13px;border-top:1px solid #E4E6EB">
+        <b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Qué</b><b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Cómo</b><b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Duración</b><b style="padding:8px 0;font-weight:600;color:#636976;border-bottom:1px solid #E4E6EB">Curva</b>
+        <sc-for list="{{ mov }}" as="m">
+          <span style="padding:8px 8px 8px 0;font-weight:500;border-bottom:1px solid #E4E6EB">{{ m.q }}</span>
+          <span style="padding:8px 8px 8px 0;color:#41464F;border-bottom:1px solid #E4E6EB">{{ m.c }}</span>
+          <span style="padding:8px 0;font-family:'Geist Mono',monospace;border-bottom:1px solid #E4E6EB">{{ m.d }}</span>
+          <span style="padding:8px 0;font-family:'Geist Mono',monospace;border-bottom:1px solid #E4E6EB">{{ m.e }}</span>
+        </sc-for>
+      </div>
+      <p style="margin:0;color:#41464F;max-width:70ch">Con <code style="font-family:'Geist Mono',monospace">prefers-reduced-motion</code> no hay desplazamientos: el panel y las tarjetas cambian de lugar al instante y solo se conservan los cambios de color. Si el panel se abre con Enter, también aparece sin animación: es una acción que se repite decenas de veces al día.</p>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:8px">
+      <h2 style="margin:0;font-size:18px;font-weight:600">Decisiones del tablero</h2>
+      <ul style="margin:0;padding-left:18px;color:#41464F;display:flex;flex-direction:column;gap:6px;max-width:72ch">
+        <li>«Por contactar» se agrupa en Recientes, Hace 1 a 2 meses y Más antiguos. Cada grupo muestra pocas tarjetas y carga de 10 en 10 con «Ver más». Dentro de cada grupo va primero quien no tiene ningún intento y luego quien lleva menos días.</li>
+        <li>Los números del filtro (Todos, Reevaluaciones…) cuentan solo «Por contactar».</li>
+        <li>Atajos: ↑ ↓ ← → para moverse entre tarjetas y columnas, Enter abre, C copia el teléfono, 1–4 responden «¿Qué pasó?», / va al buscador, Esc cierra. «H hecho» y «D descartar» se reemplazan por 1–4, porque ahora hay varias respuestas posibles.</li>
+        <li>Cada respuesta muestra un aviso con «Deshacer» durante 6 s, así que las respuestas que no cierran el seguimiento no piden confirmación. Las que sí lo cierran abren un paso de confirmación.</li>
+        <li>En celular: una columna a la vez, con pestañas arriba y el menú abajo. El panel ocupa toda la pantalla con «‹ Volver».</li>
+      </ul>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      tokens: [
+        { k: '--bg', c: '#F4F5F7', o: '#0E1015', u: 'Fondo de la app' },
+        { k: '--side / --surface', c: '#FFFFFF', o: '#171B22', u: 'Menú, tarjetas, panel' },
+        { k: '--surface-2', c: '#F8F9FB', o: '#1D222B', u: 'Botones de respuesta, pasos' },
+        { k: '--col', c: '#ECEEF2', o: '#13171D', u: 'Fondo de columna' },
+        { k: '--line', c: '#E4E6EB', o: '#272D38', u: 'Bordes' },
+        { k: '--line-2', c: '#CDD1D9', o: '#3A4250', u: 'Bordes en hover y campos' },
+        { k: '--ink', c: '#15171C', o: '#ECEEF1', u: 'Texto principal' },
+        { k: '--soft', c: '#41464F', o: '#C3C8D1', u: 'Texto secundario' },
+        { k: '--muted', c: '#636976', o: '#98A0AD', u: 'Etiquetas (AA sobre superficie)' },
+        { k: '--accent', c: '#8C1D18', o: '#EC7B71', u: 'Granate: filtro activo, atraso, acción principal' },
+        { k: '--accent-soft', c: '#F7E9E8', o: '#2E1816', u: 'Menú activo, procedimiento' },
+        { k: '--good', c: '#1E7A4C', o: '#5CC98F', u: 'Completado, copiado' },
+        { k: '--warn', c: '#985B00', o: '#E7A94B', u: 'Hierro, sesiones' },
+        { k: '--info', c: '#2F5BD3', o: '#8AABFF', u: 'Agendado, reevaluación' }
+      ],
+      mov: [
+        { q: 'Filtro segmentado', c: 'La pastilla granate se desliza (transform + width) hasta la opción elegida', d: '250 ms', e: 'ease-in-out' },
+        { q: 'Tarjeta que cambia de columna', c: 'FLIP: se mide antes y después y la tarjeta viaja desde su lugar anterior; las vecinas se reacomodan', d: '480 ms (vecinas 320)', e: 'ease-in-out' },
+        { q: 'Realce de la que llega', c: 'Anillo granate de 4 px que se desvanece', d: '1400 ms', e: 'ease-out' },
+        { q: 'Tarjeta que sale', c: 'Opacidad 1→0 y escala 1→0,96 antes de reacomodar', d: '180 ms', e: 'ease-out' },
+        { q: 'Panel del paciente', c: 'Entra desde la derecha (translateX 100%→0), velo 0→1', d: '400 entra · 300 sale', e: 'ease-drawer' },
+        { q: 'Paso de fecha o confirmación', c: 'Sube 6 px y aparece', d: '220 ms', e: 'ease-out' },
+        { q: 'Aviso', c: 'Sube 16 px y aparece; transición, no keyframes, para poder interrumpirlo', d: '300 ms', e: 'ease-out' },
+        { q: 'Carga inicial', c: 'Esqueletos con brillo lineal, luego tarjetas en cascada de 30 ms (máx. 240)', d: '260 ms c/u', e: 'ease-out' },
+        { q: 'Presionar', c: 'Escala 0,97–0,985 en botones y tarjetas', d: '160 ms', e: 'ease-out' },
+        { q: 'Hover y tema', c: 'Solo color de borde y fondo', d: '150 · 300 ms', e: 'ease' },
+        { q: 'Registro · cambio de modo', c: 'Pastilla deslizante; el formulario sube 8 px y aparece', d: '250 · 240 ms', e: 'ease-in-out · ease-out' },
+        { q: 'Registro · campos que aparecen', c: 'Sesiones, marca, «Paciente conocido» y aviso de duplicado suben 6 px', d: '220 ms', e: 'ease-out' },
+        { q: 'Registro · fila nueva en «Registrados hoy»', c: 'Baja 6 px desde arriba y se tiñe de granate claro un momento', d: '260 · 1400 ms', e: 'ease-out' },
+        { q: 'Pacientes · resultados', c: 'La lista sube 6 px bajo el buscador', d: '180 ms', e: 'ease-out' },
+        { q: 'Pacientes · ficha', c: 'Sube 8 px y aparece al elegir paciente; la barra de sesiones cambia de color', d: '260 · 300 ms', e: 'ease-out · ease' },
+        { q: 'Indicadores · pestañas', c: 'Pastilla deslizante; el contenido sube 8 px y aparece', d: '250 · 240 ms', e: 'ease-in-out · ease-out' },
+        { q: 'Indicadores · barras de tablas', c: 'Crecen desde la izquierda (scaleX) al abrir pestaña o cambiar vista, cascada de 18 ms', d: '420 ms', e: 'ease-out' },
+        { q: 'Indicadores · mes a mes', c: 'Las barras cambian de altura al filtrar; la cifra grande se renueva al cambiar de mes', d: '400 · 260 ms', e: 'ease-in-out · ease-out' },
+        { q: 'Indicadores · 100 cuadritos', c: 'Aparecen en orden (escala .6 → 1), 5 ms entre cada uno', d: '220 ms c/u', e: 'ease-out' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

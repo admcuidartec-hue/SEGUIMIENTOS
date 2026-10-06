@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+[data-tema]{--ease-out:cubic-bezier(.23,1,.32,1);--ease-in-out:cubic-bezier(.77,0,.175,1);--mono:'Geist Mono',ui-monospace,monospace}
+[data-tema="clara"]{--bg:#F4F5F7;--side:#FFFFFF;--surface:#FFFFFF;--surface-2:#F8F9FB;--line:#E4E6EB;--line-2:#CDD1D9;--ink:#15171C;--soft:#41464F;--muted:#636976;--accent:#8C1D18;--accent-hover:#741612;--accent-ink:#FFFFFF;--accent-soft:#F7E9E8;--accent-ring:rgb(140 29 24 / .28);--good:#1E7A4C;--good-soft:#E6F4EC;--warn:#985B00;--warn-soft:#FBF0DE;--info:#2F5BD3;--info-soft:#E8EEFC;--toast:#1B1E25;--toast-ink:#F4F5F7;--shadow:0 1px 2px rgb(21 23 28 / .06),0 4px 14px rgb(21 23 28 / .05)}
+[data-tema="oscura"]{--bg:#0E1015;--side:#12151B;--surface:#171B22;--surface-2:#1D222B;--line:#272D38;--line-2:#3A4250;--ink:#ECEEF1;--soft:#C3C8D1;--muted:#98A0AD;--accent:#EC7B71;--accent-hover:#F39489;--accent-ink:#1A0908;--accent-soft:#2E1816;--accent-ring:rgb(236 123 113 / .35);--good:#5CC98F;--good-soft:#132A1F;--warn:#E7A94B;--warn-soft:#2D2312;--info:#8AABFF;--info-soft:#18213A;--toast:#ECEEF1;--toast-ink:#12151B;--shadow:0 1px 0 rgb(255 255 255 / .03) inset,0 6px 20px rgb(4 5 8 / .35)}
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+::view-transition-new(root){animation-name:vt-entra}
+@keyframes vt-entra{from{opacity:0;transform:translateY(6px)}}
+::view-transition-group(menu),::view-transition-group(menu-movil){animation-duration:0s}
+@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+html,body{margin:0}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent-soft);color:var(--ink)}
+a{color:var(--accent)}a:hover{color:var(--accent-hover)}
+@keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:1ms!important;animation-duration:1ms!important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" data-tema="{{ tema }}" style="font-family:'Geist',sans-serif;font-size:14px;line-height:1.45;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased;transition:background-color .3s ease,color .3s ease">
+  <sc-if value="{{ notNarrow }}" hint-placeholder-val="{{ true }}">
+    <aside style="view-transition-name:menu;width:232px;flex:0 0 232px;background:var(--side);border-right:1px solid var(--line);padding:22px 14px 16px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 6px">
+        <span style="width:36px;height:36px;flex:0 0 36px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:12.5px;letter-spacing:.02em">CHP</span>
+        <span style="display:flex;flex-direction:column;min-width:0"><b style="font-size:15px;font-weight:600;letter-spacing:-.01em">Seguimientos</b><small style="font-size:11.5px;color:var(--muted);line-height:1.3">Centro Hematológico del Perú</small></span>
+      </div>
+      <nav aria-label="Secciones" style="display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ menu }}" as="it" hint-placeholder-count="4">
+          <a href="{{ it.href }}" aria-current="{{ it.current }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border-radius:8px;background:{{ it.bg }};color:{{ it.fg }};font-weight:500;text-decoration:none;transition:background-color .15s ease,color .15s ease" style-hover="background:{{ it.hoverBg }};color:{{ it.hoverFg }}"><i class="{{ it.icon }}" style="font-size:18px"></i>{{ it.label }}</a>
+        </sc-for>
+      </nav>
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);padding:0 2px">¿Quién es usted?
+          <select value="{{ usuario }}" onChange="{{ onUsuario }}" style="height:44px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:14px;cursor:pointer"><sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for></select>
+        </label>
+        <button onClick="{{ toggleTema }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--soft);font-weight:500;cursor:pointer" style-hover="background:var(--surface-2);color:var(--ink)"><i class="{{ temaIcon }}" style="font-size:18px"></i>{{ temaTxt }}</button>
+      </div>
+    </aside>
+  </sc-if>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+      <header style="position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--side);border-bottom:1px solid var(--line)">
+        <span style="width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:11px">CHP</span>
+        <b style="font-size:15px;font-weight:600">Seguimientos</b>
+        <select aria-label="¿Quién es usted?" value="{{ usuario }}" onChange="{{ onUsuario }}" style="margin-left:auto;height:44px;max-width:150px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px"><sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for></select>
+        <button onClick="{{ toggleTema }}" aria-label="{{ temaTxt }}" style="width:44px;height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:grid;place-items:center;font-size:18px;cursor:pointer"><i class="{{ temaIcon }}"></i></button>
+      </header>
+    </sc-if>
+
+    <main style="padding:{{ mainPad }};flex:1;min-width:0;width:100%;max-width:1400px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <h1 style="margin:0;font-size:{{ h1Size }};font-weight:600;letter-spacing:-.025em;line-height:1.15">Registro</h1>
+        <p style="margin:0;color:var(--muted)">Lo que indica el doctor: procedimientos, tratamientos y altas médicas.</p>
+      </div>
+
+      <div ref="{{ segRef }}" role="tablist" aria-label="Tipo de registro" style="position:relative;display:inline-flex;margin-top:22px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:999px">
+        <span ref="{{ pillRef }}" aria-hidden="true" style="position:absolute;top:3px;bottom:3px;left:0;border-radius:999px;background:var(--accent);transition:transform .25s var(--ease-in-out),width .25s var(--ease-in-out)"></span>
+        <sc-for list="{{ modos }}" as="m">
+          <button role="tab" aria-selected="{{ m.sel }}" onClick="{{ m.go }}" style="position:relative;z-index:1;height:40px;padding:0 18px;border:0;border-radius:999px;background:transparent;color:{{ m.fg }};font-weight:500;font-size:14px;white-space:nowrap;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:color .2s ease"><i class="{{ m.icon }}" style="font-size:16px"></i>{{ m.label }}</button>
+        </sc-for>
+      </div>
+
+      <div style="display:grid;grid-template-columns:{{ layoutCols }};gap:32px 48px;align-items:start;margin-top:24px">
+        <form ref="{{ formRef }}" onSubmit="{{ noSubmit }}" style="display:flex;flex-direction:column;gap:28px;min-width:0;max-width:600px">
+          <sc-if value="{{ esInd }}" hint-placeholder-val="{{ true }}">
+            <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;min-width:0">
+              <legend style="padding:0;margin-bottom:14px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;letter-spacing:-.01em"><span style="font-family:var(--mono);font-size:13px;color:var(--accent)">1</span>Paciente</legend>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">DNI o carné de extranjería
+                <input value="{{ dni }}" onInput="{{ onDni }}" inputmode="numeric" autocomplete="off" placeholder="8 dígitos" style="height:48px;padding:0 14px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:18px;letter-spacing:.04em">
+              </label>
+              <sc-if value="{{ hayConocido }}">
+                <p style="margin:0;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;background:var(--info-soft);color:var(--ink);font-size:13.5px;animation:entra .22s var(--ease-out)"><i class="ph ph-user-check" style="font-size:18px;color:var(--info)"></i>{{ conocidoTxt }}</p>
+              </sc-if>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">Nombres y apellidos
+                <input value="{{ nombre }}" onInput="{{ onNombre }}" autocomplete="off" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px">
+              </label>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+                <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">Teléfono o usuario
+                  <input value="{{ tel }}" onInput="{{ onTel }}" autocomplete="off" placeholder="987 654 321 o @usuario" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:15px">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">Fecha
+                  <input type="date" value="{{ fecha }}" onChange="{{ onFecha }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:15px;color-scheme:{{ colorScheme }}">
+                </label>
+              </div>
+            </fieldset>
+
+            <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:14px">
+              <legend style="padding:0;margin-bottom:14px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;letter-spacing:-.01em"><span style="font-family:var(--mono);font-size:13px;color:var(--accent)">2</span>Doctor</legend>
+              <select aria-label="Doctor" value="{{ med }}" onChange="{{ onMed }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px;cursor:pointer"><sc-for list="{{ medOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+            </fieldset>
+
+            <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:12px">
+              <legend style="padding:0;margin-bottom:12px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;letter-spacing:-.01em"><span style="font-family:var(--mono);font-size:13px;color:var(--accent)">3</span>Procedimiento<span style="font-size:13px;font-weight:400;color:var(--muted)">si aplica, puede elegir varios</span></legend>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ procs }}" as="c">
+                  <button type="button" aria-pressed="{{ c.on }}" onClick="{{ c.go }}" style="height:40px;padding:0 14px;border:1px solid {{ c.borde }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};font-weight:500;font-size:13.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .16s var(--ease-out)" style-active="transform:scale(.97)"><i class="{{ c.icon }}"></i>{{ c.l }}</button>
+                </sc-for>
+              </div>
+            </fieldset>
+
+            <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:14px">
+              <legend style="padding:0;margin-bottom:12px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;letter-spacing:-.01em"><span style="font-family:var(--mono);font-size:13px;color:var(--accent)">4</span>Tratamiento<span style="font-size:13px;font-weight:400;color:var(--muted)">si aplica</span></legend>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ trats }}" as="c">
+                  <button type="button" aria-pressed="{{ c.on }}" onClick="{{ c.go }}" style="height:40px;padding:0 14px;border:1px solid {{ c.borde }};border-radius:999px;background:{{ c.bg }};color:{{ c.fg }};font-weight:500;font-size:13.5px;white-space:nowrap;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .16s var(--ease-out)" style-active="transform:scale(.97)">{{ c.l }}</button>
+                </sc-for>
+              </div>
+              <sc-if value="{{ hayTrat }}">
+                <div style="display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);animation:entra .22s var(--ease-out)">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <span style="font-size:12.5px;color:var(--muted)">¿Cuántas sesiones?</span>
+                    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                      <sc-for list="{{ sesOpts }}" as="c">
+                        <button type="button" aria-pressed="{{ c.on }}" onClick="{{ c.go }}" style="min-width:44px;height:44px;padding:0 12px;border:1px solid {{ c.borde }};border-radius:8px;background:{{ c.bg }};color:{{ c.fg }};font-family:var(--mono);font-weight:500;font-size:15px;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease">{{ c.l }}</button>
+                      </sc-for>
+                      <sc-if value="{{ sesEsOtro }}"><input type="number" min="6" max="20" value="{{ sesOtro }}" onInput="{{ onSesOtro }}" aria-label="Número de sesiones" placeholder="6" style="width:80px;height:44px;padding:0 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:15px"></sc-if>
+                    </div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <span style="font-size:12.5px;color:var(--muted)">Marca</span>
+                    <sc-if value="{{ hayMarcas }}">
+                      <div style="display:flex;flex-wrap:wrap;gap:6px">
+                        <sc-for list="{{ marcas }}" as="c">
+                          <button type="button" aria-pressed="{{ c.on }}" onClick="{{ c.go }}" style="height:44px;padding:0 16px;border:1px solid {{ c.borde }};border-radius:8px;background:{{ c.bg }};color:{{ c.fg }};font-weight:500;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease">{{ c.l }}</button>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ sinMarca }}"><span style="color:var(--soft)">El sacarato no lleva marca.</span></sc-if>
+                  </div>
+                </div>
+              </sc-if>
+            </fieldset>
+          </sc-if>
+
+          <sc-if value="{{ esAlta }}" hint-placeholder-val="{{ false }}">
+            <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;min-width:0">
+              <legend style="padding:0;margin-bottom:14px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;letter-spacing:-.01em"><span style="font-family:var(--mono);font-size:13px;color:var(--accent)">1</span>Paciente</legend>
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">DNI o carné de extranjería
+                <input value="{{ aDni }}" onInput="{{ onADni }}" inputmode="numeric" autocomplete="off" placeholder="8 dígitos" style="height:48px;padding:0 14px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:18px;letter-spacing:.04em">
+              </label>
+              <sc-if value="{{ aHayPac }}"><p style="margin:0;display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:8px;background:var(--info-soft);color:var(--ink);font-size:13.5px;animation:entra .22s var(--ease-out)"><i class="ph ph-user-check" style="font-size:18px;color:var(--info)"></i>{{ aPacTxt }}</p></sc-if>
+              <sc-if value="{{ aNoPac }}"><p style="margin:0;padding:10px 12px;border:1px dashed var(--line-2);border-radius:8px;color:var(--soft);font-size:13.5px">No encontramos ese DNI. El alta solo se registra para pacientes que ya tienen consultas.</p></sc-if>
+            </fieldset>
+            <fieldset style="border:0;margin:0;padding:0;display:flex;flex-direction:column;gap:12px">
+              <legend style="padding:0;margin-bottom:12px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;letter-spacing:-.01em"><span style="font-family:var(--mono);font-size:13px;color:var(--accent)">2</span>Especialidad del alta<span style="font-size:13px;font-weight:400;color:var(--muted)">solo las que tiene</span></legend>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <sc-for list="{{ aEsps }}" as="c">
+                  <button type="button" aria-pressed="{{ c.on }}" onClick="{{ c.go }}" style="height:44px;padding:0 16px;border:1px solid {{ c.borde }};border-radius:8px;background:{{ c.bg }};color:{{ c.fg }};font-weight:500;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease">{{ c.l }}</button>
+                </sc-for>
+                <sc-if value="{{ aSinEsps }}"><span style="color:var(--muted);font-size:13.5px">Escriba un DNI para ver sus especialidades.</span></sc-if>
+              </div>
+            </fieldset>
+            <fieldset style="border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">
+              <legend style="padding:0;margin-bottom:14px;display:flex;align-items:baseline;gap:10px;font-size:16px;font-weight:600;letter-spacing:-.01em"><span style="font-family:var(--mono);font-size:13px;color:var(--accent)">3</span>Doctor y fecha</legend>
+              <select aria-label="Doctor" value="{{ aMed }}" onChange="{{ onAMed }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px;cursor:pointer"><sc-for list="{{ medOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+              <input type="date" aria-label="Fecha del alta" value="{{ aFecha }}" onChange="{{ onAFecha }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:15px;color-scheme:{{ colorScheme }}">
+            </fieldset>
+            <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">Nota (opcional)
+              <textarea value="{{ aNota }}" onInput="{{ onANota }}" rows="2" style="resize:vertical;min-height:64px;padding:10px 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:14px"></textarea>
+            </label>
+          </sc-if>
+
+          <sc-if value="{{ hayDup }}">
+            <div role="alert" style="display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--warn);border-radius:12px;background:var(--warn-soft);color:var(--ink);animation:entra .22s var(--ease-out)">
+              <div style="display:flex;gap:10px;align-items:flex-start"><i class="ph ph-copy-simple" style="font-size:20px;color:var(--warn);margin-top:1px"></i><div style="display:flex;flex-direction:column;gap:2px"><b style="font-weight:600">Posible duplicado</b><span style="text-wrap:pretty">{{ dupTxt }}</span></div></div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button type="button" onClick="{{ forzar }}" style="height:44px;padding:0 16px;border:1px solid var(--ink);border-radius:8px;background:transparent;color:var(--ink);font-weight:600;cursor:pointer">Registrar de todos modos</button>
+                <button type="button" onClick="{{ cancelarDup }}" style="height:44px;padding:0 16px;border:0;border-radius:8px;background:transparent;color:var(--ink);font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:3px">Revisar</button>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;bottom:{{ barBottom }};padding:12px 0;background:var(--bg)">
+            <button type="button" onClick="{{ registrar }}" disabled="{{ noListo }}" style="height:48px;padding:0 22px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:15px;display:inline-flex;align-items:center;gap:8px;cursor:{{ btnCursor }};opacity:{{ btnOp }};transition:background-color .15s ease,opacity .15s ease,transform .16s var(--ease-out)" style-hover="background:var(--accent-hover)" style-active="transform:scale(.97)"><i class="ph ph-check" style="font-size:17px"></i>{{ btnTxt }}</button>
+            <span style="font-size:13px;color:var(--muted);text-wrap:pretty">{{ faltaTxt }}</span>
+          </div>
+        </form>
+
+        <section aria-labelledby="hoy" style="position:{{ hoyPos }};top:24px;display:flex;flex-direction:column;gap:10px;min-width:0">
+          <h2 id="hoy" style="margin:0;display:flex;align-items:baseline;gap:10px;font-size:17px;font-weight:600;letter-spacing:-.01em">Registrados hoy<span style="font-family:var(--mono);font-size:13px;font-weight:500;color:var(--muted)">{{ nHoy }}</span></h2>
+          <sc-if value="{{ hoyVacio }}"><p style="margin:0;padding:20px 0;color:var(--muted)">Todavía no hay registros hoy.</p></sc-if>
+          <ol style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border-top:1px solid var(--line)">
+            <sc-for list="{{ hoy }}" as="r">
+              <li data-reg="{{ r.id }}" style="display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:4px 12px;align-items:start;padding:14px 0;border-bottom:1px solid var(--line);opacity:{{ r.op }}">
+                <span style="font-family:var(--mono);font-size:13px;color:var(--muted);padding-top:1px">{{ r.hora }}</span>
+                <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                  <b style="font-weight:600;font-size:14px;text-decoration:{{ r.deco }}">{{ r.n }}<span style="font-family:var(--mono);font-weight:400;font-size:12.5px;color:var(--muted)"> · {{ r.dni }}</span></b>
+                  <span style="font-size:13.5px;color:var(--soft);text-decoration:{{ r.deco }}">{{ r.det }}</span>
+                  <span style="font-size:12px;color:var(--muted)">{{ r.meta }}</span>
+                  <sc-if value="{{ r.anulando }}">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;animation:entra .2s var(--ease-out)">
+                      <input value="{{ motivo }}" onInput="{{ onMotivo }}" placeholder="Motivo de la anulación" aria-label="Motivo de la anulación" style="flex:1;min-width:160px;height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink)">
+                      <button onClick="{{ r.confirmar }}" disabled="{{ sinMotivo }}" style="height:44px;padding:0 14px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer;opacity:{{ motivoOp }}">Anular</button>
+                      <button onClick="{{ cancelarAnula }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;cursor:pointer">Cancelar</button>
+                    </div>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ r.puedeAnular }}"><button onClick="{{ r.anular }}" style="height:36px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:var(--soft);font-weight:500;cursor:pointer" style-hover="background:var(--surface);color:var(--accent)">Anular</button></sc-if>
+                <sc-if value="{{ r.anulado }}"><span style="font-size:12px;font-weight:600;color:var(--accent);padding-top:2px">Anulado</span></sc-if>
+              </li>
+            </sc-for>
+          </ol>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div role="status" aria-live="polite" style="position:fixed;left:50%;bottom:{{ toastBottom }};transform:{{ toastX }};opacity:{{ toastOp }};pointer-events:none;transition:transform .3s var(--ease-out),opacity .3s ease;z-index:60;width:max-content;max-width:calc(100% - 28px);padding:12px 16px;background:var(--toast);color:var(--toast-ink);border-radius:10px;box-shadow:var(--shadow);font-weight:500;text-wrap:pretty">{{ toastTxt }}</div>
+
+  <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+    <nav aria-label="Secciones" style="view-transition-name:menu-movil;position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);height:64px;background:var(--side);border-top:1px solid var(--line)">
+      <sc-for list="{{ menu }}" as="it"><a href="{{ it.href }}" aria-current="{{ it.current }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;font-weight:500;color:{{ it.navFg }};text-decoration:none"><i class="{{ it.icon }}" style="font-size:21px"></i>{{ it.label }}</a></sc-for>
+    </nav>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const HOY = '2026-10-06';
+const dmy = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : '';
+const LS = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const MEDS = [['cab', 'Dr. Elí Cabanillas'], ['lat', 'Dra. Alejandra La Torre'], ['sem', 'Dr. Víctor Seminario'], ['vil', 'Dr. Álvaro Villanueva'], ['mat', 'Dra. Karen Matos'], ['matp', 'Dra. Karen Matos – Particular'], ['pac', 'Dr. Iván Pacheco']];
+const MED = k => (MEDS.find(m => m[0] === k) || ['', ''])[1];
+const USERS = [{ v: 'Magaly', l: 'Magaly' }, { v: 'Ana', l: 'Ana' }, { v: 'Rachel', l: 'Rachel' }, { v: 'cab', l: 'Dr. Elí Cabanillas' }];
+const SECC = [['tablero', 'Tablero', 'ph ph-kanban', 'Tablero Seguimientos.dc.html'], ['registro', 'Registro', 'ph ph-note-pencil', 'Registro.dc.html'], ['pacientes', 'Pacientes', 'ph ph-users-three', 'Pacientes.dc.html'], ['indicadores', 'Indicadores', 'ph ph-chart-line-up', 'Indicadores.dc.html']];
+const PROCS = ['Sangría', 'AMO', 'Biopsia', 'Citometría de flujo', 'Cariotipo', 'Transfusión'];
+const TRATS = [['', 'Ninguno'], ['sacarato', 'Hierro sacarato'], ['derisomaltosa', 'Hierro derisomaltosa'], ['carboximaltosa', 'Hierro carboximaltosa']];
+const MARCAS = { carboximaltosa: ['Ferinject', 'Likfer'], derisomaltosa: ['Monofer'], sacarato: [] };
+const PACS = {
+  '40222333': { n: 'Jorge Luis Mendoza Paredes', tel: '912 345 678', med: 'mat', ultima: '18/07/2026', esps: ['Hematología'] },
+  '40111222': { n: 'Rosa Elena Quispe Huamán', tel: '987 654 321', med: 'cab', ultima: '05/08/2026', esps: ['Hematología'] },
+  '40333444': { n: 'Ana María Flores Ríos', tel: '@ana.flores', med: 'cab', ultima: '23/06/2026', esps: ['Hematología', 'Reumatología'] },
+  '40444555': { n: 'Luis Alberto Ramos Vega', tel: '923 456 789', med: 'lat', ultima: '17/08/2026', esps: ['Hematología', 'Medicina interna'] }
+};
+const corto = m => m.replace(/^(Dra?\.) (\S+) .*?(\S+)$/, '$1 $3');
+const chip = (on, go, l, extra) => Object.assign({ l, on: String(on), go, bg: on ? 'var(--accent-soft)' : 'var(--surface)', fg: on ? 'var(--accent)' : 'var(--soft)', borde: on ? 'var(--accent)' : 'var(--line-2)' }, extra || {});
+
+class Component extends DCLogic {
+  rootRef = React.createRef(); segRef = React.createRef(); pillRef = React.createRef(); formRef = React.createRef();
+  state = {
+    tema: LS.get('chp-tema', 'clara'), usuario: LS.get('chp-usuario', 'Magaly'), w: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    modo: 'ind', dni: '', nombre: '', tel: '', fecha: HOY, med: '', procs: [], trat: '', ses: 0, sesOtro: '', marca: '', dup: null,
+    aDni: '', aEsp: '', aMed: '', aFecha: HOY, aNota: '',
+    sig: 4, anulando: null, motivo: '', toast: null,
+    regs: [
+      { id: 'REG-000003', hora: '11:00', dni: '40222333', n: 'Jorge Luis Mendoza Paredes', det: 'Hierro carboximaltosa · Ferinject × 3 sesiones', key: 'trat:carboximaltosa', quien: 'Magaly' },
+      { id: 'REG-000002', hora: '11:00', dni: '40222333', n: 'Jorge Luis Mendoza Paredes', det: 'Sangría', key: 'proc:Sangría', quien: 'Magaly' }
+    ]
+  };
+  componentDidMount() {
+    this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.medir = () => { const r = this.rootRef.current; const w = Math.round((r && r.getBoundingClientRect().width) || innerWidth); if (w !== this.state.w) this.setState({ w }); };
+    addEventListener('resize', this.medir); requestAnimationFrame(this.medir); setTimeout(this.medir, 300);
+    if (document.fonts) document.fonts.ready.then(() => this.pill(true));
+    this.pill(true);
+  }
+  componentWillUnmount() { removeEventListener('resize', this.medir); clearTimeout(this._tt); }
+  componentDidUpdate() {
+    const prev = { modo: this._prevModo === undefined ? this.state.modo : this._prevModo };
+    this._prevModo = this.state.modo;
+    this.pill();
+    if (prev.modo !== this.state.modo && !this.reduced && this.formRef.current) this.formRef.current.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.23,1,.32,1)' });
+    if (this._nuevos && !this.reduced) {
+      this._nuevos.forEach(id => { const el = this.rootRef.current && this.rootRef.current.querySelector(`[data-reg="${id}"]`); if (el) { el.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.23,1,.32,1)' }); el.animate([{ background: 'var(--accent-soft)' }, { background: 'transparent' }], { duration: 1400, easing: 'ease-out' }); } });
+    }
+    this._nuevos = null;
+  }
+  pill(instant) {
+    const seg = this.segRef.current, pl = this.pillRef.current; if (!seg || !pl) return;
+    const on = seg.querySelector('[aria-selected="true"]'); if (!on) return;
+    const w = on.offsetWidth + 'px', t = `translateX(${on.offsetLeft}px)`;
+    if (pl.style.width === w && pl.style.transform === t) return;
+    if (instant || !this._pl) { const tr = pl.style.transition; pl.style.transition = 'none'; pl.style.width = w; pl.style.transform = t; void pl.offsetWidth; pl.style.transition = tr; this._pl = true; }
+    else { pl.style.width = w; pl.style.transform = t; }
+  }
+  aviso(txt) { clearTimeout(this._tt); this.setState({ toast: txt }); this._tt = setTimeout(() => this.setState({ toast: null }), 3600); }
+  quien() { const u = USERS.find(x => x.v === this.state.usuario); return u.v === 'cab' ? 'Dr. Cabanillas' : u.l; }
+  hora() { const d = new Date(); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; }
+
+  items() {
+    const s = this.state, out = s.procs.map(p => ({ det: p, key: 'proc:' + p }));
+    if (s.trat) {
+      const n = s.ses === 'otro' ? Number(s.sesOtro) || 0 : s.ses;
+      out.push({ det: `Hierro ${s.trat}${s.marca ? ' · ' + s.marca : ''} × ${n} ${n === 1 ? 'sesión' : 'sesiones'}`, key: 'trat:' + s.trat });
+    }
+    return out;
+  }
+  faltan() {
+    const s = this.state, f = [];
+    if (s.modo === 'ind') {
+      if (s.dni.length < 8) f.push('DNI'); if (!s.nombre.trim()) f.push('nombres'); if (!s.med) f.push('doctor');
+      if (!s.procs.length && !s.trat) f.push('un procedimiento o tratamiento');
+      if (s.trat && !(s.ses === 'otro' ? Number(s.sesOtro) > 0 : s.ses)) f.push('sesiones');
+      if (s.trat && MARCAS[s.trat].length && !s.marca) f.push('marca');
+    } else {
+      if (!PACS[s.aDni]) f.push('DNI de un paciente'); if (!s.aEsp) f.push('especialidad'); if (!s.aMed) f.push('doctor');
+    }
+    return f;
+  }
+  registrar(forzar) {
+    const s = this.state;
+    if (this.faltan().length) return;
+    let nuevos;
+    if (s.modo === 'ind') {
+      const its = this.items();
+      if (!forzar) {
+        const rep = its.filter(it => s.regs.some(r => !r.anulado && r.dni === s.dni && r.key === it.key));
+        if (rep.length) {
+          const r = s.regs.find(x => !x.anulado && x.dni === s.dni && x.key === rep[0].key);
+          this.setState({ dup: `${s.nombre} ya tiene ${rep.map(x => x.det.split(' · ')[0]).join(' y ')} registrado hoy (${r.id}).` });
+          return;
+        }
+      }
+      let sig = s.sig;
+      nuevos = its.map(it => ({ id: 'REG-' + String(sig++).padStart(6, '0'), hora: this.hora(), dni: s.dni, n: s.nombre.trim(), det: it.det, key: it.key, quien: this.quien() }));
+      this._nuevos = nuevos.map(r => r.id);
+      this.setState({ regs: nuevos.slice().reverse().concat(s.regs), sig, dup: null, dni: '', nombre: '', tel: '', med: '', procs: [], trat: '', ses: 0, sesOtro: '', marca: '', fecha: HOY });
+      this.aviso(`Registrado: ${its.map(i => i.det).join(' + ')} — ${s.nombre.trim()} · ${nuevos.map(r => r.id).join(', ')}`);
+    } else {
+      const p = PACS[s.aDni];
+      const r = { id: 'ALT-' + String(s.sig).padStart(6, '0'), hora: this.hora(), dni: s.aDni, n: p.n, det: `Alta médica · ${s.aEsp} · ${MED(s.aMed)}${s.aNota.trim() ? ' · «' + s.aNota.trim() + '»' : ''}`, key: 'alta:' + s.aEsp, quien: this.quien() };
+      this._nuevos = [r.id];
+      this.setState({ regs: [r].concat(s.regs), sig: s.sig + 1, aDni: '', aEsp: '', aMed: '', aNota: '', aFecha: HOY });
+      this.aviso(`Alta médica registrada: ${p.n} · ${s.aEsp}. Sale de los seguimientos de esa especialidad.`);
+    }
+  }
+
+  renderVals() {
+    const s = this.state, narrow = s.w < 760, wide = s.w >= 1100;
+    const conocido = PACS[s.dni], aPac = PACS[s.aDni];
+    const falta = this.faltan(), listo = !falta.length;
+    const marcas = s.trat ? MARCAS[s.trat] : [];
+    const set = o => this.setState(Object.assign({ dup: null }, o));
+    return {
+      tema: s.tema, colorScheme: s.tema === 'oscura' ? 'dark' : 'light', rootRef: this.rootRef, segRef: this.segRef, pillRef: this.pillRef, formRef: this.formRef,
+      narrow, notNarrow: !narrow, mainPad: narrow ? '18px 14px 96px' : '28px 32px 56px', h1Size: narrow ? '23px' : '28px',
+      menu: SECC.map(([k, l, i, href]) => { const on = k === 'registro'; return { label: l, href, icon: on ? i.replace('ph ', 'ph-fill ') : i, current: on ? 'page' : undefined, bg: on ? 'var(--accent-soft)' : 'transparent', fg: on ? 'var(--accent)' : 'var(--soft)', hoverBg: on ? 'var(--accent-soft)' : 'var(--surface-2)', hoverFg: on ? 'var(--accent)' : 'var(--ink)', navFg: on ? 'var(--accent)' : 'var(--muted)' }; }),
+      usuarios: USERS, usuario: s.usuario, onUsuario: e => { LS.set('chp-usuario', e.target.value); this.setState({ usuario: e.target.value }); },
+      toggleTema: () => { const t = s.tema === 'clara' ? 'oscura' : 'clara'; LS.set('chp-tema', t); this.setState({ tema: t }); },
+      temaIcon: s.tema === 'clara' ? 'ph ph-moon' : 'ph ph-sun', temaTxt: s.tema === 'clara' ? 'Modo oscuro' : 'Modo claro',
+      modos: [['ind', 'Indicación', 'ph ph-prescription'], ['alta', 'Alta médica', 'ph ph-seal-check']].map(([k, l, i]) => ({ label: l, icon: i, sel: String(s.modo === k), fg: s.modo === k ? 'var(--accent-ink)' : 'var(--soft)', go: () => this.setState({ modo: k, dup: null }) })),
+      layoutCols: wide ? 'minmax(0,600px) minmax(0,1fr)' : 'minmax(0,1fr)', hoyPos: wide ? 'sticky' : 'static', barBottom: narrow ? '64px' : '0px',
+      esInd: s.modo === 'ind', esAlta: s.modo === 'alta', noSubmit: e => e.preventDefault(),
+      dni: s.dni, onDni: e => {
+        const v = e.target.value.replace(/\D/g, '').slice(0, 9), p = PACS[v];
+        set(p ? { dni: v, nombre: p.n, tel: p.tel, med: p.med } : { dni: v });
+      },
+      hayConocido: !!conocido, conocidoTxt: conocido ? `Paciente conocido · última consulta ${conocido.ultima} con ${corto(MED(conocido.med))}` : '',
+      nombre: s.nombre, onNombre: e => set({ nombre: e.target.value }), tel: s.tel, onTel: e => set({ tel: e.target.value }),
+      fecha: s.fecha, onFecha: e => set({ fecha: e.target.value || HOY }),
+      medOpts: [{ v: '', l: '— Elija —' }].concat(MEDS.map(([v, l]) => ({ v, l }))), med: s.med, onMed: e => set({ med: e.target.value }),
+      procs: PROCS.map(p => { const on = s.procs.includes(p); return chip(on, () => set({ procs: on ? s.procs.filter(x => x !== p) : s.procs.concat(p) }), p, { icon: on ? 'ph ph-check' : 'ph ph-plus' }); }),
+      trats: TRATS.map(([k, l]) => chip(s.trat === k, () => set({ trat: k, ses: k ? s.ses : 0, marca: k === 'derisomaltosa' ? 'Monofer' : '' }), l)),
+      hayTrat: !!s.trat,
+      sesOpts: [1, 2, 3, 4, 5, 'otro'].map(n => chip(s.ses === n, () => set({ ses: n }), n === 'otro' ? 'Otro' : String(n))),
+      sesEsOtro: s.ses === 'otro', sesOtro: s.sesOtro, onSesOtro: e => set({ sesOtro: e.target.value }),
+      hayMarcas: marcas.length > 0, sinMarca: s.trat === 'sacarato', marcas: marcas.map(m => chip(s.marca === m, () => set({ marca: m }), m)),
+      aDni: s.aDni, onADni: e => this.setState({ aDni: e.target.value.replace(/\D/g, '').slice(0, 9), aEsp: '' }),
+      aHayPac: !!aPac, aPacTxt: aPac ? `${aPac.n} · última consulta ${aPac.ultima}` : '', aNoPac: s.aDni.length >= 8 && !aPac,
+      aEsps: aPac ? aPac.esps.map(e => chip(s.aEsp === e, () => this.setState({ aEsp: e }), e)) : [], aSinEsps: !aPac,
+      aMed: s.aMed, onAMed: e => this.setState({ aMed: e.target.value }), aFecha: s.aFecha, onAFecha: e => this.setState({ aFecha: e.target.value || HOY }),
+      aNota: s.aNota, onANota: e => this.setState({ aNota: e.target.value }),
+      hayDup: !!s.dup, dupTxt: s.dup || '', forzar: () => this.registrar(true), cancelarDup: () => this.setState({ dup: null }),
+      registrar: () => this.registrar(false), noListo: !listo, btnOp: listo ? 1 : .45, btnCursor: listo ? 'pointer' : 'not-allowed',
+      btnTxt: s.modo === 'ind' ? 'Registrar' : 'Registrar alta',
+      faltaTxt: listo ? (s.modo === 'ind' ? `Se crearán ${this.items().length} ${this.items().length === 1 ? 'registro' : 'registros'}.` : 'Cierra el seguimiento de esa especialidad.') : `Falta: ${falta.join(', ')}.`,
+      nHoy: s.regs.filter(r => !r.anulado).length, hoyVacio: !s.regs.length,
+      hoy: s.regs.map(r => ({
+        id: r.id, hora: r.hora, n: r.n, dni: 'DNI ' + r.dni, det: r.det, deco: r.anulado ? 'line-through' : 'none', op: r.anulado ? .6 : 1,
+        meta: r.anulado ? `${r.id} · anulado por ${r.anuloQuien}: ${r.motivo}` : `${r.id} · registró ${r.quien}`,
+        anulado: !!r.anulado, puedeAnular: !r.anulado && s.anulando !== r.id, anulando: s.anulando === r.id,
+        anular: () => this.setState({ anulando: r.id, motivo: '' }),
+        confirmar: () => { if (!s.motivo.trim()) return; this.setState({ regs: s.regs.map(x => x.id === r.id ? Object.assign({}, x, { anulado: true, motivo: s.motivo.trim(), anuloQuien: this.quien() }) : x), anulando: null }); this.aviso(`${r.id} anulado.`); }
+      })),
+      motivo: s.motivo, onMotivo: e => this.setState({ motivo: e.target.value }), sinMotivo: !s.motivo.trim(), motivoOp: s.motivo.trim() ? 1 : .45,
+      cancelarAnula: () => this.setState({ anulando: null }),
+      toastTxt: s.toast || '', toastOp: s.toast ? 1 : 0, toastX: s.toast ? 'translate(-50%,0)' : 'translate(-50%,16px)', toastBottom: narrow ? '80px' : '24px'
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+[data-tema]{--ease-out:cubic-bezier(.23,1,.32,1);--ease-in-out:cubic-bezier(.77,0,.175,1);--mono:'Geist Mono',ui-monospace,monospace}
+[data-tema="clara"]{--bg:#F4F5F7;--side:#FFFFFF;--surface:#FFFFFF;--surface-2:#F8F9FB;--line:#E4E6EB;--line-2:#CDD1D9;--ink:#15171C;--soft:#41464F;--muted:#636976;--accent:#8C1D18;--accent-hover:#741612;--accent-ink:#FFFFFF;--accent-soft:#F7E9E8;--good:#1E7A4C;--good-soft:#E6F4EC;--warn:#985B00;--warn-soft:#FBF0DE;--info:#2F5BD3;--info-soft:#E8EEFC;--w1:#7A1A15;--w2:#B8433B;--w3:#DA857D;--w4:#F0C2BC;--shadow:0 1px 2px rgb(21 23 28 / .06),0 4px 14px rgb(21 23 28 / .05)}
+[data-tema="oscura"]{--bg:#0E1015;--side:#12151B;--surface:#171B22;--surface-2:#1D222B;--line:#272D38;--line-2:#3A4250;--ink:#ECEEF1;--soft:#C3C8D1;--muted:#98A0AD;--accent:#EC7B71;--accent-hover:#F39489;--accent-ink:#1A0908;--accent-soft:#2E1816;--good:#5CC98F;--good-soft:#132A1F;--warn:#E7A94B;--warn-soft:#2D2312;--info:#8AABFF;--info-soft:#18213A;--w1:#EC7B71;--w2:#B85A52;--w3:#844640;--w4:#4E2C29;--shadow:0 1px 0 rgb(255 255 255 / .03) inset,0 6px 20px rgb(4 5 8 / .35)}
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+::view-transition-new(root){animation-name:vt-entra}
+@keyframes vt-entra{from{opacity:0;transform:translateY(6px)}}
+::view-transition-group(menu),::view-transition-group(menu-movil){animation-duration:0s}
+@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+html,body{margin:0}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent-soft);color:var(--ink)}
+a{color:var(--accent)}a:hover{color:var(--accent-hover)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:1ms!important;animation-duration:1ms!important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" data-tema="{{ tema }}" style="font-family:'Geist',sans-serif;font-size:14px;line-height:1.45;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased;transition:background-color .3s ease,color .3s ease">
+  <sc-if value="{{ notNarrow }}" hint-placeholder-val="{{ true }}">
+    <aside style="view-transition-name:menu;width:232px;flex:0 0 232px;background:var(--side);border-right:1px solid var(--line);padding:22px 14px 16px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 6px">
+        <span style="width:36px;height:36px;flex:0 0 36px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:12.5px;letter-spacing:.02em">CHP</span>
+        <span style="display:flex;flex-direction:column;min-width:0"><b style="font-size:15px;font-weight:600;letter-spacing:-.01em">Seguimientos</b><small style="font-size:11.5px;color:var(--muted);line-height:1.3">Centro Hematológico del Perú</small></span>
+      </div>
+      <nav aria-label="Secciones" style="display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ menu }}" as="it" hint-placeholder-count="4">
+          <a href="{{ it.href }}" aria-current="{{ it.current }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border-radius:8px;background:{{ it.bg }};color:{{ it.fg }};font-weight:500;text-decoration:none;transition:background-color .15s ease,color .15s ease" style-hover="background:{{ it.hoverBg }};color:{{ it.hoverFg }}"><i class="{{ it.icon }}" style="font-size:18px"></i>{{ it.label }}</a>
+        </sc-for>
+      </nav>
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);padding:0 2px">¿Quién es usted?
+          <select value="{{ usuario }}" onChange="{{ onUsuario }}" style="height:44px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:14px;cursor:pointer"><sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for></select>
+        </label>
+        <button onClick="{{ toggleTema }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--soft);font-weight:500;cursor:pointer" style-hover="background:var(--surface-2);color:var(--ink)"><i class="{{ temaIcon }}" style="font-size:18px"></i>{{ temaTxt }}</button>
+      </div>
+    </aside>
+  </sc-if>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+      <header style="position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--side);border-bottom:1px solid var(--line)">
+        <span style="width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:11px">CHP</span>
+        <b style="font-size:15px;font-weight:600">Seguimientos</b>
+        <select aria-label="¿Quién es usted?" value="{{ usuario }}" onChange="{{ onUsuario }}" style="margin-left:auto;height:44px;max-width:150px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px"><sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for></select>
+        <button onClick="{{ toggleTema }}" aria-label="{{ temaTxt }}" style="width:44px;height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:grid;place-items:center;font-size:18px;cursor:pointer"><i class="{{ temaIcon }}"></i></button>
+      </header>
+    </sc-if>
+
+    <main style="padding:{{ mainPad }};flex:1;min-width:0;width:100%;max-width:1400px">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px 24px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <h1 style="margin:0;font-size:{{ h1Size }};font-weight:600;letter-spacing:-.025em;line-height:1.15">Indicadores</h1>
+          <div role="group" aria-label="Mes" style="display:inline-flex;align-items:center;gap:2px;height:44px;padding:2px;border:1px solid var(--line);border-radius:999px;background:var(--surface)">
+            <button onClick="{{ mesAnt }}" disabled="{{ sinAnt }}" aria-label="Mes anterior" style="width:40px;height:38px;border:0;border-radius:999px;background:transparent;display:grid;place-items:center;cursor:pointer;opacity:{{ antOp }}" style-hover="background:var(--surface-2)"><i class="ph ph-caret-left"></i></button>
+            <span aria-live="polite" style="min-width:128px;text-align:center;font-weight:600">{{ mesTxt }}</span>
+            <button onClick="{{ mesSig }}" disabled="{{ sinSig }}" aria-label="Mes siguiente" style="width:40px;height:38px;border:0;border-radius:999px;background:transparent;display:grid;place-items:center;cursor:pointer;opacity:{{ sigOp }}" style-hover="background:var(--surface-2)"><i class="ph ph-caret-right"></i></button>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="Resumen del mes.dc.html" style="height:44px;padding:0 16px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-weight:600;font-size:13.5px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;transition:background-color .15s ease,transform .16s var(--ease-out)" style-hover="background:var(--accent-hover);color:var(--accent-ink)" style-active="transform:scale(.97)"><i class="ph ph-printer" style="font-size:17px"></i>Resumen para imprimir</a>
+          <label style="position:relative;display:inline-flex;align-items:center"><i class="ph ph-stethoscope" style="position:absolute;left:13px;pointer-events:none;color:var(--muted)"></i><select aria-label="Médico" value="{{ medico }}" onChange="{{ onMedico }}" style="appearance:none;-webkit-appearance:none;height:44px;max-width:240px;padding:0 34px 0 36px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px;cursor:pointer"><sc-for list="{{ medOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select><i class="ph ph-caret-down" style="position:absolute;right:13px;pointer-events:none;color:var(--muted)"></i></label>
+          <label style="position:relative;display:inline-flex;align-items:center"><i class="ph ph-heartbeat" style="position:absolute;left:13px;pointer-events:none;color:var(--muted)"></i><select aria-label="Especialidad" value="{{ esp }}" onChange="{{ onEsp }}" style="appearance:none;-webkit-appearance:none;height:44px;padding:0 34px 0 36px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px;cursor:pointer"><sc-for list="{{ espOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select><i class="ph ph-caret-down" style="position:absolute;right:13px;pointer-events:none;color:var(--muted)"></i></label>
+        </div>
+      </div>
+
+      <div ref="{{ segRef }}" role="tablist" aria-label="Secciones de indicadores" style="position:relative;display:flex;width:max-content;max-width:100%;margin-top:22px;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:999px;overflow-x:auto;scrollbar-width:none">
+        <span ref="{{ pillRef }}" aria-hidden="true" style="position:absolute;top:3px;bottom:3px;left:0;border-radius:999px;background:var(--accent);transition:transform .25s var(--ease-in-out),width .25s var(--ease-in-out)"></span>
+        <sc-for list="{{ tabs }}" as="t">
+          <button role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.go }}" style="position:relative;z-index:1;flex:0 0 auto;height:40px;padding:0 14px;border:0;border-radius:999px;background:transparent;color:{{ t.fg }};font-weight:500;font-size:13.5px;white-space:nowrap;cursor:pointer;transition:color .2s ease" style-hover="color:{{ t.hoverFg }}">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <div ref="{{ panelRef }}" role="tabpanel" style="margin-top:32px">
+        <sc-if value="{{ tResumen }}" hint-placeholder-val="{{ true }}">
+          <section style="display:grid;grid-template-columns:{{ resCols }};gap:32px 56px;align-items:end">
+            <div style="display:flex;flex-direction:column;gap:10px;max-width:440px">
+              <span data-cifra="1" style="display:inline-block;font-family:var(--mono);font-size:{{ bigSize }};font-weight:500;letter-spacing:-.06em;line-height:.9;color:var(--accent)">{{ r.pct }}%</span>
+              <p style="margin:6px 0 0;font-size:19px;font-weight:500;letter-spacing:-.01em;line-height:1.3;text-wrap:balance">de los pacientes de {{ r.mes }} no volvieron a su reevaluación.</p>
+              <p style="margin:0;color:var(--soft)"><b style="color:var(--ink);font-weight:600">{{ r.nNo }} de {{ r.nTot }}</b> pacientes · nuevos {{ r.nuevos }} · en control {{ r.control }}</p>
+              <sc-if value="{{ r.hayPlazo }}"><p style="margin:0;color:var(--soft);font-size:13.5px">A {{ r.plazo }} pacientes de este mes aún no les toca volver: no cuentan todavía.</p></sc-if>
+              <p style="margin:0;font-size:13.5px;display:flex;align-items:center;gap:8px;color:{{ r.metaColor }}"><i class="{{ r.metaIcon }}" style="font-size:16px"></i>{{ r.metaTxt }}</p>
+            </div>
+            <dl style="margin:0;display:grid;grid-template-columns:{{ secCols }};border-top:1px solid var(--line)">
+              <sc-for list="{{ r.sec }}" as="k">
+                <div style="padding:16px 18px 4px 0;display:flex;flex-direction:column;gap:4px">
+                  <dd style="margin:0;font-family:var(--mono);font-size:34px;font-weight:500;letter-spacing:-.04em;line-height:1;color:{{ k.color }}">{{ k.pct }}%</dd>
+                  <dt style="font-size:13.5px;line-height:1.35;text-wrap:balance">{{ k.l }}</dt>
+                  <span style="font-family:var(--mono);font-size:12px;color:var(--muted)">{{ k.n }}</span>
+                </div>
+              </sc-for>
+            </dl>
+          </section>
+          <section style="margin-top:48px;display:flex;flex-direction:column;gap:16px">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap">
+              <h2 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em">Mes a mes · % que no volvió</h2>
+              <div style="display:flex;gap:16px;font-size:12.5px;color:var(--soft);flex-wrap:wrap">
+                <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:12px;height:12px;border-radius:2px;background:var(--accent)"></i>Mes cerrado</span>
+                <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:12px;height:12px;border-radius:2px;border:1.5px solid var(--accent);background:repeating-linear-gradient(135deg,var(--accent) 0 1.5px,transparent 1.5px 4px)"></i>En curso</span>
+                <span style="display:inline-flex;align-items:center;gap:6px"><i style="width:16px;border-top:1.5px dashed var(--ink)"></i>Meta: no más de 40 %</span>
+              </div>
+            </div>
+            <div style="position:relative;height:240px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:{{ barGap }};align-items:end;border-bottom:1px solid var(--line-2)">
+              <span aria-hidden="true" style="position:absolute;left:0;right:0;bottom:40%;border-top:1.5px dashed var(--ink);opacity:.7;pointer-events:none"></span>
+              <sc-for list="{{ barras }}" as="b">
+                <button onClick="{{ b.go }}" aria-label="{{ b.aria }}" aria-pressed="{{ b.sel }}" style="position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:stretch;border:0;padding:0;background:transparent;cursor:pointer">
+                  <span style="position:relative;height:{{ b.h }};background:{{ b.bg }};border:{{ b.borde }};border-radius:4px 4px 0 0;opacity:{{ b.op }};transition:height .4s var(--ease-in-out),opacity .2s ease">
+                    <span style="position:absolute;left:0;right:0;bottom:100%;padding-bottom:6px;text-align:center;font-family:var(--mono);font-size:{{ barLbl }};font-weight:500;color:var(--ink)">{{ b.pct }}%</span>
+                  </span>
+                </button>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:{{ barGap }};margin-top:-8px">
+              <sc-for list="{{ barras }}" as="b"><span style="display:flex;flex-direction:column;align-items:center;text-align:center"><b style="font-weight:{{ b.w }};color:{{ b.fg }};font-size:13px">{{ b.mes }}</b><small style="font-size:11.5px;color:var(--muted)">{{ b.estado }}</small></span></sc-for>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{ tLlegan }}">
+          <section style="display:grid;grid-template-columns:{{ llegCols }};gap:36px 56px;align-items:start">
+            <div style="display:flex;flex-direction:column;gap:16px">
+              <div ref="{{ waffleRef }}" role="img" aria-label="De cada 100 pacientes nuevos: 66 no volvieron nunca, 23 volvieron a 1 reevaluación, 5 a 2 y 6 a 3 o más" style="display:grid;grid-template-columns:repeat(10,1fr);gap:4px;width:{{ waffleW }}">
+                <sc-for list="{{ waffle }}" as="q"><i style="aspect-ratio:1;border-radius:3px;background:{{ q }}"></i></sc-for>
+              </div>
+              <ul style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">
+                <sc-for list="{{ leyenda }}" as="l"><li style="display:flex;align-items:baseline;gap:10px"><i style="width:12px;height:12px;border-radius:3px;background:{{ l.c }};flex:0 0 auto;transform:translateY(1px)"></i><b style="font-family:var(--mono);font-size:17px;font-weight:500;min-width:26px">{{ l.n }}</b><span style="color:var(--soft)">{{ l.l }}</span></li></sc-for>
+              </ul>
+              <small style="color:var(--muted)">Cada cuadrito es 1 de cada 100 pacientes nuevos a quienes ya les venció el plazo.</small>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px;max-width:62ch">
+              <p style="margin:0;font-size:{{ relatoSize }};font-weight:500;letter-spacing:-.02em;line-height:1.25;text-wrap:balance">De cada 100 pacientes nuevos, <span style="color:var(--accent);font-weight:600">66 no vuelven nunca</span> después de su primera consulta.</p>
+              <p style="margin:0;font-size:15px">34 vuelven a su 1.ª reevaluación, 11 llegan a la 2.ª y 6 a la 3.ª.</p>
+              <p style="margin:0;font-size:15px">Donde más se pierden es entre la 1.ª y la 2.ª reevaluación: el 68 % no sigue.</p>
+              <p style="margin:0;font-size:15px">El mes con más pacientes perdidos fue agosto 2026 (74 % no volvió); el mejor, enero 2026 (58 %).</p>
+              <p style="margin:0;font-size:15px;font-weight:600">La meta es que vuelva el 60 %; hoy vuelve el 34 %.</p>
+              <p style="margin:0;font-size:15px;color:var(--soft)">Otros 157 pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo: aún no se cuentan.</p>
+            </div>
+          </section>
+          <section style="margin-top:44px;display:flex;flex-direction:column;gap:10px">
+            <h2 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em">Mes por mes</h2>
+            <div style="overflow-x:auto">
+              <table style="width:100%;min-width:820px;border-collapse:collapse;font-size:13.5px">
+                <thead><tr>
+                  <th style="text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 10px 8px 0;border-bottom:1px solid var(--line)">Mes de la primera consulta</th>
+                  <th style="text-align:right;font-weight:600;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)">Pacientes nuevos</th>
+                  <th style="text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);width:200px">Reparto</th>
+                  <sc-for list="{{ cats }}" as="c"><th style="text-align:right;font-weight:600;font-size:12px;color:var(--muted);padding:8px 0 8px 10px;border-bottom:1px solid var(--line)"><span style="display:inline-flex;align-items:center;gap:5px"><i style="width:9px;height:9px;border-radius:2px;background:{{ c.c }}"></i>{{ c.l }}</span></th></sc-for>
+                </tr></thead>
+                <tbody>
+                  <sc-for list="{{ filas }}" as="f">
+                    <tr>
+                      <td style="padding:11px 10px 11px 0;border-bottom:1px solid var(--line);font-weight:{{ f.w }}">{{ f.mes }}</td>
+                      <td style="padding:11px 10px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-weight:{{ f.w }}">{{ f.tot }}</td>
+                      <td style="padding:11px 10px;border-bottom:1px solid var(--line)"><div data-barra="1" style="display:flex;height:12px;border-radius:3px;overflow:hidden;gap:1px;transform-origin:left center"><sc-for list="{{ f.seg }}" as="sg"><i style="width:{{ sg.w }};background:{{ sg.c }}"></i></sc-for></div></td>
+                      <sc-for list="{{ f.vals }}" as="v"><td style="padding:11px 0 11px 10px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);font-size:13px;white-space:nowrap;font-weight:{{ f.w }}">{{ v }}</td></sc-for>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <small style="color:var(--muted);max-width:90ch">Cada paciente cuenta una sola vez, según la última reevaluación a la que llegó: las partes suman el total del mes. Solo cuentan aquellos a quienes ya les venció el plazo; un paciente atendido en dos especialidades cuenta en cada una.</small>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{ tTabla }}">
+          <section style="display:flex;flex-direction:column;gap:12px;max-width:1120px">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+              <h2 style="margin:0;font-size:20px;font-weight:600;letter-spacing:-.015em">{{ tb.titulo }}</h2>
+              <sc-if value="{{ tb.haySub }}">
+                <div role="group" style="display:inline-flex;padding:3px;border:1px solid var(--line);border-radius:999px;background:var(--surface)">
+                  <sc-for list="{{ tb.subs }}" as="x"><button aria-pressed="{{ x.sel }}" onClick="{{ x.go }}" style="height:36px;padding:0 12px;border:0;border-radius:999px;background:{{ x.bg }};color:{{ x.fg }};font-weight:500;font-size:13px;white-space:nowrap;cursor:pointer;transition:background-color .15s ease,color .15s ease">{{ x.l }}</button></sc-for>
+                </div>
+              </sc-if>
+            </div>
+            <p style="margin:0;color:var(--soft);max-width:78ch;text-wrap:pretty">{{ tb.intro }}</p>
+            <sc-if value="{{ tb.hayNota }}"><p style="margin:0;display:flex;gap:8px;align-items:flex-start;max-width:78ch;padding:10px 12px;border-radius:8px;background:var(--info-soft);color:var(--ink);font-size:13.5px"><i class="ph ph-info" style="color:var(--info);font-size:17px;margin-top:1px"></i><span>{{ tb.nota }}</span></p></sc-if>
+            <sc-if value="{{ tb.hayCifras }}">
+              <dl style="margin:8px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));border-top:1px solid var(--line)">
+                <sc-for list="{{ tb.cifras }}" as="k"><div style="padding:16px 18px 4px 0;display:flex;flex-direction:column;gap:4px"><dd style="margin:0;font-family:var(--mono);font-size:34px;font-weight:500;letter-spacing:-.04em;line-height:1">{{ k.v }}</dd><dt style="font-size:13.5px">{{ k.l }}</dt></div></sc-for>
+              </dl>
+            </sc-if>
+            <sc-for list="{{ tb.bloques }}" as="bq">
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:{{ bq.mt }}">
+                <sc-if value="{{ bq.hayTitulo }}"><h3 style="margin:0;font-size:15px;font-weight:600">{{ bq.titulo }}</h3></sc-if>
+                <div style="overflow-x:auto">
+                  <table style="width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px">
+                    <thead><tr><sc-for list="{{ bq.cols }}" as="c"><th style="text-align:{{ c.a }};font-weight:600;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;width:{{ c.w }}">{{ c.l }}</th></sc-for></tr></thead>
+                    <tbody>
+                      <sc-for list="{{ bq.filas }}" as="f">
+                        <tr style="transition:background-color .15s ease" style-hover="background:var(--surface)">
+                          <sc-for list="{{ f.antes }}" as="c"><td style="padding:10px;border-bottom:1px solid var(--line);text-align:{{ c.a }};font-family:{{ c.ff }};font-weight:{{ c.w }};color:{{ c.color }}">{{ c.v }}</td></sc-for>
+                          <sc-if value="{{ f.hayBarra }}">
+                            <td style="padding:8px 10px;border-bottom:1px solid var(--line);min-width:200px">
+                              <div style="display:flex;flex-direction:column;gap:5px">
+                                <span style="text-align:right;font-family:var(--mono);font-size:13px;color:{{ f.lblColor }}">{{ f.lbl }}</span>
+                                <div style="position:relative;height:6px;border-radius:3px;background:var(--line);overflow:hidden"><sc-for list="{{ f.barras }}" as="b"><i data-barra="1" style="position:absolute;left:0;top:0;bottom:0;width:{{ b.w }};background:{{ b.c }};border-radius:3px;transform-origin:left center"></i></sc-for></div>
+                              </div>
+                            </td>
+                          </sc-if>
+                          <sc-for list="{{ f.despues }}" as="c"><td style="padding:10px;border-bottom:1px solid var(--line);text-align:{{ c.a }};font-family:{{ c.ff }};font-weight:{{ c.w }};color:{{ c.color }}">{{ c.v }}</td></sc-for>
+                          <sc-if value="{{ f.hayAccion }}"><td style="padding:6px 10px;border-bottom:1px solid var(--line)"><a href="Pacientes.dc.html" style="display:inline-flex;align-items:center;gap:6px;min-height:40px;font-weight:600;text-decoration:none;white-space:nowrap">Buscar paciente<i class="ph ph-arrow-right"></i></a></td></sc-if>
+                        </tr>
+                      </sc-for>
+                    </tbody>
+                  </table>
+                </div>
+                <sc-if value="{{ bq.hayMas }}"><button onClick="{{ bq.verMas }}" style="align-self:flex-start;height:40px;padding:0 14px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px" style-hover="border-color:var(--accent)">{{ bq.masTxt }}<i class="{{ bq.masIcon }}"></i></button></sc-if>
+              </div>
+            </sc-for>
+            <sc-if value="{{ tb.hayLeyenda }}"><div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--soft)"><sc-for list="{{ tb.leyenda }}" as="l"><span style="display:inline-flex;align-items:center;gap:6px"><i style="width:12px;height:12px;border-radius:2px;background:{{ l.c }}"></i>{{ l.l }}</span></sc-for></div></sc-if>
+          </section>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+    <nav aria-label="Secciones" style="view-transition-name:menu-movil;position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);height:64px;background:var(--side);border-top:1px solid var(--line)">
+      <sc-for list="{{ menu }}" as="it"><a href="{{ it.href }}" aria-current="{{ it.current }}" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;font-weight:500;color:{{ it.navFg }};text-decoration:none"><i class="{{ it.icon }}" style="font-size:21px"></i>{{ it.label }}</a></sc-for>
+    </nav>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const LS = { get: (k, d) => { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+const MEDS = [['cab', 'Dr. Elí Cabanillas'], ['lat', 'Dra. Alejandra La Torre'], ['sem', 'Dr. Víctor Seminario'], ['vil', 'Dr. Álvaro Villanueva'], ['mat', 'Dra. Karen Matos'], ['matp', 'Dra. Karen Matos – Particular'], ['pac', 'Dr. Iván Pacheco']];
+const USERS = [{ v: 'Magaly', l: 'Magaly' }, { v: 'Ana', l: 'Ana' }, { v: 'Rachel', l: 'Rachel' }, { v: 'cab', l: 'Dr. Elí Cabanillas' }];
+const SECC = [['tablero', 'Tablero', 'ph ph-kanban', 'Tablero Seguimientos.dc.html'], ['registro', 'Registro', 'ph ph-note-pencil', 'Registro.dc.html'], ['pacientes', 'Pacientes', 'ph ph-users-three', 'Pacientes.dc.html'], ['indicadores', 'Indicadores', 'ph ph-chart-line-up', 'Indicadores.dc.html']];
+const MESES = ['abril', 'mayo', 'junio', 'julio', 'agosto', 'setiembre'];
+const CORTO = ['abr', 'may', 'jun', 'jul', 'ago', 'set'];
+const BASE = { pct: [61, 58, 58, 57, 47, 25], tot: [38, 44, 40, 58, 48, 20], plazo: [0, 0, 0, 0, 4, 35],
+  hNo: [38, 45, 40, 44, 50, 42], hNoN: [13, 11, 15, 9, 12, 12], hOk: [52, 40, 47, 41, 33, 8], hOkN: [21, 15, 17, 12, 12, 12],
+  pNo: [50, 33, 60, 57, 40, 67], pNoN: [6, 9, 5, 7, 5, 3], rec: [31, 36, 29, 35, 38, 40], recN: [13, 11, 14, 17, 13, 10] };
+const TABS = [['resumen', 'Resumen del mes'], ['llegan', '¿Hasta dónde llegan?'], ['campanas', 'Campañas'], ['procs', 'Procedimientos'], ['recup', 'Recuperación'], ['motivos', 'Motivos de cierre'], ['sinpac', 'Procedimientos sin paciente']];
+const CATS = [{ l: 'No volvió nunca', c: 'var(--w1)' }, { l: 'Volvió a 1 reevaluación', c: 'var(--w2)' }, { l: 'Volvió a 2', c: 'var(--w3)' }, { l: 'Volvió a 3 o más', c: 'var(--w4)' }, { l: 'Aún en plazo', c: 'repeating-linear-gradient(135deg,var(--line-2) 0 2px,var(--surface-2) 2px 5px)' }, { l: 'Alta médica', c: 'var(--good)' }];
+const FILAS = [['enero 2026', [122, 54, 13, 19, 2, 0]], ['febrero 2026', [100, 34, 2, 13, 1, 0]], ['marzo 2026', [99, 39, 9, 7, 7, 0]], ['abril 2026', [75, 33, 4, 8, 0, 0]], ['mayo 2026', [100, 26, 6, 1, 3, 0]], ['junio 2026', [80, 20, 6, 0, 4, 0]], ['julio 2026', [86, 22, 1, 1, 9, 0]], ['agosto 2026', [80, 4, 1, 1, 22, 0]], ['setiembre 2026', [0, 0, 0, 1, 17, 0]]];
+const CANALES = [['WhatsApp directo', 143, 35, 115, 28], ['Google', 60, 12, 31, 29], ['Referido', 53, 9, 26, 27], ['Sin registro en el CRM', 52, 12, 32, 20], ['Facebook Ads', 39, 8, 23, 16], ['TikTok', 12, 2, 8, 4], ['Instagram', 3, 0, 2, 1], ['Llamada no identificada', 3, 0, 0, 3]];
+const CAMPANAS = [['Sin campaña', 283, 62, 192, 91], ['Sin registro en el CRM', 52, 12, 32, 20], ['Campañas de TikTok', 5, 1, 1, 4], ['V-STOP ANEM2', 5, 1, 5, 0], ['ANM-003', 4, 0, 0, 4], ['CIT-001', 2, 0, 0, 2], ['I-SANGRE-IMAGEN2', 2, 1, 2, 0], ['I-SIN ENERGIA', 2, 0, 2, 0], ['ANM-001', 1, 0, 0, 1], ['ANM-002', 1, 0, 0, 1], ['ANM-004', 1, 0, 0, 1], ['ANM-006', 1, 0, 0, 1], ['Campañas de Instagram', 1, 0, 0, 1], ['GES-001', 1, 0, 0, 1], ['HEM-003', 1, 0, 0, 1], ['LAB-003', 1, 1, 1, 0], ['V-FALTA HIERRO', 1, 0, 1, 0], ['V-STOP ANEM1', 1, 0, 1, 0]];
+const PROC_RAW = [['AMO + BIOPSIA', 2, 0, 0, 'a'], ['AMO + BIOPSIA + CARIOTIPO', 1, 0, 0, 'b'], ['AMO + BIOPSIA + CARIOTIPO + CITOMATERÍA DE FLUJO', 14, 4, 4, 'c'], ['AMO + BIOPSIA + CARIOTIPO + CITOMETREÍADE FLUJO', 20, 1, 1, 'c'], ['AMO + BIOPSIA + CARIOTIPO + CITOMETRÍA DE FLUJO', 4, 0, 0, 'c'], ['AMO + BIOPSIA + CITOMATERÍA DE FLUJO', 4, 2, 2, 'd'], ['AMO + BIOPSIA + CITOMETREÍADE FLUJO', 1, 1, 1, 'd'], ['AMO + BIOPSIA + CITOMETRIA', 1, 0, 0, 'd'], ['AMO + BIOPSIA + CITOMETRIA DE FLUJO + CARIOTIPO', 1, 0, 0, 'c'], ['AMO + BIOSIA + CARIOTIPO + CITOMETRÍA DE FLUJO', 13, 1, 1, 'c'], ['AMO + BIPOSIA + CITOMETRIA', 1, 0, 0, 'd'], ['AMO + CARIOTIPO + CITOMETRIA DE FLUJO', 1, 0, 0, 'e'], ['AMO + CITOMETRIA + CITOGENETICA', 1, 0, 0, 'f'], ['BIOPSIA + CARIOTIPO + CITOMETRIA DE FLUJO + AMO', 3, 0, 0, 'c'], ['Hierro (Ferinject)', 227, 109, 109, 'g']];
+const PROC_GRUPO = { a: 'AMO + biopsia', b: 'AMO + biopsia + cariotipo', c: 'AMO + biopsia + cariotipo + citometría de flujo', d: 'AMO + biopsia + citometría de flujo', e: 'AMO + cariotipo + citometría de flujo', f: 'AMO + citometría + citogenética', g: 'Hierro (Ferinject)' };
+const PROC_MED = [['Dr. Alfonso Gerardo Céspedes Castañeda', 1, 1, 1], ['Dr. Elí Fabrizio Cabanillas Hualpa', 134, 54, 54], ['Dr. Iván Paolo Pacheco Modesto', 1, 1, 1], ['Dr. Juvenal Hanampa Roque', 1, 1, 1], ['Dr. Víctor Ernesto Seminario Marcelo', 12, 8, 8]];
+const pc = (a, b) => b ? Math.round(a * 100 / b) : 0;
+const num = (v, a) => ({ v: String(v), a: a || 'right', ff: 'var(--mono)', w: 400 });
+const txt = (v, w) => ({ v, a: 'left', ff: 'inherit', w: w || 400 });
+
+class Component extends DCLogic {
+  rootRef = React.createRef(); segRef = React.createRef(); pillRef = React.createRef(); panelRef = React.createRef(); waffleRef = React.createRef();
+  state = { tema: LS.get('chp-tema', 'clara'), usuario: LS.get('chp-usuario', 'Magaly'), w: typeof window !== 'undefined' ? window.innerWidth : 1440, mes: 5, medico: '', esp: '', tab: 'resumen', sub: 'tipo', verCamp: false };
+  componentDidMount() {
+    this.reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.medir = () => { const r = this.rootRef.current; const w = Math.round((r && r.getBoundingClientRect().width) || innerWidth); if (w !== this.state.w) this.setState({ w }); };
+    addEventListener('resize', this.medir); requestAnimationFrame(this.medir); setTimeout(this.medir, 300);
+    if (document.fonts) document.fonts.ready.then(() => this.pill(true));
+    this.pill(true);
+    this._prevS = { tab: this.state.tab, sub: this.state.sub, verCamp: this.state.verCamp, mes: this.state.mes };
+  }
+  componentWillUnmount() { removeEventListener('resize', this.medir); }
+  componentDidUpdate() {
+    const s0 = this.state, prev = this._prevS || s0;
+    this._prevS = { tab: s0.tab, sub: s0.sub, verCamp: s0.verCamp, mes: s0.mes };
+    this.pill();
+    if (!this.reduced && (prev.tab !== this.state.tab || prev.sub !== this.state.sub || prev.verCamp !== this.state.verCamp) && this.panelRef.current) {
+      Array.from(this.panelRef.current.querySelectorAll('[data-barra]')).forEach((b, i) => b.animate([{ transform: 'scaleX(0)' }, { transform: 'none' }], { duration: 420, delay: Math.min(i * 18, 260), easing: 'cubic-bezier(.23,1,.32,1)', fill: 'backwards' }));
+    }
+    if (prev.mes !== this.state.mes && !this.reduced && this.panelRef.current) {
+      const big = this.panelRef.current.querySelector('[data-cifra]');
+      if (big) big.animate([{ opacity: .2, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 260, easing: 'cubic-bezier(.23,1,.32,1)' });
+    }
+    if (prev.tab !== this.state.tab && !this.reduced) {
+      const el = this.panelRef.current;
+      if (el) el.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.23,1,.32,1)' });
+      if (this.state.tab === 'llegan' && this.waffleRef.current)
+        Array.from(this.waffleRef.current.children).forEach((q, i) => q.animate([{ opacity: 0, transform: 'scale(.6)' }, { opacity: 1, transform: 'none' }], { duration: 220, delay: i * 5, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'backwards' }));
+    }
+  }
+  pill(instant) {
+    const seg = this.segRef.current, pl = this.pillRef.current; if (!seg || !pl) return;
+    const on = seg.querySelector('[aria-selected="true"]'); if (!on) return;
+    const w = on.offsetWidth + 'px', t = `translateX(${on.offsetLeft}px)`;
+    if (pl.style.width === w && pl.style.transform === t) return;
+    if (instant || !this._pl) { const tr = pl.style.transition; pl.style.transition = 'none'; pl.style.width = w; pl.style.transform = t; void pl.offsetWidth; pl.style.transition = tr; this._pl = true; }
+    else { pl.style.width = w; pl.style.transform = t; }
+  }
+
+  datos(i) {
+    const s = this.state;
+    const mi = MEDS.findIndex(m => m[0] === s.medico), ei = ['Hematología', 'Reumatología', 'Medicina interna'].indexOf(s.esp);
+    const off = (mi >= 0 ? ((mi * 7 + i * 3) % 15) - 7 : 0) + (ei >= 0 ? ((ei * 5 + i) % 9) - 4 : 0);
+    const k = mi >= 0 || ei >= 0 ? .35 : 1;
+    const v = (arr) => Math.max(0, Math.min(100, arr[i] + off));
+    const n = (arr) => Math.max(1, Math.round(arr[i] * k));
+    return { pct: v(BASE.pct), tot: n(BASE.tot), plazo: Math.round(BASE.plazo[i] * k), hNo: v(BASE.hNo), hNoN: n(BASE.hNoN), hOk: v(BASE.hOk), hOkN: n(BASE.hOkN), pNo: v(BASE.pNo), pNoN: n(BASE.pNoN), rec: v(BASE.rec), recN: n(BASE.recN) };
+  }
+
+  tabla() {
+    const s = this.state;
+    const bar = (pairs) => pairs.map(([w, c]) => ({ w: w + '%', c }));
+    const cel = (v, a, mono, w, color) => ({ v: String(v), a: a || 'left', ff: mono ? 'var(--mono)' : 'inherit', w: w || 400, color: color || 'var(--ink)' });
+    const vuelta = ([c, n, v, base, curso]) => ({ antes: [cel(c, 'left', false, 500), cel(n, 'right', true)], hayBarra: true, lbl: base ? `${pc(v, base)} % (${v}/${base})` : '— (0/0)', lblColor: base ? 'var(--ink)' : 'var(--muted)', barras: bar([[base ? pc(v, base) : 0, 'var(--good)']]), despues: [cel(curso, 'right', true, 400, 'var(--soft)')] });
+    const colsV = n => [{ l: n, a: 'left', w: 'auto' }, { l: 'Pacientes nuevos', a: 'right', w: '130px' }, { l: 'Volvieron a su 1.ª reevaluación', a: 'right', w: '34%' }, { l: 'En curso', a: 'right', w: '90px' }];
+    if (s.tab === 'campanas') {
+      const camp = s.verCamp ? CAMPANAS : CAMPANAS.slice(0, 8);
+      return { titulo: '¿Qué campañas traen pacientes que vuelven?', intro: 'Pacientes nuevos desde que existe el CRM, según el último anuncio o canal por el que escribieron antes de su primera consulta. El filtro de especialidad no cambia esta sección.',
+        bloques: [
+          { hayTitulo: true, titulo: 'Por canal', mt: '8px', cols: colsV('Canal'), filas: CANALES.map(vuelta) },
+          { hayTitulo: true, titulo: 'Por campaña', mt: '28px', cols: colsV('Campaña'), filas: camp.map(vuelta), hayMas: true, masTxt: s.verCamp ? 'Ver menos' : `Ver las ${CAMPANAS.length} campañas`, masIcon: s.verCamp ? 'ph ph-caret-up' : 'ph ph-caret-down', verMas: () => this.setState({ verCamp: !s.verCamp }) }
+        ] };
+    }
+    if (s.tab === 'procs') {
+      let rows;
+      if (s.sub === 'medico') rows = PROC_MED;
+      else if (s.sub === 'escrito') rows = PROC_RAW;
+      else { const g = {}; PROC_RAW.forEach(([n, a, b, c, k]) => { g[k] = g[k] || [PROC_GRUPO[k], 0, 0, 0]; g[k][1] += a; g[k][2] += b; g[k][3] += c; }); rows = Object.values(g).sort((x, y) => y[1] - x[1]); }
+      const fila = ([c, a, b, d]) => ({ antes: [cel(c, 'left', false, 500), cel(a, 'right', true), cel(b, 'right', true), cel(d, 'right', true)], hayBarra: true, lbl: `${pc(b, a)} %`, lblColor: 'var(--ink)', barras: bar([[pc(b, a), 'var(--warn)']]), despues: [] });
+      return { titulo: 'Procedimientos (hierro y otros)', intro: 'De lo cotizado, cuánto se empezó y cuánto se completó: todas las sesiones de un tratamiento, o el procedimiento hecho. Lo registrado hace menos de 7 días todavía no cuenta. Los procedimientos no tienen especialidad: ese filtro no los cambia.', haySub: true,
+        hayNota: s.sub === 'tipo', nota: 'Juntamos los nombres que se escribieron de distinta forma, como «CITOMETREÍADE FLUJO» o «BIOSIA». Para ver cada fila tal como se escribió, elija «Como se escribió».',
+        subs: [['tipo', 'Por tipo'], ['escrito', 'Como se escribió'], ['medico', 'Por médico']].map(([k, l]) => ({ l, sel: String(s.sub === k), bg: s.sub === k ? 'var(--ink)' : 'transparent', fg: s.sub === k ? 'var(--bg)' : 'var(--soft)', go: () => this.setState({ sub: k }) })),
+        bloques: [{ hayTitulo: false, mt: '4px', cols: [{ l: s.sub === 'medico' ? 'Médico' : 'Procedimiento', a: 'left', w: 'auto' }, { l: 'Cotizados', a: 'right', w: '100px' }, { l: 'Empezaron', a: 'right', w: '100px' }, { l: 'Completaron', a: 'right', w: '110px' }, { l: 'Empezaron (%)', a: 'right', w: '28%' }], filas: rows.map(fila) }] };
+    }
+    const muestra = 'Datos de muestra: todavía no recibimos las cifras reales de esta sección.';
+    if (s.tab === 'recup') {
+      const rows = [['Magaly', 92, 28, 8], ['Ana', 71, 19, 10], ['Rachel', 51, 14, 9]];
+      return { titulo: 'Recuperación', intro: `Seguimientos hechos en ${MESES[s.mes]} y cuántos de esos pacientes volvieron después.`, hayNota: true, nota: muestra, hayCifras: true,
+        cifras: [{ v: '214', l: 'seguimientos hechos' }, { v: '61', l: 'pacientes volvieron (29 %)' }, { v: '9 días', l: 'en volver, en la mitad de los casos' }],
+        bloques: [{ hayTitulo: false, mt: '4px', cols: [{ l: 'Asesora', a: 'left', w: 'auto' }, { l: 'Seguimientos', a: 'right', w: '120px' }, { l: 'Días hasta volver', a: 'right', w: '140px' }, { l: 'Volvieron', a: 'right', w: '34%' }],
+          filas: rows.map(([c, a, b, d]) => ({ antes: [cel(c, 'left', false, 500), cel(a, 'right', true), cel(d, 'right', true)], hayBarra: true, lbl: `${pc(b, a)} % (${b}/${a})`, lblColor: 'var(--ink)', barras: bar([[pc(b, a), 'var(--good)']]), despues: [] })) }] };
+    }
+    if (s.tab === 'motivos') {
+      const rows = [['No contestó 2 veces', 48], ['Se atiende en otro lugar', 21], ['No desea continuar', 14], ['Número equivocado, sin otro número', 11], ['Alta médica', 9], ['Falleció', 2]];
+      const max = 48, tot = rows.reduce((a, r) => a + r[1], 0);
+      return { titulo: 'Motivos de cierre', intro: `Por qué se cerraron los ${tot} seguimientos de ${MESES[s.mes]}.`, hayNota: true, nota: muestra,
+        bloques: [{ hayTitulo: false, mt: '4px', cols: [{ l: 'Motivo', a: 'left', w: 'auto' }, { l: 'Seguimientos', a: 'right', w: '46%' }],
+          filas: rows.map(([c, a]) => ({ antes: [cel(c, 'left', false, 500)], hayBarra: true, lbl: `${a} · ${pc(a, tot)} %`, lblColor: 'var(--ink)', barras: bar([[pc(a, max), c === 'Alta médica' ? 'var(--good)' : 'var(--accent)']]), despues: [] })) }] };
+    }
+    const rows = [['02/10/2026', 'Sangría', 'Dr. Víctor Seminario', 'DNI mal escrito'], ['29/09/2026', 'Hierro carboximaltosa × 2', 'Dra. Karen Matos', 'Sin DNI'], ['24/09/2026', 'Biopsia', 'Dra. Alejandra La Torre', 'Carné de extranjería no encontrado']];
+    return { titulo: 'Procedimientos sin paciente', intro: 'Registros de SOFDOC que no se pudieron unir a un paciente. Mientras no se unan, no entran en el tablero ni en estas cifras.', hayNota: true, nota: muestra,
+      bloques: [{ hayTitulo: false, mt: '4px', cols: [{ l: 'Fecha', a: 'left', w: '110px' }, { l: 'Procedimiento', a: 'left', w: 'auto' }, { l: 'Médico', a: 'left', w: 'auto' }, { l: 'Problema', a: 'left', w: 'auto' }, { l: '', a: 'left', w: '150px' }],
+        filas: rows.map(r => ({ antes: [cel(r[0], 'left', true), cel(r[1], 'left', false, 500), cel(r[2]), cel(r[3], 'left', false, 400, 'var(--soft)')], despues: [], hayAccion: true })) }] };
+  }
+
+  renderVals() {
+    const s = this.state, narrow = s.w < 760, wide = s.w >= 1100;
+    const d = this.datos(s.mes), cerrado = s.mes < 5;
+    const nNo = Math.round(d.pct * d.tot / 100);
+    const nuevosT = Math.ceil(d.tot / 2), nuevosN = Math.min(nuevosT, Math.round(nNo * .45));
+    const metaOk = d.pct <= 40;
+    const barras = MESES.map((m, i) => {
+      const x = this.datos(i), cur = i === 5, sel = i === s.mes;
+      return { mes: CORTO[i], pct: x.pct, h: x.pct + '%', sel: String(sel), aria: `${MESES[i]}: ${x.pct} % no volvió${cur ? ', en curso' : ''}`,
+        bg: cur ? 'repeating-linear-gradient(135deg,var(--accent) 0 2px,transparent 2px 7px)' : 'var(--accent)', borde: cur ? '1.5px solid var(--accent)' : '0',
+        op: sel ? 1 : .55, w: sel ? 600 : 400, fg: sel ? 'var(--accent)' : 'var(--ink)', estado: cur ? 'en curso' : 'cerrado', go: () => this.setState({ mes: i }) };
+    });
+    const tot = FILAS.reduce((a, f) => a.map((v, i) => v + f[1][i]), [0, 0, 0, 0, 0, 0]);
+    const fila = (mes, v, w) => { const t = v.reduce((a, b) => a + b, 0); return { mes, tot: t, w, seg: v.map((x, i) => ({ w: pc(x, t) + '%', c: CATS[i].c })).filter((_, i) => v[i]), vals: v.map(x => x ? `${x} · ${pc(x, t)} %` : '0') }; };
+    const waffle = [].concat(Array(66).fill('var(--w1)'), Array(23).fill('var(--w2)'), Array(5).fill('var(--w3)'), Array(6).fill('var(--w4)'));
+    const esTabla = !['resumen', 'llegan'].includes(s.tab);
+    return {
+      tema: s.tema, rootRef: this.rootRef, segRef: this.segRef, pillRef: this.pillRef, panelRef: this.panelRef, waffleRef: this.waffleRef,
+      narrow, notNarrow: !narrow, mainPad: narrow ? '18px 14px 96px' : '28px 32px 56px', h1Size: narrow ? '23px' : '28px',
+      menu: SECC.map(([k, l, i, href]) => { const on = k === 'indicadores'; return { label: l, href, icon: on ? i.replace('ph ', 'ph-fill ') : i, current: on ? 'page' : undefined, bg: on ? 'var(--accent-soft)' : 'transparent', fg: on ? 'var(--accent)' : 'var(--soft)', hoverBg: on ? 'var(--accent-soft)' : 'var(--surface-2)', hoverFg: on ? 'var(--accent)' : 'var(--ink)', navFg: on ? 'var(--accent)' : 'var(--muted)' }; }),
+      usuarios: USERS, usuario: s.usuario, onUsuario: e => { LS.set('chp-usuario', e.target.value); this.setState({ usuario: e.target.value }); },
+      toggleTema: () => { const t = s.tema === 'clara' ? 'oscura' : 'clara'; LS.set('chp-tema', t); this.setState({ tema: t }); },
+      temaIcon: s.tema === 'clara' ? 'ph ph-moon' : 'ph ph-sun', temaTxt: s.tema === 'clara' ? 'Modo oscuro' : 'Modo claro',
+      mesTxt: `${MESES[s.mes]} 2026`, mesAnt: () => this.setState({ mes: Math.max(0, s.mes - 1) }), mesSig: () => this.setState({ mes: Math.min(5, s.mes + 1) }),
+      sinAnt: s.mes === 0, sinSig: s.mes === 5, antOp: s.mes === 0 ? .35 : 1, sigOp: s.mes === 5 ? .35 : 1,
+      medOpts: [{ v: '', l: 'Todos los médicos' }].concat(MEDS.map(([v, l]) => ({ v, l }))), medico: s.medico, onMedico: e => this.setState({ medico: e.target.value }),
+      espOpts: [{ v: '', l: 'Todas las especialidades' }, { v: 'Hematología', l: 'Hematología' }, { v: 'Reumatología', l: 'Reumatología' }, { v: 'Medicina interna', l: 'Medicina interna' }], esp: s.esp, onEsp: e => this.setState({ esp: e.target.value }),
+      tabs: TABS.map(([k, l]) => ({ label: l, sel: String(s.tab === k), fg: s.tab === k ? 'var(--accent-ink)' : 'var(--soft)', hoverFg: s.tab === k ? 'var(--accent-ink)' : 'var(--ink)', go: () => this.setState({ tab: k }) })),
+      tResumen: s.tab === 'resumen', tLlegan: s.tab === 'llegan', tTabla: esTabla,
+      resCols: wide ? 'minmax(0,1fr) minmax(0,1.5fr)' : 'minmax(0,1fr)', secCols: narrow ? 'repeat(2,minmax(0,1fr))' : 'repeat(4,minmax(0,1fr))', bigSize: narrow ? '84px' : '120px',
+      r: {
+        pct: d.pct, mes: MESES[s.mes], nNo, nTot: d.tot, nuevos: `${nuevosN} de ${nuevosT}`, control: `${nNo - nuevosN} de ${d.tot - nuevosT}`,
+        hayPlazo: d.plazo > 0, plazo: d.plazo,
+        metaTxt: metaOk ? `Dentro de la meta: que vuelva el 60 % (no vuelve como máximo el 40 %).${cerrado ? '' : ' El mes sigue en curso.'}` : `Fuera de la meta por ${d.pct - 40} puntos: la meta es que no vuelva como máximo el 40 %.`,
+        metaColor: metaOk ? 'var(--good)' : 'var(--accent)', metaIcon: metaOk ? 'ph-fill ph-check-circle' : 'ph-fill ph-warning-circle',
+        sec: [
+          { pct: d.hNo, l: 'no siguieron el tratamiento de hierro', n: `${Math.round(d.hNo * d.hNoN / 100)} de ${d.hNoN}`, color: 'var(--warn)' },
+          { pct: d.hOk, l: 'completaron el tratamiento de hierro', n: `${Math.round(d.hOk * d.hOkN / 100)} de ${d.hOkN}`, color: 'var(--good)' },
+          { pct: d.pNo, l: 'no siguieron otros procedimientos', n: `${Math.round(d.pNo * d.pNoN / 100)} de ${d.pNoN}`, color: 'var(--warn)' },
+          { pct: d.rec, l: 'volvieron tras el seguimiento', n: `${Math.round(d.rec * d.recN / 100)} de ${d.recN}`, color: 'var(--good)' }
+        ]
+      },
+      barras, barGap: narrow ? '8px' : '20px', barLbl: narrow ? '12px' : '15px',
+      llegCols: wide ? 'minmax(260px,360px) minmax(0,1fr)' : 'minmax(0,1fr)', waffleW: narrow ? '100%' : '260px', relatoSize: narrow ? '22px' : '28px',
+      waffle, leyenda: [{ n: 66, l: 'no volvió nunca', c: 'var(--w1)' }, { n: 23, l: 'volvió a 1 reevaluación', c: 'var(--w2)' }, { n: 5, l: 'volvió a 2 reevaluaciones', c: 'var(--w3)' }, { n: 6, l: 'volvió a 3 o más', c: 'var(--w4)' }],
+      cats: CATS, filas: FILAS.map(([m, v]) => fila(m, v, 400)).concat([fila('Total', tot, 600)]),
+      tb: esTabla ? Object.assign({ haySub: false, subs: [], hayCifras: false, cifras: [], hayLeyenda: false, leyenda: [], hayNota: false, nota: '', bloques: [] }, this.tabla()) : { bloques: [] }
+    };
+  }
+}
+</script>
+</body>
+</html>

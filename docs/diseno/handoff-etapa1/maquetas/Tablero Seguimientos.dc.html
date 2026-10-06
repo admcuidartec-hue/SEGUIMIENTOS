@@ -1,0 +1,1042 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+[data-tema]{--ease-out:cubic-bezier(.23,1,.32,1);--ease-in-out:cubic-bezier(.77,0,.175,1);--ease-drawer:cubic-bezier(.32,.72,0,1);--r:12px;--r-s:8px;--mono:'Geist Mono',ui-monospace,monospace}
+[data-tema="clara"]{--bg:#F4F5F7;--side:#FFFFFF;--surface:#FFFFFF;--surface-2:#F8F9FB;--line:#E4E6EB;--line-2:#CDD1D9;--ink:#15171C;--soft:#41464F;--muted:#636976;--accent:#8C1D18;--accent-hover:#741612;--accent-ink:#FFFFFF;--accent-soft:#F7E9E8;--accent-ring:rgb(140 29 24 / .28);--good:#1E7A4C;--good-soft:#E6F4EC;--warn:#985B00;--warn-soft:#FBF0DE;--info:#2F5BD3;--info-soft:#E8EEFC;--col:#ECEEF2;--velo:rgb(21 23 28 / .32);--skel:#E4E6EB;--skel-2:#F1F2F5;--toast:#1B1E25;--toast-ink:#F4F5F7;--shadow:0 1px 2px rgb(21 23 28 / .06),0 4px 14px rgb(21 23 28 / .05);--shadow-lg:-24px 0 64px rgb(21 23 28 / .14)}
+[data-tema="oscura"]{--bg:#0E1015;--side:#12151B;--surface:#171B22;--surface-2:#1D222B;--line:#272D38;--line-2:#3A4250;--ink:#ECEEF1;--soft:#C3C8D1;--muted:#98A0AD;--accent:#EC7B71;--accent-hover:#F39489;--accent-ink:#1A0908;--accent-soft:#2E1816;--accent-ring:rgb(236 123 113 / .35);--good:#5CC98F;--good-soft:#132A1F;--warn:#E7A94B;--warn-soft:#2D2312;--info:#8AABFF;--info-soft:#18213A;--col:#13171D;--velo:rgb(4 5 8 / .6);--skel:#1F242D;--skel-2:#2A303B;--toast:#ECEEF1;--toast-ink:#12151B;--shadow:0 1px 0 rgb(255 255 255 / .03) inset,0 6px 20px rgb(4 5 8 / .35);--shadow-lg:-24px 0 64px rgb(4 5 8 / .5)}
+@view-transition{navigation:auto}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+::view-transition-new(root){animation-name:vt-entra}
+@keyframes vt-entra{from{opacity:0;transform:translateY(6px)}}
+::view-transition-group(menu),::view-transition-group(menu-movil){animation-duration:0s}
+@media (prefers-reduced-motion:reduce){::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
+html,body{margin:0}
+*{box-sizing:border-box}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+::selection{background:var(--accent-soft);color:var(--ink)}
+@keyframes brillo{0%{background-position:100% 0}100%{background-position:-100% 0}}
+@keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}}
+</style>
+</helmet>
+<div ref="{{ rootRef }}" data-tema="{{ tema }}" style="font-family:'Geist',sans-serif;font-size:14px;line-height:1.45;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;-webkit-font-smoothing:antialiased;transition:background-color .3s ease,color .3s ease">
+
+  <sc-if value="{{ notNarrow }}" hint-placeholder-val="{{ true }}">
+    <aside style="view-transition-name:menu;width:232px;flex:0 0 232px;background:var(--side);border-right:1px solid var(--line);padding:22px 14px 16px;display:flex;flex-direction:column;gap:26px;position:sticky;top:0;height:100vh;transition:background-color .3s ease">
+      <div style="display:flex;align-items:center;gap:10px;padding:0 6px">
+        <span style="width:36px;height:36px;flex:0 0 36px;border-radius:10px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:12.5px;letter-spacing:.02em">CHP</span>
+        <span style="display:flex;flex-direction:column;min-width:0"><b style="font-size:15px;font-weight:600;letter-spacing:-.01em">Seguimientos</b><small style="font-size:11.5px;color:var(--muted);line-height:1.3">Centro Hematológico del Perú</small></span>
+      </div>
+      <nav aria-label="Secciones" style="display:flex;flex-direction:column;gap:2px">
+        <sc-for list="{{ menu }}" as="it" hint-placeholder-count="4">
+          <button onClick="{{ it.go }}" aria-current="{{ it.current }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border:0;border-radius:8px;background:{{ it.bg }};color:{{ it.fg }};font-weight:500;font-size:14px;text-align:left;cursor:pointer;transition:background-color .15s ease,color .15s ease" style-hover="background:{{ it.hoverBg }};color:{{ it.hoverFg }}"><i class="{{ it.icon }}" style="font-size:18px"></i>{{ it.label }}</button>
+        </sc-for>
+      </nav>
+      <div style="margin-top:auto;display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted);padding:0 2px">¿Quién es usted?
+          <select value="{{ usuario }}" onChange="{{ onUsuario }}" style="height:44px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:14px;cursor:pointer">
+            <sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for>
+          </select>
+        </label>
+        <button onClick="{{ toggleTema }}" style="display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--soft);font-weight:500;cursor:pointer;transition:background-color .15s ease" style-hover="background:var(--surface-2);color:var(--ink)"><i class="{{ temaIcon }}" style="font-size:18px"></i>{{ temaTxt }}</button>
+      </div>
+    </aside>
+  </sc-if>
+
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column">
+    <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+      <header style="position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--side);border-bottom:1px solid var(--line)">
+        <span style="width:32px;height:32px;border-radius:9px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:11px">CHP</span>
+        <b style="font-size:15px;font-weight:600;letter-spacing:-.01em">Seguimientos</b>
+        <select aria-label="¿Quién es usted?" value="{{ usuario }}" onChange="{{ onUsuario }}" style="margin-left:auto;height:44px;max-width:150px;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px">
+          <sc-for list="{{ usuarios }}" as="u"><option value="{{ u.v }}">{{ u.l }}</option></sc-for>
+        </select>
+        <button onClick="{{ toggleTema }}" aria-label="{{ temaTxt }}" style="width:44px;height:44px;border:1px solid var(--line);border-radius:8px;background:var(--surface);display:grid;place-items:center;font-size:18px;cursor:pointer"><i class="{{ temaIcon }}"></i></button>
+      </header>
+    </sc-if>
+
+    <main style="padding:{{ mainPad }};flex:1;min-width:0;width:100%;max-width:1680px">
+      <sc-if value="{{ enTablero }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px 24px;flex-wrap:wrap">
+          <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+            <h1 style="margin:0;font-size:{{ h1Size }};font-weight:600;letter-spacing:-.025em;line-height:1.15">{{ saludo }}</h1>
+            <p style="margin:0;color:var(--muted)">{{ subtitulo }}</p>
+            <div ref="{{ metaRef }}" style="display:flex;align-items:center;gap:10px;margin-top:6px;font-size:12.5px;color:{{ metaFg }}"><span aria-hidden="true" style="width:120px;height:6px;border-radius:3px;background:var(--line);overflow:hidden"><i style="display:block;height:100%;width:100%;transform:scaleX({{ metaScale }});transform-origin:left center;background:{{ metaColor }};border-radius:3px;transition:transform .5s var(--ease-out),background-color .3s ease"></i></span><span style="font-weight:{{ metaW }}">{{ metaTxt }}</span></div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;height:44px;padding:0 6px 0 12px;background:var(--surface);border:1px solid var(--line);border-radius:8px;width:{{ buscarW }};color:var(--muted);cursor:text;transition:border-color .15s ease" style-hover="border-color:var(--line-2)">
+            <i class="ph ph-magnifying-glass" style="font-size:17px"></i>
+            <input ref="{{ searchRef }}" value="{{ q }}" onInput="{{ onQ }}" placeholder="Buscar por nombre o DNI" aria-label="Buscar por nombre o DNI" style="flex:1;min-width:0;height:100%;border:0;background:none;outline:none;font-size:14px;color:var(--ink)">
+            <sc-if value="{{ notNarrow }}"><kbd style="font-family:var(--mono);font-size:11px;padding:2px 6px;border:1px solid var(--line-2);border-radius:4px;color:var(--muted)">/</kbd></sc-if>
+          </label>
+        </div>
+
+        <dl style="margin:22px 0 0;display:grid;grid-template-columns:{{ kpiCols }};background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden">
+          <sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+            <div style="padding:14px 18px;display:flex;flex-direction:column;gap:2px;box-shadow:-1px 0 0 var(--line),0 -1px 0 var(--line)">
+              <dt style="font-size:12.5px;color:var(--muted)">{{ k.label }}</dt>
+              <dd style="margin:0;font-family:var(--mono);font-size:28px;font-weight:500;letter-spacing:-.03em;line-height:1.15">{{ k.val }}</dd>
+              <span style="font-size:12px;color:{{ k.subColor }}">{{ k.sub }}</span>
+            </div>
+          </sc-for>
+        </dl>
+
+        <div style="display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:22px">
+          <div ref="{{ segRef }}" role="group" aria-label="Tipo de seguimiento (cuántos por contactar)" style="position:relative;display:inline-flex;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:999px;max-width:100%;overflow-x:auto;scrollbar-width:none">
+            <span ref="{{ pillRef }}" aria-hidden="true" style="position:absolute;top:3px;bottom:3px;left:0;border-radius:999px;background:var(--accent);transition:transform .25s var(--ease-in-out),width .25s var(--ease-in-out)"></span>
+            <sc-for list="{{ segs }}" as="s" hint-placeholder-count="4">
+              <button aria-pressed="{{ s.pressed }}" onClick="{{ s.go }}" style="position:relative;z-index:1;flex:0 0 auto;height:40px;padding:0 14px;border:0;border-radius:999px;background:transparent;color:{{ s.fg }};font-weight:500;font-size:13.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:color .2s ease" style-hover="color:{{ s.hoverFg }}">{{ s.label }}<span style="font-family:var(--mono);font-size:12px;color:{{ s.countFg }};transition:color .2s ease">{{ s.count }}</span></button>
+            </sc-for>
+          </div>
+          <sc-if value="{{ notNarrow }}"><span style="flex:1"></span></sc-if>
+          <label style="position:relative;display:inline-flex;align-items:center;max-width:100%">
+            <i class="ph ph-stethoscope" style="position:absolute;left:13px;pointer-events:none;color:var(--muted);font-size:16px"></i>
+            <select aria-label="Médico" value="{{ medico }}" onChange="{{ onMedico }}" disabled="{{ medDisabled }}" style="appearance:none;-webkit-appearance:none;height:44px;max-width:250px;padding:0 34px 0 36px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px;cursor:pointer;opacity:{{ medOp }};transition:border-color .15s ease" style-hover="border-color:var(--line-2)">
+              <sc-for list="{{ medOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for>
+            </select>
+            <i class="ph ph-caret-down" style="position:absolute;right:13px;pointer-events:none;color:var(--muted)"></i>
+          </label>
+          <label style="position:relative;display:inline-flex;align-items:center">
+            <i class="ph ph-heartbeat" style="position:absolute;left:13px;pointer-events:none;color:var(--muted);font-size:16px"></i>
+            <select aria-label="Especialidad" value="{{ esp }}" onChange="{{ onEsp }}" style="appearance:none;-webkit-appearance:none;height:44px;padding:0 34px 0 36px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:500;font-size:13.5px;cursor:pointer;transition:border-color .15s ease" style-hover="border-color:var(--line-2)">
+              <sc-for list="{{ espOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for>
+            </select>
+            <i class="ph ph-caret-down" style="position:absolute;right:13px;pointer-events:none;color:var(--muted)"></i>
+          </label>
+          <button aria-pressed="{{ sinTelPressed }}" onClick="{{ toggleSinTel }}" style="flex:0 0 auto;white-space:nowrap;height:44px;padding:0 14px;border:1px solid {{ sinTelBorde }};border-radius:999px;background:{{ sinTelBg }};color:{{ sinTelFg }};font-weight:500;font-size:13.5px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease"><i class="ph ph-phone-slash" style="font-size:16px"></i>Solo sin teléfono</button>
+        </div>
+
+        <sc-if value="{{ verAtajos }}">
+          <div aria-hidden="true" style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:12px;color:var(--muted)">
+            <span style="display:inline-flex;gap:5px;align-items:center;white-space:nowrap"><kbd style="font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);white-space:nowrap">↑ ↓ ← →</kbd>moverse</span>
+            <span style="display:inline-flex;gap:5px;align-items:center;white-space:nowrap"><kbd style="font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);white-space:nowrap">Enter</kbd>abrir</span>
+            <span style="display:inline-flex;gap:5px;align-items:center;white-space:nowrap"><kbd style="font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);white-space:nowrap">C</kbd>copiar teléfono</span>
+            <span style="display:inline-flex;gap:5px;align-items:center;white-space:nowrap"><kbd style="font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);white-space:nowrap">1–4</kbd>¿qué pasó? (en el panel)</span>
+            <span style="display:inline-flex;gap:5px;align-items:center;white-space:nowrap"><kbd style="font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);white-space:nowrap">/</kbd>buscar</span>
+            <span style="display:inline-flex;gap:5px;align-items:center;white-space:nowrap"><kbd style="font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;background:var(--surface);white-space:nowrap">Esc</kbd>cerrar</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hayError }}">
+          <div role="alert" style="margin-top:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 18px;border:1px solid var(--accent);border-radius:12px;background:var(--accent-soft);color:var(--ink)">
+            <i class="ph ph-warning-circle" style="font-size:24px;color:var(--accent)"></i>
+            <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:2px"><b style="font-weight:600">No se pudo cargar el tablero.</b><span>Revise la conexión e intente de nuevo. Lo que ya registró está guardado.</span></div>
+            <button onClick="{{ reintentar }}" style="height:44px;padding:0 18px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background-color .15s ease,transform .16s var(--ease-out)" style-hover="background:var(--accent-hover)" style-active="transform:scale(.97)"><i class="ph ph-arrow-clockwise"></i>Reintentar</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+          <div role="tablist" aria-label="Columnas" style="display:flex;gap:6px;margin-top:16px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px">
+            <sc-for list="{{ colTabs }}" as="t">
+              <button role="tab" aria-selected="{{ t.sel }}" onClick="{{ t.go }}" style="flex:0 0 auto;height:44px;padding:0 14px;border:1px solid {{ t.borde }};border-radius:999px;background:{{ t.bg }};color:{{ t.fg }};font-weight:500;font-size:13.5px;white-space:nowrap;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:background-color .15s ease,color .15s ease">{{ t.label }}<span style="font-family:var(--mono);font-size:12px;opacity:.8">{{ t.count }}</span></button>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ verTablero }}" hint-placeholder-val="{{ true }}">
+          <section aria-label="Tablero de seguimientos" style="display:grid;grid-template-columns:{{ gridCols }};gap:14px;align-items:start;margin-top:16px">
+            <sc-for list="{{ columnas }}" as="col" hint-placeholder-count="4">
+              <div role="region" data-col="{{ col.id }}" aria-label="{{ col.titulo }}" style="position:{{ col.pos }};top:16px;background:{{ col.bg }};box-shadow:{{ col.dropSombra }};opacity:{{ col.op }};border-radius:12px;padding:10px;min-height:{{ col.minH }};display:flex;flex-direction:column;gap:8px;transition:background-color .2s ease,box-shadow .2s ease,opacity .2s ease">
+                <h2 style="display:flex;align-items:center;gap:8px;margin:4px 6px 2px;font-size:13.5px;font-weight:600;letter-spacing:-.005em"><i class="{{ col.icon }}" style="font-size:17px;color:{{ col.iconColor }}"></i>{{ col.titulo }}<span style="margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 9px">{{ col.count }}</span></h2>
+                <sc-if value="{{ col.cargando }}">
+                  <sc-for list="{{ col.skel }}" as="k">
+                    <div aria-hidden="true" style="background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:9px">
+                      <i style="display:block;height:12px;width:{{ k.w1 }};border-radius:4px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel-2) 50%,var(--skel) 75%);background-size:200% 100%;animation:brillo 1.4s linear infinite"></i>
+                      <i style="display:block;height:10px;width:{{ k.w2 }};border-radius:4px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel-2) 50%,var(--skel) 75%);background-size:200% 100%;animation:brillo 1.4s linear infinite"></i>
+                      <i style="display:block;height:10px;width:38%;border-radius:4px;margin-top:4px;background:linear-gradient(90deg,var(--skel) 25%,var(--skel-2) 50%,var(--skel) 75%);background-size:200% 100%;animation:brillo 1.4s linear infinite"></i>
+                    </div>
+                  </sc-for>
+                </sc-if>
+                <sc-if value="{{ col.vacio }}">
+                  <div style="padding:26px 12px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;color:var(--soft)">
+                    <i class="{{ col.vacioIcon }}" style="font-size:24px;color:var(--muted)"></i>
+                    <span style="font-size:13px;text-wrap:balance">{{ col.vacioTxt }}</span>
+                    <sc-if value="{{ col.hayQuitar }}"><button onClick="{{ quitarFiltros }}" style="height:40px;padding:0 14px;border:1px solid var(--line-2);border-radius:999px;background:var(--surface);color:var(--ink);font-weight:500;cursor:pointer" style-hover="border-color:var(--accent)">Quitar filtros</button></sc-if>
+                  </div>
+                </sc-if>
+                <sc-for list="{{ col.grupos }}" as="g">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <sc-if value="{{ g.hayTitulo }}">
+                      <h3 style="display:flex;align-items:baseline;gap:8px;margin:6px 6px 0;font-size:12.5px;font-weight:600;color:var(--ink)">{{ g.titulo }}<span style="font-weight:400;color:var(--muted)">{{ g.rango }}</span><span style="margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:500;color:var(--muted)">{{ g.count }}</span></h3>
+                    </sc-if>
+                    <sc-for list="{{ g.tarjetas }}" as="c">
+                      <article data-card="{{ c.id }}" tabindex="0" role="button" aria-label="{{ c.aria }}" onClick="{{ c.abrir }}" onFocus="{{ c.foco }}" onPointerDown="{{ c.down }}" style="user-select:none;-webkit-user-select:none;cursor:{{ c.cursor }};background:var(--surface);border:1px solid {{ c.borde }};border-radius:8px;padding:12px 12px 11px;box-shadow:{{ c.sombra }};cursor:pointer;outline:none;display:flex;flex-direction:column;gap:5px;transition:border-color .15s ease,box-shadow .15s ease,transform .16s var(--ease-out)" style-hover="border-color:{{ c.bordeHover }}" style-active="transform:scale(.985)">
+                        <div style="display:flex;align-items:flex-start;gap:8px">
+                          <b style="flex:1;min-width:0;font-weight:600;font-size:13.5px;line-height:1.3;letter-spacing:-.005em;text-wrap:pretty">{{ c.n }}</b>
+                          <span style="flex:0 0 auto;font-size:11px;font-weight:600;line-height:1;padding:4px 8px;border-radius:999px;background:{{ c.tagBg }};color:{{ c.tagFg }};white-space:nowrap">{{ c.tag }}</span>
+                        </div>
+                        <div style="font-size:12.5px;color:var(--muted);line-height:1.35;text-wrap:pretty">{{ c.sub }}</div>
+                        <sc-if value="{{ c.hayProg }}">
+                          <div aria-hidden="true" style="display:flex;gap:4px;margin-top:5px"><sc-for list="{{ c.prog }}" as="sg"><i style="flex:1;height:5px;border-radius:3px;background:{{ sg.bg }}"></i></sc-for></div>
+                        </sc-if>
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:5px;font-size:12.5px;min-width:0">
+                          <sc-if value="{{ c.hayChip }}"><span style="display:inline-flex;align-items:center;gap:5px;background:var(--info-soft);color:var(--info);border-radius:6px;padding:3px 8px;font-weight:600;white-space:nowrap"><i class="{{ c.chipIcon }}"></i>{{ c.chip }}</span></sc-if>
+                          <sc-if value="{{ c.hayIzq }}"><span style="display:inline-flex;align-items:center;gap:5px;color:{{ c.izqColor }};font-weight:{{ c.izqW }};min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i class="{{ c.izqIcon }}" style="flex:0 0 auto"></i>{{ c.izq }}</span></sc-if>
+                          <span style="font-family:var(--mono);font-size:12px;color:{{ c.derColor }};font-weight:500;white-space:nowrap">{{ c.der }}</span>
+                        </div>
+                      </article>
+                    </sc-for>
+                    <sc-if value="{{ g.hayMas }}">
+                      <button onClick="{{ g.verMas }}" style="height:44px;border:1px dashed var(--line-2);border-radius:8px;background:transparent;color:var(--soft);font-weight:500;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background-color .15s ease,color .15s ease" style-hover="background:var(--surface);color:var(--ink)">{{ g.masTxt }}<i class="ph ph-caret-down"></i></button>
+                    </sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </section>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{ otraSeccion }}">
+        <div style="max-width:560px;padding:64px 0;display:flex;flex-direction:column;gap:12px">
+          <h1 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.025em">{{ seccionTitulo }}</h1>
+          <p style="margin:0;color:var(--soft);font-size:15px;text-wrap:pretty">Esta pantalla se rediseña en la Etapa 2, sobre el mismo sistema visual del tablero.</p>
+          <button onClick="{{ volverTablero }}" style="align-self:flex-start;margin-top:8px;height:44px;padding:0 16px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:8px" style-hover="border-color:var(--accent)"><i class="ph ph-arrow-left"></i>Volver al tablero</button>
+        </div>
+      </sc-if>
+    </main>
+  </div>
+
+  <div onClick="{{ cerrar }}" style="position:fixed;inset:0;background:var(--velo);opacity:{{ veloOp }};pointer-events:{{ veloPe }};transition:{{ veloTrans }};z-index:50"></div>
+  <aside ref="{{ panelRef }}" tabindex="-1" role="dialog" aria-modal="true" aria-label="Seguimiento del paciente" style="position:fixed;top:0;right:0;bottom:0;width:{{ panelW }};max-width:100%;background:var(--surface);border-left:1px solid var(--line);box-shadow:{{ panelSombra }};transform:{{ panelX }};visibility:{{ panelVis }};transition:{{ panelTrans }};z-index:51;display:flex;flex-direction:column;outline:none">
+    <sc-if value="{{ hayPanel }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:18px 24px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:4px">
+        <sc-if value="{{ narrow }}"><button onClick="{{ cerrar }}" style="align-self:flex-start;height:44px;margin:-10px 0 0 -10px;padding:0 10px;border:0;background:none;color:var(--accent);font-weight:600;font-size:15px;display:inline-flex;align-items:center;gap:2px;cursor:pointer"><i class="ph ph-caret-left" style="font-size:18px"></i>Volver</button></sc-if>
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span style="font-size:11.5px;font-weight:600;line-height:1;padding:5px 9px;border-radius:999px;background:{{ pp.tagBg }};color:{{ pp.tagFg }}">{{ pp.tag }}</span><span style="font-size:12.5px;color:var(--muted);white-space:nowrap">{{ pp.perfil }}</span></div>
+            <h2 style="margin:0;font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.2;text-wrap:balance">{{ pp.n }}</h2>
+            <div style="color:var(--muted);font-size:13px">{{ pp.meta }}</div>
+          </div>
+          <sc-if value="{{ notNarrow }}"><button onClick="{{ cerrar }}" aria-label="Cerrar (Esc)" style="width:44px;height:44px;flex:0 0 auto;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--soft);display:grid;place-items:center;cursor:pointer;font-size:18px;transition:border-color .15s ease" style-hover="border-color:var(--line-2);color:var(--ink)"><i class="ph ph-x"></i></button></sc-if>
+        </div>
+      </div>
+
+      <div style="flex:1;overflow:auto;padding:20px 24px 40px;display:flex;flex-direction:column;gap:26px">
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <sc-if value="{{ pp.hayTrat }}"><div style="font-size:14px;font-weight:500">{{ pp.trat }}</div></sc-if>
+          <dl style="margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:12px">
+            <sc-for list="{{ pp.datos }}" as="d"><div style="display:flex;flex-direction:column;gap:2px"><dt style="font-size:12px;color:var(--muted)">{{ d.l }}</dt><dd style="margin:0;font-family:var(--mono);font-size:14px;font-weight:500">{{ d.v }}</dd></div></sc-for>
+          </dl>
+          <sc-if value="{{ pp.hayProg }}"><div aria-hidden="true" style="display:flex;gap:4px"><sc-for list="{{ pp.prog }}" as="sg"><i style="flex:1;height:6px;border-radius:3px;background:{{ sg.bg }}"></i></sc-for></div></sc-if>
+          <p style="margin:0;font-size:19px;font-weight:600;letter-spacing:-.015em;line-height:1.3;color:{{ pp.alertaColor }};text-wrap:balance">{{ pp.alerta }}</p>
+        </section>
+
+        <section style="display:flex;flex-direction:column;gap:8px">
+          <h3 style="margin:0;font-size:12.5px;font-weight:600;color:var(--muted)">Contacto</h3>
+          <sc-for list="{{ pp.tels }}" as="t">
+            <div style="display:flex;align-items:center;gap:12px;min-height:56px;padding:5px 5px 5px 14px;border:1px solid var(--line);border-radius:8px">
+              <span style="flex:1;min-width:0;display:flex;flex-direction:column"><small style="font-size:11.5px;color:var(--muted)">{{ t.label }}</small><span style="font-family:var(--mono);font-size:17px;font-weight:500;text-decoration:{{ t.deco }};color:{{ t.color }};overflow-wrap:anywhere">{{ t.txt }}</span></span>
+              <sc-if value="{{ t.copiable }}"><button onClick="{{ t.copiar }}" style="height:44px;padding:0 14px;border:1px solid {{ t.btnBorde }};border-radius:8px;background:{{ t.btnBg }};color:{{ t.btnFg }};font-weight:600;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:background-color .15s ease,color .15s ease,border-color .15s ease,transform .16s var(--ease-out)" style-hover="border-color:var(--accent)" style-active="transform:scale(.97)"><i class="{{ t.btnIcon }}" style="font-size:16px"></i>{{ t.btnTxt }}<sc-if value="{{ t.hayKbd }}"><kbd style="font-family:var(--mono);font-size:11px;font-weight:500;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;color:var(--muted)">C</kbd></sc-if></button></sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{ pp.sinContacto }}"><p style="margin:0;padding:12px 14px;border:1px dashed var(--line-2);border-radius:8px;color:var(--soft)"><b style="color:var(--ink);font-weight:600">Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p></sc-if>
+        </section>
+
+        <sc-if value="{{ pp.completo }}">
+          <p style="margin:0;display:flex;gap:10px;align-items:center;padding:14px 16px;border-radius:8px;background:var(--good-soft);color:var(--ink)"><i class="ph-fill ph-check-circle" style="font-size:20px;color:var(--good)"></i>Seguimiento cerrado: {{ pp.finTxt }}.</p>
+        </sc-if>
+
+        <sc-if value="{{ verAcciones }}">
+          <section style="display:flex;flex-direction:column;gap:10px">
+            <h3 style="margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em">¿Qué pasó?</h3>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+              <sc-for list="{{ pp.acciones }}" as="a">
+                <button onClick="{{ a.go }}" style="display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px;text-align:left;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink);font-weight:500;font-size:14px;line-height:1.25;cursor:pointer;transition:border-color .15s ease,transform .16s var(--ease-out)" style-hover="border-color:var(--accent)" style-active="transform:scale(.97)"><i class="{{ a.icon }}" style="font-size:19px;color:{{ a.iconColor }};flex:0 0 auto"></i><span style="flex:1">{{ a.l }}</span><sc-if value="{{ a.hayKbd }}"><kbd style="font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;color:var(--muted)">{{ a.kbd }}</kbd></sc-if></button>
+              </sc-for>
+            </div>
+            <h3 style="margin:14px 0 0;font-size:12.5px;font-weight:600;color:var(--muted)">Cerrar el seguimiento</h3>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+              <sc-for list="{{ pp.cierres }}" as="a">
+                <button onClick="{{ a.go }}" style="display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px;text-align:left;border:1px solid var(--line);border-radius:8px;background:transparent;color:var(--soft);font-weight:500;font-size:13.5px;line-height:1.25;cursor:pointer;transition:border-color .15s ease,color .15s ease,transform .16s var(--ease-out)" style-hover="border-color:var(--line-2);color:var(--ink)" style-active="transform:scale(.97)"><i class="{{ a.icon }}" style="font-size:18px;flex:0 0 auto"></i>{{ a.l }}</button>
+              </sc-for>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{ hayPaso }}">
+          <section style="display:flex;flex-direction:column;gap:14px;padding:16px;border:1px solid {{ paso.borde }};border-radius:12px;background:var(--surface-2);animation:entra .22s var(--ease-out)">
+            <button onClick="{{ paso.cancelar }}" style="align-self:flex-start;height:32px;margin:-6px 0 -4px -6px;padding:0 6px;border:0;background:none;color:var(--soft);font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:4px;cursor:pointer" style-hover="color:var(--ink)"><i class="ph ph-caret-left"></i>Cambiar respuesta</button>
+            <div style="display:flex;align-items:center;gap:10px"><i class="{{ paso.icon }}" style="font-size:22px;color:{{ paso.iconColor }}"></i><h3 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em">{{ paso.titulo }}</h3></div>
+            <sc-if value="{{ paso.hayAviso }}"><p style="margin:0;color:var(--soft);font-size:13.5px;text-wrap:pretty">{{ paso.aviso }}</p></sc-if>
+            <sc-if value="{{ paso.hayNumeros }}">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">¿Cuál número está equivocado?
+                <select value="{{ paso.numero }}" onChange="{{ paso.onNumero }}" style="height:44px;padding:0 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:15px"><sc-for list="{{ paso.numOpts }}" as="o"><option value="{{ o }}">{{ o }}</option></sc-for></select>
+              </label>
+            </sc-if>
+            <sc-if value="{{ paso.hayDoctor }}">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">Doctor que da el alta
+                <select value="{{ paso.doctor }}" onChange="{{ paso.onDoctor }}" style="height:44px;padding:0 10px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px"><sc-for list="{{ paso.docOpts }}" as="o"><option value="{{ o.v }}">{{ o.l }}</option></sc-for></select>
+              </label>
+            </sc-if>
+            <sc-if value="{{ paso.hayFecha }}">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">{{ paso.fechaLabel }}
+                <input type="date" value="{{ paso.fecha }}" onChange="{{ paso.onFecha }}" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:15px;color-scheme:{{ colorScheme }}">
+              </label>
+            </sc-if>
+            <sc-if value="{{ paso.hayMotivo }}">
+              <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)">Motivo
+                <input value="{{ paso.motivo }}" onInput="{{ paso.onMotivo }}" placeholder="Por ejemplo: no desea continuar" style="height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-size:15px">
+              </label>
+            </sc-if>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button onClick="{{ paso.confirmar }}" disabled="{{ paso.deshabilitado }}" style="height:44px;padding:0 18px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:{{ paso.cursor }};opacity:{{ paso.op }};transition:background-color .15s ease,transform .16s var(--ease-out)" style-hover="background:var(--accent-hover)" style-active="transform:scale(.97)">{{ paso.confirmTxt }}</button>
+              <button onClick="{{ paso.cancelar }}" style="height:44px;padding:0 16px;border:1px solid var(--line-2);border-radius:8px;background:var(--surface);color:var(--ink);font-weight:500;cursor:pointer">Cancelar</button>
+            </div>
+          </section>
+        </sc-if>
+
+        <label style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:600;color:var(--muted)">Nota (opcional)
+          <textarea value="{{ nota }}" onInput="{{ onNota }}" rows="2" placeholder="Se guarda con la respuesta" style="resize:vertical;min-height:64px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:14px;font-weight:400;line-height:1.45"></textarea>
+        </label>
+
+        <section style="display:flex;flex-direction:column;gap:12px">
+          <h3 style="margin:0;font-size:12.5px;font-weight:600;color:var(--muted)">Historia</h3>
+          <ol style="list-style:none;margin:0 0 0 5px;padding:2px 0 0 14px;border-left:2px solid var(--line);display:flex;flex-direction:column;gap:12px">
+            <sc-for list="{{ pp.historia }}" as="h">
+              <li style="position:relative;font-size:13px;color:var(--soft);line-height:1.4"><span style="position:absolute;left:-21px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--surface);border:2px solid {{ h.dot }}"></span><b style="color:var(--ink);font-weight:600;font-family:var(--mono);font-size:12.5px">{{ h.f }}</b> · {{ h.txt }}</li>
+            </sc-for>
+          </ol>
+        </section>
+
+        <a href="#" onClick="{{ verFicha }}" style="align-self:flex-start;display:inline-flex;align-items:center;gap:6px;min-height:44px;color:var(--accent);font-weight:600;text-decoration:none" style-hover="text-decoration:underline">Ver ficha completa<i class="ph ph-arrow-right"></i></a>
+      </div>
+    </sc-if>
+  </aside>
+
+  <div role="status" aria-live="polite" style="position:fixed;left:50%;bottom:{{ toastBottom }};transform:{{ toastX }};opacity:{{ toastOp }};pointer-events:{{ toastPe }};transition:transform .3s var(--ease-out),opacity .3s ease;z-index:60;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100% - 28px);padding:6px 6px 6px 16px;background:var(--toast);color:var(--toast-ink);border-radius:10px;box-shadow:var(--shadow);font-weight:500">
+    <span style="text-wrap:pretty;padding:8px 0">{{ toastTxt }}</span>
+    <sc-if value="{{ hayDeshacer }}"><button onClick="{{ deshacer }}" style="height:44px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--toast-ink);font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer">Deshacer</button></sc-if>
+  </div>
+
+  <sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+    <nav aria-label="Secciones" style="view-transition-name:menu-movil;position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);height:64px;padding-bottom:env(safe-area-inset-bottom);background:var(--side);border-top:1px solid var(--line)">
+      <sc-for list="{{ menu }}" as="it">
+        <button onClick="{{ it.go }}" aria-current="{{ it.current }}" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:11.5px;font-weight:500;color:{{ it.navFg }};cursor:pointer"><i class="{{ it.icon }}" style="font-size:21px"></i>{{ it.label }}</button>
+      </sc-for>
+    </nav>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;estado&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Datos&quot;,&quot;Cargando&quot;,&quot;Vacío&quot;,&quot;Error&quot;],&quot;default&quot;:&quot;Datos&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Estados&quot;},&quot;tema&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Claro&quot;,&quot;Oscuro&quot;],&quot;default&quot;:&quot;Claro&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Estados&quot;},&quot;atajos&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Estados&quot;}}">
+const HOY = '2026-10-06';
+const META = 15;
+const FILES = { registro: 'Registro.dc.html', pacientes: 'Pacientes.dc.html', indicadores: 'Indicadores.dc.html' };
+const temaGuardado = () => { try { return localStorage.getItem('chp-tema'); } catch (e) { return null; } };
+const D = s => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+const ISO = dt => dt.toISOString().slice(0, 10);
+const sumar = (s, n) => ISO(new Date(D(s).getTime() + n * 864e5));
+const dmy = s => s ? `${s.slice(8, 10)}/${s.slice(5, 7)}/${s.slice(0, 4)}` : '—';
+const dm = s => `${s.slice(8, 10)}/${s.slice(5, 7)}`;
+const DSEM = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const ds = s => DSEM[D(s).getUTCDay()];
+const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+const norm = s => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const clon = o => JSON.parse(JSON.stringify(o));
+
+const MEDS = [
+  { k: 'cab', full: 'Dr. Elí Cabanillas', short: 'Dr. Cabanillas' },
+  { k: 'lat', full: 'Dra. Alejandra La Torre', short: 'Dra. La Torre' },
+  { k: 'sem', full: 'Dr. Víctor Seminario', short: 'Dr. Seminario' },
+  { k: 'vil', full: 'Dr. Álvaro Villanueva', short: 'Dr. Villanueva' },
+  { k: 'mat', full: 'Dra. Karen Matos', short: 'Dra. Matos' },
+  { k: 'matp', full: 'Dra. Karen Matos – Particular', short: 'Dra. Matos (part.)' },
+  { k: 'pac', full: 'Dr. Iván Pacheco', short: 'Dr. Pacheco' }
+];
+const MED = k => MEDS.find(m => m.k === k) || MEDS[0];
+const USERS = [
+  { v: 'Magaly', l: 'Magaly', rol: 'Asesora' },
+  { v: 'Ana', l: 'Ana', rol: 'Asesora' },
+  { v: 'Rachel', l: 'Rachel', rol: 'Asesora' },
+  { v: 'cab', l: 'Dr. Elí Cabanillas', rol: 'Médico' }
+];
+const ESPS = ['Hematología', 'Reumatología', 'Medicina interna'];
+const COLS = [
+  { id: 1, t: 'Por contactar', i: 'ph-fill ph-phone-call', c: 'var(--accent)', vacio: 'No hay pacientes por contactar.', vi: 'ph ph-check-circle' },
+  { id: 2, t: 'Agendado', i: 'ph-fill ph-calendar-check', c: 'var(--info)', vacio: 'Sin citas ni llamadas agendadas.', vi: 'ph ph-calendar-blank' },
+  { id: 3, t: 'En tratamiento', i: 'ph-fill ph-drop', c: 'var(--warn)', vacio: 'Nadie en tratamiento.', vi: 'ph ph-drop' },
+  { id: 4, t: 'Completado / Alta', i: 'ph-fill ph-check-circle', c: 'var(--good)', vacio: 'Todavía no hay cierres este mes.', vi: 'ph ph-flag' }
+];
+const GRUPOS = [
+  { k: 'rec', t: 'Recientes', r: '30 días o menos', f: d => d <= 30 },
+  { k: 'mes', t: 'Hace 1 a 2 meses', r: '31 a 60 días', f: d => d > 30 && d <= 60 },
+  { k: 'ant', t: 'Más antiguos', r: 'más de 60 días', f: d => d > 60 }
+];
+const ACC = [
+  { k: 'nocontesto', l: 'No contestó', i: 'ph ph-phone-x', c: 'var(--muted)' },
+  { k: 'pensara', l: 'Lo pensará', i: 'ph ph-clock-countdown', c: 'var(--info)' },
+  { k: 'agendo', l: 'Agendó cita', i: 'ph ph-calendar-plus', c: 'var(--info)' },
+  { k: 'lohizo', l: 'Lo hizo', i: 'ph ph-check-square', c: 'var(--good)', solo: ['hier', 'proc'] }
+];
+const CIERRES = [
+  { k: 'alta', l: 'Alta médica', i: 'ph ph-seal-check' },
+  { k: 'numero', l: 'Número equivocado', i: 'ph ph-phone-disconnect', conTel: true },
+  { k: 'otrolugar', l: 'Se atiende en otro lugar', i: 'ph ph-buildings' },
+  { k: 'fallecio', l: 'Falleció', i: 'ph ph-flower-lotus' },
+  { k: 'otro', l: 'No desea continuar / otro', i: 'ph ph-dots-three-outline' }
+];
+const TAG = { reev: ['var(--info-soft)', 'var(--info)'], hier: ['var(--warn-soft)', 'var(--warn)'], proc: ['var(--accent-soft)', 'var(--accent)'] };
+const activos = p => p.tel.filter(x => !(p.malos || []).includes(x));
+const tagDe = p => p.t === 'reev' ? 'Reevaluación' : p.t === 'hier' ? `${p.trat.marca || cap(p.trat.nombre.replace('Hierro ', ''))} × ${p.trat.n}` : p.proc;
+const tratLinea = p => `${p.trat.nombre}${p.trat.marca ? ' · ' + p.trat.marca : ''} × ${p.trat.n} ${p.trat.n === 1 ? 'sesión' : 'sesiones'}`;
+const corto = n => n.split(' ').slice(0, 2).join(' ');
+
+function semilla() {
+  const P = [];
+  let id = 1;
+  const add = o => {
+    const p = Object.assign({ id: id++, esp: 'Hematología', tel: [], malos: [], usuario: '', intentos: 0, perfil: 'En control', hist: [] }, o);
+    const m = MED(p.med).short;
+    if (p.t === 'reev' && p.dias != null && !p.debia) { p.debia = sumar(HOY, -p.dias); p.ultima = sumar(p.debia, -45); }
+    if (p.t === 'hier' && !p.cotizo) {
+      if (p.trat.k > 0) { p.trat.ultima = p.trat.ultima || sumar(HOY, -(p.dias || 7)); p.cotizo = sumar(p.trat.ultima, -7 * p.trat.k); }
+      else p.cotizo = sumar(HOY, -(p.dias || 7));
+    }
+    if (p.t === 'proc' && !p.cotizo) p.cotizo = sumar(HOY, -(p.dias || 7));
+    const h = [];
+    if (p.t === 'reev') { if (p.debia) h.push({ f: dm(p.debia), txt: 'debía volver a su reevaluación' }); if (p.ultima) h.push({ f: dm(p.ultima), txt: `consulta con ${m}` }); }
+    if (p.t === 'hier') { for (let i = p.trat.k; i >= 1; i--) h.push({ f: dm(i === p.trat.k ? p.trat.ultima : sumar(p.cotizo, 7 * i)), txt: `sesión ${i} de ${p.trat.n}` }); h.push({ f: dm(p.cotizo), txt: `cotizó ${tratLinea(p)} · ${m}` }); }
+    if (p.t === 'proc') h.push({ f: dm(p.cotizo), txt: `cotizó ${p.proc} · ${m}` });
+    p.hist = (o.extra || []).concat(h);
+    delete p.extra;
+    P.push(p);
+  };
+  add({ col: 1, n: 'Rosa Quispe Huamán', dni: '40111222', t: 'reev', med: 'cab', dias: 27, tel: ['987 654 321', '01 433 2210'] });
+  add({ col: 1, n: 'Jorge Mendoza Paredes', dni: '40222333', t: 'reev', med: 'mat', dias: 45, perfil: 'Paciente nuevo' });
+  add({ col: 1, n: 'Ana Flores Ríos', dni: '40333444', t: 'hier', med: 'cab', dias: 16, usuario: '@ana.flores', perfil: 'Paciente nuevo', trat: { nombre: 'Hierro carboximaltosa', marca: 'Ferinject', n: 1, k: 0 } });
+  add({ col: 1, n: 'Luis Ramos Vega', dni: '40444555', t: 'proc', proc: 'AMO + biopsia', med: 'lat', dias: 50, tel: ['923 456 789'], intentos: 1, extra: [{ f: '21/09', txt: 'Rachel: no contestó (intento 1 de 2)' }] });
+  const extras = [
+    ['Marco Antonio Huerta Lazo', 5, 'reev', 'sem', '978 113 402', 'Paciente nuevo'],
+    ['Julio César Ñaupari Rojas', 9, 'hier', 'cab', '965 220 871', 'En control', { nombre: 'Hierro sacarato', marca: '', n: 5, k: 2 }],
+    ['Patricia Salazar Inga', 12, 'reev', 'vil', '', 'Paciente nuevo'],
+    ['Fernando Quiroz Bellido', 18, 'proc', 'pac', '991 405 336', 'En control', null, 'Citometría de flujo'],
+    ['Lucía Mamani Condori', 22, 'reev', 'mat', '944 870 129', 'En control'],
+    ['Wilmer Yupanqui Torres', 29, 'reev', 'lat', '958 301 774', 'Paciente nuevo'],
+    ['Diana Chávez Ortiz', 34, 'hier', 'matp', '987 112 650', 'En control', { nombre: 'Hierro derisomaltosa', marca: 'Monofer', n: 2, k: 0 }],
+    ['Ricardo Aquino Palomino', 38, 'reev', 'cab', '976 554 018', 'En control'],
+    ['Sonia Villegas Paucar', 41, 'reev', 'sem', '', 'Paciente nuevo'],
+    ['Óscar Livia Ramírez', 47, 'proc', 'cab', '953 667 201', 'En control', null, 'Sangría'],
+    ['Elsa Huamaní Cusi', 53, 'reev', 'vil', '940 228 915', 'Paciente nuevo'],
+    ['Jaime Rivas Olivera', 58, 'reev', 'pac', '962 019 447', 'En control'],
+    ['Carmen Torres Díaz', 64, 'reev', 'lat', '912 345 678', 'En control'],
+    ['Mariela Cáceres Laura', 72, 'hier', 'mat', '981 776 304', 'Paciente nuevo', { nombre: 'Hierro carboximaltosa', marca: 'Likfer', n: 3, k: 1 }],
+    ['Hilda Poma Vargas', 85, 'reev', 'cab', '934 902 118', 'Paciente nuevo'],
+    ['Raquel Arias Meza', 96, 'reev', 'sem', '', 'En control'],
+    ['Andrés Quispe Soto', 110, 'proc', 'vil', '957 441 290', 'En control', null, 'Cariotipo'],
+    ['Teodoro Lazo Pinedo', 131, 'reev', 'mat', '969 300 552', 'Paciente nuevo']
+  ];
+  extras.forEach((e, i) => add({
+    col: 1, n: e[0], dni: String(41000000 + i * 73129), dias: e[1], t: e[2], med: e[3], tel: e[4] ? [e[4]] : [], perfil: e[5],
+    trat: e[6] || undefined, proc: e[7], esp: i % 7 === 3 ? 'Reumatología' : i % 9 === 5 ? 'Medicina interna' : 'Hematología',
+    intentos: i % 5 === 2 ? 1 : 0, extra: i % 5 === 2 ? [{ f: '24/09', txt: 'Ana: no contestó (intento 1 de 2)' }] : []
+  }));
+  add({ col: 2, n: 'Pedro Salas Ccori', dni: '41203344', t: 'reev', med: 'cab', dias: 33, tel: ['955 210 774'], cita: { tipo: 'cita', f: '2026-10-08' }, extra: [{ f: '02/10', txt: 'Magaly: agendó cita para el 08/10' }] });
+  add({ col: 2, n: 'Milagros Ayala Ruiz', dni: '41558820', t: 'hier', med: 'mat', dias: 12, tel: ['944 318 602'], trat: { nombre: 'Hierro sacarato', marca: '', n: 3, k: 0 }, cita: { tipo: 'cita', f: '2026-10-12' }, extra: [{ f: '05/10', txt: 'Rachel: agendó cita para el 12/10' }] });
+  add({ col: 2, n: 'Víctor Huanca Soto', dni: '42019931', t: 'proc', proc: 'Sangría', med: 'sem', dias: 9, tel: ['981 044 129'], cita: { tipo: 'cita', f: '2026-10-14' }, extra: [{ f: '05/10', txt: 'Magaly: agendó cita para el 14/10' }] });
+  add({ col: 2, n: 'Gloria Ticona Apaza', dni: '41877410', t: 'reev', med: 'vil', dias: 38, tel: ['964 772 015'], perfil: 'Paciente nuevo', cita: { tipo: 'llamar', f: '2026-10-09' }, extra: [{ f: '01/10', txt: 'Ana: lo pensará; llamar el 09/10' }] });
+  add({ col: 3, n: 'Elena Cárdenas Lima', dni: '40987123', t: 'hier', med: 'cab', tel: ['976 120 448'], trat: { nombre: 'Hierro carboximaltosa', marca: 'Ferinject', n: 3, k: 2, ultima: '2026-10-02', prox: '2026-10-09' } });
+  add({ col: 3, n: 'Raúl Pinto Mamani', dni: '42230876', t: 'hier', med: 'mat', tel: ['951 336 207'], trat: { nombre: 'Hierro derisomaltosa', marca: 'Monofer', n: 2, k: 1, ultima: '2026-09-26', prox: '2026-10-03', atr: 3 } });
+  add({ col: 3, n: 'Sofía Medina Arce', dni: '43112090', t: 'hier', med: 'pac', tel: ['939 805 611'], trat: { nombre: 'Hierro sacarato', marca: '', n: 5, k: 3, ultima: '2026-10-04', prox: '2026-10-11' } });
+  add({ col: 4, n: 'Teresa Vilca Rojas', dni: '40765432', t: 'reev', med: 'cab', tel: ['947 209 336'], ultima: '2026-07-20', debia: '2026-09-03', fin: 'Volvió el 02/10/2026', extra: [{ f: '02/10', txt: 'SOFDOC: volvió a su reevaluación' }, { f: '25/09', txt: 'Magaly: agendó cita para el 02/10' }] });
+  add({ col: 4, n: 'Hugo Paredes León', dni: '41330987', t: 'hier', med: 'mat', tel: ['986 551 023'], trat: { nombre: 'Hierro carboximaltosa', marca: 'Ferinject', n: 2, k: 2, ultima: '2026-09-30' }, fin: 'Completó el 30/09/2026' });
+  add({ col: 4, n: 'Nora Bustamante Gil', dni: '40559871', t: 'reev', med: 'sem', esp: 'Reumatología', tel: ['973 448 120'], ultima: '2026-08-11', debia: '2026-09-25', fin: 'Alta médica', extra: [{ f: '01/10', txt: 'Rachel: alta médica con Dr. Seminario' }] });
+  return P;
+}
+
+class Component extends DCLogic {
+  rootRef = React.createRef();
+  segRef = React.createRef();
+  pillRef = React.createRef();
+  searchRef = React.createRef();
+  metaRef = React.createRef();
+  panelRef = React.createRef();
+
+  state = {
+    tema: temaGuardado() || (this.props.tema === 'Oscuro' ? 'oscura' : 'clara'),
+    usuario: (() => { try { return localStorage.getItem('chp-usuario') || 'Magaly'; } catch (e) { return 'Magaly'; } })(), seccion: 'tablero',
+    filtro: 'todos', medico: '', esp: '', sinTel: false, q: '',
+    pacientes: semilla(), fase: 'cargando',
+    abierto: null, ultimo: null, porTeclado: false, paso: null, nota: '',
+    sel: null, w: typeof window !== 'undefined' ? window.innerWidth : 1440, colMovil: 1,
+    lim: { rec: 6, mes: 4, ant: 3 }, toast: null, copiado: null, hechos: 11, drag: null, dropCol: null
+  };
+
+  componentDidMount() {
+    this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.medir = () => {
+      const r = this.rootRef.current;
+      const w = Math.round((r && r.getBoundingClientRect().width) || window.innerWidth);
+      if (w && w !== this.state.w) this.setState({ w });
+    };
+    window.addEventListener('resize', this.medir);
+    this.ro = new ResizeObserver(() => this.medir());
+    this._roEl = this.rootRef.current;
+    if (this._roEl) this.ro.observe(this._roEl);
+    requestAnimationFrame(this.medir);
+    setTimeout(this.medir, 300);
+    this.onKey = this.onKey.bind(this);
+    document.addEventListener('keydown', this.onKey);
+    this.estado(this.props.estado);
+    if (document.fonts) document.fonts.ready.then(() => this.pill(true));
+  }
+  componentWillUnmount() { this.ro && this.ro.disconnect(); window.removeEventListener('resize', this.medir); document.removeEventListener('keydown', this.onKey); clearTimeout(this._t); clearTimeout(this._tt); }
+  componentDidUpdate(prevProps) {
+    if (prevProps.estado !== this.props.estado) this.estado(this.props.estado);
+    if (prevProps.tema !== this.props.tema) this.setState({ tema: this.props.tema === 'Oscuro' ? 'oscura' : 'clara' });
+    if (this.ro && this.rootRef.current && this.rootRef.current !== this._roEl) {
+      this.ro.disconnect(); this._roEl = this.rootRef.current; this.ro.observe(this._roEl); this.medir();
+    }
+    this.pill();
+    this.flip();
+    if (this._stagger && this.state.fase === 'listo') {
+      this._stagger = false;
+      if (!this.reduced) this.qa('[data-card]').forEach((el, i) => el.animate(
+        [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }],
+        { duration: 260, delay: Math.min(i * 30, 240), easing: 'cubic-bezier(.23,1,.32,1)', fill: 'backwards' }));
+    }
+    if (this._focusSel && this.state.sel != null && !this.state.abierto) {
+      this._focusSel = false;
+      const el = this.q(`[data-card="${this.state.sel}"]`);
+      if (el) el.focus();
+    }
+  }
+
+  q(s) { return this.rootRef.current ? this.rootRef.current.querySelector(s) : null; }
+  qa(s) { return this.rootRef.current ? Array.from(this.rootRef.current.querySelectorAll(s)) : []; }
+
+  estado(e) {
+    clearTimeout(this._t);
+    if (e === 'Cargando') this.setState({ fase: 'cargando' });
+    else if (e === 'Vacío') this.setState({ fase: 'vacio' });
+    else if (e === 'Error') this.setState({ fase: 'error' });
+    else this.cargar();
+  }
+  cargar() {
+    this.setState({ fase: 'cargando' });
+    this._t = setTimeout(() => { this._stagger = true; this.setState({ fase: 'listo' }); }, 700);
+  }
+
+  pill(instant) {
+    const seg = this.segRef.current, pl = this.pillRef.current;
+    if (!seg || !pl) return;
+    const on = seg.querySelector('button[aria-pressed="true"]');
+    if (!on) return;
+    const w = on.offsetWidth + 'px', t = `translateX(${on.offsetLeft}px)`;
+    if (pl.style.width === w && pl.style.transform === t && this._pillEl === pl) return;
+    if (instant || this._pillEl !== pl) {
+      const tr = pl.style.transition;
+      pl.style.transition = 'none'; pl.style.width = w; pl.style.transform = t;
+      void pl.offsetWidth; pl.style.transition = tr; this._pillEl = pl;
+    } else { pl.style.width = w; pl.style.transform = t; }
+  }
+
+  capturar() {
+    const a = {};
+    this.qa('[data-card]').forEach(el => { a[el.dataset.card] = el.getBoundingClientRect(); });
+    this._antes = a;
+  }
+  flip() {
+    if (!this._antes) return;
+    const antes = this._antes, llega = this._llega, celebra = this._celebra;
+    this._celebra = null;
+    this._antes = null; this._llega = null;
+    if (this.reduced) return;
+    this.qa('[data-card]').forEach(el => {
+      const id = el.dataset.card, a = antes[id], b = el.getBoundingClientRect();
+      const esLlega = String(llega) === id;
+      if (a) {
+        const dx = a.left - b.left, dy = a.top - b.top;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+          el.style.position = 'relative'; el.style.zIndex = esLlega ? '6' : '2';
+          const an = el.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }],
+            { duration: esLlega ? 480 : 320, easing: 'cubic-bezier(.77,0,.175,1)' });
+          an.onfinish = () => { el.style.zIndex = ''; el.style.position = ''; };
+        }
+      } else if (esLlega) {
+        el.animate([{ opacity: 0, transform: 'scale(.97)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.23,1,.32,1)' });
+      }
+      if (esLlega && String(celebra) === id) setTimeout(() => this.chispas(el), 460);
+      if (esLlega) el.animate([{ boxShadow: String(celebra) === id ? '0 0 0 4px var(--good)' : '0 0 0 4px var(--accent-ring)' }, { boxShadow: String(celebra) === id ? '0 0 0 4px var(--good)' : '0 0 0 4px var(--accent-ring)', offset: .55 }, { boxShadow: '0 0 0 0 transparent' }], { duration: 1400, easing: 'ease-out' });
+    });
+  }
+
+  aviso(txt, deshacer) {
+    clearTimeout(this._tt);
+    this.setState({ toast: { txt, deshacer: !!deshacer } });
+    this._tt = setTimeout(() => this.setState({ toast: null }), deshacer ? 6000 : 2600);
+  }
+
+  copiar(txt, key) {
+    const fin = () => {
+      this.setState({ copiado: key });
+      clearTimeout(this._tc); this._tc = setTimeout(() => this.setState({ copiado: null }), 1600);
+      this.aviso(`Copiado: ${txt}`);
+    };
+    try {
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(txt).then(fin, () => this.copiaVieja(txt, fin));
+      else this.copiaVieja(txt, fin);
+    } catch (e) { this.copiaVieja(txt, fin); }
+  }
+  copiaVieja(txt, fin) {
+    const t = document.createElement('textarea'); t.value = txt; t.style.position = 'fixed'; t.style.opacity = '0';
+    document.body.appendChild(t); t.select(); try { document.execCommand('copy'); } catch (e) {} t.remove(); fin();
+  }
+  contacto(p) { return activos(p)[0] || p.usuario || ''; }
+  copiarPaciente(p) {
+    const c = this.contacto(p);
+    if (!c) { this.aviso(`${corto(p.n)} no tiene teléfono registrado.`); return; }
+    this.copiar(c, p.id + ':' + c);
+  }
+
+  abrir(id, teclado) {
+    this.setState({ abierto: id, ultimo: id, porTeclado: !!teclado, paso: null, nota: '', sel: id });
+    setTimeout(() => this.panelRef.current && this.panelRef.current.focus({ preventScroll: true }), teclado ? 0 : 60);
+  }
+  cerrar() {
+    if (this.state.abierto == null) return;
+    this._focusSel = true;
+    this.setState({ abierto: null, paso: null });
+  }
+  cur() { return this.state.pacientes.find(p => p.id === this.state.ultimo); }
+
+  elegir(k) {
+    const p = this.cur();
+    if (!p) return;
+    if (k === 'nocontesto') { this.aplicar('nocontesto'); return; }
+    const f = k === 'agendo' ? sumar(HOY, 6) : k === 'pensara' ? sumar(HOY, 3) : HOY;
+    this.setState({ paso: { k, f, doctor: p.med, motivo: '', numero: activos(p)[0] || '' } });
+  }
+  setPaso(o) { this.setState(s => ({ paso: Object.assign({}, s.paso, o) })); }
+
+  aplicar(k) {
+    const prev = clon(this.state.pacientes);
+    const ps = clon(prev);
+    const p = ps.find(x => x.id === this.state.ultimo);
+    const paso = this.state.paso || {};
+    const u = USERS.find(x => x.v === this.state.usuario);
+    const quien = u.rol === 'Médico' ? MED('cab').short : u.l;
+    const h = txt => p.hist.unshift({ f: dm(HOY), txt: `${quien}: ${txt}`, nuevo: true });
+    const nombre = corto(p.n);
+    const f = paso.f || HOY;
+    let txt = '', salir = false;
+    if (k === 'nocontesto') {
+      p.intentos += 1; salir = true;
+      if (p.intentos >= 2) { h('no contestó (intento 2 de 2): seguimiento cerrado'); txt = `${nombre}: 2.º intento sin respuesta. El seguimiento se cerró.`; }
+      else { h('no contestó (intento 1 de 2)'); txt = `Intento 1 de 2. ${nombre} vuelve a la lista el ${dmy(sumar(HOY, 15))}.`; }
+    } else if (k === 'agendo') {
+      p.col = 2; p.cita = { tipo: 'cita', f }; h(`agendó cita para el ${dm(f)}`);
+      txt = `${nombre} pasa a Agendado · cita el ${ds(f)} ${dmy(f)}.`;
+    } else if (k === 'pensara') {
+      p.col = 2; p.cita = { tipo: 'llamar', f }; h(`lo pensará; llamar el ${dm(f)}`);
+      txt = `${nombre} le volverá a aparecer el ${dmy(f)}.`;
+    } else if (k === 'lohizo') {
+      if (p.t === 'hier') {
+        const t = p.trat; t.k += 1; t.ultima = f; t.atr = 0;
+        h(`lo hizo · sesión ${t.k} de ${t.n} (${dm(f)})`);
+        if (t.k >= t.n) { this._celebra = p.id; p.col = 4; p.fin = `Completó el ${dmy(f)}`; txt = `${nombre} completó el tratamiento.`; }
+        else { p.col = 3; t.prox = sumar(f, 7); txt = `Sesión ${t.k} de ${t.n} registrada: ${nombre} pasa a En tratamiento.`; }
+      } else { p.col = 4; p.fin = `Se hizo el ${dmy(f)}`; h(`se hizo ${p.proc} (${dm(f)})`); txt = `${nombre}: ${p.proc} completado.`; }
+    } else if (k === 'alta') {
+      p.col = 4; p.fin = 'Alta médica'; h(`alta médica con ${MED(paso.doctor).short} (${dm(f)})`);
+      txt = `${nombre}: alta médica registrada.`;
+    } else if (k === 'numero') {
+      if (activos(p).length > 1) { p.malos.push(paso.numero); h(`número ${paso.numero} equivocado`); txt = 'Número marcado como equivocado. El seguimiento sigue con el otro número.'; }
+      else { p.malos.push(paso.numero); salir = true; h('número equivocado: seguimiento cerrado'); txt = `Seguimiento de ${nombre} cerrado: número equivocado.`; }
+    } else {
+      salir = true;
+      const l = k === 'otrolugar' ? 'se atiende en otro lugar' : k === 'fallecio' ? 'falleció' : `cerrado · ${paso.motivo.trim()}`;
+      h(l); txt = `Seguimiento de ${nombre} cerrado.`;
+    }
+    if (this.state.nota.trim()) h(`nota: «${this.state.nota.trim()}»`);
+    if (salir) p.oculto = true;
+    const quedaAbierto = k === 'numero' && !salir;
+    if (quedaAbierto) { this._prev = prev; this.contar(); this.setState({ pacientes: ps, paso: null, nota: '' }); this.aviso(txt, true); return; }
+    this.cerrar();
+    setTimeout(() => {
+      const go = an => {
+        this.capturar(); this._prev = prev; this._llega = salir ? null : p.id;
+        this.setState({ pacientes: ps }, () => an && an.cancel());
+        this.contar();
+        this.aviso(txt, true);
+      };
+      const el = salir && !this.reduced ? this.q(`[data-card="${p.id}"]`) : null;
+      if (el) { const an = el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.96)' }], { duration: 180, easing: 'cubic-bezier(.23,1,.32,1)', fill: 'forwards' }); an.onfinish = () => go(an); }
+      else go();
+    }, this.reduced ? 0 : 220);
+  }
+
+  contar() {
+    const n = this.state.hechos + 1;
+    this.setState({ hechos: n });
+    if (n === META) setTimeout(() => this.chispas(this.metaRef.current, 'centro'), 350);
+  }
+  chispas(el, donde) {
+    if (!el || this.reduced || !this.rootRef.current) return;
+    const r = el.getBoundingClientRect();
+    const cx = donde === 'centro' ? r.left + 60 : r.right - 14, cy = donde === 'centro' ? r.top + r.height / 2 : r.top + 14;
+    const COL = ['var(--good)', 'var(--warn)', 'var(--accent)', 'var(--info)'];
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + Math.random() * .5, d = 26 + Math.random() * 22;
+      const s = document.createElement('i');
+      Object.assign(s.style, { position: 'fixed', left: cx + 'px', top: cy + 'px', width: '6px', height: '6px', borderRadius: i % 2 ? '50%' : '2px', background: COL[i % 4], zIndex: 90, pointerEvents: 'none' });
+      this.rootRef.current.appendChild(s);
+      s.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 }, { transform: `translate(calc(-50% + ${Math.cos(a) * d}px),calc(-50% + ${Math.sin(a) * d}px)) scale(.4)`, opacity: 0 }],
+        { duration: 620 + Math.random() * 160, easing: 'cubic-bezier(.23,1,.32,1)' }).onfinish = () => s.remove();
+    }
+  }
+  accionDrop(p, col) {
+    if (!p || !col || col === p.col || col === 1 || p.col === 4) return null;
+    if (col === 2) return 'agendo';
+    if (col === 3) return p.t === 'hier' ? 'lohizo' : null;
+    if (p.t === 'proc') return 'lohizo';
+    if (p.t === 'hier' && p.trat.k + 1 >= p.trat.n) return 'lohizo';
+    return 'alta';
+  }
+  motivoDrop(p, col) {
+    if (p.col === 4) return 'Ese seguimiento ya está cerrado.';
+    if (col === 1) return 'Vuelve sola a «Por contactar» si pasa la fecha sin cita.';
+    if (col === 3) return '«En tratamiento» es solo para hierro.';
+    return '';
+  }
+  down(e, p) {
+    if (e.button !== 0 || this.state.w < 760 || this.state.fase !== 'listo' || p.col === 4) return;
+    this._d = { id: p.id, x: e.clientX, y: e.clientY, el: e.currentTarget, on: false };
+    window.addEventListener('pointermove', this.dMove);
+    window.addEventListener('pointerup', this.dUp);
+    window.addEventListener('pointercancel', this.dUp);
+  }
+  dMove = e => {
+    const d = this._d; if (!d) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.on) {
+      if (Math.hypot(dx, dy) < 6) return;
+      d.on = true;
+      const r = d.el.getBoundingClientRect(), g = d.el.cloneNode(true);
+      g.removeAttribute('data-card'); g.removeAttribute('tabindex');
+      Object.assign(g.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', margin: '0', zIndex: '80', pointerEvents: 'none', boxShadow: 'var(--shadow-lg)', transition: 'none' });
+      this.rootRef.current.appendChild(g); d.g = g;
+      d.el.style.opacity = '.35'; document.body.style.cursor = 'grabbing';
+      this.setState({ drag: { id: d.id } });
+    }
+    d.g.style.transform = `translate(${dx}px,${dy}px) rotate(1.5deg) scale(1.02)`;
+    const t = document.elementsFromPoint(e.clientX, e.clientY).find(n => n.dataset && n.dataset.col);
+    const c = t ? Number(t.dataset.col) : null;
+    if (c !== this.state.dropCol) this.setState({ dropCol: c });
+  };
+  dUp = () => {
+    window.removeEventListener('pointermove', this.dMove); window.removeEventListener('pointerup', this.dUp); window.removeEventListener('pointercancel', this.dUp);
+    const d = this._d; this._d = null;
+    if (!d || !d.on) return;
+    this._arrastro = true; setTimeout(() => { this._arrastro = false; }, 60);
+    document.body.style.cursor = '';
+    const p = this.state.pacientes.find(x => x.id === d.id), col = this.state.dropCol, acc = this.accionDrop(p, col);
+    const limpiar = () => { d.g.remove(); d.el.style.opacity = ''; this.setState({ drag: null, dropCol: null }); };
+    if (acc) {
+      d.g.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, fill: 'forwards' }).onfinish = limpiar;
+      this.abrir(p.id, false); setTimeout(() => this.elegir(acc), 0);
+    } else {
+      d.g.style.transition = 'transform .22s cubic-bezier(.23,1,.32,1)'; d.g.style.transform = 'none';
+      setTimeout(limpiar, 230);
+      const m = col && col !== p.col ? this.motivoDrop(p, col) : '';
+      if (m) this.aviso(m);
+    }
+  };
+
+  deshacer() {
+    if (!this._prev) return;
+    this.capturar(); this._llega = this.state.ultimo;
+    const prev = this._prev; this._prev = null;
+    clearTimeout(this._tt);
+    this.setState({ pacientes: prev, toast: null });
+  }
+
+  onKey(e) {
+    const tag = (e.target.tagName || '').toUpperCase();
+    const enCampo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag);
+    const s = this.state;
+    if (e.key === 'Escape') {
+      if (s.paso) this.setState({ paso: null });
+      else if (s.abierto != null) this.cerrar();
+      else if (enCampo) e.target.blur();
+      return;
+    }
+    if (enCampo || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (tag === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+    if (s.abierto != null) {
+      const p = this.cur();
+      if (!s.paso && /^[1-4]$/.test(e.key) && this._acc) { const a = this._acc[+e.key - 1]; if (a) { e.preventDefault(); this.elegir(a); } }
+      else if (e.key.toLowerCase() === 'c' && p) { e.preventDefault(); this.copiarPaciente(p); }
+      return;
+    }
+    if (e.key === '/') { e.preventDefault(); this.searchRef.current && this.searchRef.current.focus(); return; }
+    if (s.seccion !== 'tablero' || !this._orden) return;
+    const o = this._orden;
+    const cols = Object.keys(o).map(Number).filter(c => o[c].length);
+    if (!cols.length) return;
+    let ci = -1, ii = -1;
+    cols.forEach(c => { const i = o[c].indexOf(s.sel); if (i >= 0) { ci = c; ii = i; } });
+    const mover = id => { e.preventDefault(); this._focusSel = true; this.setState({ sel: id }); };
+    if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      if (ci < 0) return mover(o[cols[0]][0]);
+      const L = o[ci];
+      if (e.key === 'ArrowDown') return mover(L[Math.min(ii + 1, L.length - 1)]);
+      if (e.key === 'ArrowUp') return mover(L[Math.max(ii - 1, 0)]);
+      const pos = cols.indexOf(ci) + (e.key === 'ArrowRight' ? 1 : -1);
+      if (pos < 0 || pos >= cols.length) return;
+      const N = o[cols[pos]];
+      if (this.state.w < 760) this.setState({ colMovil: cols[pos] });
+      return mover(N[Math.min(ii, N.length - 1)]);
+    }
+    if (e.key === 'Enter' && s.sel != null && ci >= 0) { e.preventDefault(); this.abrir(s.sel, true); return; }
+    if (e.key.toLowerCase() === 'c' && s.sel != null && ci >= 0) { e.preventDefault(); this.copiarPaciente(s.pacientes.find(p => p.id === s.sel)); }
+  }
+
+  tarjeta(p, sel) {
+    const m = MED(p.med), act = activos(p), [tb, tf] = TAG[p.t];
+    const c = { id: p.id, n: p.n, tag: tagDe(p), tagBg: tb, tagFg: tf, hayProg: false, prog: [], hayChip: false, hayIzq: true, izqW: 400, izqColor: 'var(--soft)', der: '', derColor: 'var(--soft)' };
+    if (p.col === 1) {
+      const que = p.t === 'reev' ? p.perfil : p.t === 'hier' ? (p.trat.k ? `sesión ${p.trat.k + 1} de ${p.trat.n} pendiente` : 'cotizó, no empezó') : 'cotizó, no lo hizo';
+      c.sub = `${m.short} · ${que}${p.intentos ? ' · 1 intento sin respuesta' : ''}`;
+      c.izq = act[0] || p.usuario || 'Sin teléfono';
+      c.izqIcon = act[0] ? 'ph ph-phone' : p.usuario ? 'ph ph-at' : 'ph ph-phone-slash';
+      if (!act[0] && !p.usuario) c.izqColor = 'var(--muted)';
+      c.der = `hace ${p.dias} días`; c.derColor = p.dias > 30 ? 'var(--accent)' : 'var(--soft)';
+    } else if (p.col === 2) {
+      c.sub = p.t === 'hier' ? `${m.short} · ${tratLinea(p)}` : m.short;
+      c.hayChip = true; c.hayIzq = false;
+      c.chip = `${p.cita.tipo === 'cita' ? 'Cita' : 'Llamar'} ${ds(p.cita.f)} ${dm(p.cita.f)}`;
+      c.chipIcon = p.cita.tipo === 'cita' ? 'ph ph-calendar-blank' : 'ph ph-phone-call';
+      c.der = act[0] || p.usuario || 'Sin teléfono';
+    } else if (p.col === 3) {
+      const t = p.trat;
+      c.sub = `${m.short} · ${t.nombre}`;
+      c.hayProg = true;
+      c.prog = Array.from({ length: t.n }, (_, i) => ({ bg: i < t.k ? 'var(--warn)' : 'var(--line)' }));
+      c.izq = `Sesión ${t.k} de ${t.n}`; c.izqIcon = 'ph ph-drop';
+      c.der = t.atr ? `atrasada ${t.atr} días` : `próxima el ${dm(t.prox)}`;
+      c.derColor = t.atr ? 'var(--accent)' : 'var(--soft)';
+    } else {
+      c.sub = m.short; c.izq = p.fin; c.izqIcon = 'ph-fill ph-check-circle'; c.izqColor = 'var(--good)'; c.izqW = 600;
+    }
+    c.aria = `${p.n}, ${c.tag}, ${c.der || c.izq}`;
+    c.borde = sel ? 'var(--accent)' : 'var(--line)';
+    c.bordeHover = sel ? 'var(--accent)' : 'var(--line-2)';
+    c.sombra = sel ? '0 0 0 3px var(--accent-ring)' : 'var(--shadow)';
+    c.abrir = () => { if (!this._arrastro) this.abrir(p.id, false); };
+    c.down = e => this.down(e, p);
+    c.cursor = p.col === 4 || this.state.w < 760 ? 'pointer' : 'grab';
+    c.foco = () => { if (this.state.sel !== p.id) this.setState({ sel: p.id }); };
+    return c;
+  }
+
+  panel(p, narrow) {
+    const m = MED(p.med), act = activos(p), [tb, tf] = TAG[p.t];
+    const datos = [];
+    if (p.t === 'reev') datos.push({ l: 'Última consulta', v: dmy(p.ultima) }, { l: 'Debía volver el', v: dmy(p.debia) });
+    else if (p.t === 'hier') datos.push({ l: 'Cotizó el', v: dmy(p.cotizo) }, { l: 'Sesión', v: `${p.trat.k} de ${p.trat.n}` }, { l: 'Última sesión', v: dmy(p.trat.ultima) });
+    else datos.push({ l: 'Cotizó el', v: dmy(p.cotizo) }, { l: 'Procedimiento', v: p.proc });
+    let alerta = '', alertaColor = 'var(--ink)';
+    if (p.col === 1) {
+      alerta = p.t === 'reev' ? `hace ${p.dias} días que no vuelve` : p.t === 'hier' ? (p.trat.k ? `sesión ${p.trat.k + 1} de ${p.trat.n} pendiente · hace ${p.dias} días` : `cotizó hace ${p.dias} días y no empezó`) : `cotizó hace ${p.dias} días y no lo hizo`;
+      alertaColor = p.dias > 30 ? 'var(--accent)' : 'var(--ink)';
+    } else if (p.col === 2) {
+      alerta = p.cita.tipo === 'cita' ? `Cita el ${ds(p.cita.f)} ${dmy(p.cita.f)}` : `Volver a llamar el ${ds(p.cita.f)} ${dmy(p.cita.f)}`;
+      alertaColor = 'var(--info)';
+    } else if (p.col === 3) {
+      alerta = p.trat.atr ? `sesión ${p.trat.k + 1} atrasada ${p.trat.atr} días` : `próxima sesión el ${ds(p.trat.prox)} ${dmy(p.trat.prox)}`;
+      alertaColor = p.trat.atr ? 'var(--accent)' : 'var(--ink)';
+    } else { alerta = p.fin; alertaColor = 'var(--good)'; }
+    const s = this.state;
+    const tels = act.map((t, i) => {
+      const key = p.id + ':' + t, ok = s.copiado === key;
+      return { label: 'Teléfono', txt: t, deco: 'none', color: 'var(--ink)', copiable: true, copiar: () => this.copiar(t, key), hayKbd: i === 0 && !narrow,
+        btnTxt: ok ? 'Copiado' : 'Copiar', btnIcon: ok ? 'ph ph-check' : 'ph ph-copy', btnBg: ok ? 'var(--good-soft)' : 'var(--surface)', btnFg: ok ? 'var(--good)' : 'var(--ink)', btnBorde: ok ? 'var(--good)' : 'var(--line-2)' };
+    });
+    if (p.usuario) {
+      const key = p.id + ':' + p.usuario, ok = s.copiado === key;
+      tels.push({ label: 'Usuario', txt: p.usuario, deco: 'none', color: 'var(--ink)', copiable: true, copiar: () => this.copiar(p.usuario, key), hayKbd: !act.length && !narrow,
+        btnTxt: ok ? 'Copiado' : 'Copiar', btnIcon: ok ? 'ph ph-check' : 'ph ph-copy', btnBg: ok ? 'var(--good-soft)' : 'var(--surface)', btnFg: ok ? 'var(--good)' : 'var(--ink)', btnBorde: ok ? 'var(--good)' : 'var(--line-2)' });
+    }
+    (p.malos || []).forEach(t => tels.push({ label: 'Equivocado', txt: t, deco: 'line-through', color: 'var(--muted)', copiable: false }));
+    const acc = ACC.filter(a => !a.solo || a.solo.includes(p.t));
+    this._acc = acc.map(a => a.k);
+    return {
+      n: p.n, tag: tagDe(p), tagBg: tb, tagFg: tf, perfil: p.perfil,
+      meta: `DNI ${p.dni} · ${p.esp} · ${m.full}`,
+      hayTrat: p.t === 'hier', trat: p.t === 'hier' ? tratLinea(p) : '',
+      datos, hayProg: p.t === 'hier', prog: p.t === 'hier' ? Array.from({ length: p.trat.n }, (_, i) => ({ bg: i < p.trat.k ? 'var(--warn)' : 'var(--line)' })) : [],
+      alerta, alertaColor, tels, sinContacto: !act.length && !p.usuario,
+      completo: p.col === 4, finTxt: (p.fin || '').toLowerCase(),
+      acciones: acc.map((a, i) => ({ l: a.l, icon: a.i, iconColor: a.c, kbd: String(i + 1), hayKbd: !narrow, go: () => this.elegir(a.k) })),
+      cierres: CIERRES.filter(c => !c.conTel || act.length).map(c => ({ l: c.l, icon: c.i, go: () => this.elegir(c.k) })),
+      historia: p.hist.map((h, i) => ({ f: h.f, txt: h.txt, dot: i === 0 ? 'var(--accent)' : 'var(--line-2)' }))
+    };
+  }
+
+  pasoVals(p) {
+    const ps = this.state.paso;
+    if (!ps || !p) return {};
+    const act = activos(p);
+    const v = { icon: 'ph ph-calendar-plus', iconColor: 'var(--info)', borde: 'var(--line-2)', hayAviso: true, hayFecha: false, hayDoctor: false, hayMotivo: false, hayNumeros: false, fecha: ps.f, numero: ps.numero, doctor: ps.doctor, motivo: ps.motivo };
+    const cierra = ['alta', 'numero', 'otrolugar', 'fallecio', 'otro'].includes(ps.k);
+    if (ps.k === 'agendo') Object.assign(v, { titulo: 'Agendó cita', hayFecha: true, fechaLabel: 'Fecha de la cita', confirmTxt: 'Pasar a Agendado', aviso: 'Si la fecha pasa sin cita realizada en SOFDOC, vuelve a «Por contactar».' });
+    if (ps.k === 'pensara') Object.assign(v, { titulo: 'Lo pensará', icon: 'ph ph-clock-countdown', hayFecha: true, fechaLabel: 'Volver a llamar el', confirmTxt: 'Guardar fecha', aviso: 'Sale de «Por contactar» hasta ese día.' });
+    if (ps.k === 'lohizo') {
+      v.icon = 'ph ph-check-square'; v.iconColor = 'var(--good)'; v.hayFecha = true;
+      if (p.t === 'hier') {
+        const k = p.trat.k + 1, ult = k >= p.trat.n;
+        Object.assign(v, { titulo: `Lo hizo · sesión ${k} de ${p.trat.n}`, fechaLabel: 'Fecha de la sesión', confirmTxt: ult ? 'Marcar como completado' : 'Pasar a En tratamiento', aviso: ult ? 'Es la última sesión: el tratamiento queda completado.' : `Quedará pendiente la sesión ${k + 1} de ${p.trat.n}.` });
+      } else Object.assign(v, { titulo: `Se hizo ${p.proc}`, fechaLabel: 'Fecha en que se lo hizo', confirmTxt: 'Marcar como completado', aviso: 'El procedimiento pasa a Completado.' });
+    }
+    if (ps.k === 'alta') Object.assign(v, { titulo: 'Alta médica', icon: 'ph ph-seal-check', hayDoctor: true, hayFecha: true, fechaLabel: 'Fecha del alta', confirmTxt: 'Confirmar alta', aviso: `Cierra el seguimiento de ${p.esp}. No cuenta como «no volvió».` });
+    if (ps.k === 'numero') Object.assign(v, act.length > 1
+      ? { titulo: 'Número equivocado', icon: 'ph ph-phone-disconnect', hayNumeros: true, confirmTxt: 'Marcar número', aviso: 'Se marca ese número. El seguimiento sigue con el otro.' }
+      : { titulo: 'Número equivocado', icon: 'ph ph-phone-disconnect', confirmTxt: 'Cerrar seguimiento', aviso: `${act[0]} es el único número: el seguimiento se cerrará.` });
+    if (ps.k === 'otrolugar') Object.assign(v, { titulo: 'Se atiende en otro lugar', icon: 'ph ph-buildings', confirmTxt: 'Cerrar seguimiento', aviso: 'Se cierra el seguimiento y el paciente sale del tablero.' });
+    if (ps.k === 'fallecio') Object.assign(v, { titulo: 'Falleció', icon: 'ph ph-flower-lotus', confirmTxt: 'Confirmar', aviso: 'Se cierra el seguimiento y el paciente no volverá a aparecer en ninguna lista.' });
+    if (ps.k === 'otro') Object.assign(v, { titulo: 'No desea continuar / otro', icon: 'ph ph-dots-three-outline', hayMotivo: true, confirmTxt: 'Cerrar seguimiento', aviso: 'Escriba el motivo. Se cierra el seguimiento.' });
+    if (cierra && ps.k !== 'alta') { v.iconColor = 'var(--accent)'; v.borde = 'var(--accent)'; }
+    const des = ps.k === 'otro' && !ps.motivo.trim();
+    Object.assign(v, {
+      deshabilitado: des, op: des ? .45 : 1, cursor: des ? 'not-allowed' : 'pointer',
+      numOpts: act, docOpts: MEDS.map(m => ({ v: m.k, l: m.full })),
+      onFecha: e => this.setPaso({ f: e.target.value || HOY }),
+      onDoctor: e => this.setPaso({ doctor: e.target.value }),
+      onMotivo: e => this.setPaso({ motivo: e.target.value }),
+      onNumero: e => this.setPaso({ numero: e.target.value }),
+      confirmar: () => { if (!des) this.aplicar(ps.k); },
+      cancelar: () => this.setState({ paso: null })
+    });
+    return v;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const narrow = s.w < 760;
+    const ncols = narrow ? 1 : s.w >= 1180 ? 4 : 2;
+    const user = USERS.find(u => u.v === s.usuario);
+    const esMed = user.rol === 'Médico';
+    const medF = esMed ? 'cab' : s.medico;
+    const nq = norm(s.q);
+    const base = p => !p.oculto && (!medF || p.med === medF) && (!s.esp || p.esp === s.esp) && (!s.sinTel || (!activos(p).length && !p.usuario)) && (!nq || norm(p.n).includes(nq) || p.dni.includes(nq));
+    const pasa = p => base(p) && (s.filtro === 'todos' || p.t === s.filtro);
+    const fase = s.fase, cargando = fase === 'cargando';
+    const lista = fase === 'vacio' || fase === 'error' ? [] : s.pacientes;
+    const vis = lista.filter(pasa);
+    const hayFiltros = !!(s.filtro !== 'todos' || (!esMed && s.medico) || s.esp || s.sinTel || nq);
+    const ordenar = a => a.slice().sort((x, y) => (x.intentos > 0) - (y.intentos > 0) || x.dias - y.dias);
+    const porCol = c => c === 1 ? ordenar(vis.filter(p => p.col === 1)) : vis.filter(p => p.col === c);
+    this._orden = {};
+
+    const columnas = COLS.filter(c => !narrow || c.id === s.colMovil).map(c => {
+      const L = cargando ? [] : porCol(c.id);
+      let grupos;
+      if (c.id === 1) {
+        grupos = GRUPOS.map(g => {
+          const todos = L.filter(p => g.f(p.dias));
+          const lim = s.lim[g.k], vistos = todos.slice(0, lim), resto = todos.length - vistos.length;
+          return { hayTitulo: true, titulo: g.t, rango: g.r, count: todos.length, tarjetas: vistos, hayMas: resto > 0, masTxt: `Ver ${Math.min(resto, 10)} más de ${resto}`, verMas: () => this.setState(st => ({ lim: Object.assign({}, st.lim, { [g.k]: st.lim[g.k] + 10 }) })) };
+        }).filter(g => g.count);
+      } else grupos = L.length ? [{ hayTitulo: false, tarjetas: L, hayMas: false }] : [];
+      this._orden[c.id] = [].concat(...grupos.map(g => g.tarjetas.map(p => p.id)));
+      grupos.forEach(g => { g.tarjetas = g.tarjetas.map(p => this.tarjeta(p, p.id === s.sel)); });
+      return {
+        ...(() => { const dp = s.drag && s.pacientes.find(x => x.id === s.drag.id), ok = dp && this.accionDrop(dp, c.id), sobre = s.dropCol === c.id; return { bg: ok && sobre ? 'var(--accent-soft)' : 'var(--col)', dropSombra: ok ? (sobre ? 'inset 0 0 0 2px var(--accent)' : 'inset 0 0 0 1.5px var(--line-2)') : 'none', op: dp && !ok && dp.col !== c.id ? .55 : 1 }; })(),
+        id: c.id, titulo: c.t, icon: c.i, iconColor: c.c, pos: ncols === 4 && c.id !== 1 ? 'sticky' : 'static', count: cargando ? '—' : L.length, minH: narrow ? '0' : '320px',
+        cargando, skel: [{ w1: '72%', w2: '55%' }, { w1: '60%', w2: '48%' }, { w1: '80%', w2: '40%' }].slice(0, c.id === 1 ? 3 : 2),
+        vacio: !cargando && !L.length, vacioTxt: hayFiltros && fase === 'listo' ? 'Nadie con estos filtros.' : c.vacio, vacioIcon: c.vi,
+        hayQuitar: hayFiltros && fase === 'listo' && !L.length, grupos
+      };
+    });
+
+    const cnt = c => cargando ? '—' : lista.filter(p => pasa(p) && p.col === c).length;
+    const col1Base = lista.filter(p => base(p) && p.col === 1);
+    const nunca = lista.filter(p => pasa(p) && p.col === 1 && !p.intentos).length;
+    const semana = lista.filter(p => pasa(p) && p.col === 2 && p.cita.tipo === 'cita' && p.cita.f <= '2026-10-11').length;
+    const atr = lista.filter(p => pasa(p) && p.col === 3 && p.trat.atr).length;
+    const kpis = [
+      { label: 'Por contactar', val: cnt(1), sub: cargando ? ' ' : `${nunca} sin ningún intento`, subColor: 'var(--muted)' },
+      { label: 'Agendados', val: cnt(2), sub: cargando ? ' ' : `${semana} ${semana === 1 ? 'cita' : 'citas'} esta semana`, subColor: 'var(--muted)' },
+      { label: 'En tratamiento', val: cnt(3), sub: cargando ? ' ' : atr ? `${atr} ${atr === 1 ? 'sesión atrasada' : 'sesiones atrasadas'}` : 'ninguna atrasada', subColor: atr && !cargando ? 'var(--accent)' : 'var(--muted)' },
+      { label: 'Completados en octubre', val: cnt(4), sub: cargando ? ' ' : 'volvieron, completaron o alta', subColor: 'var(--muted)' }
+    ];
+    const SEG = [['todos', 'Todos'], ['reev', 'Reevaluaciones'], ['hier', 'Hierro'], ['proc', 'Procedimientos']];
+    const segs = SEG.map(([k, l]) => {
+      const on = s.filtro === k;
+      return { label: l, pressed: String(on), count: cargando ? '—' : (k === 'todos' ? col1Base.length : col1Base.filter(p => p.t === k).length),
+        fg: on ? 'var(--accent-ink)' : 'var(--soft)', hoverFg: on ? 'var(--accent-ink)' : 'var(--ink)', countFg: on ? 'var(--accent-ink)' : 'var(--muted)',
+        go: () => this.setState({ filtro: k, sel: null }) };
+    });
+    const colTabs = COLS.map(c => {
+      const on = s.colMovil === c.id;
+      return { label: c.t, count: cnt(c.id), sel: String(on), bg: on ? 'var(--ink)' : 'var(--surface)', fg: on ? 'var(--bg)' : 'var(--soft)', borde: on ? 'var(--ink)' : 'var(--line)', go: () => this.setState({ colMovil: c.id }) };
+    });
+    const SECC = [['tablero', 'Tablero', 'ph ph-kanban'], ['registro', 'Registro', 'ph ph-note-pencil'], ['pacientes', 'Pacientes', 'ph ph-users-three'], ['indicadores', 'Indicadores', 'ph ph-chart-line-up']];
+    const menu = SECC.map(([k, l, i]) => {
+      const on = s.seccion === k;
+      return { label: l, icon: on ? i.replace('ph ', 'ph-fill ') : i, current: on ? 'page' : undefined, bg: on ? 'var(--accent-soft)' : 'transparent', fg: on ? 'var(--accent)' : 'var(--soft)', hoverBg: on ? 'var(--accent-soft)' : 'var(--surface-2)', hoverFg: on ? 'var(--accent)' : 'var(--ink)', navFg: on ? 'var(--accent)' : 'var(--muted)', go: () => { if (k === 'tablero') this.setState({ seccion: k, abierto: null }); else location.href = FILES[k]; } };
+    });
+
+    const p = s.ultimo != null ? s.pacientes.find(x => x.id === s.ultimo) : null;
+    const abierto = s.abierto != null;
+    const pp = p ? this.panel(p, narrow) : {};
+    const sinAnim = s.porTeclado || this.reduced;
+    const t = s.toast;
+    const nPorContactar = cargando ? '' : ` · ${cnt(1)} por contactar`;
+
+    return {
+      tema: s.tema, colorScheme: s.tema === 'oscura' ? 'dark' : 'light',
+      rootRef: this.rootRef, segRef: this.segRef, pillRef: this.pillRef, searchRef: this.searchRef, panelRef: this.panelRef,
+      narrow, notNarrow: !narrow, mainPad: narrow ? '18px 14px 96px' : '28px 32px 56px', h1Size: narrow ? '23px' : '28px', buscarW: narrow ? '100%' : '300px',
+      gridCols: `repeat(${ncols},minmax(0,1fr))`, kpiCols: s.w >= 1000 ? 'repeat(4,minmax(0,1fr))' : 'repeat(2,minmax(0,1fr))',
+      menu, usuarios: USERS, usuario: s.usuario,
+      onUsuario: e => { try { localStorage.setItem('chp-usuario', e.target.value); } catch (x) {} this.setState({ usuario: e.target.value, medico: '', sel: null }); },
+      toggleTema: () => { const t = s.tema === 'clara' ? 'oscura' : 'clara'; try { localStorage.setItem('chp-tema', t); } catch (e) {} this.setState({ tema: t }); },
+      temaIcon: s.tema === 'clara' ? 'ph ph-moon' : 'ph ph-sun', temaTxt: s.tema === 'clara' ? 'Modo oscuro' : 'Modo claro',
+      enTablero: s.seccion === 'tablero', otraSeccion: s.seccion !== 'tablero',
+      seccionTitulo: (SECC.find(x => x[0] === s.seccion) || [])[1], volverTablero: () => this.setState({ seccion: 'tablero' }),
+      saludo: esMed ? 'Buenos días, doctor Cabanillas' : `Buenos días, ${user.l}`,
+      subtitulo: `Martes ${dmy(HOY)}${nPorContactar}${esMed ? ' · solo sus pacientes' : ''}`,
+      metaRef: this.metaRef, metaScale: Math.min(1, s.hechos / META), metaColor: s.hechos >= META ? 'var(--good)' : 'var(--accent)',
+      metaTxt: s.hechos >= META ? `Meta del día cumplida · ${s.hechos} seguimientos` : `Hoy: ${s.hechos} de ${META} seguimientos`, metaFg: s.hechos >= META ? 'var(--good)' : 'var(--soft)', metaW: s.hechos >= META ? 600 : 400,
+      q: s.q, onQ: e => this.setState({ q: e.target.value, sel: null }),
+      kpis, segs,
+      medOpts: [{ v: '', l: 'Todos los médicos' }].concat(MEDS.map(m => ({ v: m.k, l: m.full }))),
+      medico: esMed ? 'cab' : s.medico, medDisabled: esMed, medOp: esMed ? .6 : 1,
+      onMedico: e => this.setState({ medico: e.target.value, sel: null }),
+      espOpts: [{ v: '', l: 'Todas las especialidades' }].concat(ESPS.map(x => ({ v: x, l: x }))),
+      esp: s.esp, onEsp: e => this.setState({ esp: e.target.value, sel: null }),
+      sinTelPressed: String(s.sinTel), toggleSinTel: () => this.setState({ sinTel: !s.sinTel, sel: null }),
+      sinTelBg: s.sinTel ? 'var(--ink)' : 'var(--surface)', sinTelFg: s.sinTel ? 'var(--bg)' : 'var(--soft)', sinTelBorde: s.sinTel ? 'var(--ink)' : 'var(--line)',
+      quitarFiltros: () => this.setState({ filtro: 'todos', medico: '', esp: '', sinTel: false, q: '' }),
+      verAtajos: !narrow && (this.props.atajos ?? true),
+      hayError: fase === 'error', reintentar: () => this.cargar(), verTablero: fase !== 'error',
+      colTabs, columnas,
+      veloOp: abierto ? 1 : 0, veloPe: abierto ? 'auto' : 'none', veloTrans: sinAnim ? 'none' : 'opacity .3s ease',
+      panelW: narrow ? '100%' : '460px', panelX: abierto ? 'translateX(0)' : 'translateX(100%)', panelVis: abierto ? 'visible' : 'hidden',
+      panelTrans: sinAnim ? 'none' : abierto ? 'transform .4s var(--ease-drawer),visibility 0s' : 'transform .3s var(--ease-drawer),visibility 0s linear .3s',
+      panelSombra: abierto ? 'var(--shadow-lg)' : 'none',
+      hayPanel: !!p, pp, verAcciones: !!p && p.col !== 4 && !s.paso, hayPaso: !!(p && s.paso), paso: this.pasoVals(p),
+      nota: s.nota, onNota: e => this.setState({ nota: e.target.value }),
+      cerrar: () => this.cerrar(),
+      verFicha: e => { e.preventDefault(); location.href = 'Pacientes.dc.html?dni=' + (p ? p.dni : ''); },
+      toastTxt: t ? t.txt : '', hayDeshacer: !!(t && t.deshacer), deshacer: () => this.deshacer(),
+      toastOp: t ? 1 : 0, toastPe: t ? 'auto' : 'none', toastX: t ? 'translate(-50%,0)' : 'translate(-50%,16px)', toastBottom: narrow ? '80px' : '24px'
+    };
+  }
+}
+</script>
+</body>
+</html>

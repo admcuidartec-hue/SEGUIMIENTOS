@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<script src="./doc-page.js"></script>
+<style>
+:root{--ink:#15171C;--soft:#41464F;--muted:#636976;--line:#E4E6EB;--line-2:#CDD1D9;--accent:#8C1D18;--accent-soft:#F7E9E8;--good:#1E7A4C;--good-soft:#E6F4EC;--warn:#985B00;--w1:#7A1A15;--w2:#B8433B;--w3:#DA857D;--w4:#F0C2BC;--mono:'Geist Mono',ui-monospace,monospace}
+doc-page:not(:defined){visibility:hidden}
+html,body{margin:0}
+*{box-sizing:border-box}
+a{color:var(--accent)}a:hover{color:#741612}
+</style>
+</helmet>
+<doc-page size="a4" margin="0">
+  <section class="page" id="p1" data-screen-label="01 Resumen del mes" style="font-family:'Geist',sans-serif;color:var(--ink);padding:15mm 16mm 12mm;display:flex;flex-direction:column;gap:7mm;font-size:10.5pt;line-height:1.45">
+    <header style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding-bottom:4mm;border-bottom:1px solid var(--line)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="width:30px;height:30px;border-radius:8px;background:var(--accent);color:#FFFFFF;display:grid;place-items:center;font-weight:600;font-size:9pt">CHP</span>
+        <span style="display:flex;flex-direction:column"><b style="font-weight:600;font-size:11pt">Seguimientos · Resumen del mes</b><span style="font-size:8.5pt;color:var(--muted)">Centro Hematológico del Perú · todos los médicos · todas las especialidades</span></span>
+      </div>
+      <span style="font-size:15pt;font-weight:600;letter-spacing:-.02em;white-space:nowrap">setiembre 2026</span>
+    </header>
+
+    <section style="display:grid;grid-template-columns:44mm 1fr;gap:8mm;align-items:center">
+      <span style="font-family:var(--mono);font-size:58pt;font-weight:500;letter-spacing:-.06em;line-height:.9;color:var(--accent)">25%</span>
+      <div style="display:flex;flex-direction:column;gap:2mm">
+        <p style="margin:0;font-size:15pt;font-weight:500;line-height:1.25;letter-spacing:-.01em">de los pacientes de setiembre no volvieron a su reevaluación.</p>
+        <p style="margin:0;color:var(--soft)">Son 5 de 20 pacientes. A otros 35 de este mes aún no les toca volver: todavía no cuentan, así que la cifra puede subir.</p>
+        <p style="margin:0;color:var(--good);font-weight:600">Dentro de la meta: que no vuelva como máximo el 40 %.</p>
+      </div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:3mm">
+      <h2 style="margin:0;font-size:11pt;font-weight:600">Tratamientos y seguimiento, en una frase cada uno</h2>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0 8mm;border-top:1px solid var(--line)">
+        <p style="margin:0;padding:3mm 0;border-bottom:1px solid var(--line);display:flex;gap:4mm;align-items:baseline"><b style="font-family:var(--mono);font-weight:500;font-size:16pt;color:var(--warn);min-width:16mm">42%</b><span>no siguió el tratamiento de hierro (5 de 12).</span></p>
+        <p style="margin:0;padding:3mm 0;border-bottom:1px solid var(--line);display:flex;gap:4mm;align-items:baseline"><b style="font-family:var(--mono);font-weight:500;font-size:16pt;color:var(--good);min-width:16mm">0%</b><span>completó el tratamiento de hierro (0 de 7): el mes recién cierra sus primeras sesiones.</span></p>
+        <p style="margin:0;padding:3mm 0;border-bottom:1px solid var(--line);display:flex;gap:4mm;align-items:baseline"><b style="font-family:var(--mono);font-weight:500;font-size:16pt;color:var(--warn);min-width:16mm">67%</b><span>no siguió otros procedimientos (2 de 3).</span></p>
+        <p style="margin:0;padding:3mm 0;border-bottom:1px solid var(--line);display:flex;gap:4mm;align-items:baseline"><b style="font-family:var(--mono);font-weight:500;font-size:16pt;color:var(--good);min-width:16mm">40%</b><span>volvió después de que la asesora le escribió (4 de 10).</span></p>
+      </div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:3mm">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+        <h2 style="margin:0;font-size:11pt;font-weight:600">Mes a mes · % que no volvió a su reevaluación</h2>
+        <span style="display:flex;gap:10px;font-size:8.5pt;color:var(--soft)"><span style="display:inline-flex;align-items:center;gap:5px"><i style="width:9px;height:9px;background:var(--accent);border-radius:2px"></i>cerrado</span><span style="display:inline-flex;align-items:center;gap:5px"><i style="width:9px;height:9px;border:1.2px solid var(--accent);background:repeating-linear-gradient(135deg,var(--accent) 0 1.2px,transparent 1.2px 3.5px);border-radius:2px"></i>en curso</span><span style="display:inline-flex;align-items:center;gap:5px"><i style="width:14px;border-top:1.2px dashed var(--ink)"></i>meta 40 %</span></span>
+      </div>
+      <div style="position:relative;height:48mm;display:grid;grid-template-columns:repeat(6,1fr);gap:7mm;align-items:end;border-bottom:1px solid var(--line-2);margin-top:5mm">
+        <span style="position:absolute;left:0;right:0;bottom:40%;border-top:1.2px dashed var(--ink);opacity:.7"></span>
+        <div style="position:relative;height:61%;background:var(--accent);border-radius:3px 3px 0 0;opacity:.6"><b style="position:absolute;bottom:100%;left:0;right:0;text-align:center;padding-bottom:1mm;font-family:var(--mono);font-weight:500;font-size:9.5pt">61%</b></div>
+        <div style="position:relative;height:58%;background:var(--accent);border-radius:3px 3px 0 0;opacity:.6"><b style="position:absolute;bottom:100%;left:0;right:0;text-align:center;padding-bottom:1mm;font-family:var(--mono);font-weight:500;font-size:9.5pt">58%</b></div>
+        <div style="position:relative;height:58%;background:var(--accent);border-radius:3px 3px 0 0;opacity:.6"><b style="position:absolute;bottom:100%;left:0;right:0;text-align:center;padding-bottom:1mm;font-family:var(--mono);font-weight:500;font-size:9.5pt">58%</b></div>
+        <div style="position:relative;height:57%;background:var(--accent);border-radius:3px 3px 0 0;opacity:.6"><b style="position:absolute;bottom:100%;left:0;right:0;text-align:center;padding-bottom:1mm;font-family:var(--mono);font-weight:500;font-size:9.5pt">57%</b></div>
+        <div style="position:relative;height:47%;background:var(--accent);border-radius:3px 3px 0 0;opacity:.6"><b style="position:absolute;bottom:100%;left:0;right:0;text-align:center;padding-bottom:1mm;font-family:var(--mono);font-weight:500;font-size:9.5pt">47%</b></div>
+        <div style="position:relative;height:25%;border:1.2px solid var(--accent);background:repeating-linear-gradient(135deg,var(--accent) 0 1.5px,transparent 1.5px 5px);border-radius:3px 3px 0 0"><b style="position:absolute;bottom:100%;left:0;right:0;text-align:center;padding-bottom:1mm;font-family:var(--mono);font-weight:500;font-size:9.5pt">25%</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:7mm;text-align:center;font-size:9pt;color:var(--soft)"><span>abril</span><span>mayo</span><span>junio</span><span>julio</span><span>agosto</span><b style="color:var(--accent);font-weight:600">setiembre</b></div>
+    </section>
+
+    <section style="margin-top:auto;display:flex;flex-direction:column;gap:2mm;padding:4mm 5mm;border-radius:6px;background:var(--accent-soft)">
+      <h2 style="margin:0;font-size:11pt;font-weight:600">Qué conviene mirar</h2>
+      <ul style="margin:0;padding-left:5mm;display:flex;flex-direction:column;gap:1mm">
+        <li>Desde abril, el porcentaje que no vuelve bajó de 61 % a 47 % en agosto. Setiembre va en 25 %, pero 35 pacientes aún están en plazo.</li>
+        <li>Más de 4 de cada 10 pacientes con hierro no siguieron el tratamiento (42 %): es lo que más conviene reforzar en el seguimiento.</li>
+      </ul>
+    </section>
+    <footer style="display:flex;justify-content:space-between;font-size:8pt;color:var(--muted)"><span>Generado el 06/10/2026 · datos de SOFDOC y de la plataforma</span><span>1 de 2</span></footer>
+  </section>
+
+  <section class="page" id="p2" data-screen-label="02 Hasta dónde llegan" style="font-family:'Geist',sans-serif;color:var(--ink);padding:15mm 16mm 12mm;display:flex;flex-direction:column;gap:7mm;font-size:10.5pt;line-height:1.45">
+    <header style="display:flex;justify-content:space-between;align-items:baseline;padding-bottom:4mm;border-bottom:1px solid var(--line)"><b style="font-weight:600;font-size:11pt">¿Hasta dónde llegan los pacientes nuevos?</b><span style="font-size:9pt;color:var(--muted)">enero a setiembre 2026</span></header>
+
+    <section style="display:grid;grid-template-columns:52mm 1fr;gap:9mm;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:3mm">
+        <div role="img" aria-label="De cada 100: 66 no volvieron nunca, 23 a 1 reevaluación, 5 a 2, 6 a 3 o más" style="display:grid;grid-template-columns:repeat(10,1fr);gap:1.2mm">
+          <sc-for list="{{ waffle }}" as="q" hint-placeholder-count="100"><i style="aspect-ratio:1;border-radius:1.5px;background:{{ q }}"></i></sc-for>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:1.2mm;font-size:9.5pt">
+          <span style="display:flex;gap:6px;align-items:baseline"><i style="width:8px;height:8px;background:var(--w1);border-radius:2px"></i><b style="font-family:var(--mono);font-weight:500;min-width:18px">66</b>no volvió nunca</span>
+          <span style="display:flex;gap:6px;align-items:baseline"><i style="width:8px;height:8px;background:var(--w2);border-radius:2px"></i><b style="font-family:var(--mono);font-weight:500;min-width:18px">23</b>volvió a 1 reevaluación</span>
+          <span style="display:flex;gap:6px;align-items:baseline"><i style="width:8px;height:8px;background:var(--w3);border-radius:2px"></i><b style="font-family:var(--mono);font-weight:500;min-width:18px">5</b>volvió a 2 reevaluaciones</span>
+          <span style="display:flex;gap:6px;align-items:baseline"><i style="width:8px;height:8px;background:var(--w4);border-radius:2px"></i><b style="font-family:var(--mono);font-weight:500;min-width:18px">6</b>volvió a 3 o más</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:2.5mm">
+        <p style="margin:0;font-size:16pt;font-weight:500;line-height:1.25;letter-spacing:-.015em">De cada 100 pacientes nuevos, <span style="color:var(--accent);font-weight:600">66 no vuelven nunca</span> después de su primera consulta.</p>
+        <p style="margin:0">34 vuelven a su 1.ª reevaluación, 11 llegan a la 2.ª y 6 a la 3.ª.</p>
+        <p style="margin:0">Donde más se pierden es entre la 1.ª y la 2.ª reevaluación: el 68 % no sigue.</p>
+        <p style="margin:0">El mes con más pacientes perdidos fue agosto 2026 (74 % no volvió); el mejor, enero 2026 (58 %).</p>
+        <p style="margin:0;font-weight:600">La meta es que vuelva el 60 %; hoy vuelve el 34 %.</p>
+        <p style="margin:0;color:var(--soft)">Otros 157 pacientes nuevos tampoco han vuelto, pero todavía están dentro de su plazo: aún no se cuentan.</p>
+      </div>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:2mm">
+      <h2 style="margin:0;font-size:11pt;font-weight:600">¿Qué canales traen pacientes que vuelven?</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:9.5pt">
+        <thead><tr><th style="text-align:left;font-weight:600;font-size:8.5pt;color:var(--muted);padding:1.5mm 0;border-bottom:1px solid var(--line)">Canal</th><th style="text-align:right;font-weight:600;font-size:8.5pt;color:var(--muted);padding:1.5mm 0;border-bottom:1px solid var(--line)">Nuevos</th><th style="text-align:left;font-weight:600;font-size:8.5pt;color:var(--muted);padding:1.5mm 0 1.5mm 6mm;border-bottom:1px solid var(--line)">Volvieron a su 1.ª reevaluación</th></tr></thead>
+        <tbody>
+          <tr><td style="padding:1.8mm 0;border-bottom:1px solid var(--line)">WhatsApp directo</td><td style="text-align:right;font-family:var(--mono);border-bottom:1px solid var(--line)">143</td><td style="padding:1.8mm 0 1.8mm 6mm;border-bottom:1px solid var(--line)"><span style="display:flex;align-items:center;gap:3mm"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:30%;background:var(--good)"></i></span><span style="font-family:var(--mono);min-width:24mm">30 % (35/115)</span></span></td></tr>
+          <tr><td style="padding:1.8mm 0;border-bottom:1px solid var(--line)">Google</td><td style="text-align:right;font-family:var(--mono);border-bottom:1px solid var(--line)">60</td><td style="padding:1.8mm 0 1.8mm 6mm;border-bottom:1px solid var(--line)"><span style="display:flex;align-items:center;gap:3mm"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:39%;background:var(--good)"></i></span><span style="font-family:var(--mono);min-width:24mm">39 % (12/31)</span></span></td></tr>
+          <tr><td style="padding:1.8mm 0;border-bottom:1px solid var(--line)">Referido</td><td style="text-align:right;font-family:var(--mono);border-bottom:1px solid var(--line)">53</td><td style="padding:1.8mm 0 1.8mm 6mm;border-bottom:1px solid var(--line)"><span style="display:flex;align-items:center;gap:3mm"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:35%;background:var(--good)"></i></span><span style="font-family:var(--mono);min-width:24mm">35 % (9/26)</span></span></td></tr>
+          <tr><td style="padding:1.8mm 0;border-bottom:1px solid var(--line)">Facebook Ads</td><td style="text-align:right;font-family:var(--mono);border-bottom:1px solid var(--line)">39</td><td style="padding:1.8mm 0 1.8mm 6mm;border-bottom:1px solid var(--line)"><span style="display:flex;align-items:center;gap:3mm"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:35%;background:var(--good)"></i></span><span style="font-family:var(--mono);min-width:24mm">35 % (8/23)</span></span></td></tr>
+          <tr><td style="padding:1.8mm 0;border-bottom:1px solid var(--line)">TikTok</td><td style="text-align:right;font-family:var(--mono);border-bottom:1px solid var(--line)">12</td><td style="padding:1.8mm 0 1.8mm 6mm;border-bottom:1px solid var(--line)"><span style="display:flex;align-items:center;gap:3mm"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:25%;background:var(--good)"></i></span><span style="font-family:var(--mono);min-width:24mm">25 % (2/8)</span></span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section style="display:flex;flex-direction:column;gap:2mm">
+      <h2 style="margin:0;font-size:11pt;font-weight:600">Procedimientos: de lo cotizado, cuánto se empezó</h2>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:0 8mm;border-top:1px solid var(--line)">
+        <p style="margin:0;padding:2.5mm 0;border-bottom:1px solid var(--line);display:flex;gap:4mm;align-items:baseline"><b style="font-family:var(--mono);font-weight:500;font-size:14pt;color:var(--warn);min-width:15mm">48%</b><span>del hierro (Ferinject) cotizado se empezó: 109 de 227.</span></p>
+        <p style="margin:0;padding:2.5mm 0;border-bottom:1px solid var(--line);display:flex;gap:4mm;align-items:baseline"><b style="font-family:var(--mono);font-weight:500;font-size:14pt;color:var(--warn);min-width:15mm">11%</b><span>de AMO + biopsia + cariotipo + citometría de flujo se empezó: 6 de 55.</span></p>
+      </div>
+    </section>
+
+    <footer style="margin-top:auto;display:flex;justify-content:space-between;font-size:8pt;color:var(--muted)"><span>Cada paciente cuenta una sola vez, según la última reevaluación a la que llegó. Solo cuentan aquellos a quienes ya les venció el plazo.</span><span style="white-space:nowrap;padding-left:6mm">2 de 2</span></footer>
+  </section>
+</doc-page>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return { waffle: [].concat(Array(66).fill('var(--w1)'), Array(23).fill('var(--w2)'), Array(5).fill('var(--w3)'), Array(6).fill('var(--w4)')) };
+  }
+}
+</script>
+</body>
+</html>

@@ -1828,21 +1828,23 @@ const RG = {
   dni: '', pac: null,            // el último DNI pedido y lo que devolvió buscarPacienteRegistro
   auto: {},                      // lo que se completó solo, por campo: se reemplaza si cambia el DNI
   aEsp: '', enviando: false, teclado: false,
-  hoy: null, anulando: '', motivo: ''
+  hoy: null, anulando: '', motivo: '',
+  anulandoEnVuelo: ''            // ID con una anulación sin respuesta: no se manda dos veces
 };
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres (documentoValido del servidor). Nunca borra letras. */
 const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '').slice(0, 12);
 const documentoOk = v => { const d = dniLimpio(v); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
 /** Un teléfono se envía sin espacios; un usuario (@…) tal cual. */
-const contactoEnvio = v => { const t = String(v || '').trim(); return /^[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t; };
-const marcasDe = t => (S.boot && S.boot.marcas && S.boot.marcas[norm(t)]) || [];
+const contactoEnvio = v => { const t = String(v || '').trim(); return /^\+?[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t; };
+/** La clave es normTexto del tratamiento: sin tildes, en mayúsculas y con los espacios (y saltos de línea) juntados. */
+const marcasDe = t => (S.boot && S.boot.marcas && S.boot.marcas[norm(t).replace(/\s+/g, ' ')]) || [];
 const PARTICULAS_CAT = { DE: 1, DEL: 1, LA: 1, EL: 1, LOS: 1, LAS: 1, Y: 1, EN: 1, CON: 1, SIN: 1 };
 /** 'CITOMETRÍA DE FLUJO' -> 'Citometría de flujo'; las siglas cortas (AMO) quedan en mayúsculas. Solo para mostrar. */
 function etiquetaCat(t) {
   return String(t || '').trim().split(/\s+/).map((w, i) => w.length <= 3 && !PARTICULAS_CAT[norm(w)] && w === w.toUpperCase() ? w
     : i ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
 }
-const sinMarca = t => 'El ' + etiquetaCat(t).replace(/^hierro\s+/i, '').toLowerCase() + ' no lleva marca.';
+const sinMarca = t => etiquetaCat(t) + ': no lleva marca.';
 const sesionesElegidas = () => RG.ses === 'otro' ? Number(RG.otro) : RG.ses;
 const opcionesDoctores = () => '<option value="">— Elija —</option>'
   + ((S.boot && S.boot.doctores) || []).map(d => `<option value="${esc(d.doctor)}">${esc(d.doctor)}</option>`).join('');
@@ -1850,13 +1852,14 @@ const opcionesDoctores = () => '<option value="">— Elija —</option>'
 /** Una vez, tras bootstrap. Los contenedores son fijos: los eventos se conectan aquí y el contenido se repinta. */
 function iniciarRegistro() {
   const f = $('#rform');
-  f.addEventListener('submit', e => e.preventDefault());
+  // Enter en un campo envía, como en la app anterior: la misma ruta que el botón (con implícito, el navegador «pulsa» #rgo).
+  f.addEventListener('submit', e => { e.preventDefault(); enviarRegistro(); });
   f.addEventListener('input', cambioRegistro);
   f.addEventListener('change', cambioRegistro);
   f.addEventListener('click', clicRegistro);
   $('#rseg').addEventListener('click', e => {
     const b = e.target.closest('[data-rmodo]');
-    if (!b || b.dataset.rmodo === RG.modo) return;
+    if (!b || b.disabled || RG.enviando || b.dataset.rmodo === RG.modo) return;
     RG.modo = b.dataset.rmodo;
     $$('#rseg [data-rmodo]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
     pastilla($('#rseg'));
@@ -1867,7 +1870,7 @@ function iniciarRegistro() {
     if (!e.target.matches('.anula input')) return;
     RG.motivo = e.target.value;
     const ok = e.target.parentNode.querySelector('[data-confirmar-anular]');
-    if (ok) ok.disabled = !RG.motivo.trim();
+    if (ok) ok.disabled = !RG.motivo.trim() || !!RG.anulandoEnVuelo;
   });
   $('#lhoy').addEventListener('keydown', e => {
     if (!e.target.matches('.anula input')) return;
@@ -1904,7 +1907,7 @@ function pintarFormRegistro(anim) {
       <div class="chips" id="rtrats">${[''].concat((S.boot && S.boot.tratamientos) || []).map(t => `<button type="button" class="chip" data-trat="${esc(t)}" aria-pressed="${t === RG.trat}">${t ? esc(etiquetaCat(t)) : 'Ninguno'}</button>`).join('')}</div>
       <div id="rses"></div></fieldset>
     <div id="rdup"></div>
-    <div class="barra-reg"><button type="button" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar</button><span id="rfalta" aria-live="polite"></span></div>`;
+    <div class="barra-reg"><button type="submit" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar</button><span id="rfalta" aria-live="polite"></span></div>`;
   else f.innerHTML = `
     <fieldset><legend><span class="k">1</span>Paciente</legend>${dni('adni')}<div class="avisos-dni" id="acon" aria-live="polite"></div></fieldset>
     <fieldset><legend><span class="k">2</span>Especialidad del alta<small>solo las que tiene</small></legend><div class="chips" id="aesps"></div></fieldset>
@@ -1912,7 +1915,7 @@ function pintarFormRegistro(anim) {
       <div class="dos"><label class="campo">Doctor que da el alta<select id="amed">${doc}</select></label>
         <label class="campo">Fecha del alta<input id="afec" type="date" value="${hoy}" max="${hoy}"></label></div></fieldset>
     <label class="campo">Nota (opcional)<textarea id="anota" rows="2"></textarea></label>
-    <div class="barra-reg"><button type="button" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar alta</button><span id="rfalta" aria-live="polite"></span></div>`;
+    <div class="barra-reg"><button type="submit" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar alta</button><span id="rfalta" aria-live="polite"></span></div>`;
   if (RG.modo === 'alta') pintarEspecialidades();
   if (anim && !reducido) f.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: EASE_OUT });
   validarRegistro();
@@ -1940,7 +1943,12 @@ function cambioRegistro(e) {
 
 function cambioDni(el) {
   const v = dniLimpio(el.value);
-  if (el.value !== v) el.value = v;
+  if (el.value !== v) {
+    // Conserva el cursor: queda tras los mismos caracteres válidos que tenía delante.
+    const pos = el.selectionStart == null ? v.length : dniLimpio(el.value.slice(0, el.selectionStart)).length;
+    el.value = v;
+    try { el.setSelectionRange(pos, pos); } catch (e) { /* sin cursor */ }
+  }
   if (v === RG.dni) return;
   RG.dni = v;
   RG.pac = null;
@@ -2046,7 +2054,7 @@ function clicRegistro(e) {
   } else if (d.esp) {
     RG.aEsp = d.esp;
     $$('#aesps [data-esp]').forEach(x => x.setAttribute('aria-pressed', String(x === t)));
-  } else if (t.id === 'rgo') { registrar(false, teclado); return; }
+  } else if (t.id === 'rgo') { RG.teclado = teclado; return; }   // lo envía el submit del formulario
   else if (t.id === 'rforzar') { registrar(true, teclado); return; }
   else if (t.id === 'rrevisar') { $('#rdup').innerHTML = ''; ($('#rnom') || $('#rdni')).focus(); return; }
   else return;
@@ -2082,10 +2090,20 @@ function validarRegistro() {
   if (!b) return;
   const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0);
   b.disabled = f.length > 0 || RG.enviando;
+  $$('#rseg [data-rmodo]').forEach(x => { x.disabled = RG.enviando; });
   $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.`
     : RG.modo === 'ind' ? (n === 1 ? 'Se creará 1 registro.' : `Se crearán ${n} registros.`) : 'Cierra el seguimiento de esa especialidad.';
 }
 
+/** Botón «Registrar» o Enter. Nunca reenvía con un envío en vuelo ni con la caja de duplicado abierta: ahí decide la asesora. */
+function enviarRegistro() {
+  const teclado = RG.teclado !== false;
+  RG.teclado = true;
+  if (RG.enviando) return;
+  const forzar = $('#rforzar');
+  if (forzar) { forzar.focus(); return; }
+  registrar(false, teclado);
+}
 /** guardarRegistro (MAPEO §1.4) o darDeAlta (§1.8). Los ID son los que devuelve el servidor. */
 async function registrar(forzar, teclado) {
   if (RG.enviando || faltanRegistro().length) return;
@@ -2158,8 +2176,8 @@ function pintarHoy(nuevos) {
       <div class="det"><b class="tx">${esc(x.NOMBRE)}<span class="mono"> · DNI ${esc(x.DNI)}</span></b><span class="tx texto">${esc(x.TEXTO)}</span>
         <span class="quien">${esc(x.ID)} · ${anulado ? 'anulado' + (x.MOTIVO_ANULACION ? ': ' + esc(x.MOTIVO_ANULACION) : '') : 'registró ' + esc(nombreBonito(x.ASESORA))}</span>
         <div class="anula">${abierto ? `<input class="ctl" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(RG.motivo)}">`
-          + `<button type="button" class="btn btn-p" data-confirmar-anular${RG.motivo.trim() ? '' : ' disabled'}>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button>` : ''}</div></div>
-      ${anulado ? '<span class="marca-anulado">Anulado</span>' : `<button type="button" class="ghost" data-anular="${esc(x.ID)}">Anular</button>`}</li>`;
+          + `<button type="button" class="btn btn-p" data-confirmar-anular${RG.motivo.trim() && !RG.anulandoEnVuelo ? '' : ' disabled'}>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button>` : ''}</div></div>
+      ${anulado ? '<span class="marca-anulado">Anulado</span>' : abierto ? '<span></span>' : `<button type="button" class="ghost" data-anular="${esc(x.ID)}">Anular</button>`}</li>`;
   }).join('') : '<li class="sin-fila"><p class="vacio">Todavía no hay registros hoy.</p></li>';
   if (nuevos && !reducido) nuevos.forEach(id => {
     const el = $$('#lhoy [data-reg]').find(x => x.dataset.reg === id);
@@ -2174,6 +2192,7 @@ function clicHoy(e) {
   if (!t) return;
   if (t.hasAttribute('data-rehoy')) { cargarRegistrosHoy(); return; }
   if (t.dataset.anular) {
+    if (RG.anulandoEnVuelo) return;
     RG.anulando = t.dataset.anular;
     RG.motivo = '';
     pintarHoy();
@@ -2183,6 +2202,7 @@ function clicHoy(e) {
   else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacionHoy(t);
 }
 function cancelarAnulacionHoy() {
+  if (RG.anulandoEnVuelo) return;
   const id = RG.anulando;
   RG.anulando = '';
   RG.motivo = '';
@@ -2193,13 +2213,21 @@ function cancelarAnulacionHoy() {
 /** Anula con su motivo (obligatorio). La fila se tacha solo cuando el servidor respondió que sí. */
 async function confirmarAnulacionHoy(boton) {
   const id = RG.anulando, motivo = RG.motivo.trim();
-  if (!id || !boton || (boton.disabled && motivo)) return;   // sin motivo avisa; con él, deshabilitado = ya en vuelo
+  if (!id || !boton || RG.anulandoEnVuelo) return;
   if (!motivo) { avisar('Escriba el motivo de la anulación.'); return; }
   if (!exigirUsuario()) return;
+  RG.anulandoEnVuelo = id;
   boton.disabled = true;
   try {
     await llamar(id.indexOf('ALT-') === 0 ? 'anularAlta' : 'anularRegistro', { usuario: S.usuario, id, motivo });
-  } catch (e) { boton.disabled = false; avisar('No se anuló: ' + e.message); return; }
+  } catch (e) {
+    RG.anulandoEnVuelo = '';
+    const ok = filaHoyEl(id) && filaHoyEl(id).querySelector('[data-confirmar-anular]');
+    if (ok) ok.disabled = !RG.motivo.trim();
+    avisar('No se anuló: ' + e.message);
+    return;
+  }
+  RG.anulandoEnVuelo = '';
   RG.anulando = '';
   RG.motivo = '';
   const x = (RG.hoy || []).find(y => y.ID === id);

@@ -1343,7 +1343,7 @@ test('registro: dos procedimientos y un tratamiento con sesiones y marca crean t
     await pagina.locator('[data-trat="HIERRO DERISOMALTOSA"]').click();
     assert.equal(await pagina.locator('#rses [data-marca="MONOFER"]').getAttribute('aria-pressed'), 'true');
     await pagina.locator('[data-trat="HIERRO SACARATO"]').click();
-    assert.match(await pagina.locator('#rses').textContent(), /El sacarato no lleva marca\./);
+    assert.match(await pagina.locator('#rses').textContent(), /Hierro sacarato: no lleva marca\./);
     await pagina.locator('[data-trat="HIERRO CARBOXIMALTOSA"]').click();
     await pagina.locator('#rses [data-ses="2"]').click();
     await pagina.locator('#rses [data-marca="FERINJECT"]').click();
@@ -1516,6 +1516,73 @@ test('registro: «Anular» pide motivo en la fila, espera al servidor y deja la 
     assert.equal(await aviso(pagina), 'Anulado: REG-000003.');
     // El tablero se actualiza: la tarjeta de ese registro sale.
     await pagina.waitForFunction(() => !S.pacientes.some(p => p.id === 'REG-000003'));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: Enter envía una sola vez, no reenvía con la caja de duplicado ni con un envío en vuelo', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('45678905');
+    await pagina.waitForSelector('#rcon .nuevo');
+    await llenarIndicacion(pagina, { nombre: 'Lía Vargas Soto', contacto: '+51 987 654 321', doctor: 'Dr. Elí Cabanillas', procs: ['SANGRÍA'] });
+    // Mientras se envía, el cambio de modo y otro Enter no hacen nada.
+    await pagina.evaluate(() => { DEMO._demora.guardarRegistro = 400; });
+    await pagina.locator('#rnom').press('Enter');
+    await pagina.waitForFunction(() => RG.enviando);
+    assert.equal(await pagina.locator('#rseg [data-rmodo="alta"]').isDisabled(), true);
+    await pagina.locator('#rnom').press('Enter');
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 1, 'Enter envía una sola vez');
+    assert.equal((await ultimo(pagina, 'guardarRegistro')).contacto, '+51987654321', 'el + se conserva y los espacios no');
+    assert.equal(await pagina.locator('#rseg [data-rmodo="alta"]').isDisabled(), false);
+    await pagina.evaluate(() => { delete DEMO._demora.guardarRegistro; });
+    // Con la caja de duplicado abierta, Enter no reenvía: decide la asesora.
+    await pagina.locator('#rdni').fill('45678905');
+    await pagina.waitForSelector('#rcon .nuevo');
+    await llenarIndicacion(pagina, { nombre: 'Lía Vargas Soto', contacto: '987654321', doctor: 'Dr. Elí Cabanillas', procs: ['SANGRÍA'] });
+    await pagina.locator('#rnom').press('Enter');
+    await pagina.waitForSelector('#rdup .dup');
+    await pagina.locator('#rtel').press('Enter');
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 2);
+    assert.ok(await pagina.locator('#rforzar').evaluate(el => el === document.activeElement), 'el foco va a «Registrar de todos modos»');
+    assert.equal(await pagina.locator('#rdup .dup').count(), 1);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: una anulación en vuelo no se manda dos veces y la fila abierta oculta su «Anular»', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const fila = filaHoy(pagina, 'REG-000003');
+    await fila.locator('[data-anular]').click();
+    assert.equal(await fila.locator('[data-anular]').count(), 0, 'con el motivo abierto no hay otro «Anular» en la fila');
+    await fila.locator('.anula input').fill('Paciente equivocado');
+    await pagina.evaluate(() => { DEMO._demora.anularRegistro = 500; });
+    await fila.locator('[data-confirmar-anular]').click();
+    await fila.locator('.anula input').fill('Paciente equivocado otra vez');
+    assert.equal(await fila.locator('[data-confirmar-anular]').isDisabled(), true, 'escribir no lo rehabilita');
+    await fila.locator('.anula input').press('Enter');
+    await fila.locator('[data-confirmar-anular]').click({ force: true });
+    await pagina.waitForSelector('#lhoy li.anulado[data-reg="REG-000003"]');
+    assert.equal(await llamadas(pagina, 'anularRegistro'), 1);
+    assert.equal(await pagina.evaluate(() => RG.anulandoEnVuelo), '');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: el DNI conserva el cursor al quitar caracteres no válidos', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const dni = pagina.locator('#rdni');
+    await dni.fill('40448555');
+    await dni.evaluate(el => el.setSelectionRange(3, 3));
+    await pagina.keyboard.type('-');
+    assert.equal(await dni.inputValue(), '40448555');
+    assert.equal(await dni.evaluate(el => el.selectionStart), 3);
+    await pagina.keyboard.type('x');
+    assert.equal(await dni.inputValue(), '404X48555');
+    assert.equal(await dni.evaluate(el => el.selectionStart), 4);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

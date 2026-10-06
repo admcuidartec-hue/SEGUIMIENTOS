@@ -341,7 +341,7 @@ test('tablero: las cuatro columnas tienen las tarjetas del DEMO, cada una con su
     const lucia = (await pintadas(pagina, '2')).find(v => v.id === '40999000|HEMATOLOGÍA');
     assert.ok(lucia.texto.includes('Reintentar el 02/10 · intento 2 de 3'), lucia.texto);
     // Rojo solo con ATRASO > 0 o SIN RESPUESTA.
-    const mal = await pagina.evaluate(() => [...document.querySelectorAll('#tablero [data-card] .etq.mal')].map(e => e.closest('[data-card]').dataset.card).sort());
+    const mal = await pagina.evaluate(() => [...document.querySelectorAll('#tablero [data-card] .etq.mal, #tablero [data-card] .chip-fecha.mal')].map(e => e.closest('[data-card]').dataset.card).sort());
     const enRojo = Object.values(d.columnas).flat().filter(t => Number(t.ATRASO) > 0 || t.AGENDA === 'SIN RESPUESTA').map(t => t.CLAVE).sort();
     assert.deepEqual(enRojo, ['REG-000001', 'REG-000004'], 'el DEMO tiene una atrasada y una sin respuesta');
     assert.deepEqual(mal, enRojo);
@@ -353,9 +353,11 @@ test('tablero: las cuatro columnas tienen las tarjetas del DEMO, cada una con su
     assert.equal(grupo['40888999|HIERRO'], 'despues');
     assert.equal(grupo['REG-000004'], 'despues');
     const chip = id => pagina.evaluate(id => [...document.querySelectorAll('[data-card]')].find(e => e.dataset.card === id).querySelector('.chip-fecha').textContent.trim(), id);
-    assert.equal(await chip('40777888|HEMATOLOGÍA'), 'Cita lun 05/10');
-    assert.equal(await chip('40888999|HIERRO'), 'Llamar jue 08/10');
-    assert.equal(await chip('40999000|HEMATOLOGÍA'), 'Reintentar 02/10');
+    for (const t of d.columnas.AGENDADO) assert.equal(await chip(t.CLAVE), t.ETIQUETA, `chip de ${t.CLAVE} = ETIQUETA`);
+    assert.equal(await chip('40777888|HEMATOLOGÍA'), 'Cita el lun 05/10');
+    assert.equal(await chip('40999000|HEMATOLOGÍA'), 'Reintentar el 02/10 · intento 2 de 3');
+    assert.equal(await pagina.locator('#tablero [data-col="2"] [data-card] .etq').count(), 0, 'en Agendado la fecha no se repite');
+    assert.equal(await pagina.evaluate(() => [...document.querySelectorAll('[data-card]')].find(e => e.dataset.card === 'REG-000004').querySelector('.chip-fecha').classList.contains('mal')), true);
     assert.deepEqual(await pagina.locator('#tablero [data-col="2"] h3').evaluateAll(l => l.map(h => h.dataset.grupo)), ['semana', 'despues']);
     // La clave es texto y el adaptador conserva la forma de la referencia.
     const p = await pagina.evaluate(() => S.pacientes.find(x => x.id === '40444555|HEMATOLOGÍA'));
@@ -535,6 +537,13 @@ test('tablero: teclado (↓ j k →, Enter abre el panel, Esc lo cierra, C copia
     assert.equal(await pagina.evaluate(() => seleccion.panel), '');
     await pagina.waitForSelector('#panel', { state: 'hidden' });
     assert.equal(await pagina.evaluate(() => document.activeElement.dataset.card), c2[1]);
+    // Espacio también abre (role="button") y no desplaza la página.
+    await pagina.evaluate(() => addEventListener('keydown', e => { if (e.key === ' ') window.espacioPrevenido = e.defaultPrevented; }));
+    await pagina.keyboard.press(' ');
+    assert.equal(await pagina.evaluate(() => seleccion.panel), c2[1]);
+    assert.equal(await pagina.evaluate(() => window.espacioPrevenido), true, 'Espacio no desplaza la página');
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForSelector('#panel', { state: 'hidden' });
     // / va al buscador y Esc sale del campo.
     await pagina.keyboard.press('/');
     assert.equal(await pagina.evaluate(() => document.activeElement.id), 'q');

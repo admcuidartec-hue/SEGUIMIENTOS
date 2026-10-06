@@ -604,19 +604,18 @@ function contactoHtml(p, clase) {
   if (p.usuario) return `<span class="${clase}"><i class="ph ph-at"></i>${esc(p.usuario)}</span>`;
   return `<span class="${clase} sin"><i class="ph ph-phone-slash"></i>Sin teléfono</span>`;
 }
+/** Chip de Agendado: el texto es la ETIQUETA del servidor; aquí solo se elige el icono y el rojo. */
 function chipDe(p) {
-  const f = p.cita.f, k = p.cita.tipo;
-  const txt = k === 'llamar' ? `Llamar ${diaSem(f)} ${dm(f)}` : k === 'reintentar' ? `Reintentar ${dm(f)}`
-    : k === 'sinrespuesta' ? `Se cierra ${dm(f)}` : `Cita ${diaSem(f)} ${dm(f)}`;
+  const k = p.cita.tipo, mal = p.atraso > 0 || p.agenda === 'SIN RESPUESTA';
   const ic = k === 'llamar' ? 'ph-phone-call' : k === 'reintentar' ? 'ph-arrow-clockwise' : k === 'sinrespuesta' ? 'ph-phone-x' : 'ph-calendar-blank';
-  return `<span class="chip-fecha${k === 'sinrespuesta' ? ' mal' : ''}"><i class="ph ${ic}"></i>${esc(txt)}</span>`;
+  return `<span class="chip-fecha${mal ? ' mal' : ''}"><i class="ph ${ic}"></i>${esc(p.etiqueta)}</span>`;
 }
 function tarjetaHtml(p) {
   const tag = tagDe(p);
   const sub = [medicoCorto(p.med), p.t === 'reev' ? p.perfil : p.t === 'hier' ? p.trat.nombre : 'Procedimiento',
     p.col === 1 && p.intentos ? plural(p.intentos, 'intento', 'intentos') : ''].filter(Boolean).join(' · ');
   const mal = p.atraso > 0 || p.agenda === 'SIN RESPUESTA';
-  const etq = p.col !== 4 && p.etiqueta ? `<div class="etq${mal ? ' mal' : ''}">${esc(p.etiqueta)}</div>` : '';
+  const etq = p.col !== 2 && p.col !== 4 && p.etiqueta ? `<div class="etq${mal ? ' mal' : ''}">${esc(p.etiqueta)}</div>` : '';
   const prog = p.col === 3 && p.trat && p.trat.n
     ? `<div class="prog" aria-hidden="true">${Array.from({ length: p.trat.n }, (_, i) => `<i class="${i < p.trat.k ? 'si' : ''}"></i>`).join('')}</div>` : '';
   let pie;
@@ -731,6 +730,7 @@ async function cargarTablero(pedido) {
     S.fase = 'listo';
   } catch (e) {
     if (n !== cargarTablero.n) return;
+    console.error(e);
     S.fase = 'error';
   }
   pintarTablero();
@@ -756,7 +756,7 @@ function pintarTablero() {
   // Cifras: siguen a los filtros, como las columnas.
   const hoy6 = masDias(S.hoy, 6);
   const nunca = enCol(1).filter(p => !p.intentos).length;
-  const semana = enCol(2).filter(p => p.agenda === 'CITA' && p.cita.f && p.cita.f <= hoy6).length;
+  const semana = enCol(2).filter(p => p.agenda === 'CITA' && (!p.fechaClave || p.fechaClave <= hoy6)).length;   // el mismo campo que el grupo «Esta semana»
   const atr = enCol(1).filter(p => p.atraso > 0).length;   // las sesiones atrasadas están en Por contactar
   const nc = S.cerrados.length;
   const enlace = listo && nc ? ` · <button type="button" class="enlace" id="ver-cerrados" aria-controls="cerrados" aria-expanded="${!$('#cerrados').hidden}">${plural(nc, 'cerrado', 'cerrados')} este mes</button>` : '';
@@ -876,7 +876,7 @@ document.addEventListener('keydown', e => {
     return mover(N[Math.min(ii, N.length - 1)]);
   }
   if (ci < 0) return;
-  if (e.key === 'Enter') { e.preventDefault(); abrirPanel(seleccion.id, true); }
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirPanel(seleccion.id, true); }   // role="button": Enter y Espacio
   else if (e.key === 'c' || e.key === 'C') copiarContacto(S.pacientes.find(p => p.id === seleccion.id));
 });
 

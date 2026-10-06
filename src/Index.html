@@ -197,6 +197,8 @@ button{cursor:pointer}
 .g-dup{border-left:3px solid var(--chp-pending);padding:10px 14px;background:var(--chp-row-hover)}
 .g-dup p{margin:0 0 10px}
 .g-item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;padding:10px 0;border-bottom:1px solid var(--chp-rule);align-items:baseline}
+.historia{list-style:none;padding:0;display:grid;gap:6px}
+.historia li.anulado{text-decoration:line-through;color:var(--chp-muted)}
 .g-item.anulado b,.g-item.anulado .linea-g{text-decoration:line-through;color:var(--chp-muted)}
 .linea-g{font-size:14px;color:var(--chp-soft)}
 .g-motivo{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:6px}
@@ -842,7 +844,8 @@ async function guardarResultado(k, resultado, extra = {}) {
     if (E.abierto === k) E.abierto = siguiente;
   }
   if (sumaHecho) c.hechosHoy++;
-  E.paso = ''; E.cierreAbierto = false; E.telElegido = ''; E.nota = '';
+  E.paso = ''; E.cierreAbierto = false; E.telElegido = '';
+  if (estabaAbierto) E.nota = '';
   E.kpi = null; E.resumen = null;
   pintarBandeja();
 
@@ -1033,10 +1036,11 @@ async function buscarDni() {
   try { r = await llamar('buscarPacienteRegistro', dni); } catch (e) { avisar(e.message); return; }
   if ($('#g-dni').value !== dni) return;  // mientras tanto escribieron otro DNI
   G.paciente = r;
+  const aviso = r.fallecido ? `<p class="g-fallecido hace">Este paciente figura como fallecido el ${fechaCorta(r.fallecido.fecha)} (${esc(r.fallecido.quien)}). Si es un error, anúlelo desde su ficha.</p>` : '';
   if (!r.encontrado) {
-    $('#g-conocido').textContent = 'Todavía no está en SOFDOC. Puede registrarlo igual.';
+    $('#g-conocido').innerHTML = aviso + 'Todavía no está en SOFDOC. Puede registrarlo igual.';
   } else {
-    $('#g-conocido').textContent = `Paciente conocido · última consulta ${fechaCorta(r.ultimaFecha)} con ${medicoCorto(r.ultimoMedico)}`;
+    $('#g-conocido').innerHTML = aviso + `Paciente conocido · última consulta ${fechaCorta(r.ultimaFecha)} con ${medicoCorto(r.ultimoMedico)}`;
     if (!$('#g-nombre').value.trim()) $('#g-nombre').value = r.nombre;
     if (!$('#g-contacto').value.trim() && r.telefonos.length) $('#g-contacto').value = r.telefonos[0];
     if (!$('#g-doctor').value && r.doctor) $('#g-doctor').value = r.doctor;
@@ -1119,7 +1123,7 @@ function pedirMotivo(contenedor, que, id) {
   $('#g-motivo').focus();
 }
 
-const FUNCION_ANULAR = { registro: 'anularRegistro', sesion: 'anularSesion', alta: 'anularAlta' };
+const FUNCION_ANULAR = { registro: 'anularRegistro', sesion: 'anularSesion', alta: 'anularAlta', seguimiento: 'anularResultado' };
 
 async function confirmarAnulacion(boton, alTerminar) {
   if (!exigirUsuario()) return;
@@ -1181,7 +1185,8 @@ async function abrirFicha(dni) {
 const ESTADO_BUENO = { 'AL DÍA': 1, 'RECUPERADO': 1, 'AGENDADO': 1, 'ALTA': 1 };
 const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más de 6 meses', 'POR VENCER': 'Le toca volver pronto',
   'AL DÍA': 'Al día', 'CONTACTADO': 'Se le escribió, esperando respuesta', 'RECUPERADO': 'Volvió tras el seguimiento',
-  'AGENDADO': 'Ya tiene cita', 'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas', 'ALTA': 'Alta médica' };
+  'DESCARTADO': 'Descartado', 'SIN ATENCIÓN': 'Sin consultas realizadas', 'ALTA': 'Alta médica',
+  'CERRADO': 'Seguimiento cerrado', 'FALLECIDO': 'Fallecido', 'AGENDADO': 'Agendado o por volver a llamar' };
 
 function lineaDeTiempo(citas) {
   let n = 0;
@@ -1235,9 +1240,24 @@ function pintarFicha(p) {
         `<tr><td>${fechaCorta(i.FECHA)}</td><td>${esc(i.TIPO)}</td><td>${esc(i.DETALLE)}${Number(i.CANTIDAD) > 1 ? ' ×' + esc(i.CANTIDAD) : ''}</td><td>${i.ESTADO === 'COTIZÓ' ? 'Cotizó, no lo hizo' : i.ESTADO === 'ACEPTÓ' ? 'Lo hizo' : esc(i.ESTADO)}</td><td>${esc(i.TELEFONO)}</td><td>${esc(i.OBSERVACIONES)}</td></tr>`).join('')}</table>`
     : '<p class="muted">Sin procedimientos indicados.</p>';
 
+  const textoRes = s => {
+    const r = s.RESULTADO || (s.ACCION === 'HECHO' ? 'SEGUIMIENTO HECHO' : s.ACCION === 'DESCARTADO' ? 'DESCARTADO' : s.ACCION);
+    const f = fechaCorta(s.FECHA_PROXIMA).slice(0, 5);
+    return ({ 'LO PENSARÁ': `lo pensará · llamar el ${f}`, 'AGENDÓ CITA': `agendó para el ${f}`, 'LO HIZO': `lo hizo el ${f}`,
+      'NÚMERO EQUIVOCADO': `número equivocado: ${esc(s.TELEFONO)}`, 'DESCARTADO': `descartado${s.MOTIVO ? ': ' + esc(s.MOTIVO.toLowerCase()) : ''}`,
+      'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || esc(String(r).toLowerCase());
+  };
+  const claveSeg = s => s.DNI + '|' + s.ESPECIALIDAD + '|' + (s.REFERENCIA || '');
+  const ultimoDe = {};
+  p.seguimientos.filter(s => s.ANULADO !== 'SÍ').forEach(s => { ultimoDe[claveSeg(s)] = s.ID; });
   const seguimientos = p.seguimientos.length
-    ? `<table><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Para</th><th>Motivo</th><th>Nota</th></tr>${p.seguimientos.map(s =>
-        `<tr><td>${esc(s.FECHA_HORA)}</td><td>${esc(s.RESPONSABLE)}</td><td>${esc(s.ACCION)}</td><td>${esc(PARA[norm(s.ESPECIALIDAD)] || 'Reevaluación · ' + s.ESPECIALIDAD)}</td><td>${esc(s.MOTIVO)}</td><td>${esc(s.NOTA)}</td></tr>`).join('')}</table>`
+    ? `<ol class="historia">${p.seguimientos.slice().sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? -1 : 1).map(s => {
+        const anulado = s.ANULADO === 'SÍ';
+        const puede = !anulado && String(s.ID).startsWith('SEG-') && (s.RESULTADO === 'FALLECIÓ' || ultimoDe[claveSeg(s)] === s.ID);
+        return `<li class="${anulado ? 'anulado' : ''}"><b>${fechaCorta(s.FECHA_HORA).slice(0, 5)} ${esc(s.RESPONSABLE)}:</b> ${textoRes(s)}
+          <span class="muted">· ${esc(PARA[norm(s.ESPECIALIDAD)] || 'Reevaluación · ' + s.ESPECIALIDAD)}${s.NOTA ? ' · ' + esc(s.NOTA) : ''}${anulado ? ' · anulado: ' + esc(s.MOTIVO_ANULACION) : ''}</span>
+          ${puede ? `<button type="button" class="btn-texto" data-anular-seg="${esc(s.ID)}">Anular</button>` : ''}</li>`;
+      }).join('')}</ol>`
     : '<p class="muted">Todavía no hay seguimientos.</p>';
 
   const registros = (p.registros || []).length ? p.registros.map(r => `<div class="reg-ficha" data-reg="${esc(r.ID)}">
@@ -1253,7 +1273,9 @@ function pintarFicha(p) {
       ${esc(a.ESPECIALIDAD)} · ${fechaCorta(a.FECHA)} · ${esc(a.DOCTOR || 'sin doctor')} · registró ${esc(a.REGISTRADO_POR)}
       ${a.ANULADO ? ` · <span class="muted">anulada: ${esc(a.MOTIVO_ANULACION)}</span>` : a.VIGENTE ? ' · <b>vigente</b>' : ' · <span class="muted">cerrada: volvió después</span>'}
       ${!a.ANULADO && String(a.ID).startsWith('ALT-') ? ` <button type="button" class="btn-texto" data-anular-alta="${esc(a.ID)}">Anular</button>` : ''}</li>`).join('')}</ul></div>` : '';
-  $('#ficha').innerHTML = `<div class="ficha-cab"><h1>${esc(p.nombre)}</h1><div class="muted">DNI ${esc(p.dni)}</div></div>
+  $('#ficha').innerHTML = `<div class="ficha-cab"><h1>${esc(p.nombre)}</h1><div class="muted">DNI ${esc(p.dni)}</div>
+    ${p.fallecido ? `<p class="hace">Figura como fallecido el ${fechaCorta(p.fallecido.fecha)} (${esc(p.fallecido.quien)}).</p>` : ''}
+    ${(p.telefonosDescartados || []).length ? `<p class="muted">Números equivocados: ${p.telefonosDescartados.map(n => `<s>${esc(n)}</s>`).join(', ')}</p>` : ''}</div>
     ${confirmar}${series}
     <div class="seccion"><h2>Registros (procedimientos y tratamientos)</h2>${registros}</div>
     ${altas}
@@ -1297,6 +1319,8 @@ $('#ficha').addEventListener('click', async ev => {
   if (as) { pedirMotivo(as.closest('li'), 'sesion', as.dataset.anularSes); return; }
   const aa = t.closest('[data-anular-alta]');
   if (aa) { pedirMotivo(aa.closest('li'), 'alta', aa.dataset.anularAlta); return; }
+  const ag = t.closest('[data-anular-seg]');
+  if (ag) { pedirMotivo(ag.closest('li'), 'seguimiento', ag.dataset.anularSeg); return; }
   const ca = t.closest('[data-confirmar-anular]');
   if (ca) { confirmarAnulacion(ca, refrescarTrasFicha); return; }
   if (t.closest('[data-cancelar-anular]')) { t.closest('.g-motivo').remove(); return; }
@@ -1710,6 +1734,7 @@ const DEMO = (() => {
   pendientes[1].USUARIO = '@ana.flores';
   let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
     candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
+  const muertos = {};
   const seguimientos = [{ ID: 'SEG-1', FECHA_HORA: '2026-09-10 11:20', DNI: '40333444', ESPECIALIDAD: 'REUMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'HECHO', MOTIVO: '', NOTA: 'Dijo que llamará' }];
 
   function exigir(x, conMotivo) {
@@ -1764,6 +1789,8 @@ const DEMO = (() => {
         indicaciones: indicaciones.filter(i => i.DNI === dni),
         porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === dni)),
         seguimientos: seguimientos.filter(s => s.DNI === dni).map(({ pac, antes, otras, ...s }) => s),
+        fallecido: muertos[dni] || null,
+        telefonosDescartados: seguimientos.filter(s => s.DNI === dni && s.RESULTADO === 'NÚMERO EQUIVOCADO' && s.ANULADO !== 'SÍ').map(s => s.TELEFONO),
         registros: registros.filter(r => r.DNI === dni).map(r => {
           const ss = sesiones.filter(s => s.ID_REGISTRO === r.ID && !s.ANULADO).sort((a, b) => a.NUMERO - b.NUMERO);
           const estado = r.ANULADO ? 'ANULADO' : ss.length >= r.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO' : 'COTIZADO';
@@ -1824,10 +1851,10 @@ const DEMO = (() => {
     },
     buscarPacienteRegistro: dni => {
       const s = pacientes.filter(x => x.DNI === String(dni).trim());
-      if (!s.length) return { encontrado: false };
+      if (!s.length) return { encontrado: false, fallecido: muertos[String(dni).trim()] || null };
       const u = s.slice().sort((a, b) => a.ULTIMA_CITA < b.ULTIMA_CITA ? 1 : -1)[0];
       const d = doctores.find(x => x.sofdoc === u.MEDICO_ULTIMO);
-      return { encontrado: true, nombre: u.NOMBRE, telefonos: String(u.TELEFONOS || '').split(' / ').filter(Boolean), ultimaFecha: u.ULTIMA_CITA,
+      return { encontrado: true, fallecido: muertos[String(dni).trim()] || null, nombre: u.NOMBRE, telefonos: String(u.TELEFONOS || '').split(' / ').filter(Boolean), ultimaFecha: u.ULTIMA_CITA,
         ultimoMedico: u.MEDICO_ULTIMO, doctor: d ? d.doctor : '', especialidades: s.map(x => ({ especialidad: x.ESPECIALIDAD, alta: x.ESTADO === 'ALTA' })) };
     },
     guardarRegistro: x => {
@@ -1897,6 +1924,7 @@ const DEMO = (() => {
       return { ok: true };
     },
     registrarResultado,
+    marcarFallecido: dni => { muertos[dni] = { fecha: hoy, quien: 'RACHEL' }; },
     anularResultado: x => {
       exigir(x, false);
       const s = seguimientos.find(y => y.ID === x.id);

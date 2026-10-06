@@ -652,3 +652,51 @@ test('¿Qué pasó?: «Falleció» saca al paciente de todas las listas', async 
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('ficha: la historia dice qué pasó, tacha lo anulado y deja anular el último', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'REEVALUACION');
+    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).first().click();
+    await pagina.locator('[data-res="LO PENSARÁ"]').click();
+    await pagina.locator('#qp-guardar').click();
+    await pagina.waitForSelector('#aviso:not([hidden])');
+    await pagina.evaluate(() => abrirFicha('40111222'));
+    await pagina.waitForSelector('.historia li');
+    const linea = await pagina.locator('.historia li').last().textContent();
+    assert.match(linea, /MAGALY: lo pensará · llamar el 02\/10/);
+    await pagina.locator('.historia [data-anular-seg]').last().click();
+    await pagina.fill('#g-motivo', 'me equivoqué');
+    await pagina.locator('[data-confirmar-anular]').click();
+    await pagina.waitForSelector('.historia li.anulado');
+    assert.match(await pagina.locator('.historia li.anulado').textContent(), /anulado: me equivoqué/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: un paciente fallecido muestra el aviso pero deja registrar', async () => {
+  const { navegador, pagina } = await abrir();
+  try {
+    await pagina.evaluate(() => { DEMO.marcarFallecido('40111222'); });
+    await pagina.locator('[data-vista="registro"]').click();
+    await pagina.fill('#g-dni', '40111222');
+    await pagina.waitForSelector('.g-fallecido');
+    assert.match(await pagina.locator('.g-fallecido').textContent(), /figura como fallecido el \d\d\/\d\d/);
+    assert.equal(await pagina.locator('#g-guardar').isDisabled(), false);
+  } finally { await navegador.close(); }
+});
+
+test('bandeja: un «No contestó» rápido en otra fila no borra la nota del panel abierto', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.selectOption('#usuario', 'MAGALY');
+    await tipo(pagina, 'REEVALUACION');
+    await pagina.locator('.fila', { hasText: 'ROSA ELENA' }).first().click();
+    await pagina.locator('#nota').fill('Nota de Rosa');
+    await pagina.locator('.fila', { hasText: 'JORGE LUIS' }).first().locator('.hecho').click();
+    await pagina.waitForSelector('#aviso:not([hidden])');
+    assert.equal(await pagina.locator('#nota').inputValue(), 'Nota de Rosa');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

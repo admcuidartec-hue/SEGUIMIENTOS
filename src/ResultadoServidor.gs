@@ -5,9 +5,15 @@
    la sesión de un registro ya tienen su hoja: se delegan en darDeAlta y marcarSesion.
    ========================================================================== */
 
+/** Solo las tarjetas abiertas aceptan un resultado: uno tardío sobre una serie cerrada la reabriría. */
+function tarjetasAbiertas_(d) {
+  var c = armarTablero(d).columnas;
+  return (c.POR_CONTACTAR || []).concat(c.AGENDADO || [], c.EN_TRATAMIENTO || []);
+}
+
 function registrarResultado(p) {
   var d = datos_();
-  var v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: d.pacientes.concat(d.pendientes) });
+  var v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(d) });
   if (v.error) throw new Error(v.error);
   var t = v.tarjeta, indicacion = !!TIPOS_INDICACION[normTexto(t.ESPECIALIDAD)];
   if (v.fila.RESULTADO === 'ALTA MÉDICA' && !indicacion) {
@@ -24,7 +30,7 @@ function registrarResultado(p) {
     // Se vuelve a validar con lo releído: otra asesora pudo cerrar o dar de baja al paciente.
     d.seguimientos = frescos;
     derivar_(d);
-    v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: d.pacientes.concat(d.pendientes) });
+    v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(d) });
     if (v.error) throw new Error(v.error);
     t = v.tarjeta;
     var quedan = true;

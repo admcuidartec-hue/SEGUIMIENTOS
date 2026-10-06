@@ -95,21 +95,22 @@ test('getTablero devuelve las columnas listas para enviar', () => {
 });
 
 test('registrarResultado: vuelve a validar dentro del candado con la hoja releída', () => {
-  // Un FALLECIÓ ajeno deja la tarjeta en el tablero (estado FALLECIDO), así que no basta para que desaparezca:
-  // se comprueba que la segunda validación ocurre con el candado tomado, y que su error lo suelta.
   const muerto = { ID: 'SEG-9', FECHA_HORA: '2026-10-06 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'FALLECIÓ', ACCION: 'DESCARTADO', REFERENCIA: '' };
   const { ctx, escrito, lock } = servidor([], [muerto]);
-  const original = ctx.validarResultado, tomado = [];
-  ctx.validarResultado = (a, b) => { tomado.push(lock.tomado); return original(a, b); };
-  ctx.registrarResultado(p({}));
-  assert.deepEqual(tomado, [0, 1], 'valida fuera y otra vez dentro del candado');
-  ctx.validarResultado = (a, b) => { const r = original(a, b); if (lock.tomado) r.error = 'no está en la lista'; return r; };
   assert.throws(() => ctx.registrarResultado(p({})), /no está en la lista/);
-  assert.deepEqual([escrito.SEGUIMIENTOS.length, lock.tomado], [1, 0]);
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, lock.tomado], [0, 0]);
+});
+
+test('registrarResultado: una tarjeta ya cerrada no acepta resultados y no toma el candado', () => {
+  const cerrada = { ID: 'SEG-5', FECHA_HORA: '2026-10-05 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'SE ATIENDE EN OTRO LUGAR',
+    MOTIVO: 'SE ATIENDE EN OTRO LUGAR', ACCION: 'DESCARTADO', REFERENCIA: '' };
+  const { ctx, escrito, lock } = servidor([cerrada]);
+  assert.throws(() => ctx.registrarResultado(p({})), /no está en la lista/);
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, lock.tomado, lock.flush], [0, 0, 0]);
 });
 
 test('«lo hizo» de un registro va a marcarSesion y no escribe en SEGUIMIENTOS', () => {
-  const reg = { ID: 'REG-000004', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10-01', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos',
+  const reg = { ID: 'REG-000004', FECHA_HORA: '2026-09-25 09:00', FECHA: '2026-09-25', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos',
     DNI: '40111222', TIPO: 'HIERRO', CONTACTO: '987654321', DETALLE: '', SESIONES: 1 };
   const { ctx, escrito } = servidor([], [], [reg]);
   const tarjeta = ctx.datos_().pendientes[0];

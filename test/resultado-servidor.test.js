@@ -7,7 +7,7 @@ const { cita, reglas } = require('./fixtures');
 const CAT = { usuarios: ['MAGALY', 'RACHEL'], motivos: [], alias: {}, doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: '' }],
   procedimientos: [], tratamientos: [], marcas: {} };
 
-function servidor(hoja) {
+function servidor(hoja, extraEnHoja, registros) {
   const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs']);
   const escrito = { SEGUIMIENTOS: [], BITACORA: [], anulados: [], llamadas: [] };
   const lock = { tomado: 0, flush: 0 };
@@ -16,10 +16,10 @@ function servidor(hoja) {
   ctx.datos_ = () => ctx.derivar_({ hoy: '2026-10-06', catalogos: CAT, reglas: Object.assign(reglas(L), { maxSeguimientos: 2 }),
     citas: [cita({ fecha: '2026-07-01' })], indicaciones: [{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' },
       { DNI: '40111222', TELEFONO: '912345678', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' }],
-    contactos: [], registros: [], sesiones: [], altas: [], seguimientosTodos: enHoja.slice(), seguimientos: enHoja.filter(s => !L.anulado_(s)) });
+    contactos: [], registros: registros || [], sesiones: [], altas: [], seguimientosTodos: enHoja.slice(), seguimientos: enHoja.filter(s => !L.anulado_(s)) });
   ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
   ctx.SpreadsheetApp = { flush: () => { lock.flush++; } };
-  ctx.leerSeguimientos_ = () => enHoja.concat(escrito.SEGUIMIENTOS);
+  ctx.leerSeguimientos_ = () => enHoja.concat(extraEnHoja || [], escrito.SEGUIMIENTOS);
   ctx.anexarObjeto_ = (n, cols, o) => { assert.equal(lock.tomado, 1, 'se escribe con el candado tomado'); escrito[n].push(plano(o)); };
   ctx.bitacora_ = (u, a, d) => escrito.BITACORA.push([u, a, d]);
   ctx.fechaHoraTexto_ = () => '2026-10-06 10:30';
@@ -92,4 +92,29 @@ test('getTablero devuelve las columnas listas para enviar', () => {
   const { ctx } = servidor();
   const t = plano(ctx.getTablero());
   assert.deepEqual(t.columnas.POR_CONTACTAR.map(x => x.CLAVE), ['40111222|HEMATOLOGÍA']);
+});
+
+test('registrarResultado: vuelve a validar dentro del candado con la hoja releída', () => {
+  // Un FALLECIÓ ajeno deja la tarjeta en el tablero (estado FALLECIDO), así que no basta para que desaparezca:
+  // se comprueba que la segunda validación ocurre con el candado tomado, y que su error lo suelta.
+  const muerto = { ID: 'SEG-9', FECHA_HORA: '2026-10-06 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'FALLECIÓ', ACCION: 'DESCARTADO', REFERENCIA: '' };
+  const { ctx, escrito, lock } = servidor([], [muerto]);
+  const original = ctx.validarResultado, tomado = [];
+  ctx.validarResultado = (a, b) => { tomado.push(lock.tomado); return original(a, b); };
+  ctx.registrarResultado(p({}));
+  assert.deepEqual(tomado, [0, 1], 'valida fuera y otra vez dentro del candado');
+  ctx.validarResultado = (a, b) => { const r = original(a, b); if (lock.tomado) r.error = 'no está en la lista'; return r; };
+  assert.throws(() => ctx.registrarResultado(p({})), /no está en la lista/);
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, lock.tomado], [1, 0]);
+});
+
+test('«lo hizo» de un registro va a marcarSesion y no escribe en SEGUIMIENTOS', () => {
+  const reg = { ID: 'REG-000004', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10-01', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos',
+    DNI: '40111222', TIPO: 'HIERRO', CONTACTO: '987654321', DETALLE: '', SESIONES: 1 };
+  const { ctx, escrito } = servidor([], [], [reg]);
+  const tarjeta = ctx.datos_().pendientes[0];
+  assert.ok(tarjeta && tarjeta.ID_REGISTRO === 'REG-000004', 'hay tarjeta de registro');
+  ctx.registrarResultado(p({ especialidad: tarjeta.ESPECIALIDAD, referencia: 'REG-000004', resultado: 'LO HIZO', fecha: '2026-10-06', nota: 'ok' }));
+  assert.deepEqual(escrito.llamadas, [['marcarSesion', { usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-06', nota: 'ok' }]]);
+  assert.equal(escrito.SEGUIMIENTOS.length, 0);
 });

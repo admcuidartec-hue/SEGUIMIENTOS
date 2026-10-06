@@ -21,6 +21,12 @@ function registrarResultado(p) {
     var ahora = new Date();
     // Otra asesora pudo marcar otro número entretanto: se decide con la hoja releída dentro del candado.
     var frescos = leerSeguimientos_().filter(function (x) { return !anulado_(x); });
+    // Se vuelve a validar con lo releído: otra asesora pudo cerrar o dar de baja al paciente.
+    d.seguimientos = frescos;
+    derivar_(d);
+    v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: d.pacientes.concat(d.pendientes) });
+    if (v.error) throw new Error(v.error);
+    t = v.tarjeta;
     var quedan = true;
     if (v.fila.TELEFONO) {
       var marca = { DNI: v.fila.DNI, RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: v.fila.TELEFONO, FECHA_HORA: fechaHoraTexto_(ahora) };

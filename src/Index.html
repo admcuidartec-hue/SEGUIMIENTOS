@@ -77,18 +77,10 @@ main{padding:28px 32px 56px;flex:1;min-width:0;width:100%;max-width:1680px}
 h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.025em;line-height:1.15}
 .sub{margin:4px 0 0;color:var(--muted)}
 .vista{animation:vista .24s var(--ease-out)}
+/* Con View Transitions la entrada la anima ::view-transition-new(root): la vista no se anima dos veces. */
+html.con-vt .vista{animation:none}
 @keyframes vista{from{opacity:0;transform:translateY(8px)}}
 .cargando{margin:22px 0 0;color:var(--muted)}
-
-/* Controles comunes */
-.btn{height:44px;padding:0 18px;border:0;border-radius:var(--r-s);font-weight:600;display:inline-flex;align-items:center;gap:8px;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .16s var(--ease-out)}
-.btn:active{transform:scale(.97)}
-.btn-p{background:var(--accent);color:var(--accent-ink)}
-.btn-p:hover{background:var(--accent-hover)}
-.btn-s{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);font-weight:500}
-.btn-s:hover{border-color:var(--accent)}
-.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
-.kbd{font-family:var(--mono);font-size:11px;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;color:var(--muted);background:var(--surface);white-space:nowrap}
 
 /* Segmentado con pastilla deslizante (la mide pastilla()) */
 .seg{position:relative;display:inline-flex;padding:3px;background:var(--surface);border:1px solid var(--line);border-radius:999px;max-width:100%;overflow-x:auto;scrollbar-width:none}
@@ -108,10 +100,11 @@ h1{margin:0;font-size:28px;font-weight:600;letter-spacing:-.025em;line-height:1.
 @media (max-width:760px){
   .side{display:none}.topmovil{display:flex}.navmovil{display:grid}
   main{padding:18px 14px 96px}h1{font-size:23px}
-  .kbd{display:none}.aviso{bottom:80px}
+  .aviso{bottom:80px}
 }
 @view-transition{navigation:auto}
 ::view-transition-old(root),::view-transition-new(root){animation-duration:.22s;animation-timing-function:cubic-bezier(.23,1,.32,1)}
+::view-transition-new(root){animation-name:vista}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:1ms!important;animation-duration:1ms!important;animation-iteration-count:1!important}::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}}
 </style>
 </head>
@@ -173,11 +166,25 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&a
 /** Sin tildes y en MAYÚSCULAS, como normTexto del servidor. */
 const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
 const reducido = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (document.startViewTransition && !reducido) document.documentElement.classList.add('con-vt');
 /** Preferencias del navegador (seg.usuario, seg.modo, seg.tipo). Sin almacenamiento no pasa nada. */
 const LS = {
   get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
 };
+
+/**
+ * Copia de limpiarParaEnvio (Logica.gs): el servidor manda null/undefined como '' y los números no finitos como ''.
+ * El DEMO pasa por aquí para que ninguna de sus funciones se aparte de lo que de verdad llega.
+ */
+function limpiarParaEnvio(v) {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return isFinite(v) ? v : '';
+  if (Array.isArray(v)) return v.map(limpiarParaEnvio);
+  if (Object.prototype.toString.call(v) === '[object Date]') return isNaN(v.getTime()) ? '' : v.toISOString();
+  if (typeof v === 'object') { const o = {}; Object.keys(v).forEach(k => { o[k] = limpiarParaEnvio(v[k]); }); return o; }
+  return v;
+}
 
 /* ============ Puente con Apps Script. Abierto como archivo, usa el DEMO del final ============ */
 const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
@@ -189,8 +196,8 @@ function llamar(fn, ...args) {
       .withFailureHandler(e => rej(new Error(e.message || e)))[fn](...args));
   }
   if (!DEMO[fn]) return Promise.reject(new Error('El modo de demostración no tiene ' + fn + '.'));
-  // Copia JSON, como google.script.run: tocar la respuesta no cambia el DEMO.
-  return new Promise(res => res(DEMO[fn](...args))).then(x => x === undefined ? null : JSON.parse(JSON.stringify(x)));
+  // Limpia como el servidor y copia, como google.script.run: tocar la respuesta no cambia el DEMO.
+  return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(limpiarParaEnvio(x))));
 }
 
 /* ============ Estado global ============ */
@@ -393,6 +400,7 @@ async function iniciar() {
      DEMO._llamadas[fn]  cuántas veces se llamó fn
      DEMO._ultimo[fn]    copia de los argumentos de la última llamada
      DEMO._fallar[fn]    = 'mensaje': fn lanza Error('mensaje') hasta que se borre
+     window.DEMO_FALLAR  = { fn: 'mensaje' } antes de cargar: lo mismo desde el arranque (p. ej. bootstrap)
      DEMO._demora[fn]    = ms: fn responde tras esa demora
    ========================================================================== */
 const DEMO = (() => {
@@ -487,6 +495,7 @@ const DEMO = (() => {
       if (t.AGENDA === 'LLAMAR') return 'Llamar el ' + diaCorto(t.FECHA_AGENDA);
       if (t.AGENDA === 'REINTENTAR') return 'Reintentar el ' + dm(t.FECHA_AGENDA) + ' · intento ' + t.INTENTO + ' de ' + reglas.maxSeguimientos;
       if (t.AGENDA === 'SIN RESPUESTA') return 'Sin respuesta · se cierra el ' + dm(t.FECHA_AGENDA);
+      if (t.PROXIMA_AGENDADA) return 'Cita el ' + diaCorto(t.PROXIMA_AGENDADA);
       return '';
     }
     if (t.COLUMNA === 'EN_TRATAMIENTO') return sesion + ' · próxima ~' + dm(mas(t.ULTIMA_SESION, reglas.diasEntreSesiones));
@@ -587,7 +596,7 @@ const DEMO = (() => {
     candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
   const antiguas = [
     ind({ DNI: '40666777', TIPO_SEGUIMIENTO: 'PROCEDIMIENTO', NOMBRE: 'PEDRO PABLO SALAS CHÁVEZ', TELEFONOS: '945667788', MEDICO_ULTIMO: KAREN,
-      FECHA_COTIZACION: '2026-08-12', DETALLE: 'AMO + BIOPSIA', ULTIMA_CITA: '2026-08-10' }),
+      FECHA_COTIZACION: '2026-08-12', DETALLE: 'AMO + BIOPSIA', ULTIMA_CITA: '2026-09-05' }),
     ind({ DNI: '40888999', TIPO_SEGUIMIENTO: 'HIERRO', NOMBRE: 'VÍCTOR HUGO PAREDES ROJAS', TELEFONOS: '976543210', FECHA_COTIZACION: '2026-09-10',
       DETALLE: 'Hierro (Ferinject) ×2', ULTIMA_CITA: '2026-09-08', N_SEGUIMIENTOS: 1, ULTIMO_SEGUIMIENTO: '2026-09-25', ESTADO: 'AGENDADO',
       AGENDA: 'LLAMAR', FECHA_AGENDA: '2026-10-08' }),
@@ -662,9 +671,10 @@ const DEMO = (() => {
   const asc = (a, b) => a.FECHA_CLAVE < b.FECHA_CLAVE ? -1 : a.FECHA_CLAVE > b.FECHA_CLAVE ? 1 : 0;
 
   function exigir(x, conMotivo) {
-    if (!x || !usuarios.includes(x.usuario)) throw new Error('Elija quién es usted en el selector de arriba.');
+    const u = x && usuarios.find(y => mismo(y, x.usuario));   // como enLista_: sin tildes ni mayúsculas
+    if (!u) throw new Error('Elija quién es usted en el selector de arriba.');
     if (conMotivo && !String(x.motivo || '').trim()) throw new Error('Escriba el motivo de la anulación.');
-    return x.usuario;
+    return u;
   }
 
   /* ---- Tras una sesión: la tarjeta del registro, como la recalcula el servidor ---- */
@@ -779,6 +789,18 @@ const DEMO = (() => {
   const descartadosDe = dni => [...new Set(tarjetas.filter(t => t.DNI === dni).flatMap(t => t.TELEFONOS_DESCARTADOS || []))];
   const CAMPOS_TARJETA = ['CLAVE', 'COLUMNA', 'ETIQUETA', 'FECHA_CLAVE', 'TIPO_SEGUIMIENTO', 'TELEFONOS_DESCARTADOS', 'SIN_CONTACTO'];
   const comoSerie = s => { const o = clonar(s); CAMPOS_TARJETA.forEach(k => delete o[k]); return o; };
+  // Como armarPacientes: toda persona con consultas realizadas tiene su serie, aunque solo venga por hierro o procedimiento.
+  [...new Set(citas.map(c => c.DNI + '|' + c.ESPECIALIDAD))].forEach(k => {
+    const [dni, esp] = k.split('|');
+    if (serie(dni, esp)) return;
+    const hechas = citas.filter(c => c.DNI === dni && c.ESPECIALIDAD === esp && c.ESTADO === 'REALIZADO');
+    if (!hechas.length) return;
+    const u = hechas[hechas.length - 1], esperada = mas(u.FECHA, 30), vence = mas(u.FECHA, 45);
+    // Las fechas del DEMO están elegidas para que ninguna quede VENCIDO (estaría en el tablero).
+    series.push(reev({ DNI: dni, ESPECIALIDAD: esp, NOMBRE: u.NOMBRE, TELEFONOS: telefonosDe(dni).join(' / '), MEDICO_ULTIMO: u.MEDICO,
+      PRIMERA_CITA: hechas[0].FECHA, ULTIMA_CITA: u.FECHA, N_REALIZADAS: hechas.length,
+      ESTADO: hoy < esperada ? 'AL DÍA' : hoy < vence ? 'POR VENCER' : 'VENCIDO' }));
+  });
   const vigente = (dni, esp) => altas.filter(a => !a.ANULADO && a.DNI === dni && mismo(a.ESPECIALIDAD, esp)).pop() || null;
 
   const api = {
@@ -1078,7 +1100,8 @@ const DEMO = (() => {
   };
 
   // Envoltorio para las pruebas: cuenta llamadas, guarda los argumentos y puede fallar o tardar a pedido.
-  const demo = { _llamadas: {}, _ultimo: {}, _fallar: {}, _demora: {} };
+  // window.DEMO_FALLAR (puesto antes de cargar, p. ej. con addInitScript) permite que falle hasta bootstrap.
+  const demo = { _llamadas: {}, _ultimo: {}, _fallar: Object.assign({}, window.DEMO_FALLAR || {}), _demora: {} };
   Object.keys(api).forEach(fn => {
     demo[fn] = (...args) => {
       demo._llamadas[fn] = (demo._llamadas[fn] || 0) + 1;

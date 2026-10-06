@@ -11,7 +11,8 @@ const SECCIONES = ['tablero', 'registro', 'pacientes', 'indicadores'];
 
 /**
  * Abre la app en modo DEMO y junta los `pageerror`.
- * opciones: viewport, colorScheme ('light' | 'dark'), guardado ({ clave: valor } en localStorage antes de cargar).
+ * opciones: viewport, colorScheme ('light' | 'dark'), guardado ({ clave: valor } en localStorage antes de cargar),
+ * fallar ({ fn: 'mensaje' } en window.DEMO_FALLAR antes de cargar), sinEsperar (no espera a S.boot).
  */
 async function abrir(opciones = {}) {
   const navegador = await chromium.launch();
@@ -26,8 +27,9 @@ async function abrir(opciones = {}) {
     if (opciones.guardado) {
       await pagina.addInitScript(g => { for (const k of Object.keys(g)) localStorage.setItem(k, g[k]); }, opciones.guardado);
     }
+    if (opciones.fallar) await pagina.addInitScript(f => { window.DEMO_FALLAR = f; }, opciones.fallar);
     await pagina.goto('file://' + ARCHIVO, { waitUntil: 'domcontentloaded' });
-    await pagina.waitForFunction(() => typeof S !== 'undefined' && !!S.boot, null, { timeout: 10000 });
+    if (!opciones.sinEsperar) await pagina.waitForFunction(() => typeof S !== 'undefined' && !!S.boot, null, { timeout: 10000 });
   } catch (e) {
     await navegador.close();   // si no, el navegador queda abierto y la corrida no termina
     throw e;
@@ -226,13 +228,66 @@ test('DEMO: un error del servidor llega a llamar como Error con su mensaje', asy
   } finally { await navegador.close(); }
 });
 
+test('si bootstrap falla, cada pantalla dice «No se pudo iniciar: …»', async () => {
+  const { navegador, pagina, errores } = await abrir({ fallar: { bootstrap: 'Sin conexión con el servidor.' }, sinEsperar: true });
+  try {
+    await pagina.waitForFunction(() => /No se pudo iniciar/.test(document.querySelector('#v-tablero').textContent));
+    assert.match(await pagina.locator('#v-tablero .cargando').textContent(), /^No se pudo iniciar: Sin conexión con el servidor\.$/);
+    assert.equal(await pagina.evaluate(() => S.boot), null);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('el DEMO llega como del servidor: nulos y NaN pasan a \'\' (limpiarParaEnvio)', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    const p = await pagina.evaluate(() => llamar('getPaciente', '40444555'));
+    assert.equal(p.fallecido, '');
+    const r = await pagina.evaluate(async () => {
+      DEMO.pruebaNaN = () => ({ n: NaN, i: Infinity, nada: null, falta: undefined, lista: [null, 1] });
+      const a = await llamar('pruebaNaN');
+      DEMO.pruebaNada = () => undefined;
+      return [a, await llamar('pruebaNada')];
+    });
+    assert.deepEqual(r, [{ n: '', i: '', nada: '', falta: '', lista: ['', 1] }, '']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('DEMO: series para quien solo vino por hierro o procedimiento, y usuario sin distinguir mayúsculas', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    const r = await pagina.evaluate(async () => {
+      const p = await llamar('getPaciente', '40111222');
+      const a = await llamar('registrarResultado', { usuario: 'magaly', dni: '40444555', especialidad: 'HEMATOLOGÍA', resultado: 'NO CONTESTÓ' });
+      return { series: p.series.map(s => s.ESPECIALIDAD + ' ' + s.ESTADO + ' ' + s.N_REALIZADAS), quien: a.seguimiento.RESPONSABLE };
+    });
+    assert.deepEqual(r.series, ['HEMATOLOGÍA AL DÍA 1']);
+    assert.equal(r.quien, 'MAGALY');
+    const vencidas = await pagina.evaluate(async () => {
+      const t = await llamar('getTablero');
+      const enTablero = new Set(t.columnas.POR_CONTACTAR.map(x => x.DNI));
+      const out = [];
+      for (const dni of ['40111222', '40555666', '40666777', '40888999', '41000111', '41111222', '41333444', '41444555', '41555666', '41777888']) {
+        (await llamar('getPaciente', dni)).series.forEach(s => { if (s.ESTADO === 'VENCIDO' && !enTablero.has(dni)) out.push(dni); });
+      }
+      return out;
+    });
+    assert.deepEqual(vencidas, [], 'ninguna serie vencida fuera del tablero');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('no hay colores escritos a mano fuera de la paleta', () => {
   const html = fs.readFileSync(ARCHIVO, 'utf8');
   const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
   assert.ok(/:root\{/.test(css) && /html\[data-modo="oscuro"\]\{/.test(css), 'los dos bloques de tokens existen');
   const resto = css.replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/:root\{[^}]*\}/, '').replace(/html\[data-modo="oscuro"\]\{[^}]*\}/, '');
-  assert.equal(resto.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g), null);
+  assert.equal(resto.match(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(|color-mix\(/g), null);
+  // Colores con nombre, solo como valor CSS (tras ':', espacio, coma o paréntesis y antes de ; } ! , o ')').
+  const NOMBRES = 'white|black|red|green|blue|gray|grey|orange|yellow|purple|pink|brown';
+  assert.equal(resto.match(new RegExp(`[:\\s,(](${NOMBRES})\\s*(?=[;}!,)])`, 'gi')), null);
   const fuera = html.replace(/<style>[\s\S]*?<\/style>/, '').replace(/<script>[\s\S]*<\/script>/, '');
   assert.equal(fuera.match(/style="[^"]*(#[0-9a-fA-F]{3,8}\b|rgba?\()/g), null, 'ni en atributos style');
 });

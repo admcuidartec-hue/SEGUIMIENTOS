@@ -68,7 +68,9 @@ function etiquetaDe(t, reglas, hoy) {
     if (t.AGENDA === 'CITA') return 'Cita el ' + diaCorto_(t.FECHA_AGENDA);
     if (t.AGENDA === 'LLAMAR') return 'Llamar el ' + diaCorto_(t.FECHA_AGENDA);
     if (t.AGENDA === 'REINTENTAR') return 'Reintentar el ' + dm_(t.FECHA_AGENDA) + ' · intento ' + t.INTENTO + ' de ' + reglas.maxSeguimientos;
-    return 'Sin respuesta · se cierra el ' + dm_(t.FECHA_AGENDA);
+    if (t.AGENDA === 'SIN RESPUESTA') return 'Sin respuesta · se cierra el ' + dm_(t.FECHA_AGENDA);
+    if (t.PROXIMA_AGENDADA) return 'Cita el ' + diaCorto_(t.PROXIMA_AGENDADA);
+    return '';
   }
   if (t.COLUMNA === 'EN_TRATAMIENTO') return sesion + ' · próxima ~' + dm_(sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones));
   return t.ETIQUETA || '';
@@ -102,7 +104,7 @@ function armarTablero(d) {
   });
   todas.forEach(function (t) {
     var c = columnaDe(t);
-    if (c === 'AGENDADO') col.AGENDADO.push(tarjeta_(t, c, reglas, hoy, t.FECHA_AGENDA));
+    if (c === 'AGENDADO') col.AGENDADO.push(tarjeta_(t, c, reglas, hoy, t.FECHA_AGENDA || t.PROXIMA_AGENDADA));
     if (c === 'EN_TRATAMIENTO') col.EN_TRATAMIENTO.push(tarjeta_(t, c, reglas, hoy, sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones)));
     if (t.ESTADO === 'COMPLETADO') {
       var f = t.ULTIMA_SESION && t.ESTADO_REGISTRO === 'COMPLETO' ? t.ULTIMA_SESION : t.FECHA_LOHIZO;
@@ -127,6 +129,15 @@ function armarTablero(d) {
   Object.keys(muertos).forEach(function (dni) {
     if (mesDe(muertos[dni].fecha) === mes) cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: '', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: muertos[dni].fecha });
   });
+
+  // Deduplicate COMPLETADO by CLAVE, keeping the card with latest FECHA_CLAVE
+  var porClave = {}, deduped = [];
+  col.COMPLETADO.forEach(function (t) {
+    var k = t.CLAVE;
+    if (!porClave[k] || t.FECHA_CLAVE > porClave[k].FECHA_CLAVE) porClave[k] = t;
+  });
+  Object.keys(porClave).forEach(function (k) { deduped.push(porClave[k]); });
+  col.COMPLETADO = deduped;
 
   var asc = function (a, b) { return a.FECHA_CLAVE < b.FECHA_CLAVE ? -1 : a.FECHA_CLAVE > b.FECHA_CLAVE ? 1 : 0; };
   col.AGENDADO.sort(asc);

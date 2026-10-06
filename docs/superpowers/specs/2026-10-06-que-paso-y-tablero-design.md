@@ -269,7 +269,7 @@ Todas se arman en el servidor, para que la app y las pruebas digan lo mismo.
 
 | Situación | Etiqueta |
 |---|---|
-| Reevaluación por contactar | «Hace 27 días · debía volver el 09/09» |
+| Reevaluación por contactar | «Debía volver el 09/09 · hace 27 días» |
 | Hierro o procedimiento por contactar | «Cotizó hace 16 días» |
 | Sesión atrasada | «Sesión 2 de 3 · atrasada 3 días», en rojo |
 | Agendó, o tiene cita en SOFDOC | «Cita el jue 08/10» |

@@ -35,6 +35,7 @@ test('etiquetaDe: textos de cada columna', () => {
   assert.equal(et(pac({ AGENDA: 'LLAMAR', FECHA_AGENDA: '2026-10-12' }), 'AGENDADO'), 'Llamar el lun 12/10');
   assert.equal(et(pac({ AGENDA: 'REINTENTAR', FECHA_AGENDA: '2026-10-21', INTENTO: 1 }), 'AGENDADO'), 'Reintentar el 21/10 · intento 1 de 2');
   assert.equal(et(pac({ AGENDA: 'SIN RESPUESTA', FECHA_AGENDA: '2026-10-21', INTENTO: 2 }), 'AGENDADO'), 'Sin respuesta · se cierra el 21/10');
+  assert.equal(et(pac({ AGENDA: '', FECHA_AGENDA: '', PROXIMA_AGENDADA: '2026-10-08' }), 'AGENDADO'), 'Cita el jue 08/10');
   assert.equal(et(reg(), 'EN_TRATAMIENTO'), 'Sesión 2 de 3 · próxima ~09/10');
 });
 
@@ -66,4 +67,15 @@ test('armarTablero: completados del mes por retorno tras seguimiento, alta y «l
     ['12', 'Alta médica · Dra. Karen Matos'], ['9', 'Volvió el 02/10'], ['13', 'Lo hizo el 01/10']]);
   assert.equal(t.cifras.cerradosMes, 1, 'el fallecido');
   assert.equal(t.cifras.hechosHoy, 1);
+});
+
+test('armarTablero: deduplicación de COMPLETADO por CLAVE, manteniendo la tarjeta con FECHA_CLAVE más reciente', () => {
+  const citas = [cita({ dni: '14', fecha: '2026-08-01' }), cita({ dni: '14', fecha: '2026-10-02' })];
+  const segs = [seg({ dni: '14', fecha: '2026-09-20' }), seg({ dni: '14', fecha: '2026-10-05', accion: 'HECHO' })];
+  const vigentes = { '14|HEMATOLOGIA': { ID: 'ALT-000002', FECHA: '2026-10-04', DNI: '14', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dra. X' } };
+  const t = tablero({ pacientes: [pac({ DNI: '14' })], citas, seguimientos: segs, vigentes });
+  const completados = t.columnas.COMPLETADO;
+  assert.equal(completados.length, 1, 'una sola tarjeta tras deduplicación');
+  assert.ok(completados[0].ETIQUETA.startsWith('Alta médica'), 'etiqueta es la del alta (FECHA_CLAVE más reciente)');
+  assert.equal(t.cifras.completadosMes, 1, 'métrica de completados cuenta después de deduplicación');
 });

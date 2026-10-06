@@ -159,18 +159,19 @@ function getRegistrosHoy() {
 }
 
 function buscarPacienteRegistro(dni) {
-  var d = datos_(), k = normDni(dni);
+  var d = datos_(), k = normDni(dni), muerto = fallecidos(d.seguimientos)[k] || null;
   var realizadas = d.citas.filter(function (c) { return c.DNI === k && normTexto(c.ESTADO) === 'REALIZADO'; }).sort(porFecha);
-  if (!k || !realizadas.length) return { encontrado: false };
+  if (!k || !realizadas.length) return limpiarParaEnvio({ encontrado: false, fallecido: muerto });
   var ultima = realizadas[realizadas.length - 1], esp = {};
   realizadas.forEach(function (c) { esp[c.ESPECIALIDAD] = 1; });
   return limpiarParaEnvio({
     encontrado: true,
     nombre: ultima.NOMBRE,
-    telefonos: telefonosPorDni(d.indicacionesTodas, d.contactos)[k] || [],
+    telefonos: d.telefonos[k] || [],
     ultimaFecha: ultima.FECHA,
     ultimoMedico: ultima.MEDICO,
     doctor: doctorPropuesto(d.catalogos, ultima.MEDICO),
-    especialidades: Object.keys(esp).sort().map(function (e) { return { especialidad: e, alta: !!d.vigentes[claveSerie(k, e)] }; })
+    especialidades: Object.keys(esp).sort().map(function (e) { return { especialidad: e, alta: !!d.vigentes[claveSerie(k, e)] }; }),
+    fallecido: muerto
   });
 }

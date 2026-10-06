@@ -88,11 +88,11 @@ test('getRegistrosHoy: registros y altas de hoy, lo más reciente primero', () =
 
 test('buscarPacienteRegistro: datos del paciente conocido y propuesta de doctor', () => {
   const c = [cita({ fecha: '2026-09-01', medico: 'Dra. KAREN DIANA MATOS PEÑA' })];
-  const { ctx } = servidor({ citas: c, indicacionesTodas: [{ DNI: '40111222', TELEFONO: '912345678' }] });
+  const { ctx } = servidor({ citas: c, telefonos: { '40111222': ['912345678'] }, seguimientos: [] });
   assert.deepEqual(plano(ctx.buscarPacienteRegistro('40111222')), { encontrado: true, nombre: 'ROSA ELENA QUISPE HUAMAN', telefonos: ['912345678'],
     ultimaFecha: '2026-09-01', ultimoMedico: 'Dra. KAREN DIANA MATOS PEÑA', doctor: 'Dra. Karen Matos',
-    especialidades: [{ especialidad: 'HEMATOLOGÍA', alta: false }] });
-  assert.deepEqual(plano(ctx.buscarPacienteRegistro('40000000')), { encontrado: false });
+    especialidades: [{ especialidad: 'HEMATOLOGÍA', alta: false }], fallecido: '' });
+  assert.deepEqual(plano(ctx.buscarPacienteRegistro('40000000')), { encontrado: false, fallecido: '' });
 });
 
 test('marcarAnulado_ escribe SÍ y el motivo en la fila de ese ID, y no anula dos veces', () => {

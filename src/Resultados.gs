@@ -131,3 +131,97 @@ function leerCiclo(lista, reglas, hoy) {
   }
   return out;
 }
+
+/** Lo que la asesora eligió en «¿Qué pasó?», revisado. La tarjeta se busca como en la bandeja. */
+function validarResultado(p, d) {
+  function no(m) { return { error: m, fila: null, tarjeta: null }; }
+  if (!p) return no('Faltan los datos.');
+  var quien = enLista_(d.catalogos.usuarios, p.usuario);
+  if (!quien) return no('Elija quién es usted en el selector de arriba.');
+  var dni = normDni(p.dni);
+  if (!dni) return no('Falta el DNI del paciente.');
+  if (!normTexto(p.especialidad)) return no('Falta la especialidad.');
+  var ref = textoLimpio_(p.referencia);
+  var t = (d.tarjetas || []).filter(function (x) {
+    return x.DNI === dni && normTexto(x.ESPECIALIDAD) === normTexto(p.especialidad) && (ref ? x.ID_REGISTRO === ref : !x.ID_REGISTRO);
+  })[0];
+  if (!t) return no('Ese paciente no está en la lista. Recargue la página.');
+  var r = RESULTADOS[normTexto(p.resultado)];
+  if (!r) return no('Elija qué pasó.');
+  if (r.soloIndicacion && !TIPOS_INDICACION[normTexto(t.ESPECIALIDAD)]) return no('«Lo hizo» es solo para hierro y procedimientos.');
+  var hoy = d.hoy, f = fechaIso(p.fecha), nota = textoLimpio_(p.nota);
+  var fila = { DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD, RESPONSABLE: quien, MOTIVO: r.grupo === 'SIGUE' ? '' : r.nombre, NOTA: nota,
+    REFERENCIA: ref, RESULTADO: r.nombre, FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
+  if (r.nombre === 'LO PENSARÁ') {
+    if (!f) return no('Falta la fecha para volver a llamar.');
+    if (f <= hoy || f > sumarDias(hoy, 90)) return no('La fecha para volver a llamar va de mañana a 90 días.');
+    fila.FECHA_PROXIMA = f;
+  }
+  if (r.nombre === 'AGENDÓ CITA') {
+    if (!f) return no('Falta la fecha de la cita.');
+    if (f < hoy || f > sumarDias(hoy, 180)) return no('La fecha de la cita va de hoy a 180 días.');
+    fila.FECHA_PROXIMA = f;
+  }
+  if (r.nombre === 'LO HIZO') {
+    if (!f) return no('Falta la fecha de la sesión.');
+    if (f > hoy) return no('La fecha de la sesión no puede ser futura.');
+    fila.FECHA_PROXIMA = f;
+  }
+  if (r.nombre === 'ALTA MÉDICA') {
+    var doc = (d.catalogos.doctores || []).filter(function (x) { return normTexto(x.doctor) === normTexto(p.doctor); })[0];
+    if (!doc) return no('Elija el doctor que da el alta.');
+    fila.NOTA = unirNota_('Alta: ' + doc.doctor, nota);
+  }
+  if (r.nombre === 'NÚMERO EQUIVOCADO') {
+    var tel = normTelefono(p.telefono);
+    if (!tel) return no('Elija cuál teléfono está equivocado.');
+    if (String(t.TELEFONOS || '').split(' / ').indexOf(tel) < 0) return no('Ese teléfono no es de este paciente.');
+    fila.TELEFONO = tel;
+  }
+  if (r.nombre === 'NO DESEA CONTINUAR') {
+    var motivo = textoLimpio_(p.motivo);
+    if (!motivo) return no('Escriba el motivo.');
+    fila.NOTA = unirNota_('Motivo: ' + motivo, nota);
+  }
+  return { error: '', fila: fila, tarjeta: t };
+}
+
+function unirNota_(a, b) { return b ? a + ' · ' + b : a; }
+
+/** ACCION que se escribe junto al resultado, para que las cifras antiguas sigan igual. */
+function accionPara(resultado, quedanContactos) {
+  var r = RESULTADOS[normTexto(resultado)];
+  if (!r) return '';
+  if (r.grupo === 'SIGUE') return 'HECHO';
+  if (r.grupo === 'TELEFONO') return quedanContactos ? 'TELEFONO' : 'DESCARTADO';
+  return 'DESCARTADO';
+}
+
+/** Se anula el último resultado de su seguimiento; un «falleció», siempre (vale para todo el paciente). */
+function validarAnulacionResultado(id, seguimientos) {
+  var lista = seguimientos || [];
+  var s = lista.filter(function (x) { return x.ID === id; })[0];
+  if (!s) return 'No encontré ' + id + '.';
+  if (anulado_(s)) return id + ' ya estaba anulado.';
+  if (resultadoDe(s).resultado === 'FALLECIÓ') return '';
+  var mismo = lista.filter(function (x) {
+    return !anulado_(x) && normDni(x.DNI) === normDni(s.DNI) && normTexto(x.ESPECIALIDAD) === normTexto(s.ESPECIALIDAD) &&
+      textoLimpio_(x.REFERENCIA) === textoLimpio_(s.REFERENCIA);
+  }).sort(porFechaHora_);
+  return mismo[mismo.length - 1].ID === id ? '' : 'Solo se puede anular el último resultado de este seguimiento.';
+}
+
+/** Para «Verificar»: cuántas filas hay de cada clase. No reescribe ninguna. */
+function resumenAntiguos(seguimientos) {
+  var out = { hechos: 0, descartes: 0, fallecidos: 0, nuevos: 0, anulados: 0 };
+  (seguimientos || []).forEach(function (s) {
+    if (anulado_(s)) { out.anulados++; return; }
+    var r = resultadoDe(s);
+    if (!r) return;
+    if (!r.antiguo) out.nuevos++;
+    else if (r.resultado === 'FALLECIÓ') out.fallecidos++;
+    else if (r.grupo === 'SIGUE') out.hechos++;
+    else out.descartes++;
+  });
+  return out;
+}

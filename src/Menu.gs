@@ -369,6 +369,9 @@ function verificar() {
     lineas.push(planV.error ? '✗ SEGUIMIENTOS: ' + planV.error
       : planV.agregar.length ? '✗ A SEGUIMIENTOS le falta la columna ' + planV.agregar.join(', ') + '. Use «Preparar hojas».'
       : '✓ SEGUIMIENTOS tiene todas sus columnas.');
+    var ra = resumenAntiguos(leerSeguimientos_());
+    lineas.push('ℹ SEGUIMIENTOS: ' + ra.nuevos + ' con resultado, ' + ra.hechos + ' «hecho» y ' + ra.descartes +
+      ' descartes antiguos, ' + ra.fallecidos + ' fallecidos, ' + ra.anulados + ' anulados.');
   }
   if (ss.getSheetByName('CATALOGOS')) revisarCatalogos(catalogos_()).forEach(function (l) { lineas.push(l); });
   try {

@@ -1,0 +1,95 @@
+// Servidor de «¿Qué pasó?» con dobles de las hojas. Datos inventados.
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const { cargar, plano } = require('./cargar');
+const { cita, reglas } = require('./fixtures');
+
+const CAT = { usuarios: ['MAGALY', 'RACHEL'], motivos: [], alias: {}, doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: '' }],
+  procedimientos: [], tratamientos: [], marcas: {} };
+
+function servidor(hoja) {
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs']);
+  const escrito = { SEGUIMIENTOS: [], BITACORA: [], anulados: [], llamadas: [] };
+  const lock = { tomado: 0, flush: 0 };
+  const L = cargar();
+  const enHoja = hoja || [];
+  ctx.datos_ = () => ctx.derivar_({ hoy: '2026-10-06', catalogos: CAT, reglas: Object.assign(reglas(L), { maxSeguimientos: 2 }),
+    citas: [cita({ fecha: '2026-07-01' })], indicaciones: [{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' },
+      { DNI: '40111222', TELEFONO: '912345678', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' }],
+    contactos: [], registros: [], sesiones: [], altas: [], seguimientosTodos: enHoja.slice(), seguimientos: enHoja.filter(s => !L.anulado_(s)) });
+  ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
+  ctx.SpreadsheetApp = { flush: () => { lock.flush++; } };
+  ctx.leerSeguimientos_ = () => enHoja.concat(escrito.SEGUIMIENTOS);
+  ctx.anexarObjeto_ = (n, cols, o) => { assert.equal(lock.tomado, 1, 'se escribe con el candado tomado'); escrito[n].push(plano(o)); };
+  ctx.bitacora_ = (u, a, d) => escrito.BITACORA.push([u, a, d]);
+  ctx.fechaHoraTexto_ = () => '2026-10-06 10:30';
+  ctx.marcarAnulado_ = (n, id, motivo) => { assert.equal(lock.tomado, 1); escrito.anulados.push([n, id, motivo]); };
+  ctx.darDeAlta = p => { escrito.llamadas.push(['darDeAlta', plano(p)]); return { ok: true, alta: { ID: 'ALT-000001' } }; };
+  ctx.marcarSesion = p => { escrito.llamadas.push(['marcarSesion', plano(p)]); return { ok: true, sesion: { ID: 'SES-000001' }, completo: false }; };
+  return { ctx, escrito, lock };
+}
+const p = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'NO CONTESTÓ' }, o);
+
+test('registrarResultado: lo inválido no toma el candado', () => {
+  const { ctx, escrito, lock } = servidor();
+  assert.throws(() => ctx.registrarResultado(p({ resultado: 'quizás' })), /Elija qué pasó/);
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, lock.tomado, lock.flush], [0, 0, 0]);
+});
+
+test('registrarResultado: escribe la fila, la bitácora, suelta con flush y devuelve la tarjeta movida', () => {
+  const { ctx, escrito, lock } = servidor();
+  const r = plano(ctx.registrarResultado(p({ resultado: 'lo pensará', fecha: '2026-10-09' })));
+  assert.equal(r.ok, true);
+  const s = escrito.SEGUIMIENTOS[0];
+  assert.match(s.ID, /^SEG-\d+-\d+$/);
+  assert.deepEqual([s.FECHA_HORA, s.ACCION, s.RESULTADO, s.FECHA_PROXIMA], ['2026-10-06 10:30', 'HECHO', 'LO PENSARÁ', '2026-10-09']);
+  assert.deepEqual(escrito.BITACORA, [['MAGALY', 'RESULTADO', '40111222 · HEMATOLOGÍA · LO PENSARÁ']]);
+  assert.deepEqual([lock.tomado, lock.flush], [0, 1]);
+  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.ETIQUETA], ['AGENDADO', 'Llamar el vie 09/10']);
+});
+
+test('número equivocado: con otro teléfono sigue (TELEFONO); el último cierra (DESCARTADO), releyendo dentro del candado', () => {
+  const { ctx, escrito } = servidor();
+  ctx.registrarResultado(p({ resultado: 'NÚMERO EQUIVOCADO', telefono: '987654321' }));
+  assert.equal(escrito.SEGUIMIENTOS[0].ACCION, 'TELEFONO');
+  // Otra asesora, con datos de antes de la primera marca, marca el otro número.
+  const r = plano(ctx.registrarResultado(p({ resultado: 'NÚMERO EQUIVOCADO', telefono: '912345678' })));
+  assert.equal(escrito.SEGUIMIENTOS[1].ACCION, 'DESCARTADO');
+  assert.equal(r.tarjeta, '', 'cerrada: ya no está en el tablero');
+});
+
+test('alta médica de una reevaluación y «lo hizo» de un registro van a sus funciones', () => {
+  const { ctx, escrito } = servidor();
+  const a = plano(ctx.registrarResultado(p({ resultado: 'ALTA MÉDICA', doctor: 'Dra. Karen Matos', fecha: '2026-10-06' })));
+  assert.equal(a.alta.ID, 'ALT-000001');
+  assert.deepEqual(escrito.llamadas[0][1], { usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-06', nota: '' });
+  assert.equal(escrito.SEGUIMIENTOS.length, 0);
+});
+
+test('anularResultado: solo SEG-, motivo obligatorio, el último de su seguimiento', () => {
+  const hoja = [{ ID: 'SEG-1', FECHA_HORA: '2026-10-01 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'NO CONTESTÓ', ACCION: 'HECHO', REFERENCIA: '' },
+    { ID: 'SEG-2', FECHA_HORA: '2026-10-02 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'NO CONTESTÓ', ACCION: 'HECHO', REFERENCIA: '' }];
+  const { ctx, escrito, lock } = servidor(hoja);
+  assert.throws(() => ctx.anularResultado({ usuario: 'MAGALY', id: 'ALT-1', motivo: 'x' }), /resultados de seguimiento/);
+  assert.throws(() => ctx.anularResultado({ usuario: 'MAGALY', id: 'SEG-2', motivo: '' }), /Escriba el motivo/);
+  assert.throws(() => ctx.anularResultado({ usuario: 'MAGALY', id: 'SEG-1', motivo: 'error' }), /Solo se puede anular el último/);
+  assert.equal(lock.tomado, 0, 'el candado se suelta también con error');
+  assert.deepEqual(plano(ctx.anularResultado({ usuario: 'MAGALY', id: 'SEG-2', motivo: 'Deshecho al momento' })), { ok: true });
+  assert.deepEqual(escrito.anulados, [['SEGUIMIENTOS', 'SEG-2', 'Deshecho al momento']]);
+});
+
+test('datos_ deja fuera las anuladas; marcarSeguimiento y descartar siguen funcionando', () => {
+  const hoja = [{ ID: 'SEG-1', FECHA_HORA: '2026-10-05 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', ACCION: 'HECHO', ANULADO: 'SÍ' }];
+  const { ctx, escrito } = servidor(hoja);
+  assert.equal(ctx.datos_().pacientes[0].ESTADO, 'VENCIDO', 'el intento anulado no cuenta');
+  ctx.marcarSeguimiento(p({}));
+  assert.deepEqual([escrito.SEGUIMIENTOS[0].RESULTADO, escrito.SEGUIMIENTOS[0].ACCION], ['NO CONTESTÓ', 'HECHO']);
+  ctx.descartar(p({ motivo: 'SE ATIENDE EN OTRO LUGAR' }));
+  assert.deepEqual([escrito.SEGUIMIENTOS[1].RESULTADO, escrito.SEGUIMIENTOS[1].ACCION], ['SE ATIENDE EN OTRO LUGAR', 'DESCARTADO']);
+});
+
+test('getTablero devuelve las columnas listas para enviar', () => {
+  const { ctx } = servidor();
+  const t = plano(ctx.getTablero());
+  assert.deepEqual(t.columnas.POR_CONTACTAR.map(x => x.CLAVE), ['40111222|HEMATOLOGÍA']);
+});

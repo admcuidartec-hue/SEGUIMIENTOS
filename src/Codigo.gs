@@ -222,26 +222,34 @@ function leerAltas_() {
 /** Todo lo que necesita la app, leído una vez por petición. */
 function datos_() {
   if (MEMO.datos) return MEMO.datos;
-  var d = {
+  var todos = leerSeguimientos_();
+  MEMO.datos = derivar_({
     hoy: hoy_(),
     reglas: reglas_(),
     catalogos: catalogos_(),
     citas: leerCitas_(),
     indicaciones: leerIndicaciones_(),
-    seguimientos: leerSeguimientos_(),
+    // Las anuladas solo se muestran en la historia; ninguna cifra las cuenta.
+    seguimientosTodos: todos,
+    seguimientos: todos.filter(function (s) { return !anulado_(s); }),
     contactos: leerContactos_(),
     registros: leerRegistros_(),
     sesiones: leerSesiones_(),
     altas: leerAltas_()
-  };
+  });
+  return MEMO.datos;
+}
+
+/** Lo que se calcula a partir de lo leído. Se repite tras guardar, sin volver a leer las hojas. */
+function derivar_(d) {
   // Historial (INDICACIONES) + Registro: lo que cuenta en cifras, teléfonos y pendientes.
   d.indicacionesTodas = d.indicaciones.concat(indicacionesDeRegistros(d.registros, d.sesiones, d.catalogos, d.reglas, d.hoy));
   d.vigentes = altasVigentes(d.altas, d.seguimientos, d.citas);
+  d.telefonos = telefonosPorDni(d.indicacionesTodas, d.contactos, d.seguimientos);
   d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes);
   d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos)
     .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
-      reglas: d.reglas, hoy: d.hoy, telefonos: telefonosPorDni(d.indicacionesTodas, d.contactos), catalogos: d.catalogos }));
-  MEMO.datos = d;
+      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos }));
   return d;
 }
 
@@ -315,7 +323,7 @@ function getPaciente(dni) {
     citas: citas,
     indicaciones: d.indicaciones.filter(function (i) { return i.DNI === k; }),
     porConfirmar: porConfirmar,
-    seguimientos: d.seguimientos.filter(function (s) { return s.DNI === k; }),
+    seguimientos: d.seguimientosTodos.filter(function (s) { return s.DNI === k; }),
     registros: d.registros.filter(function (r) { return r.DNI === k; }).map(function (r) {
       var e = estadoRegistro(r, d.sesiones);
       return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
@@ -328,7 +336,9 @@ function getPaciente(dni) {
       var v = d.vigentes[claveSerie(k, a.ESPECIALIDAD)];
       return { ID: a.ID, FECHA: fechaIso(a.FECHA), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR, REGISTRADO_POR: a.REGISTRADO_POR,
         ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', VIGENTE: !!(v && v.ID === a.ID) };
-    })
+    }),
+    fallecido: fallecidos(d.seguimientos)[k] || null,
+    telefonosDescartados: telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos)[k] || []
   });
 }
 
@@ -348,35 +358,16 @@ function buscar(texto) {
   return limpiarParaEnvio(out);
 }
 
-function registrar_(p, accion) {
-  var d = datos_();
-  var error = validarAccion(p, d.catalogos, accion, d.pacientes.concat(d.pendientes));
-  if (error) throw new Error(error);
-  var lock = bloquear_();
-  try {
-    var ahora = new Date();
-    var s = {
-      ID: 'SEG-' + ahora.getTime() + '-' + Math.floor(Math.random() * 1000),
-      FECHA_HORA: fechaHoraTexto_(ahora),
-      DNI: normDni(p.dni),
-      ESPECIALIDAD: String(p.especialidad).trim(),
-      RESPONSABLE: String(p.usuario).trim(),
-      ACCION: accion,
-      MOTIVO: accion === 'DESCARTADO' ? String(p.motivo).trim() : '',
-      NOTA: String(p.nota || '').trim(),
-      REFERENCIA: textoLimpio_(p.referencia)
-    };
-    anexarObjeto_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS, s);
-    bitacora_(s.RESPONSABLE, accion === 'HECHO' ? 'SEGUIMIENTO' : 'DESCARTE', s.DNI + ' · ' + s.ESPECIALIDAD + (s.REFERENCIA ? ' · ' + s.REFERENCIA : ''));
-    return limpiarParaEnvio({ ok: true, seguimiento: s });
-  } finally {
-    lock.releaseLock();
-  }
+/** Envoltorios de la app anterior: «Hecho» es un «no contestó»; «Descartar» cierra con el motivo elegido. */
+function marcarSeguimiento(p) { return registrarResultado(copia_(p || {}, { resultado: 'NO CONTESTÓ' })); }
+
+function descartar(p) {
+  var r = RESULTADOS[normTexto(p && p.motivo)];
+  var q = r && r.grupo === 'CIERRE' && r.pide !== 'DOCTOR'
+    ? { resultado: r.nombre, motivo: r.nombre }
+    : { resultado: 'NO DESEA CONTINUAR', motivo: textoLimpio_(p && p.motivo) || 'OTRO' };
+  return registrarResultado(copia_(p || {}, q));
 }
-
-function marcarSeguimiento(p) { return registrar_(p, 'HECHO'); }
-
-function descartar(p) { return registrar_(p, 'DESCARTADO'); }
 
 function confirmarEmparejamiento(p) {
   var d = datos_();

@@ -4,7 +4,7 @@
   "description": "Plataforma de seguimiento de pacientes del Centro Hematológico del Perú sobre Google Apps Script",
   "private": true,
   "scripts": {
-    "test": "node --test test/logica-*.test.js test/sintaxis.test.js test/menu.test.js test/registro-servidor.test.js",
+    "test": "node --test test/logica-*.test.js test/sintaxis.test.js test/menu.test.js test/registro-servidor.test.js test/resultado-servidor.test.js",
     "test:ui": "node --test test/ui.test.js",
     "login": "clasp login",
     "subir": "clasp push --force",

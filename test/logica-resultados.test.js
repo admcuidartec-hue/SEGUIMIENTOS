@@ -120,3 +120,60 @@ test('armarPacientes: un número equivocado sin más contacto cierra; con otro t
   const q = plano(L.armarPacientes(citas, otro, [marca], reglas(L), '2026-10-01'))[0];
   assert.deepEqual([q.ESTADO, q.TELEFONOS], ['VENCIDO', '912345678']);
 });
+
+const CAT = { usuarios: ['MAGALY'], motivos: [], doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: '' }] };
+const TARJ = [{ DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', TELEFONOS: '987654321 / 912345678' },
+  { DNI: '40111222', ESPECIALIDAD: 'HIERRO', ID_REGISTRO: 'REG-000001', TELEFONOS: '' }];
+const val = o => plano(L.validarResultado(Object.assign({ usuario: 'magaly', dni: '40111222', especialidad: 'Hematología', referencia: '',
+  resultado: 'no contestó', nota: '' }, o), { catalogos: CAT, hoy: '2026-10-06', tarjetas: TARJ }));
+
+test('validarResultado: mensajes de cada error', () => {
+  assert.match(val({ usuario: 'X' }).error, /Elija quién es usted/);
+  assert.match(val({ dni: '' }).error, /Falta el DNI/);
+  assert.match(val({ especialidad: 'NUTRICIÓN' }).error, /no está en la lista/);
+  assert.match(val({ resultado: 'quizás' }).error, /Elija qué pasó/);
+  assert.match(val({ resultado: 'LO HIZO', fecha: '2026-10-06' }).error, /solo para hierro y procedimientos/);
+  assert.match(val({ resultado: 'LO PENSARÁ' }).error, /Falta la fecha para volver a llamar/);
+  assert.match(val({ resultado: 'LO PENSARÁ', fecha: '2026-10-06' }).error, /de mañana a 90 días/);
+  assert.match(val({ resultado: 'AGENDÓ CITA', fecha: '2026-10-05' }).error, /de hoy a 180 días/);
+  assert.match(val({ resultado: 'ALTA MÉDICA', doctor: 'Dr. Nadie' }).error, /Elija el doctor/);
+  assert.match(val({ resultado: 'NÚMERO EQUIVOCADO' }).error, /Elija cuál teléfono/);
+  assert.match(val({ resultado: 'NÚMERO EQUIVOCADO', telefono: '955555555' }).error, /no es de este paciente/);
+  assert.match(val({ resultado: 'NO DESEA CONTINUAR', motivo: '  ' }).error, /Escriba el motivo/);
+  assert.match(val({ especialidad: 'HIERRO', referencia: 'REG-000001', resultado: 'LO HIZO', fecha: '2026-10-07' }).error, /no puede ser futura/);
+});
+
+test('validarResultado: la fila que se guarda', () => {
+  const v = val({ resultado: 'lo pensara', fecha: '2026-10-09', nota: ' llamar tarde ' });
+  assert.equal(v.error, '');
+  assert.deepEqual(v.fila, { DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESPONSABLE: 'MAGALY', MOTIVO: '', NOTA: 'llamar tarde', REFERENCIA: '',
+    RESULTADO: 'LO PENSARÁ', FECHA_PROXIMA: '2026-10-09', TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' });
+  const nd = val({ resultado: 'NO DESEA CONTINUAR', motivo: 'Lo ve otro médico', nota: 'amable' }).fila;
+  assert.deepEqual([nd.MOTIVO, nd.NOTA], ['NO DESEA CONTINUAR', 'Motivo: Lo ve otro médico · amable']);
+  const ne = val({ resultado: 'NÚMERO EQUIVOCADO', telefono: '51987654321' }).fila;
+  assert.deepEqual([ne.MOTIVO, ne.TELEFONO], ['NÚMERO EQUIVOCADO', '987654321']);
+  const al = val({ especialidad: 'HIERRO', referencia: 'REG-000001', resultado: 'ALTA MÉDICA', doctor: 'dra. karen matos' }).fila;
+  assert.deepEqual([al.MOTIVO, al.NOTA, al.REFERENCIA], ['ALTA MÉDICA', 'Alta: Dra. Karen Matos', 'REG-000001']);
+});
+
+test('accionPara y validarAnulacionResultado', () => {
+  assert.equal(L.accionPara('LO PENSARÁ', true), 'HECHO');
+  assert.equal(L.accionPara('NÚMERO EQUIVOCADO', true), 'TELEFONO');
+  assert.equal(L.accionPara('NÚMERO EQUIVOCADO', false), 'DESCARTADO');
+  assert.equal(L.accionPara('FALLECIÓ', true), 'DESCARTADO');
+  const a = Object.assign(res('2026-10-01', 'NO CONTESTÓ'), { ID: 'SEG-1' });
+  const b = Object.assign(res('2026-10-03', 'LO PENSARÁ'), { ID: 'SEG-2' });
+  const m = Object.assign(res('2026-10-02', 'FALLECIÓ', { ESPECIALIDAD: 'NUTRICIÓN' }), { ID: 'SEG-3' });
+  assert.equal(L.validarAnulacionResultado('SEG-2', [a, b, m]), '');
+  assert.match(L.validarAnulacionResultado('SEG-1', [a, b, m]), /Solo se puede anular el último/);
+  assert.equal(L.validarAnulacionResultado('SEG-3', [a, b, m, Object.assign(res('2026-10-04', 'NO CONTESTÓ', { ESPECIALIDAD: 'NUTRICIÓN' }), { ID: 'SEG-4' })]), '', 'un falleció siempre se puede anular');
+  assert.match(L.validarAnulacionResultado('SEG-9', [a]), /No encontré SEG-9/);
+  assert.match(L.validarAnulacionResultado('SEG-1', [Object.assign({}, a, { ANULADO: 'SÍ' })]), /ya estaba anulado/);
+});
+
+test('resumenAntiguos cuenta las filas por clase', () => {
+  const r = plano(L.resumenAntiguos([seg({ fecha: '2026-09-01' }), seg({ fecha: '2026-09-02', accion: 'DESCARTADO', motivo: 'OTRO' }),
+    seg({ fecha: '2026-09-03', accion: 'DESCARTADO', motivo: 'FALLECIÓ' }), res('2026-10-01', 'LO PENSARÁ'),
+    Object.assign(res('2026-10-02', 'NO CONTESTÓ'), { ANULADO: 'SÍ' })]));
+  assert.deepEqual(r, { hechos: 1, descartes: 1, fallecidos: 1, nuevos: 1, anulados: 1 });
+});

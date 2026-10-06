@@ -833,6 +833,7 @@ const S = {
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
   escrituras: 0,      // sube cuando sale cada guardado: una recarga pedida antes puede traer el tablero de antes
   recargaPendiente: false, // una recarga silenciosa descartada que se repide cuando enVuelo quede vacío
+  historiaTrasRecarga: false, // Deshacer: repedir la historia del panel cuando se aplique la recarga
   fichaDni: '',     // «Ver ficha completa»: el DNI que abre Pacientes (Tarea 9)
   kpi: null,        // getKpi() en caché (Tarea 10); invalidarIndicadores() lo olvida tras cada escritura
   resumen: null,    // getResumen() en caché (Tarea 10); ídem
@@ -1225,20 +1226,32 @@ function iniciarTablero() {
  * silencioso: tras una escritura (Deshacer, Anular) no muestra esqueletos; las tarjetas viajan con FLIP a su sitio.
  */
 async function cargarTablero(pedido, silencioso, intento) {
-  const n = cargarTablero.n = (cargarTablero.n || 0) + 1, gen = S.escrituras;
+  const n = cargarTablero.n = (cargarTablero.n || 0) + 1, gen = S.escrituras, limpio = !S.enVuelo.size;
   if (S.fase !== 'listo') silencioso = false;
   if (!silencioso) { S.fase = 'cargando'; pintarTablero(); S.recargaPendiente = false; }
   try {
     const r = await (pedido || llamar('getTablero'));
     if (n !== cargarTablero.n) return;
-    // getTablero no toma el candado: si un guardado salió después de pedirlo, o sigue sin respuesta, esta foto puede ser
-    // de antes del guardado y devolvería la tarjeta a su columna vieja. Se descarta y se pide otra: en el acto si ya no
-    // hay guardados en vuelo (a lo sumo 3 veces seguidas), o cuando termine el último.
-    if (silencioso && (S.escrituras !== gen || S.enVuelo.size) && (intento || 0) < 3) {
-      if (S.enVuelo.size) { S.recargaPendiente = true; return; }
-      return cargarTablero(null, true, (intento || 0) + 1);
+    // getTablero no toma el candado: puede leer la hoja antes de que un guardado escriba. Una recarga silenciosa solo se
+    // aplica si al pedirla no había guardados en vuelo y desde entonces no salió ninguno. Si no, se descarta (nunca se
+    // aplica: el r.tarjeta de cada guardado ya deja bien el tablero) y se pide otra: en el acto si ya no hay guardados
+    // en vuelo (a lo sumo 3 veces seguidas), o cuando termine el último.
+    if (silencioso && (!limpio || S.escrituras !== gen)) {
+      if (S.enVuelo.size) S.recargaPendiente = true;
+      else if ((intento || 0) < 3) return cargarTablero(null, true, (intento || 0) + 1);
+      return false;
     }
-    if (silencioso) { conFlip(() => { adaptarTablero(r); pintarTablero(); }); trasRecargar(); return; }
+    if (silencioso) {
+      conFlip(() => { adaptarTablero(r); pintarTablero(); });
+      trasRecargar();
+      // Deshacer: con el panel abierto (p. ej. número equivocado), su historia ya no es la de antes.
+      if (S.historiaTrasRecarga) {
+        S.historiaTrasRecarga = false;
+        const pa = seleccion.panel && S.pacientes.find(x => x.id === seleccion.panel);
+        if (pa) cargarHistoria(pa);
+      }
+      return true;
+    }
     adaptarTablero(r);
     S.fase = 'listo';
   } catch (e) {
@@ -2051,10 +2064,9 @@ async function deshacer(fn, id, quien, nombre) {
     invalidarIndicadores();
     avisar('Deshecho: ' + nombre + '.');
   } catch (e) { avisar('No se deshizo: ' + e.message); }
+  // La historia del panel se vuelve a pedir cuando llegue el tablero que sí se aplica (aunque esta recarga se descarte).
+  S.historiaTrasRecarga = true;
   await cargarTablero(null, true);
-  // Si el panel sigue abierto (p. ej. número equivocado), su historia ya no es la de antes.
-  const pa = seleccion.panel && S.pacientes.find(x => x.id === seleccion.panel);
-  if (pa) cargarHistoria(pa);
 }
 
 /* ---- Historia (getPaciente al abrir el panel) ---- */

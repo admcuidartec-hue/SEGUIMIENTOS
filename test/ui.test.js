@@ -799,6 +799,41 @@ test('panel: una recarga silenciosa pedida antes de un guardado no devuelve la t
   } finally { await navegador.close(); }
 });
 
+test('panel: un 1 pulsado mientras Deshacer anula no queda deshecho por la recarga que sale después (I1, guardado antes de pedirla)', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarCol(pagina, LUIS, '2');
+    await esperarEstable(pagina);
+    // La anulación termina antes que el guardado; la recarga se pide con el guardado en vuelo, lee la hoja antes
+    // de que el guardado escriba y responde después de él.
+    await pagina.evaluate(() => {
+      DEMO._demora.anularResultado = 400; DEMO._demora.registrarResultado = 700;
+      DEMO._demora.getTablero = 600; DEMO._alPedir.getTablero = true;
+    });
+    const tab = await llamadas(pagina, 'getTablero');
+    await pagina.waitForSelector('#aviso button:not([hidden])');
+    await pagina.locator('#aviso button').click();   // Deshacer
+    await pagina.locator(`#tablero [data-card="${CARMEN}"]`).focus();
+    await pagina.keyboard.press('1');                // durante la anulación
+    await esperarCol(pagina, CARMEN, '2');
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 1);
+    assert.equal(await pagina.evaluate(() => S.enVuelo.size), 1, 'la recarga se pidió con el guardado en vuelo');
+    await esperarEstable(pagina);                    // el guardado responde antes que la recarga
+    await pagina.waitForTimeout(700);                // llegó la foto de antes del guardado
+    assert.equal(await colPintada(pagina, CARMEN), '2', 'la foto de antes del guardado no se aplicó');
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 2);   // se descartó y se repidió
+    await esperarCol(pagina, LUIS, '1');
+    await pagina.waitForTimeout(800);
+    assert.equal(await colPintada(pagina, CARMEN), '2', 'tras asentarse todo, Agendado');
+    assert.equal(await colPintada(pagina, LUIS), '1');
+    assert.equal(await llamadas(pagina, 'getTablero'), tab + 2);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('panel: si el servidor falla, todo vuelve, «No se guardó: …» y sin «Deshacer»', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {

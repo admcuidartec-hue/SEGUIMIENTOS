@@ -833,7 +833,7 @@ const S = {
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
   escrituras: 0,      // sube cuando sale cada guardado: una recarga pedida antes puede traer el tablero de antes
   recargaPendiente: false, // una recarga silenciosa descartada que se repide cuando enVuelo quede vacío
-  historiaTrasRecarga: false, // Deshacer: repedir la historia del panel cuando se aplique la recarga
+  historiaTrasRecarga: '', // Deshacer: CLAVE del panel abierto cuya historia se repide cuando se aplique la recarga
   fichaDni: '',     // «Ver ficha completa»: el DNI que abre Pacientes (Tarea 9)
   kpi: null,        // getKpi() en caché (Tarea 10); invalidarIndicadores() lo olvida tras cada escritura
   resumen: null,    // getResumen() en caché (Tarea 10); ídem
@@ -1237,17 +1237,20 @@ async function cargarTablero(pedido, silencioso, intento) {
     // aplica: el r.tarjeta de cada guardado ya deja bien el tablero) y se pide otra: en el acto si ya no hay guardados
     // en vuelo (a lo sumo 3 veces seguidas), o cuando termine el último.
     if (silencioso && (!limpio || S.escrituras !== gen)) {
-      if (S.enVuelo.size) S.recargaPendiente = true;
-      else if ((intento || 0) < 3) return cargarTablero(null, true, (intento || 0) + 1);
+      if (!S.enVuelo.size && (intento || 0) < 3) return cargarTablero(null, true, (intento || 0) + 1);
+      // Con guardados en vuelo, o en el tope: queda pendiente y la pide de nuevo (intento 0) el próximo guardado que termine.
+      S.recargaPendiente = true;
       return false;
     }
     if (silencioso) {
       conFlip(() => { adaptarTablero(r); pintarTablero(); });
       trasRecargar();
       // Deshacer: con el panel abierto (p. ej. número equivocado), su historia ya no es la de antes.
+      // Solo si sigue abierto el mismo panel para el que se pidió.
       if (S.historiaTrasRecarga) {
-        S.historiaTrasRecarga = false;
-        const pa = seleccion.panel && S.pacientes.find(x => x.id === seleccion.panel);
+        const clave = S.historiaTrasRecarga;
+        S.historiaTrasRecarga = '';
+        const pa = seleccion.panel === clave && S.pacientes.find(x => x.id === clave);
         if (pa) cargarHistoria(pa);
       }
       return true;
@@ -2065,7 +2068,7 @@ async function deshacer(fn, id, quien, nombre) {
     avisar('Deshecho: ' + nombre + '.');
   } catch (e) { avisar('No se deshizo: ' + e.message); }
   // La historia del panel se vuelve a pedir cuando llegue el tablero que sí se aplica (aunque esta recarga se descarte).
-  S.historiaTrasRecarga = true;
+  S.historiaTrasRecarga = seleccion.panel || '';
   await cargarTablero(null, true);
 }
 

@@ -834,6 +834,38 @@ test('panel: un 1 pulsado mientras Deshacer anula no queda deshecho por la recar
   } finally { await navegador.close(); }
 });
 
+test('panel: en el tope de recargas descartadas queda una pendiente y el siguiente guardado la pide (I1, tope)', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarCol(pagina, LUIS, '2');
+    await esperarEstable(pagina);
+    // Cada getTablero cuenta como si saliera un guardado mientras viaja: las 4 respuestas (intento 0 a 3) se descartan.
+    await pagina.evaluate(() => { window.__tab = DEMO.getTablero; DEMO.getTablero = (...a) => { S.escrituras++; return window.__tab(...a); }; });
+    const tab = await llamadas(pagina, 'getTablero');
+    await pagina.waitForSelector('#aviso button:not([hidden])');
+    await pagina.locator('#aviso button').click();   // Deshacer
+    await pagina.waitForFunction(() => DEMO._llamadas.anularResultado === 1);
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 4);
+    await pagina.waitForTimeout(300);
+    assert.equal(await llamadas(pagina, 'getTablero'), tab + 4, 'tope: sin bucle');
+    assert.equal(await colPintada(pagina, LUIS), '2', 'ninguna respuesta descartada se aplicó');
+    assert.equal(await pagina.evaluate(() => S.recargaPendiente), true, 'en el tope queda pendiente');
+    // El siguiente guardado, al terminar, pide un tablero nuevo que sí se aplica.
+    await pagina.evaluate(() => { DEMO.getTablero = window.__tab; });
+    await pagina.locator(`#tablero [data-card="${CARMEN}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarEstable(pagina);
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 5);
+    await esperarCol(pagina, LUIS, '1');
+    assert.equal(await colPintada(pagina, CARMEN), '2');
+    assert.equal(await pagina.evaluate(() => S.recargaPendiente), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('panel: si el servidor falla, todo vuelve, «No se guardó: …» y sin «Deshacer»', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {

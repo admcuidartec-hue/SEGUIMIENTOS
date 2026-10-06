@@ -83,13 +83,18 @@ function validarRegistro(p, catalogos, hoy) {
   var doctor = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(p.doctor); })[0];
   if (!doctor) return no('Elija el doctor de la lista.');
   var proc = textoLimpio_(p.procedimiento), trat = textoLimpio_(p.tratamiento);
-  if (!proc && !trat) return no('Elija un procedimiento, un tratamiento o ambos.');
+  var procs = (Array.isArray(p.procedimientos) ? p.procedimientos : []).concat(proc ? [proc] : [])
+    .map(textoLimpio_).filter(Boolean);
+  if (!procs.length && !trat) return no('Elija un procedimiento, un tratamiento o ambos.');
   var base = { FECHA: fecha, ASESORA: asesora, DOCTOR: doctor.doctor, NOMBRE: nombre, DNI: normDni(p.dni), CONTACTO: contacto,
     MARCA: '', ANULADO: '', MOTIVO_ANULACION: '' };
   var filas = [];
-  if (proc) {
-    var p1 = enLista_(catalogos.procedimientos, proc);
-    if (!p1) return no('El procedimiento «' + proc + '» no está en CATALOGOS.');
+  var vistos = {};
+  for (var i = 0; i < procs.length; i++) {
+    var p1 = enLista_(catalogos.procedimientos, procs[i]);
+    if (!p1) return no('El procedimiento «' + procs[i] + '» no está en CATALOGOS.');
+    if (vistos[normTexto(p1)]) continue;
+    vistos[normTexto(p1)] = 1;
     filas.push(copia_(base, { TIPO: 'PROCEDIMIENTO', DETALLE: p1, SESIONES: 1 }));
   }
   if (trat) {
@@ -204,6 +209,8 @@ function pendientesRegistro(d) {
       ESPECIALIDAD_CONSULTA: ultima ? ultima.ESPECIALIDAD : '',
       FECHA_COTIZACION: fechaIso(r.FECHA),
       DETALLE: textoRegistro(r),
+      TRATAMIENTO: r.TIPO === 'HIERRO' ? frase_(r.DETALLE) : '',
+      MARCA: r.TIPO === 'HIERRO' ? frase_(r.MARCA) : '',
       SESIONES: e.total,
       HECHAS: e.hechas,
       ULTIMA_SESION: e.ultima,

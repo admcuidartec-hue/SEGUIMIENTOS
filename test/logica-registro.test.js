@@ -290,3 +290,21 @@ test('revisión final: un registro aún en su espera no marca «cotizó y no lo 
   const p = L.pendientesPorDni([{ DNI: '1', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', ESTADO: 'COTIZÓ', FECHA: '2026-10-04', CANTIDAD: 2, EN_ESPERA: 'SÍ' }]);
   assert.deepEqual(plano(p), {});
 });
+
+test('validarRegistro: varios procedimientos dan una fila cada uno; el singular sigue funcionando', () => {
+  const cat = Object.assign({}, CAT, { procedimientos: ['SANGRÍA', 'AMO', 'BIOPSIA'] });
+  const v = plano(L.validarRegistro(Object.assign(base(), { procedimiento: '', procedimientos: ['amo', 'Biopsia'] }), cat, HOY));
+  assert.equal(v.error, '');
+  assert.deepEqual(v.filas.map(f => [f.TIPO, f.DETALLE]), [['PROCEDIMIENTO', 'AMO'], ['PROCEDIMIENTO', 'BIOPSIA']]);
+  assert.match(L.validarRegistro(Object.assign(base(), { procedimientos: ['XYZ'] }), cat, HOY).error, /«XYZ» no está en CATALOGOS/);
+  assert.equal(L.validarRegistro(Object.assign(base(), { procedimientos: ['AMO', 'amo'] }), cat, HOY).filas.length, 1, 'sin repetidos');
+});
+
+test('pendientesRegistro: un registro de hierro trae TRATAMIENTO y MARCA en frase; el procedimiento, vacíos', () => {
+  const reg = (id, tipo, detalle, marca) => ({ ID: id, FECHA_HORA: '2026-09-25 09:00', FECHA: '2026-09-25', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas',
+    NOMBRE: 'ROSA', DNI: '40111222', TIPO: tipo, CONTACTO: '987654321', DETALLE: detalle, MARCA: marca, SESIONES: 1 });
+  const p = pend([reg('REG-000001', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT'), reg('REG-000002', 'PROCEDIMIENTO', 'SANGRÍA', '')]);
+  const h = p.find(x => x.ID_REGISTRO === 'REG-000001'), s = p.find(x => x.ID_REGISTRO === 'REG-000002');
+  assert.deepEqual([h.TRATAMIENTO, h.MARCA], ['Hierro carboximaltosa', 'Ferinject']);
+  assert.deepEqual([s.TRATAMIENTO, s.MARCA], ['', '']);
+});

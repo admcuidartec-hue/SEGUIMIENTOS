@@ -148,3 +148,11 @@ test('kpiMotivos solo cuenta los descartes de reevaluación', () => {
     seg({ fecha: '2026-09-02', esp: 'HIERRO', accion: 'DESCARTADO', motivo: 'OTRO' })];
   assert.deepEqual(plano(L.kpiMotivos(segs)), [{ MOTIVO: 'OTRO', N: 1 }]);
 });
+
+test('pendientesIndicacion: el hierro antiguo trae TRATAMIENTO «Hierro (Ferinject)» y MARCA vacía; el procedimiento, vacíos', () => {
+  const citas = [cita({ fecha: '2026-08-01' })];
+  const p = pend(citas, [ind({ ID: 'I1', TIPO: 'HIERRO' }), ind({ ID: 'I2', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA' })]);
+  const h = p.find(x => x.TIPO_SEGUIMIENTO === 'HIERRO'), s = p.find(x => x.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO');
+  assert.deepEqual([h.TRATAMIENTO, h.MARCA], ['Hierro (Ferinject)', '']);
+  assert.deepEqual([s.TRATAMIENTO, s.MARCA], ['', '']);
+});

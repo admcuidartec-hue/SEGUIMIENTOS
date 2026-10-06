@@ -13,10 +13,11 @@ function servidor(hoja, extraEnHoja, registros, cabecera) {
   const lock = { tomado: 0, flush: 0 };
   const L = cargar();
   const enHoja = hoja || [];
+  const altas = [], sesiones = [];
   ctx.datos_ = () => ctx.derivar_({ hoy: '2026-10-06', catalogos: CAT, reglas: Object.assign(reglas(L), { maxSeguimientos: 2 }),
     citas: [cita({ fecha: '2026-07-01' })], indicaciones: [{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' },
       { DNI: '40111222', TELEFONO: '912345678', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' }],
-    contactos: [], registros: registros || [], sesiones: [], altas: [], seguimientosTodos: enHoja.slice(), seguimientos: enHoja.filter(s => !L.anulado_(s)) });
+    contactos: [], registros: registros || [], sesiones: sesiones.slice(), altas: altas.slice(), seguimientosTodos: enHoja.slice(), seguimientos: enHoja.filter(s => !L.anulado_(s)) });
   ctx.hoja_ = () => ({});
   ctx.encabezado_ = () => cabecera || ctx.COLUMNAS_SEGUIMIENTOS.slice();
   ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
@@ -26,8 +27,8 @@ function servidor(hoja, extraEnHoja, registros, cabecera) {
   ctx.bitacora_ = (u, a, d) => escrito.BITACORA.push([u, a, d]);
   ctx.fechaHoraTexto_ = () => '2026-10-06 10:30';
   ctx.marcarAnulado_ = (n, id, motivo) => { assert.equal(lock.tomado, 1); escrito.anulados.push([n, id, motivo]); };
-  ctx.darDeAlta = p => { escrito.llamadas.push(['darDeAlta', plano(p)]); return { ok: true, alta: { ID: 'ALT-000001' } }; };
-  ctx.marcarSesion = p => { escrito.llamadas.push(['marcarSesion', plano(p)]); return { ok: true, sesion: { ID: 'SES-000001' }, completo: false }; };
+  ctx.darDeAlta = p => { escrito.llamadas.push(['darDeAlta', plano(p)]); altas.push({ ID: 'ALT-000001', FECHA: p.fecha, DNI: p.dni, ESPECIALIDAD: p.especialidad, DOCTOR: p.doctor }); return { ok: true, alta: { ID: 'ALT-000001' } }; };
+  ctx.marcarSesion = p => { escrito.llamadas.push(['marcarSesion', plano(p)]); sesiones.push({ ID: 'SES-000001', ID_REGISTRO: p.id, FECHA: p.fecha, N: 1 }); return { ok: true, sesion: { ID: 'SES-000001' }, completo: false }; };
   return { ctx, escrito, lock };
 }
 const p = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'NO CONTESTÓ' }, o);
@@ -64,6 +65,9 @@ test('alta médica de una reevaluación y «lo hizo» de un registro van a sus f
   const { ctx, escrito } = servidor();
   const a = plano(ctx.registrarResultado(p({ resultado: 'ALTA MÉDICA', doctor: 'Dra. Karen Matos', fecha: '2026-10-06' })));
   assert.equal(a.alta.ID, 'ALT-000001');
+  assert.ok('tarjeta' in a, 'devuelve la tarjeta recalculada');
+  assert.equal(a.tarjeta.COLUMNA, 'COMPLETADO', 'con el alta la reevaluación sale de las abiertas');
+  assert.match(a.tarjeta.ETIQUETA, /Alta médica/);
   assert.deepEqual(escrito.llamadas[0][1], { usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-06', nota: '' });
   assert.equal(escrito.SEGUIMIENTOS.length, 0);
 });
@@ -117,9 +121,11 @@ test('«lo hizo» de un registro va a marcarSesion y no escribe en SEGUIMIENTOS'
   const { ctx, escrito } = servidor([], [], [reg]);
   const tarjeta = ctx.datos_().pendientes[0];
   assert.ok(tarjeta && tarjeta.ID_REGISTRO === 'REG-000004', 'hay tarjeta de registro');
-  ctx.registrarResultado(p({ especialidad: tarjeta.ESPECIALIDAD, referencia: 'REG-000004', resultado: 'LO HIZO', fecha: '2026-10-06', nota: 'ok' }));
+  const r = plano(ctx.registrarResultado(p({ especialidad: tarjeta.ESPECIALIDAD, referencia: 'REG-000004', resultado: 'LO HIZO', fecha: '2026-10-06', nota: 'ok' })));
   assert.deepEqual(escrito.llamadas, [['marcarSesion', { usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-06', nota: 'ok' }]]);
   assert.equal(escrito.SEGUIMIENTOS.length, 0);
+  assert.ok('tarjeta' in r, 'devuelve la tarjeta recalculada');
+  assert.ok(r.tarjeta === '' || r.tarjeta.CLAVE === 'REG-000004');
 });
 
 test('hojas sin preparar: registrar y anular se niegan, no escriben y sueltan el candado', () => {

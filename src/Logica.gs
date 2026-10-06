@@ -677,6 +677,8 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
       ESPECIALIDAD_CONSULTA: previa ? previa.ESPECIALIDAD : '',
       FECHA_COTIZACION: g.fecha,
       DETALLE: g.detalles.join(' · '),
+      TRATAMIENTO: g.tipo === 'HIERRO' ? 'Hierro (Ferinject)' : '',
+      MARCA: '',
       DIAS: dias,
       ULTIMA_CITA: ultima ? ultima.FECHA : '',
       N_SEGUIMIENTOS: c.intentos,

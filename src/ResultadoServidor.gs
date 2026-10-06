@@ -19,6 +19,17 @@ function exigirHojaPreparada_() {
   if (plan.error || plan.agregar.length) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
 }
 
+/** Tras una escritura delegada, la tarjeta recalculada (o '' si salió del tablero), para que la app confirme el movimiento. */
+function conTarjeta_(r, clave) {
+  MEMO.datos = null;
+  var tab = armarTablero(datos_()), nueva = '';
+  Object.keys(tab.columnas).forEach(function (c) { tab.columnas[c].forEach(function (x) { if (x.CLAVE === clave && !nueva) nueva = x; }); });
+  var out = {};
+  Object.keys(r || {}).forEach(function (k) { out[k] = r[k]; });
+  out.tarjeta = nueva;
+  return limpiarParaEnvio(out);
+}
+
 /** `opciones` es interno (no viene de la app): { motivo } conserva el motivo original de una pestaña vieja. */
 function registrarResultado_(p, opciones) {
   var d = datos_();
@@ -26,10 +37,12 @@ function registrarResultado_(p, opciones) {
   if (v.error) throw new Error(v.error);
   var t = v.tarjeta, indicacion = !!TIPOS_INDICACION[normTexto(t.ESPECIALIDAD)];
   if (v.fila.RESULTADO === 'ALTA MÉDICA' && !indicacion) {
-    return darDeAlta({ usuario: p.usuario, dni: v.fila.DNI, especialidad: t.ESPECIALIDAD, doctor: p.doctor, fecha: p.fecha, nota: textoLimpio_(p.nota) });
+    var rAlta = darDeAlta({ usuario: p.usuario, dni: v.fila.DNI, especialidad: t.ESPECIALIDAD, doctor: p.doctor, fecha: p.fecha, nota: textoLimpio_(p.nota) });
+    return conTarjeta_(rAlta, claveTarjeta(t));
   }
   if (v.fila.RESULTADO === 'LO HIZO' && t.ID_REGISTRO) {
-    return marcarSesion({ usuario: p.usuario, id: t.ID_REGISTRO, fecha: p.fecha, nota: textoLimpio_(p.nota) });
+    var rSesion = marcarSesion({ usuario: p.usuario, id: t.ID_REGISTRO, fecha: p.fecha, nota: textoLimpio_(p.nota) });
+    return conTarjeta_(rSesion, claveTarjeta(t));
   }
   var lock = bloquear_(), s;
   try {

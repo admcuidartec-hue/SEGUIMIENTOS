@@ -84,7 +84,7 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
 |---|---|
 | ↑ ↓ (o j k) y ← → | Moverse entre tarjetas y columnas |
 | Enter | Abrir el panel de la tarjeta |
-| 1 a 4 | «¿Qué pasó?»: No contestó, Lo pensará, Agendó cita, Lo hizo. El 1 guarda sin abrir el panel |
+| 1 a 4 | «¿Qué pasó?»: 1 = No contestó, 2 = Lo pensará, 3 = Agendó cita, 4 = Lo hizo (solo hierro y procedimiento). El 1 guarda sin abrir el panel |
 | X | Cerrar el seguimiento (abre las opciones de cierre; nada se cierra sin confirmar) |
 | C | Copiar el teléfono |
 | / | Ir al buscador |
@@ -107,13 +107,26 @@ npm run subir            # solo cambia @HEAD, el banco de pruebas
 #   y en REGLAS, MAX_SEGUIMIENTOS debe valer 2 (si la celda falta, el código usa 3)
 # en el @HEAD, probar: un resultado de cada tipo, «Deshacer», un registro y un alta,
 #   una impresión del resumen, el celular y el modo oscuro
-npm run actualizar       # publica para el equipo conservando la URL
+#   (solo sobre un paciente de prueba: ver «Probar en @HEAD escribe en el libro real», abajo)
+npm run actualizar       # publica para el equipo conservando la URL, EN LA MISMA SESIÓN que las pruebas
 # pedir a las asesoras que recarguen la app (las pestañas abiertas siguen con la versión vieja)
 # y avisarles que H y D se reemplazan por 1 a 4 y X
 ```
 
 Ese orden importa: hasta que «Preparar hojas» agrega las 5 columnas, `registrarResultado` y `anularResultado` se niegan a escribir (SEGUIMIENTOS se escribe por posición).
 «Verificar» no muestra `MAX_SEGUIMIENTOS`: hay que mirarlo en la hoja `REGLAS`.
+
+**Probar en @HEAD escribe en el libro real**, el mismo que lee la versión en producción (v3) que usa el equipo.
+La v3 solo mira `ACCION` en SEGUIMIENTOS y no conoce la columna `ANULADO`: para ella, una fila deshecha o anulada
+sigue viva. Un «No contestó», «Lo pensará» o «Agendó» de prueba saca al paciente de la bandeja del equipo durante
+la espera, y un cierre lo deja como descartado, aunque después se pulse «Deshacer». Por eso:
+
+- Pruebe los resultados sobre un **paciente de prueba** (un DNI de prueba, por ejemplo el registro de alguien del
+  personal que lo autorice), nunca sobre pacientes reales que alguien vaya a llamar.
+- **No pruebe «Falleció» ni los demás cierres** (alta, se atiende en otro lugar, no desea continuar) sobre pacientes reales.
+- Ejecute `npm run actualizar` **en la misma sesión**, justo después de las pruebas. Si algo sale mal y la publicación
+  se pospone, la v3 seguirá contando lo probado (anularlo no le basta) hasta que se publique: otra razón para usar
+  solo el paciente de prueba.
 
 - Script (incrustado en el libro madre): `10jN1KMUrKYWTAQNrh68hMlBrA6s5Hvc-YI06n1rHaZV9gDIT99hjdZZY`
 - Deployment estable (el que usa el equipo): `AKfycbzSvnyttpl1VOiKNDilyPPoqlD7VkxPDxwExa4kS75mgbgTfRbe16kJj6fpfGoBUWCkcA`

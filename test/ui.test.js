@@ -752,6 +752,53 @@ test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corres
   } finally { await navegador.close(); }
 });
 
+test('panel: una recarga silenciosa pedida antes de un guardado no devuelve la tarjeta a su columna vieja (I1)', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarCol(pagina, LUIS, '2');
+    await esperarEstable(pagina);
+    // getTablero lee la hoja al pedirlo y responde 600 ms después, como un servidor que leyó antes del guardado.
+    await pagina.evaluate(() => { DEMO._demora.getTablero = 600; DEMO._alPedir.getTablero = true; });
+    const tab = await llamadas(pagina, 'getTablero');
+    await pagina.waitForSelector('#aviso button:not([hidden])');
+    await pagina.locator('#aviso button').click();   // Deshacer: anula y recarga en silencio
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 1);
+    // Durante la recarga, 1 sobre otra tarjeta: el guardado responde antes que la recarga.
+    await pagina.locator(`#tablero [data-card="${CARMEN}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarCol(pagina, CARMEN, '2');
+    await esperarEstable(pagina);
+    await pagina.waitForTimeout(800);   // llegó la foto vieja
+    assert.equal(await colPintada(pagina, CARMEN), '2', 'la foto de antes del guardado no se aplica');
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 2);
+    await esperarCol(pagina, LUIS, '1');   // la recarga repetida sí trae lo deshecho
+    await pagina.waitForTimeout(800);
+    assert.equal(await colPintada(pagina, CARMEN), '2', 'tras asentarse todo, Agendado');
+    assert.equal(await colPintada(pagina, LUIS), '1');
+    assert.equal(await llamadas(pagina, 'getTablero'), tab + 2, 'una sola recarga repetida, sin bucle');
+    // Un guardado todavía en vuelo cuando llega la recarga: se descarta y se repide al terminar el guardado.
+    const otra = (await pintadas(pagina, '1')).map(v => v.id).find(id => id !== LUIS);
+    await pagina.evaluate(() => { DEMO._demora.registrarResultado = 1500; cargarTablero(null, true); });
+    await pagina.locator(`#tablero [data-card="${otra}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarCol(pagina, otra, '2');
+    await pagina.waitForTimeout(900);   // la recarga ya llegó; el guardado sigue en vuelo
+    assert.equal(await pagina.evaluate(() => S.enVuelo.size), 1);
+    assert.equal(await colPintada(pagina, otra), '2', 'con un guardado en vuelo la recarga no se aplica');
+    assert.equal(await llamadas(pagina, 'getTablero'), tab + 3);
+    await esperarEstable(pagina);
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 4);
+    await pagina.waitForTimeout(800);
+    assert.equal(await colPintada(pagina, otra), '2');
+    assert.equal(await llamadas(pagina, 'getTablero'), tab + 4);
+    assert.equal(await pagina.evaluate(() => S.recargaPendiente), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('panel: si el servidor falla, todo vuelve, «No se guardó: …» y sin «Deshacer»', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
@@ -942,6 +989,74 @@ test('panel: la historia trae la entrada nueva y «Anular» de la última pide m
     assert.match(h[0], /anulado: Me equivoqué de paciente/);
     assert.equal(await pagina.locator('#panel .historia li').first().evaluate(e => getComputedStyle(e.querySelector('.txt')).textDecorationLine), 'line-through');
     await esperarCol(pagina, CARMEN, '1');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: «Ya se le escribió N veces · la última el …»; el motivo abierto oculta su «Anular», Enter confirma y un repintado no deja anular dos veces', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    // M5: la línea de la app anterior, con «por esto» en hierro y procedimiento; sin seguimientos, nada.
+    await abrirPanelDe(pagina, CARMEN);
+    assert.equal(await pagina.locator('#panel .p-prev').textContent(), 'Ya se le escribió 1 vez · la última el 10/09/2026');
+    await pagina.keyboard.press('Escape');
+    await abrirPanelDe(pagina, '40888999|HIERRO');
+    assert.equal(await pagina.locator('#panel .p-prev').textContent(), 'Ya se le escribió por esto 1 vez · la última el 25/09/2026');
+    await pagina.keyboard.press('Escape');
+    await abrirPanelDe(pagina, 'REG-000004');
+    assert.equal(await pagina.locator('#panel .p-prev').textContent(), 'Ya se le escribió por esto 3 veces · la última el 29/09/2026');
+    await pagina.keyboard.press('Escape');
+    await abrirPanelDe(pagina, LUIS);
+    assert.equal(await pagina.locator('#panel .p-prev').count(), 0);
+    await pagina.keyboard.press('Escape');
+    // M1: con el motivo abierto, la fila no muestra su propio «Anular».
+    await abrirPanelDe(pagina, CARMEN);
+    await pagina.waitForSelector('#panel .historia li');
+    const primera = pagina.locator('#panel .historia li').first();
+    await primera.locator('[data-anular]').click();
+    assert.equal(await primera.locator('#motivo-anular').count(), 1);
+    assert.equal(await primera.locator('[data-anular]').count(), 0, 'sin un segundo «Anular» en la fila');
+    assert.equal(await pagina.locator('#panel .historia button.enlace[data-anular]').count(), 0);
+    // M2 y M3: Enter confirma; en vuelo, un repintado no rehabilita el botón ni deja mandar otra.
+    const n = await llamadas(pagina, 'anularResultado');
+    await pagina.evaluate(() => { DEMO._demora.anularResultado = 600; });
+    await pagina.locator('#panel #motivo-anular').fill('Era otro paciente');
+    await pagina.locator('#panel #motivo-anular').press('Enter');
+    await pagina.waitForFunction(n => DEMO._llamadas.anularResultado === n + 1, n);
+    await pagina.evaluate(() => pintarHistoria());
+    assert.equal(await pagina.locator('#panel #motivo-anular').inputValue(), 'Era otro paciente', 'el motivo sobrevive al repintado');
+    assert.equal(await pagina.locator('#panel [data-confirmar-anular]').isDisabled(), true, 'repintado en vuelo: deshabilitado');
+    await pagina.locator('#panel #motivo-anular').press('Enter');
+    await pagina.locator('#panel [data-confirmar-anular]').click({ force: true });
+    await pagina.evaluate(() => confirmarAnulacion(document.querySelector('#panel [data-confirmar-anular]')));
+    await pagina.waitForFunction(() => document.querySelector('#panel .historia li.anulado'));
+    assert.equal(await llamadas(pagina, 'anularResultado'), n + 1, 'una sola anulación');
+    assert.equal(await aviso(pagina), 'Anulado: ' + (await ultimo(pagina, 'anularResultado')).id + '.');
+    assert.equal(await pagina.evaluate(() => P.anulandoEnVuelo), '');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: si la anulación falla, «No se anuló: …», la fila no se tacha y el botón vuelve con el motivo escrito', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, CARMEN);
+    await pagina.waitForSelector('#panel .historia li');
+    await pagina.locator('#panel .historia li').first().locator('[data-anular]').click();
+    await pagina.evaluate(() => { DEMO._fallar.anularResultado = 'Sin conexión con el servidor.'; DEMO._demora.anularResultado = 400; });
+    await pagina.locator('#panel #motivo-anular').fill('Era otro paciente');
+    await pagina.locator('#panel [data-confirmar-anular]').click();
+    await pagina.evaluate(() => pintarHistoria());   // un repintado en vuelo
+    await pagina.waitForFunction(() => /No se anuló/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'No se anuló: Sin conexión con el servidor.');
+    assert.equal(await pagina.locator('#panel .historia li.anulado').count(), 0);
+    assert.equal(await pagina.locator('#panel [data-confirmar-anular]').isDisabled(), false, 'el botón vuelve');
+    assert.equal(await pagina.locator('#panel #motivo-anular').inputValue(), 'Era otro paciente');
+    // Reintentar con el servidor bien: anula.
+    await pagina.evaluate(() => { delete DEMO._fallar.anularResultado; delete DEMO._demora.anularResultado; });
+    await pagina.locator('#panel #motivo-anular').press('Enter');
+    await pagina.waitForSelector('#panel .historia li.anulado');
+    assert.equal(await llamadas(pagina, 'anularResultado'), 2);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -1570,6 +1685,28 @@ test('registro: una anulación en vuelo no se manda dos veces y la fila abierta 
   } finally { await navegador.close(); }
 });
 
+test('registro: si anular falla en «Registrados hoy», la fila no se tacha, el botón vuelve y se avisa', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const fila = filaHoy(pagina, 'REG-000003');
+    await fila.locator('[data-anular]').click();
+    await fila.locator('.anula input').fill('Paciente equivocado');
+    await pagina.evaluate(() => { DEMO._fallar.anularRegistro = 'Sin conexión con el servidor.'; DEMO._demora.anularRegistro = 400; });
+    const ok = fila.locator('[data-confirmar-anular]');
+    await ok.click();
+    assert.equal(await ok.isDisabled(), true, 'en vuelo, deshabilitado');
+    await pagina.waitForFunction(() => /No se anuló/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await aviso(pagina), 'No se anuló: Sin conexión con el servidor.');
+    assert.equal(await pagina.locator('#lhoy li.anulado[data-reg="REG-000003"]').count(), 0, 'la fila no se tacha');
+    assert.doesNotMatch(await fila.textContent(), /anulado:/);
+    assert.equal(await ok.isDisabled(), false, 'el botón vuelve');
+    assert.equal(await fila.locator('.anula input').inputValue(), 'Paciente equivocado');
+    assert.equal(await pagina.evaluate(() => RG.anulandoEnVuelo), '');
+    assert.equal(await llamadas(pagina, 'anularRegistro'), 1);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('registro: el DNI conserva el cursor al quitar caracteres no válidos', async () => {
   const { navegador, pagina, errores } = await abrirRegistro();
   try {
@@ -1948,6 +2085,22 @@ test('pacientes: el aviso de fallecido, los números tachados y la historia con 
       { ID: 'SEG-2', FECHA_HORA: '2026-09-02 10:00', ESPECIALIDAD: 'HEMATOLOGÍA', REFERENCIA: '', RESPONSABLE: 'ANA', RESULTADO: 'NO CONTESTÓ', ANULADO: 'sí', MOTIVO_ANULACION: 'x' }
     ]).map(f => [f.anulado, !!f.anular]));
     assert.deepEqual(filas, [[false, true], [true, false]]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('pacientes: «Procedimientos indicados antes de la plataforma» con Tipo y Detalle; el motivo abierto oculta el «Anular» de su fila', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '40333444');
+    assert.deepEqual(await pagina.locator('#ficha table.previos th').allTextContents(), ['Fecha', 'Tipo', 'Detalle', 'Estado', 'Teléfono', 'Observaciones']);
+    const celdas = await pagina.locator('#ficha table.previos tbody tr').first().locator('td').allTextContents();
+    assert.equal(celdas.length, 6);
+    assert.deepEqual(celdas.slice(0, 2), ['25/08/2026', 'Hierro']);
+    const fila = pagina.locator('#f-hist .historia li').first();
+    await fila.locator('[data-anular]').click();
+    assert.equal(await fila.locator('#fmotivo').count(), 1);
+    assert.equal(await fila.locator('[data-anular]').count(), 0, 'sin un segundo «Anular» en la fila');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -2434,9 +2587,16 @@ test('imprimible: en pantalla de impresión solo se ve #imprimible, con la palet
     assert.equal(await pagina.locator('#imprimible').isVisible(), true);
     assert.equal(await pagina.locator('#imp-p1').isVisible(), true);
     assert.equal(await pagina.locator('#imp-p2').isVisible(), true);
-    for (const sel of ['.app', '.side', '#vista', '.vista', '#v-indicadores', '.navmovil', '#panel', '#aviso']) {
-      assert.equal(await pagina.locator(sel).first().isVisible(), false, sel + ' no se imprime');
+    // Cada selector existe y se ve en pantalla; al imprimir, no (si no, la aserción no podría fallar).
+    const PANTALLA = ['.app', '.side', '#vista', '#v-indicadores', '#ipanel', '#aviso'];
+    await pagina.evaluate(() => avisar('Aviso de prueba'));
+    await pagina.emulateMedia({ media: 'screen' });
+    for (const sel of PANTALLA) {
+      assert.equal(await pagina.locator(sel).count(), 1, sel + ' existe');
+      assert.equal(await pagina.locator(sel).isVisible(), true, sel + ' se ve en pantalla');
     }
+    await pagina.emulateMedia({ media: 'print' });
+    for (const sel of PANTALLA) assert.equal(await pagina.locator(sel).isVisible(), false, sel + ' no se imprime');
     // Lo que hace el navegador al imprimir: beforeprint fuerza la paleta clara; afterprint devuelve el modo.
     await pagina.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
     assert.notEqual(await pagina.evaluate(() => document.documentElement.dataset.modo), 'oscuro');
@@ -2595,6 +2755,9 @@ test('tablero: el chip de Agendado y el teléfono no se salen de la tarjeta', as
   for (const width of [1366, 1440, 1920]) {
     const { navegador, pagina, errores } = await abrirTablero({ viewport: { width, height: 900 } });
     try {
+      const n = await pagina.evaluate(() => [...document.querySelectorAll('#tablero [data-col="2"] .tarjeta')]
+        .filter(t => t.querySelector('.t3 .chip-fecha') && t.querySelector('.t3 > *:not(.chip-fecha)')).length);
+      assert.ok(n > 0, `${width}: hay tarjetas de Agendado con chip y teléfono que medir`);
       const fuera = await pagina.evaluate(() => [...document.querySelectorAll('#tablero [data-col="2"] .tarjeta')].filter(t => {
         const r = t.getBoundingClientRect();
         return [...t.querySelectorAll('.t3 > *')].some(x => { const q = x.getBoundingClientRect(); return q.right > r.right - 1 || q.left < r.left; });
@@ -2724,6 +2887,74 @@ test('imprimible: un error al armar avisa «No se pudo preparar el resumen: …�
     // Repuesto, imprime.
     await pagina.evaluate(() => { htmlImpPagina2 = window.__htmlImp2; });
     await imprimir(pagina);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ============ Corrección final (revisión de toda la rama) ============ */
+
+test('indicadores: Recuperación con una fila de base 0 dice «— (0/0)»', async () => {
+  const { navegador, pagina, errores } = await abrirIndicadores();
+  try {
+    await pestana(pagina, 'recup');
+    // Cada fila del servidor es un seguimiento, así que la base 0 no llega con datos reales: se inyecta en datosRecup.
+    await pagina.evaluate(() => {
+      const orig = datosRecup;
+      datosRecup = (k, f) => { const d = orig(k, f); d.porAsesora.push(['Nadie', { n: 0, v: 0, d: [] }]); return d; };
+      pintarIndicadores(false);
+    });
+    const filas = await filasDe(pagina, '[data-tabla="asesora"]');
+    const cero = filas.find(f => f[0] === 'Nadie');
+    assert.ok(cero, 'la fila inyectada se pinta');
+    assert.equal(cero[3], '— (0/0)');
+    assert.equal(await pagina.locator('#ipanel [data-tabla="asesora"] tbody tr').last().locator('.cero').count(), 1);
+    assert.ok(filas.filter(f => f[0] !== 'Nadie').every(f => /^\d+ % \(\d+\/\d+\)$/.test(f[3])), 'las demás con su porcentaje');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('saludo: «doctora» para una médica; la hora es la de Lima aunque el navegador esté en otra zona, y se repasa al repintar', async () => {
+  const navegador = await chromium.launch();
+  try {
+    // Navegador en Madrid (7 h más que Lima): a las 20:10 de Lima allí es de madrugada.
+    const pagina = await (await navegador.newContext({ timezoneId: 'Europe/Madrid' })).newPage();
+    await pagina.clock.install({ time: new Date('2026-10-01T08:00:00-05:00') });
+    await pagina.addInitScript(() => localStorage.setItem('seg.usuario', 'MAGALY'));
+    await pagina.goto('file://' + ARCHIVO);
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenos días, Magaly', 'las 8 de Lima, no las 15 de Madrid');
+    await pagina.clock.setFixedTime(new Date('2026-10-01T15:30:00-05:00'));
+    await pagina.evaluate(() => pintarTablero());
+    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas tardes, Magaly', 'el repintado del tablero lo actualiza');
+    await pagina.clock.setFixedTime(new Date('2026-10-01T20:10:00-05:00'));
+    await pagina.locator('#fsin').click();   // un filtro repinta el tablero
+    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas noches, Magaly');
+    // Una médica: «doctora»; un médico: «doctor».
+    await pagina.evaluate(() => {
+      S.boot = adaptarBoot(Object.assign({}, DEMO.bootstrap(), { usuarios: ['MAGALY', 'DR. ELI CABANILLAS', 'DRA. KAREN MATOS'] }));
+      S.usuario = 'DRA. KAREN MATOS'; pintarSaludo();
+    });
+    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas noches, doctora Matos');
+    await pagina.evaluate(() => { S.usuario = 'DR. ELI CABANILLAS'; pintarSaludo(); });
+    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas noches, doctor Cabanillas');
+  } finally { await navegador.close(); }
+});
+
+test('tablero: «N citas esta semana» cuenta también la cita sin AGENDA con fecha (PROXIMA_AGENDADA), como el chip', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const citas = () => pagina.locator('#kpis > div').nth(1).locator('span').textContent();
+    const antes = Number((await citas()).match(/^(\d+)/)[1]);
+    await pagina.evaluate(() => {
+      const base = S.tablero.columnas.AGENDADO.find(t => t.AGENDA === 'CITA');
+      const sofdoc = Object.assign({}, base, { CLAVE: '49999999|HEMATOLOGÍA', DNI: '49999999', AGENDA: '', FECHA_AGENDA: '',
+        PROXIMA_AGENDADA: '2026-10-03', FECHA_CLAVE: '2026-10-03', ETIQUETA: 'Cita el sáb 03/10' });
+      const sinFecha = Object.assign({}, base, { CLAVE: '49999998|HEMATOLOGÍA', DNI: '49999998', AGENDA: '', FECHA_AGENDA: '',
+        PROXIMA_AGENDADA: '', FECHA_CLAVE: '', ETIQUETA: 'Agendado' });
+      S.tablero.columnas.AGENDADO.push(sofdoc, sinFecha);
+      adaptarTablero(S.tablero); pintarTablero();
+    });
+    assert.match(await citas(), new RegExp(`^${antes + 1} citas? esta semana$`), 'la de SOFDOC suma; la que no tiene fecha, no');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

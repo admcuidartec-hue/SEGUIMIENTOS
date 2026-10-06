@@ -228,6 +228,7 @@ html.con-vt .vista{animation:none}
 .alerta.mal{color:var(--accent)}.alerta.info{color:var(--info)}.alerta.ok{color:var(--good)}
 .p-pend{margin:0;font-size:13px;color:var(--soft)}
 .p-pend b{color:var(--ink)}
+.p-prev{margin:6px 0 0;font-size:13px;color:var(--soft)}
 .contacto{display:flex;align-items:center;gap:12px;min-height:56px;padding:5px 5px 5px 14px;border:1px solid var(--line);border-radius:var(--r-s)}
 .contacto .v{flex:1;min-width:0;display:flex;flex-direction:column}
 .contacto small{font-size:11.5px;color:var(--muted)}
@@ -830,6 +831,8 @@ const S = {
   lim: { rec: 6, mes: 4, ant: 3 },
   colMovil: 1,
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
+  escrituras: 0,      // sube cuando sale cada guardado: una recarga pedida antes puede traer el tablero de antes
+  recargaPendiente: false, // una recarga silenciosa descartada que se repide cuando enVuelo quede vacío
   fichaDni: '',     // «Ver ficha completa»: el DNI que abre Pacientes (Tarea 9)
   kpi: null,        // getKpi() en caché (Tarea 10); invalidarIndicadores() lo olvida tras cada escritura
   resumen: null,    // getResumen() en caché (Tarea 10); ídem
@@ -894,14 +897,21 @@ function aplicarModo() {
   });
 }
 
-/** D8: el saludo según la hora del equipo (en Lima): días hasta las 12, tardes hasta las 19, luego noches. */
+/** D8: el saludo según la hora de Lima (no la del navegador): días hasta las 12, tardes hasta las 19, luego noches. */
 function saludoHora() {
-  const h = new Date().getHours();
+  let h;
+  try {
+    const parte = new Intl.DateTimeFormat('es-PE', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/Lima' })
+      .formatToParts(new Date()).find(x => x.type === 'hour');
+    h = Number(parte && parte.value);
+  } catch (e) { h = NaN; }
+  if (!(h >= 0 && h < 24)) h = new Date().getHours();
   return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
 }
 function pintarSaludo() {
   const u = yo(), s = saludoHora();
-  $('#saludo').textContent = !u ? s : u.rol === 'Médico' ? s + ', doctor ' + u.l.split(' ').pop() : s + ', ' + u.l;
+  const titulo = /^DRA\b/.test(norm(u ? u.v : '')) ? ', doctora ' : ', doctor ';
+  $('#saludo').textContent = !u ? s : u.rol === 'Médico' ? s + titulo + u.l.split(' ').pop() : s + ', ' + u.l;
 }
 
 function pintarUsuarios() {
@@ -1214,13 +1224,20 @@ function iniciarTablero() {
  * Pide getTablero (o usa el pedido del arranque) y pinta. Solo vale la última respuesta.
  * silencioso: tras una escritura (Deshacer, Anular) no muestra esqueletos; las tarjetas viajan con FLIP a su sitio.
  */
-async function cargarTablero(pedido, silencioso) {
-  const n = cargarTablero.n = (cargarTablero.n || 0) + 1;
+async function cargarTablero(pedido, silencioso, intento) {
+  const n = cargarTablero.n = (cargarTablero.n || 0) + 1, gen = S.escrituras;
   if (S.fase !== 'listo') silencioso = false;
-  if (!silencioso) { S.fase = 'cargando'; pintarTablero(); }
+  if (!silencioso) { S.fase = 'cargando'; pintarTablero(); S.recargaPendiente = false; }
   try {
     const r = await (pedido || llamar('getTablero'));
     if (n !== cargarTablero.n) return;
+    // getTablero no toma el candado: si un guardado salió después de pedirlo, o sigue sin respuesta, esta foto puede ser
+    // de antes del guardado y devolvería la tarjeta a su columna vieja. Se descarta y se pide otra: en el acto si ya no
+    // hay guardados en vuelo (a lo sumo 3 veces seguidas), o cuando termine el último.
+    if (silencioso && (S.escrituras !== gen || S.enVuelo.size) && (intento || 0) < 3) {
+      if (S.enVuelo.size) { S.recargaPendiente = true; return; }
+      return cargarTablero(null, true, (intento || 0) + 1);
+    }
     if (silencioso) { conFlip(() => { adaptarTablero(r); pintarTablero(); }); trasRecargar(); return; }
     adaptarTablero(r);
     S.fase = 'listo';
@@ -1248,13 +1265,17 @@ function pintarTablero() {
   const nCol = c => listo ? enCol(c).length : '—';
   const u = yo(), soloSuyos = !!(u && u.med && S.medico === u.med);
   const d = diaUTC(S.hoy).getUTCDay();
+  pintarSaludo();   // la hora cambia durante el día: el saludo se repasa con cada repintado del tablero
   $('#subtit').textContent = `${DSEM_LARGO[d] || ''} ${dmy(S.hoy)}${listo ? ' · ' + nCol(1) + ' por contactar' : ''}${soloSuyos ? ' · solo sus pacientes' : ''}`;
   pintarMeta();
 
   // Cifras: siguen a los filtros, como las columnas.
   const hoy6 = masDias(S.hoy, 6);
   const nunca = enCol(1).filter(p => !p.intentos).length;
-  const semana = enCol(2).filter(p => p.agenda === 'CITA' && (!p.fechaClave || p.fechaClave <= hoy6)).length;   // el mismo campo que el grupo «Esta semana»
+  // Citas: AGENDA = CITA, o sin AGENDA pero con fecha (una cita de SOFDOC en PROXIMA_AGENDADA), como el chip.
+  // La semana, con el mismo campo que el grupo «Esta semana».
+  const esCita = p => p.agenda === 'CITA' || (!p.agenda && !!(p.raw.PROXIMA_AGENDADA || p.fechaClave));
+  const semana = enCol(2).filter(p => esCita(p) && (!p.fechaClave || p.fechaClave <= hoy6)).length;
   const atr = enCol(1).filter(p => p.atraso > 0).length;   // las sesiones atrasadas están en Por contactar
   const nc = S.cerrados.length;
   const enlace = listo && nc ? ` · <button type="button" class="enlace" id="ver-cerrados" aria-controls="cerrados" aria-expanded="${!$('#cerrados').hidden}">${plural(nc, 'cerrado', 'cerrados')} este mes</button>` : '';
@@ -1447,7 +1468,7 @@ document.addEventListener('keydown', e => {
     // Con el panel: primero el motivo de una anulación, luego el paso, luego el panel.
     if (seleccion.panel) {
       e.preventDefault();
-      if (P.anulando) { P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); }
+      if (P.anulando) { if (!P.anulandoEnVuelo) { P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); } }
       else if (P.paso) cerrarPaso(true);
       else cerrarPanel(false, true);
     } else if (enCampo) e.target.blur();
@@ -1526,7 +1547,7 @@ const EASE_IO = 'cubic-bezier(.77,0,.175,1)', EASE_OUT = 'cubic-bezier(.23,1,.32
 const esAnulado = v => v === true || norm(v) === 'SI';
 
 /** Estado del panel abierto. La nota vive aquí mientras el panel siga abierto en ese paciente. */
-const P = { clave: '', paso: null, nota: '', cierre: false, anulando: '', hist: null };
+const P = { clave: '', paso: null, nota: '', cierre: false, anulando: '', motivoAnular: '', anulandoEnVuelo: '', hist: null };
 
 /* ---- Movimiento: FLIP, salida y chispas (README §7). Solo transform y opacity ---- */
 function conFlip(fn, llega, celebra, sinAnim) {
@@ -1646,6 +1667,12 @@ function datosDe(p) {
   }
   return [['Cotizó el', dmy(p.cotizo)], ['Procedimiento', p.proc]];
 }
+/** Como la app anterior: «Ya se le escribió N veces · la última el dd/mm/aaaa» («por esto» en hierro y procedimiento). */
+function yaEscrito(p) {
+  const n = Number(p.raw.N_SEGUIMIENTOS) || 0, f = String(p.raw.ULTIMO_SEGUIMIENTO || '').slice(0, 10);
+  if (!n) return '';
+  return `<p class="p-prev">${esc(`Ya se le escribió${p.t !== 'reev' ? ' por esto' : ''} ${n === 1 ? '1 vez' : n + ' veces'}${f ? ' · la última el ' + dmy(f) : ''}`)}</p>`;
+}
 function alertaDe(p) {
   if (p.col === 1) {
     const mal = p.dias > 30 || p.atraso > 0 ? 'mal' : '';
@@ -1692,7 +1719,7 @@ function pintarPanel() {
     + '<div class="p-cuerpo">'
     + `<section>${p.t === 'hier' && p.raw.DETALLE ? `<div class="p-trat">${esc(p.raw.DETALLE)}</div>` : ''}`
     + `<dl class="datos">${datosDe(p).map(([l, v]) => `<div><dt>${l}</dt><dd>${esc(v) || '&nbsp;'}</dd></div>`).join('')}</dl>${prog}`
-    + `<p class="alerta${tono ? ' ' + tono : ''}">${esc(alerta)}</p>${pend}</section>`
+    + `<p class="alerta${tono ? ' ' + tono : ''}">${esc(alerta)}</p>${pend}${yaEscrito(p)}</section>`
     + `<section><h3>Contacto</h3>${contactosHtml(p)}</section>`
     + quePasoHtml(p)
     + (p.col !== 4 ? `<label class="campo">Nota (opcional)<textarea id="nota" rows="2" placeholder="Se guarda con la respuesta">${esc(P.nota)}</textarea></label>` : '')
@@ -1947,6 +1974,7 @@ async function guardarResultado(clave, resultado, extra) {
     : lista.slice(i + 1).find(x => !fuera.includes(x)) || lista.slice(0, Math.max(i, 0)).reverse().find(x => !fuera.includes(x))
       || (plan.cambios[0].nuevo ? clave : '');
   S.enVuelo.add(clave);
+  S.escrituras++;
   if (enPanel) {
     if (plan.sigue) { P.paso = null; P.nota = ''; } else cerrarPanel(true, teclado);
   }
@@ -1964,6 +1992,7 @@ async function guardarResultado(clave, resultado, extra) {
     r = await llamar('registrarResultado', payload);
   } catch (e) {
     S.enVuelo.delete(clave);
+    recargarSiPendiente();
     // Todo vuelve: las tarjetas a su sitio, «cerrados» y la meta.
     plan.cambios.forEach(c => { const j = S.pacientes.indexOf(c.nuevo); if (j >= 0) S.pacientes.splice(j, 1); });
     plan.cambios.slice().sort((a, b) => a.pos - b.pos).forEach(c => {
@@ -1988,6 +2017,7 @@ async function guardarResultado(clave, resultado, extra) {
     return;
   }
   S.enVuelo.delete(clave);
+  recargarSiPendiente();
   invalidarIndicadores();
   // Manda el servidor: r.tarjeta es la tarjeta recalculada, o '' si salió del tablero.
   const actual = S.pacientes.find(x => x.id === clave), t = r && r.tarjeta;
@@ -2004,6 +2034,12 @@ async function guardarResultado(clave, resultado, extra) {
   if (seleccion.panel === clave) { pintarPanel(); const pa = S.pacientes.find(x => x.id === clave); if (pa) cargarHistoria(pa); }
   const d = deshacerDe(r);
   avisar(textoGuardado(p, resultado, r), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
+}
+/** La recarga silenciosa que se descartó por un guardado en vuelo se pide de nuevo al terminar el último. */
+function recargarSiPendiente() {
+  if (!S.recargaPendiente || S.enVuelo.size) return;
+  S.recargaPendiente = false;
+  cargarTablero(null, true);
 }
 /** Qué anula «Deshacer», según lo que devolvió registrarResultado (MAPEO §2.4). */
 const deshacerDe = r => r && (r.seguimiento && r.seguimiento.ID ? ['anularResultado', r.seguimiento.ID]
@@ -2083,26 +2119,27 @@ async function cargarHistoria(p) {
   pintarHistoria();
 }
 /** El motivo de una anulación, en la misma fila (prompt() puede estar bloqueado dentro del iframe de Apps Script). */
-const htmlMotivo = (id, valor) => `<div class="motivo"><input id="${id}" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(valor || '')}">`
-  + '<button type="button" class="btn btn-p" data-confirmar-anular>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button></div>';
+const htmlMotivo = (id, valor, enVuelo) => `<div class="motivo"><input id="${id}" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(valor || '')}">`
+  + `<button type="button" class="btn btn-p" data-confirmar-anular${enVuelo ? ' disabled' : ''}>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button></div>`;
 /**
- * La historia de seguimientos (panel y ficha): esqueleto, error, vacía o la lista. `anulando` es el ID con el motivo abierto
- * e `idMotivo` el id de su campo. «Anular» lleva el índice de la fila en `data-anular`.
+ * La historia de seguimientos (panel y ficha): esqueleto, error, vacía o la lista. `anulando` es el ID con el motivo abierto,
+ * `idMotivo` el id de su campo, `motivo` lo ya escrito (sobrevive a un repintado) y `enVuelo` deja su botón deshabilitado.
+ * «Anular» lleva el índice de la fila en `data-anular`; la fila con el motivo abierto no lo muestra.
  */
-function htmlHistoria(h, anulando, idMotivo) {
+function htmlHistoria(h, anulando, idMotivo, motivo, enVuelo) {
   if (!h || h.estado === 'cargando') return '<div class="hist-skel" aria-hidden="true"><i></i><i></i><i></i></div>';
   if (h.estado === 'error') return `<p class="p-vacio">No se pudo cargar la historia: ${esc(h.msg)} <button type="button" class="enlace" data-rehist>Reintentar</button></p>`;
   if (!h.filas.length) return '<p class="p-vacio">Todavía no hay seguimientos.</p>';
   return '<ol class="historia">' + h.filas.map((x, i) => `<li class="${x.anulado ? 'anulado' : ''}">`
     + `<span class="txt"><b>${esc(x.f)}</b> · ${esc(x.quien)}: ${esc(x.txt)}${x.para ? ' · ' + esc(x.para) : ''}${x.nota ? ' · ' + esc(x.nota) : ''}</span>`
     + (x.anulado ? ` · anulado${x.motivo ? ': ' + esc(x.motivo) : ''}` : '')
-    + (x.anular ? `<button type="button" class="enlace" data-anular="${i}">Anular</button>` : '')
-    + (x.anular && anulando && anulando === x.anular.id ? htmlMotivo(idMotivo) : '')
+    + (x.anular && !(anulando && anulando === x.anular.id) ? `<button type="button" class="enlace" data-anular="${i}">Anular</button>` : '')
+    + (x.anular && anulando && anulando === x.anular.id ? htmlMotivo(idMotivo, motivo, enVuelo) : '')
     + '</li>').join('') + '</ol>';
 }
 function pintarHistoria() {
   const c = $('#p-hist');
-  if (c) c.innerHTML = htmlHistoria(P.hist, P.anulando, 'motivo-anular');
+  if (c) c.innerHTML = htmlHistoria(P.hist, P.anulando, 'motivo-anular', P.motivoAnular, !!P.anulandoEnVuelo);
 }
 /**
  * Anula en el servidor con su motivo (obligatorio): resultado, sesión, alta o registro. Lo usan el panel y la ficha.
@@ -2119,12 +2156,21 @@ async function anularConMotivo(que, id, motivo, boton, campo) {
   invalidarIndicadores();
   return true;
 }
-/** Anula una fila de la historia del panel. */
+/**
+ * Anula una fila de la historia del panel. P.anulandoEnVuelo (no solo boton.disabled) impide un segundo envío:
+ * un repintado de la historia mientras tanto (p. ej. cargarHistoria tras un guardado) recrea el botón.
+ */
 async function confirmarAnulacion(boton) {
+  if (P.anulandoEnVuelo) return;
   const fila = P.hist && P.hist.filas && P.hist.filas.find(x => x.anular && x.anular.id === P.anulando);
   if (!fila) return;
-  if (!await anularConMotivo(fila.anular.que, fila.anular.id, ($('#motivo-anular').value || '').trim(), boton, '#motivo-anular')) return;
+  const campo = $('#motivo-anular'), motivo = ((campo ? campo.value : P.motivoAnular) || '').trim();
+  if (motivo) P.anulandoEnVuelo = fila.anular.id;
+  const ok = await anularConMotivo(fila.anular.que, fila.anular.id, motivo, boton, '#motivo-anular');
+  P.anulandoEnVuelo = '';
+  if (!ok) { const b = $('#p-hist [data-confirmar-anular]'); if (b) b.disabled = false; return; }
   P.anulando = '';
+  P.motivoAnular = '';
   const p = S.pacientes.find(x => x.id === seleccion.panel);
   if (p) cargarHistoria(p);
   $('#panel').focus({ preventScroll: true });
@@ -2143,16 +2189,19 @@ $('#panel').addEventListener('click', e => {
   else if (t.dataset.ficha) { S.fichaDni = t.dataset.ficha; ir('pacientes'); }
   else if (t.hasAttribute('data-anular')) {
     const fila = P.hist && P.hist.filas[Number(t.dataset.anular)];
-    if (!fila || !fila.anular) return;
+    if (!fila || !fila.anular || P.anulandoEnVuelo) return;
     P.anulando = fila.anular.id;
+    P.motivoAnular = '';
     pintarHistoria();
     enfocar('#motivo-anular');
   } else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacion(t);
-  else if (t.hasAttribute('data-cancelar-anular')) { P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); }
+  else if (t.hasAttribute('data-cancelar-anular')) { if (P.anulandoEnVuelo) return; P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); }
   else if (t.hasAttribute('data-rehist')) { const p = S.pacientes.find(x => x.id === seleccion.panel); if (p) cargarHistoria(p); }
 });
 // Enter en la fecha o en el motivo confirma el paso, como el botón principal (el recorrido completo con el teclado).
 $('#panel').addEventListener('keydown', e => {
+  // Enter en el motivo de una anulación la confirma, como en Registro y en la ficha (confirmarAnulacion se protege sola).
+  if (e.key === 'Enter' && e.target.id === 'motivo-anular') { e.preventDefault(); confirmarAnulacion($('#panel [data-confirmar-anular]')); return; }
   if (e.key !== 'Enter' || !P.paso || !e.target.matches('#pf, #pm')) return;
   e.preventDefault();
   const b = $('#panel [data-confirmar]');
@@ -2161,6 +2210,7 @@ $('#panel').addEventListener('keydown', e => {
 $('#panel').addEventListener('input', e => {
   const id = e.target.id;
   if (id === 'nota') P.nota = e.target.value;
+  if (id === 'motivo-anular') P.motivoAnular = e.target.value;
   if (!P.paso) return;
   if (id === 'pf') P.paso.f = e.target.value;
   if (id === 'pm') { P.paso.motivo = e.target.value; const b = $('#panel [data-confirmar]'); if (b) b.disabled = !e.target.value.trim(); }
@@ -2664,7 +2714,7 @@ function adaptarFicha(r) {
           .sort((a, b) => a.numero - b.numero) };
     }),
     altas,
-    previos: (r.indicaciones || []).map(i => ({ f: isoDe(i.FECHA), det: etiquetaCat(i.DETALLE) + (Number(i.CANTIDAD) > 1 ? ' ×' + Number(i.CANTIDAD) : ''),
+    previos: (r.indicaciones || []).map(i => ({ f: isoDe(i.FECHA), tipo: frase(i.TIPO), det: etiquetaCat(i.DETALLE) + (Number(i.CANTIDAD) > 1 ? ' ×' + Number(i.CANTIDAD) : ''),
       estado: ESTADO_PREVIO[norm(i.ESTADO)] || frase(i.ESTADO), tel: i.TELEFONO ? telBonito(i.TELEFONO) : '', obs: i.OBSERVACIONES ? frase(i.OBSERVACIONES) : '' })),
     hist: filasSeguimientos(r.seguimientos || [], true).sort(recientesPrimero)
   };
@@ -2809,15 +2859,15 @@ function htmlFicha(p) {
     + p.porConfirmar.map(i => htmlEmparejar(p, i)).join('')
     + `<section class="bloque"><h3>Especialidades</h3> ${p.especialidades.length ? p.especialidades.map(htmlEsp).join('') : '<p class="p-vacio">Sin consultas realizadas.</p>'}</section>`
     + `<section class="bloque"><h3>Tratamientos y procedimientos registrados</h3> ${p.trats.length ? p.trats.map(htmlTrat).join('') : '<p class="p-vacio">No tiene registros en la plataforma.</p>'}</section>`
-    + `<section class="bloque"><h3>Procedimientos indicados antes de la plataforma</h3> ${p.previos.length ? '<div class="desplazable"><table class="previos"><thead><tr><th>Fecha</th><th>Detalle</th><th>Estado</th><th>Teléfono</th><th>Observaciones</th></tr></thead><tbody>'
-      + p.previos.map(x => `<tr><td class="mono">${esc(dmy(x.f))}</td><td>${esc(x.det)}</td><td>${esc(x.estado)}</td><td class="mono">${esc(x.tel)}</td><td class="obs">${esc(x.obs)}</td></tr>`).join('')
+    + `<section class="bloque"><h3>Procedimientos indicados antes de la plataforma</h3> ${p.previos.length ? '<div class="desplazable"><table class="previos"><thead><tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Estado</th><th>Teléfono</th><th>Observaciones</th></tr></thead><tbody>'
+      + p.previos.map(x => `<tr><td class="mono">${esc(dmy(x.f))}</td><td>${esc(x.tipo)}</td><td>${esc(x.det)}</td><td>${esc(x.estado)}</td><td class="mono">${esc(x.tel)}</td><td class="obs">${esc(x.obs)}</td></tr>`).join('')
       + '</tbody></table></div>' : '<p class="p-vacio">Ninguno.</p>'}</section>`
     + '</div><aside class="lado">'
     + `<section class="bloque" id="f-contacto"><h3>Contacto</h3> ${p.tels.length ? p.tels.map(t => `<div class="contacto"><span class="v"><small>Teléfono</small><span class="num">${esc(telBonito(t))}</span></span>`
       + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(t)}"><i class="ph ph-copy"></i>Copiar</button></div>`).join('')
       : '<p class="sin-tel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}</section>`
     + `<section class="bloque" id="f-altas"><h3>Altas médicas</h3> ${p.altas.length ? '<ul class="altas">' + p.altas.map(htmlAlta).join('') + '</ul>' : '<p class="p-vacio">Ninguna.</p>'}</section>`
-    + `<section class="bloque" id="f-hist"><h3>Historia de seguimientos</h3> ${htmlHistoria({ estado: 'listo', filas: p.hist }, h, 'fmotivo')}</section>`
+    + `<section class="bloque" id="f-hist"><h3>Historia de seguimientos</h3> ${htmlHistoria({ estado: 'listo', filas: p.hist }, h, 'fmotivo', PA.motivo, !!h && PA.enVuelo === h)}</section>`
     + '</aside></article>';
 }
 function htmlEmparejar(p, i) {
@@ -2963,7 +3013,12 @@ async function confirmarAnulacionFicha(boton) {
   if (A.que === 'sesion') PA.p.trats.forEach(t => t.sesiones.forEach(s => { if (s.id === A.id) ses = { reg: t.id, numero: s.numero, f: s.f, quien: s.quien }; }));
   PA.enVuelo = A.id;
   const motivo = PA.motivo.trim();
-  if (!await anularConMotivo(A.que, A.id, motivo, boton, '#fmotivo')) { PA.enVuelo = ''; return; }
+  if (!await anularConMotivo(A.que, A.id, motivo, boton, '#fmotivo')) {
+    PA.enVuelo = '';
+    const b = $('#ficha [data-confirmar-anular]');   // un repintado en vuelo lo dibujó deshabilitado
+    if (b) b.disabled = false;
+    return;
+  }
   if (ses) (PA.sesAnuladas[ses.reg] = PA.sesAnuladas[ses.reg] || []).push(Object.assign({ motivo }, ses));
   PA.anulando = null;
   PA.motivo = '';
@@ -3692,6 +3747,8 @@ async function iniciar() {
      DEMO._fallar[fn]    = 'mensaje': fn lanza Error('mensaje') hasta que se borre
      window.DEMO_FALLAR  = { fn: 'mensaje' } antes de cargar: lo mismo desde el arranque (p. ej. bootstrap)
      DEMO._demora[fn]    = ms: fn responde tras esa demora
+     DEMO._alPedir[fn]   = true: con _demora, fn lee los datos al pedirla y la respuesta llega después
+                           (como getTablero, que lee la hoja sin candado mientras otro guardado escribe)
    ========================================================================== */
 const DEMO = (() => {
   const hoy = '2026-10-01';
@@ -4463,13 +4520,18 @@ const DEMO = (() => {
 
   // Envoltorio para las pruebas: cuenta llamadas, guarda los argumentos y puede fallar o tardar a pedido.
   // window.DEMO_FALLAR (puesto antes de cargar, p. ej. con addInitScript) permite que falle hasta bootstrap.
-  const demo = { _llamadas: {}, _ultimo: {}, _fallar: Object.assign({}, window.DEMO_FALLAR || {}), _demora: {} };
+  const demo = { _llamadas: {}, _ultimo: {}, _fallar: Object.assign({}, window.DEMO_FALLAR || {}), _demora: {}, _alPedir: {} };
   Object.keys(api).forEach(fn => {
     demo[fn] = (...args) => {
       demo._llamadas[fn] = (demo._llamadas[fn] || 0) + 1;
       demo._ultimo[fn] = clonar(args);
       const correr = () => { if (demo._fallar[fn]) throw new Error(demo._fallar[fn]); return api[fn](...args); };
       if (!demo._demora[fn]) return correr();
+      if (demo._alPedir[fn]) {
+        let foto, error;
+        try { foto = clonar(correr()); } catch (e) { error = e; }
+        return new Promise((ok, mal) => setTimeout(() => error ? mal(error) : ok(foto), demo._demora[fn]));
+      }
       return new Promise((ok, mal) => setTimeout(() => { try { ok(correr()); } catch (e) { mal(e); } }, demo._demora[fn]));
     };
   });

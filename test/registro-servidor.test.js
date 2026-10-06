@@ -127,3 +127,30 @@ test('revisión final: dos altas simultáneas — la segunda se rechaza dentro d
     /ya tiene un alta vigente/);
   assert.equal(escrito.ALTAS.length, 0);
 });
+
+test('guardarRegistro: procedimientos[] y un tratamiento en el mismo envío escriben exactamente tres filas; hierro sin marca va sin MARCA', () => {
+  const cat = Object.assign({}, CAT, { procedimientos: ['SANGRÍA', 'AMO'], tratamientos: ['HIERRO SACARATO', 'HIERRO CARBOXIMALTOSA'],
+    marcas: { 'HIERRO CARBOXIMALTOSA': ['FERINJECT', 'GENÉRICO'] } });
+  const { ctx, escrito } = servidor({ catalogos: cat, registros: [] }, { REGISTROS: [] });
+  // La forma exacta que manda la pestaña Registro: procedimientos[], tratamiento, sesiones y marca.
+  const r = plano(ctx.guardarRegistro({ usuario: 'MAGALY', dni: '40111222', nombre: 'Rosa Quispe', contacto: '+51987654321', fecha: '2026-10-05',
+    doctor: 'Dra. Karen Matos', procedimientos: ['SANGRÍA', 'AMO'], tratamiento: 'HIERRO CARBOXIMALTOSA', sesiones: 2, marca: 'FERINJECT' }));
+  const base = { FECHA_HORA: '2026-10-05 10:30', FECHA: '2026-10-05', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ROSA QUISPE',
+    DNI: '40111222', CONTACTO: '+51987654321', ANULADO: '', MOTIVO_ANULACION: '' };
+  assert.deepEqual(escrito.REGISTROS.map(x => Object.fromEntries(Object.entries(x).sort())), [
+    Object.assign({ ID: 'REG-000001', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: 1 }, base),
+    Object.assign({ ID: 'REG-000002', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO', MARCA: '', SESIONES: 1 }, base),
+    Object.assign({ ID: 'REG-000003', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'FERINJECT', SESIONES: 2 }, base)
+  ].map(x => Object.fromEntries(Object.entries(x).sort())));
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.registros.map(x => x.ID), ['REG-000001', 'REG-000002', 'REG-000003']);
+  assert.deepEqual(escrito.BITACORA.map(b => b[1]), ['REGISTRO', 'REGISTRO', 'REGISTRO']);
+  // Hierro sin marca en CATALOGOS: MARCA vacía; con una marca escrita, se rechaza sin escribir.
+  const s2 = servidor({ catalogos: cat, registros: [] }, { REGISTROS: [] });
+  plano(s2.ctx.guardarRegistro({ usuario: 'MAGALY', dni: '40111222', nombre: 'Rosa Quispe', contacto: '987654321', fecha: '2026-10-05',
+    doctor: 'Dra. Karen Matos', procedimientos: [], tratamiento: 'HIERRO SACARATO', sesiones: 3, marca: '' }));
+  assert.deepEqual(s2.escrito.REGISTROS.map(x => [x.TIPO, x.DETALLE, x.MARCA, x.SESIONES]), [['HIERRO', 'HIERRO SACARATO', '', 3]]);
+  assert.throws(() => s2.ctx.guardarRegistro({ usuario: 'MAGALY', dni: '40111222', nombre: 'Rosa Quispe', contacto: '987654321', fecha: '2026-10-05',
+    doctor: 'Dra. Karen Matos', procedimientos: [], tratamiento: 'HIERRO SACARATO', sesiones: 3, marca: 'FERINJECT', confirmado: true }), /no lleva marca/);
+  assert.equal(s2.escrito.REGISTROS.length, 1);
+});

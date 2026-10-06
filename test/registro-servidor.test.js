@@ -11,10 +11,10 @@ const REG4 = { ID: 'REG-000004', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10
   NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987654321', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: '1', ANULADO: '' };
 
 function servidor(extra, hojas) {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs']);
   const escrito = { REGISTROS: [], SESIONES: [], ALTAS: [], BITACORA: [], anulados: [] };
   const lock = { tomado: 0 };
-  const L = cargar(['Logica.gs', 'Registro.gs']);
+  const L = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs']);
   ctx.datos_ = () => Object.assign({ hoy: '2026-10-05', catalogos: CAT, reglas: reglas(L), citas: [cita({ fecha: '2026-09-01' })],
     registros: [REG4], sesiones: [], altas: [], vigentes: {}, indicacionesTodas: [], contactos: [] }, extra);
   ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };

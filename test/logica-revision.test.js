@@ -47,7 +47,7 @@ test('textoSeguro neutraliza fórmulas en el texto que llega del navegador', () 
 });
 
 test('celdaParaHoja_ escribe el texto ya neutralizado', () => {
-  const C = cargar(['Logica.gs', 'Codigo.gs']);
+  const C = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs']);
   assert.equal(C.celdaParaHoja_('=1+1', 'NOTA'), "'=1+1");
 });
 

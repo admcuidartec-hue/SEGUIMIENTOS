@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { cargar, plano } = require('./cargar');
 
 function contexto() {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'Menu.gs']);
   const estado = { tomado: false, avisos: [] };
   ctx.LockService = { getScriptLock: () => ({
     tryLock: () => { estado.tomado = true; return true; },

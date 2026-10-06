@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { cargar } = require('./cargar');
 
 test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', () => {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs']);
   for (const f of ['doGet', 'bootstrap', 'getBandeja', 'getPaciente', 'buscar', 'marcarSeguimiento',
     'descartar', 'confirmarEmparejamiento', 'getKpi', 'getResumen',
     'guardarRegistro', 'marcarSesion', 'anularRegistro', 'anularSesion', 'darDeAlta', 'anularAlta', 'getRegistrosHoy', 'buscarPacienteRegistro']) {
@@ -15,7 +15,7 @@ test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', ()
 });
 
 test('Menu.gs carga con los otros y expone las funciones del menú', () => {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'Menu.gs']);
   for (const f of ['onOpen', 'actualizar', 'verificar', 'prepararHojas', 'importarIndicaciones']) {
     assert.equal(typeof ctx[f], 'function', f);
   }

@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { cargar, plano } = require('./cargar');
 const { cita, seg, reglas } = require('./fixtures');
-const L = cargar(['Logica.gs', 'Registro.gs']);
+const L = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs']);
 
 const HOY = '2026-10-05';
 const CAT = L.catalogosDesdeFilas(

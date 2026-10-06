@@ -103,7 +103,7 @@ test('reglas: GRACIA_AGENDA_DIAS se lee de REGLAS', () => {
 });
 
 test('COLUMNAS_SEGUIMIENTOS y COLUMNAS_PACIENTES crecen solo al final', () => {
-  const C = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs']);
+  const C = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs']);
   assert.deepEqual(plano(C.COLUMNAS_SEGUIMIENTOS), ['ID', 'FECHA_HORA', 'DNI', 'ESPECIALIDAD', 'RESPONSABLE', 'ACCION', 'MOTIVO', 'NOTA',
     'REFERENCIA', 'RESULTADO', 'FECHA_PROXIMA', 'TELEFONO', 'ANULADO', 'MOTIVO_ANULACION']);
   assert.deepEqual(plano(L.COLUMNAS_PACIENTES).slice(16), ['CIERRE', 'FECHA_CIERRE', 'AGENDA', 'FECHA_AGENDA', 'INTENTO']);

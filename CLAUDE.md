@@ -27,7 +27,7 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - No cambie los nombres `doGet`, `bootstrap`, `getBandeja`, `getPaciente`, `buscar`,
   `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`, `guardarRegistro`,
   `marcarSesion`, `anularRegistro`, `anularSesion`, `darDeAlta`, `anularAlta`, `getRegistrosHoy`,
-  `buscarPacienteRegistro`.
+  `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.
@@ -47,6 +47,19 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
   se guardan en `SEGUIMIENTOS` con `ESPECIALIDAD` = `HIERRO` o `PROCEDIMIENTO` y no cuentan
   en «volvieron tras el seguimiento». Parámetros en `REGLAS`: `CORTE_INDICACIONES_DIAS` (180)
   y `META_RETORNO_PCT` (60).
+
+## «¿Qué pasó?» (Etapa 1)
+
+- La lista de resultados vive en `RESULTADOS` (`src/Resultados.gs`), no en `CATALOGOS`.
+- Cada fila de `SEGUIMIENTOS` lleva `RESULTADO`, y además `ACCION` (`HECHO`, `TELEFONO` o
+  `DESCARTADO`), para que las cifras antiguas no cambien.
+- Las filas antiguas, sin `RESULTADO`, se leen con `resultadoDe`; no se reescriben.
+- Los resultados solo se aceptan sobre tarjetas abiertas (Por contactar, Agendado o En tratamiento): un resultado tardío no reabre un seguimiento ya cerrado; para corregir un cierre, primero se anula.
+- Solo «No contestó» cuenta para el cierre automático (`MAX_SEGUIMIENTOS` seguidos, más la espera).
+- «Número equivocado» marca el número y no cierra mientras quede otro contacto.
+- «Falleció» vale para todo el paciente.
+- Las filas anuladas (`ANULADO = SI`) no cuentan en ninguna cifra; `datos_` las filtra.
+- Tras publicar, usar «Preparar hojas», que agrega 5 columnas a `SEGUIMIENTOS` y `GRACIA_AGENDA_DIAS` a `REGLAS`, y después «Verificar».
 
 ## Publicar
 

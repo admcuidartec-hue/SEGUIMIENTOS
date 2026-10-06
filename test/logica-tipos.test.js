@@ -66,19 +66,30 @@ test('pendientesIndicacion: el médico solicitante gana; sin cita usa el nombre 
   assert.equal(p[0].ESPECIALIDAD_CONSULTA, '');
 });
 
-test('pendientesIndicacion: los seguimientos de su tipo dan CONTACTADO y DESCARTADO; los de reevaluación no cuentan', () => {
+test('pendientesIndicacion: los seguimientos de su tipo dan AGENDADO y CERRADO; los de reevaluación no cuentan', () => {
   const citas = [cita({ fecha: '2026-08-01' })];
   const inds = [ind({ FECHA: '2026-08-01' })];
   const s = (fecha, accion) => seg({ fecha, esp: 'HIERRO', accion });
   assert.equal(pend(citas, inds, [seg({ fecha: '2026-09-28' })])[0].ESTADO, 'PENDIENTE', 'seguimiento de HEMATOLOGÍA');
   let p = pend(citas, inds, [s('2026-09-28')])[0];
-  assert.equal(p.ESTADO, 'CONTACTADO');
+  assert.deepEqual([p.ESTADO, p.AGENDA, p.FECHA_AGENDA, p.INTENTO], ['AGENDADO', 'REINTENTAR', '2026-10-13', 1]);
   assert.equal(p.N_SEGUIMIENTOS, 1);
   assert.equal(p.ULTIMO_SEGUIMIENTO, '2026-09-28');
   assert.equal(pend(citas, inds, [s('2026-09-01')])[0].ESTADO, 'PENDIENTE', 'pasada la espera vuelve');
-  assert.equal(pend(citas, inds, [s('2026-09-01', 'DESCARTADO')])[0].ESTADO, 'DESCARTADO');
-  assert.equal(pend(citas, inds, [s('2026-08-20'), s('2026-09-05'), s('2026-09-12')])[0].ESTADO, 'DESCARTADO', '3 intentos');
+  p = pend(citas, inds, [s('2026-09-01', 'DESCARTADO')])[0];
+  assert.deepEqual([p.ESTADO, p.CIERRE], ['CERRADO', 'SIN MOTIVO']);
+  assert.equal(pend(citas, inds, [s('2026-08-20'), s('2026-09-05'), s('2026-09-12')])[0].ESTADO, 'CERRADO', '3 intentos');
   assert.equal(pend(citas, inds, [s('2026-07-20', 'DESCARTADO')])[0].ESTADO, 'PENDIENTE', 'un descarte anterior a la cotización no cuenta');
+});
+
+test('pendientesIndicacion: «lo hizo» en una cotización antigua la completa; un fallecido no vuelve', () => {
+  const citas = [cita({ fecha: '2026-08-01' })];
+  const inds = [ind({ FECHA: '2026-08-01' })];
+  const lohizo = Object.assign(seg({ fecha: '2026-09-28', esp: 'HIERRO' }), { RESULTADO: 'LO HIZO', FECHA_PROXIMA: '2026-09-27' });
+  const p = pend(citas, inds, [lohizo])[0];
+  assert.deepEqual([p.ESTADO, p.FECHA_LOHIZO], ['COMPLETADO', '2026-09-27']);
+  const murio = seg({ fecha: '2026-09-28', accion: 'DESCARTADO', motivo: 'FALLECIÓ' });
+  assert.equal(pend(citas, inds, [murio])[0].ESTADO, 'FALLECIDO', 'un fallecido en HEMATOLOGÍA sale también del hierro');
 });
 
 test('pendientesIndicacion: pasado CORTE_INDICACIONES_DIAS queda ANTIGUO', () => {

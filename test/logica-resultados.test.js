@@ -107,3 +107,16 @@ test('fallecidos: filas nuevas y antiguas; la anulada no cuenta', () => {
     40333444: { fecha: '2026-08-01', quien: 'MAGALY', id: antigua.ID }
   });
 });
+
+const { cita } = require('./fixtures');
+
+test('armarPacientes: un número equivocado sin más contacto cierra; con otro teléfono sigue', () => {
+  const citas = [cita({ fecha: '2026-07-01' })];
+  const inds = [{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' }];
+  const marca = equivocado('2026-09-28', '987654321');
+  const p = plano(L.armarPacientes(citas, inds, [marca], reglas(L), '2026-10-01'))[0];
+  assert.deepEqual([p.ESTADO, p.CIERRE, p.FECHA_CIERRE, p.TELEFONOS], ['CERRADO', 'NÚMERO EQUIVOCADO', '2026-09-28', '']);
+  const otro = inds.concat([{ DNI: '40111222', TELEFONO: '912345678', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' }]);
+  const q = plano(L.armarPacientes(citas, otro, [marca], reglas(L), '2026-10-01'))[0];
+  assert.deepEqual([q.ESTADO, q.TELEFONOS], ['VENCIDO', '912345678']);
+});

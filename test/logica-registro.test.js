@@ -142,22 +142,23 @@ test('pendientesRegistro: un cotizado entra a los 7 días, con lo que necesita l
   assert.equal(p.NOMBRE, 'ROSA ELENA QUISPE HUAMAN', 'el nombre de SOFDOC si lo hay');
 });
 
-test('pendientesRegistro: en curso entra a los 7 días de la última sesión; completo y anulado no entran', () => {
+test('pendientesRegistro: en curso es EN TRATAMIENTO hasta los 7 días de la última sesión; completo vuelve como COMPLETADO', () => {
   const s = [ses(1, '2026-09-29')];
-  assert.equal(pend([reg()], s)[0].ESTADO, 'EN ESPERA');
-  const p = pend([reg()], [ses(1, '2026-09-28')])[0];
-  assert.deepEqual([p.ESTADO, p.ESTADO_REGISTRO, p.HECHAS, p.SESIONES, p.ULTIMA_SESION, p.DIAS], ['PENDIENTE', 'EN CURSO', 1, 3, '2026-09-28', 7]);
-  assert.deepEqual(pend([reg({ SESIONES: '1' })], [ses(1, '2026-09-28')]), []);
+  assert.equal(pend([reg()], s)[0].ESTADO, 'EN TRATAMIENTO');
+  const p = pend([reg()], [ses(1, '2026-09-26')])[0];
+  assert.deepEqual([p.ESTADO, p.ESTADO_REGISTRO, p.HECHAS, p.SESIONES, p.ULTIMA_SESION, p.DIAS, p.ATRASO], ['PENDIENTE', 'EN CURSO', 1, 3, '2026-09-26', 9, 2]);
+  const c = pend([reg({ SESIONES: '1' })], [ses(1, '2026-09-28')]);
+  assert.deepEqual([c.length, c[0].ESTADO, c[0].ULTIMA_SESION], [1, 'COMPLETADO', '2026-09-28']);
   assert.deepEqual(pend([reg({ ANULADO: 'SÍ' })]), []);
 });
 
 test('pendientesRegistro: seguimientos por REFERENCIA, contados desde la fecha que corresponde', () => {
   const r = [reg({ FECHA: '2026-09-01' })];
   const sg = (fecha, o) => Object.assign(seg({ fecha, esp: 'HIERRO' }), { REFERENCIA: 'REG-000001' }, o);
-  assert.equal(pend(r, [], [sg('2026-10-01')])[0].ESTADO, 'CONTACTADO');
+  assert.equal(pend(r, [], [sg('2026-10-01')])[0].ESTADO, 'AGENDADO');
   assert.equal(pend(r, [], [sg('2026-10-01', { REFERENCIA: 'REG-000777' })])[0].ESTADO, 'PENDIENTE', 'de otro registro');
-  assert.equal(pend(r, [], [sg('2026-09-10', { ACCION: 'DESCARTADO', MOTIVO: 'OTRO' })])[0].ESTADO, 'DESCARTADO');
-  assert.equal(pend(r, [], [sg('2026-09-05'), sg('2026-09-15'), sg('2026-09-20')])[0].ESTADO, 'DESCARTADO', '3 intentos, espera cumplida');
+  assert.equal(pend(r, [], [sg('2026-09-10', { ACCION: 'DESCARTADO', MOTIVO: 'OTRO' })])[0].ESTADO, 'CERRADO');
+  assert.equal(pend(r, [], [sg('2026-09-05'), sg('2026-09-15'), sg('2026-09-20')])[0].ESTADO, 'CERRADO', '3 intentos, espera cumplida');
   const p = pend(r, [ses(1, '2026-09-20')], [sg('2026-09-10')])[0];
   assert.deepEqual([p.ESTADO, p.N_SEGUIMIENTOS], ['PENDIENTE', 0], 'tras una sesión los intentos empiezan de cero');
 });

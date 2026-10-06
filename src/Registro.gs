@@ -169,27 +169,29 @@ function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA
  */
 function pendientesRegistro(d) {
   var porDni = realizadasPorDni_(d.citas), segs = {}, reglas = d.reglas, hoy = d.hoy;
+  var marcas = marcasTelefono(d.seguimientos), muertos = fallecidos(d.seguimientos);
   (d.seguimientos || []).forEach(function (s) {
     if (s.REFERENCIA) (segs[s.REFERENCIA] = segs[s.REFERENCIA] || []).push(s);
   });
   return (d.registros || []).map(function (r) {
     var e = estadoRegistro(r, d.sesiones);
-    if (e.estado === 'ANULADO' || e.estado === 'COMPLETO') return null;
+    if (e.estado === 'ANULADO') return null;
     var enCurso = e.estado === 'EN CURSO';
     var desde = enCurso ? e.ultima : fechaIso(r.FECHA);
     var dias = Math.max(0, diasEntre(desde, hoy));
     var lista = (segs[r.ID] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= desde; }).sort(porFechaHora_);
-    var hechos = lista.filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; });
-    var ultimoHecho = hechos[hechos.length - 1];
-    var diasDesdeHecho = ultimoHecho ? diasEntre(fechaIso(ultimoHecho.FECHA_HORA), hoy) : null;
-    var estado = 'PENDIENTE';
-    if (lista.length && normTexto(lista[lista.length - 1].ACCION) === 'DESCARTADO') estado = 'DESCARTADO';
-    else if (hechos.length >= reglas.maxSeguimientos && diasDesdeHecho >= reglas.espera) estado = 'DESCARTADO';
-    else if (ultimoHecho && diasDesdeHecho < reglas.espera) estado = 'CONTACTADO';
-    else if (dias < (enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion)) estado = 'EN ESPERA';
+    var c = leerCiclo(lista, reglas, hoy);
+    var dni = normDni(r.DNI), tel = normTelefono(r.CONTACTO), usuario = tel.length === 9 ? '' : textoLimpio_(r.CONTACTO);
+    var sc = sinContacto_(dni, marcas, d.telefonos, usuario), cierre = c.cierre, estado = 'PENDIENTE';
+    var espera = enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion;
+    if (muertos[dni]) estado = 'FALLECIDO';
+    else if (e.estado === 'COMPLETO') estado = 'COMPLETADO';
+    else if (cierre) estado = 'CERRADO';
+    else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
+    else if (c.agenda) estado = 'AGENDADO';
+    else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
-    var dni = normDni(r.DNI), realizadas = porDni[dni] || [], ultima = realizadas[realizadas.length - 1];
-    var tel = normTelefono(r.CONTACTO);
+    var realizadas = porDni[dni] || [], ultima = realizadas[realizadas.length - 1];
     return {
       ID_REGISTRO: r.ID,
       DNI: dni,
@@ -197,7 +199,7 @@ function pendientesRegistro(d) {
       TIPO_SEGUIMIENTO: r.TIPO,
       NOMBRE: ultima ? ultima.NOMBRE : r.NOMBRE,
       TELEFONOS: ((d.telefonos || {})[dni] || []).join(' / '),
-      USUARIO: tel.length === 9 ? '' : textoLimpio_(r.CONTACTO),
+      USUARIO: usuario,
       MEDICO_ULTIMO: medicoDeRegistro(r, d.catalogos),
       ESPECIALIDAD_CONSULTA: ultima ? ultima.ESPECIALIDAD : '',
       FECHA_COTIZACION: fechaIso(r.FECHA),
@@ -207,10 +209,16 @@ function pendientesRegistro(d) {
       ULTIMA_SESION: e.ultima,
       DIAS: dias,
       ULTIMA_CITA: ultima ? ultima.FECHA : '',
-      N_SEGUIMIENTOS: hechos.length,
+      N_SEGUIMIENTOS: c.intentos,
       ULTIMO_SEGUIMIENTO: lista.length ? fechaIso(lista[lista.length - 1].FECHA_HORA) : '',
       ESTADO: estado,
-      ESTADO_REGISTRO: e.estado
+      ESTADO_REGISTRO: e.estado,
+      ATRASO: enCurso && estado === 'PENDIENTE' ? dias - reglas.diasEntreSesiones : 0,
+      CIERRE: cierre ? cierre.motivo : '',
+      FECHA_CIERRE: cierre ? cierre.fecha : '',
+      AGENDA: c.agenda ? c.agenda.tipo : '',
+      FECHA_AGENDA: c.agenda ? c.agenda.fecha : '',
+      INTENTO: c.agenda ? c.agenda.intento : 0
     };
   }).filter(Boolean);
 }

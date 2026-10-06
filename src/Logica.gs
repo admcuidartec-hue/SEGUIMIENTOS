@@ -280,9 +280,9 @@ function armarSeries(citas) {
 
 /**
  * Estado de una serie. Gana la primera regla que se cumple (diseño §5):
- * ALTA, DESCARTADO, AGENDADO, CONTACTADO, RECUPERADO, AL DÍA, POR VENCER, VENCIDO, ANTIGUO.
+ * ALTA, FALLECIDO, CERRADO, AGENDADO, RECUPERADO, AL DÍA, POR VENCER, VENCIDO, ANTIGUO.
  */
-function estadoDeSerie(serie, seguimientos, reglas, hoy, alta) {
+function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
   var plazo = plazoDe(reglas, serie.especialidad);
   var r = serie.realizadas;
   var ultima = r.length ? r[r.length - 1].FECHA : '';
@@ -296,6 +296,9 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta) {
   out.esperada = sumarDias(ultima, plazo.esperado);
   out.vence = sumarDias(ultima, plazo.vence);
   out.atraso = Math.max(0, diasEntre(out.vence, hoy));
+  extra = extra || {};
+  out.cierre = ''; out.fechaCierre = ''; out.agenda = null;
+  if (extra.fallecido) { out.estado = 'FALLECIDO'; return out; }
   // El alta va primero: el doctor cerró el seguimiento (diseño de Registro, §5bis).
   if (alta) { out.estado = 'ALTA'; return out; }
 
@@ -304,16 +307,14 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta) {
   });
   if (lista.length) out.ultimoSeguimiento = fechaIso(lista[lista.length - 1].FECHA_HORA);
   var posteriores = lista.filter(function (s) { return fechaIso(s.FECHA_HORA) > ultima; });
-  var hechos = posteriores.filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; });
-  out.intentos = hechos.length;
-  var ultimoPost = posteriores[posteriores.length - 1];
-  var ultimoHecho = hechos[hechos.length - 1];
-  var diasDesdeHecho = ultimoHecho ? diasEntre(fechaIso(ultimoHecho.FECHA_HORA), hoy) : null;
+  var c = leerCiclo(posteriores, reglas, hoy);
+  out.intentos = c.intentos;
 
-  if (ultimoPost && normTexto(ultimoPost.ACCION) === 'DESCARTADO') { out.estado = 'DESCARTADO'; return out; }
-  if (hechos.length >= reglas.maxSeguimientos && diasDesdeHecho >= reglas.espera) { out.estado = 'DESCARTADO'; return out; }
-  if (futura) { out.estado = 'AGENDADO'; return out; }
-  if (ultimoHecho && diasDesdeHecho < reglas.espera) { out.estado = 'CONTACTADO'; return out; }
+  if (c.cierre) { out.estado = 'CERRADO'; out.cierre = c.cierre.motivo; out.fechaCierre = c.cierre.fecha; return out; }
+  if (extra.sinContacto) { out.estado = 'CERRADO'; out.cierre = 'NÚMERO EQUIVOCADO'; out.fechaCierre = extra.sinContacto; return out; }
+  // La cita de SOFDOC gana sobre lo que haya dicho la asesora.
+  if (futura) { out.estado = 'AGENDADO'; out.agenda = { tipo: 'CITA', fecha: futura.FECHA, intento: 0 }; return out; }
+  if (c.agenda) { out.estado = 'AGENDADO'; out.agenda = c.agenda; return out; }
 
   var hechoAntesDeVolver = lista.some(function (s) {
     var f = fechaIso(s.FECHA_HORA);
@@ -583,12 +584,14 @@ function segsPorSerie(seguimientos) {
 
 function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas) {
   var series = armarSeries(citas);
-  var tel = telefonosPorDni(indicaciones, contactos), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
+  var tel = telefonosPorDni(indicaciones, contactos, seguimientos), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
+  var marcas = marcasTelefono(seguimientos), muertos = fallecidos(seguimientos);
   var out = [];
   Object.keys(series).forEach(function (k) {
     var s = series[k];
     if (!s.realizadas.length) return;
-    var e = estadoDeSerie(s, segs[k], reglas, hoy, (altas || {})[k]);
+    var e = estadoDeSerie(s, segs[k], reglas, hoy, (altas || {})[k],
+      { fallecido: !!muertos[s.dni], sinContacto: sinContacto_(s.dni, marcas, tel, '') });
     out.push({
       DNI: s.dni,
       ESPECIALIDAD: s.especialidad,
@@ -606,7 +609,11 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
       N_SEGUIMIENTOS: e.intentos,
       ULTIMO_SEGUIMIENTO: e.ultimoSeguimiento,
       PENDIENTE: (pend[s.dni] || []).join('; '),
-      CIERRE: '', FECHA_CIERRE: '', AGENDA: '', FECHA_AGENDA: '', INTENTO: 0
+      CIERRE: e.cierre || '',
+      FECHA_CIERRE: e.fechaCierre || '',
+      AGENDA: e.agenda ? e.agenda.tipo : '',
+      FECHA_AGENDA: e.agenda ? e.agenda.fecha : '',
+      INTENTO: e.agenda ? e.agenda.intento : 0
     });
   });
   return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });
@@ -637,7 +644,8 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
     var texto = (i.TIPO === 'HIERRO' ? 'Hierro (Ferinject)' : (i.DETALLE || 'Procedimiento')) + (cantidad > 1 ? ' ×' + cantidad : '');
     if (g.detalles.indexOf(texto) < 0) g.detalles.push(texto);
   });
-  var porDni = realizadasPorDni_(citas), tel = telefonosPorDni(indicaciones, contactos), segs = {};
+  var porDni = realizadasPorDni_(citas), tel = telefonosPorDni(indicaciones, contactos, seguimientos), segs = {};
+  var marcas = marcasTelefono(seguimientos), muertos = fallecidos(seguimientos);
   (seguimientos || []).forEach(function (s) {
     var t = normTexto(s.ESPECIALIDAD);
     if (s.REFERENCIA || !TIPOS_INDICACION[t]) return;
@@ -649,13 +657,14 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
     var ultima = realizadas[realizadas.length - 1];
     var lista = (segs[k] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= g.fecha; })
       .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; });
-    var hechos = lista.filter(function (s) { return normTexto(s.ACCION) === 'HECHO'; });
-    var ultimoHecho = hechos[hechos.length - 1];
-    var diasDesdeHecho = ultimoHecho ? diasEntre(fechaIso(ultimoHecho.FECHA_HORA), hoy) : null;
-    var dias = Math.max(0, diasEntre(g.fecha, hoy)), estado = 'PENDIENTE';
-    if (lista.length && normTexto(lista[lista.length - 1].ACCION) === 'DESCARTADO') estado = 'DESCARTADO';
-    else if (hechos.length >= reglas.maxSeguimientos && diasDesdeHecho >= reglas.espera) estado = 'DESCARTADO';
-    else if (ultimoHecho && diasDesdeHecho < reglas.espera) estado = 'CONTACTADO';
+    var c = leerCiclo(lista, reglas, hoy);
+    var dias = Math.max(0, diasEntre(g.fecha, hoy)), estado = 'PENDIENTE', cierre = c.cierre;
+    var sc = sinContacto_(g.dni, marcas, tel, '');
+    if (muertos[g.dni]) estado = 'FALLECIDO';
+    else if (cierre) estado = 'CERRADO';
+    else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
+    else if (c.loHizo) estado = 'COMPLETADO';
+    else if (c.agenda) estado = 'AGENDADO';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
     return {
       DNI: g.dni,
@@ -669,9 +678,15 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
       DETALLE: g.detalles.join(' · '),
       DIAS: dias,
       ULTIMA_CITA: ultima ? ultima.FECHA : '',
-      N_SEGUIMIENTOS: hechos.length,
+      N_SEGUIMIENTOS: c.intentos,
       ULTIMO_SEGUIMIENTO: lista.length ? fechaIso(lista[lista.length - 1].FECHA_HORA) : '',
-      ESTADO: estado
+      ESTADO: estado,
+      CIERRE: cierre ? cierre.motivo : '',
+      FECHA_CIERRE: cierre ? cierre.fecha : '',
+      AGENDA: c.agenda ? c.agenda.tipo : '',
+      FECHA_AGENDA: c.agenda ? c.agenda.fecha : '',
+      INTENTO: c.agenda ? c.agenda.intento : 0,
+      FECHA_LOHIZO: c.loHizo
     };
   });
 }

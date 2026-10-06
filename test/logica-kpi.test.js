@@ -73,7 +73,10 @@ test('grupoProcedimiento junta las variantes escritas a mano', () => {
   assert.equal(g('AMOXICILINA'), 'AMOXICILINA', 'AMO como word boundary, no AMOX');
   assert.equal(g('AMO, BIOSIA'), 'AMO + BIOPSIA', 'split on ,');
   assert.equal(g('AMO + AMO'), 'AMO', 'deduplication');
-  assert.equal(g('biopsia de hueso'), 'BIOPSIA', 'qualifiers dropped by design');
+  assert.equal(g('biopsia de hueso'), 'BIOPSIA', 'BIOPSIA DE HUESO starts with BIOPS');
+  // Fix round 2: unknown procedures keep their structure
+  assert.equal(g('TRANSFUSION DE PLAQUETAS'), 'TRANSFUSION DE PLAQUETAS', 'unknown preserves stop words');
+  assert.equal(g('ASPIRADO Y BIOPSIA'), 'ASPIRADO Y BIOPSIA', 'unknown preserves Y separator');
 });
 
 test('kpiIndicaciones agrega GRUPO sin cambiar las filas', () => {

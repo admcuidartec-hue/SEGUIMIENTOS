@@ -772,44 +772,24 @@ var GRUPOS_PROC = [
 var ORDEN_GRUPOS = ['AMO', 'BIOPSIA', 'CITOMETRÍA DE FLUJO', 'CARIOTIPO', 'CITOGENÉTICA', 'SANGRÍA'];
 
 function grupoProcedimiento(detalle) {
-  var partes_sin_procesar = normTexto(detalle).split(/[\+,\/]/);
+  var partesRaw = normTexto(detalle).split(/[\+,\/]/);
   var partes = [];
-  partes_sin_procesar.forEach(function(parte) {
+  partesRaw.forEach(function(parte) {
     parte = parte.trim();
     if (!parte) return;
-    var palabras = parte.split(/\s+/);
-    var resultado_palabras = [];
-    var encontrado_prefijo = false;
-    for (var i = 0; i < palabras.length; i++) {
-      var palabra = palabras[i];
-      if (PALABRAS_VACIAS[palabra]) continue;
-      if (!encontrado_prefijo) {
-        if (palabra === 'AMO') {
-          resultado_palabras.push('AMO');
-          encontrado_prefijo = true;
-          break;
-        } else {
-          var prefijo_coincide = false;
-          for (var j = 0; j < GRUPOS_PROC.length; j++) {
-            var prefijo = GRUPOS_PROC[j][0];
-            if (prefijo === 'CITOM' && palabra.indexOf('CITOMEG') === 0) continue;
-            if (palabra.indexOf(prefijo) === 0) {
-              resultado_palabras.push(GRUPOS_PROC[j][1]);
-              encontrado_prefijo = true;
-              prefijo_coincide = true;
-              break;
-            }
-          }
-          if (!prefijo_coincide) {
-            for (var k = 0; k < palabras.length; k++) {
-              if (!PALABRAS_VACIAS[palabras[k]]) resultado_palabras.push(palabras[k]);
-            }
-            break;
-          }
-        }
+    if (parte === 'AMO' || parte.indexOf('AMO ') === 0) {
+      partes.push('AMO');
+      return;
+    }
+    for (var i = 0; i < GRUPOS_PROC.length; i++) {
+      var prefijo = GRUPOS_PROC[i][0];
+      if (prefijo === 'CITOM' && parte.indexOf('CITOMEG') === 0) continue;
+      if (parte.indexOf(prefijo) === 0) {
+        partes.push(GRUPOS_PROC[i][1]);
+        return;
       }
     }
-    if (resultado_palabras.length > 0) partes.push(resultado_palabras.join(' '));
+    partes.push(parte);
   });
   var unicas = partes.filter(function (x, i) { return partes.indexOf(x) === i; });
   return unicas.sort(function (a, b) {

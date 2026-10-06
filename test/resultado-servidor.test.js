@@ -189,3 +189,14 @@ test('getPaciente: sin consultas, el nombre sale del registro más reciente y, s
   // Con consultas manda la consulta.
   assert.equal(plano(ctx.getPaciente('40111222')).nombre, plano(ctx.getPaciente('40111222')).citas.slice(-1)[0].NOMBRE);
 });
+
+test('getPaciente: un registro anulado no da el nombre; si todos lo están, lo da la indicación', () => {
+  const reg = (ID, FECHA, NOMBRE, ANULADO, DNI) => ({ ID, FECHA_HORA: FECHA + ' 10:00', FECHA, ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE, DNI,
+    CONTACTO: '987000111', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: 1, ANULADO: ANULADO || '', MOTIVO_ANULACION: ANULADO ? 'Paciente equivocado' : '' });
+  const { ctx } = servidor([], [], [reg('REG-000001', '2026-08-01', 'ANA LUCÍA PÉREZ', '', '45000111'), reg('REG-000002', '2026-09-20', 'OTRA PERSONA', 'SÍ', '45000111'),
+    reg('REG-000003', '2026-09-21', 'NADIE', 'sí', '45000222')]);
+  assert.equal(plano(ctx.getPaciente('45000111')).nombre, 'ANA LUCÍA PÉREZ');
+  const base = ctx.datos_;
+  ctx.datos_ = () => { const d = base(); d.indicaciones = d.indicaciones.concat([{ DNI: '45000222', NOMBRE: 'LUIS ALBERTO NUEVO', FECHA: '2026-07-01', TIPO: 'HIERRO', ESTADO: 'COTIZÓ' }]); return d; };
+  assert.equal(plano(ctx.getPaciente('45000222')).nombre, 'LUIS ALBERTO NUEVO');
+});

@@ -3305,9 +3305,9 @@ const DEMO = (() => {
       const k = dniDe(dni), propias = citas.filter(c => c.DNI === k);
       const sus = series.filter(s => s.DNI === k).map(comoSerie);
       return {
-        // Como el servidor: sin consultas, el nombre del registro más reciente y, si no, el de la indicación más reciente.
+        // Como el servidor: sin consultas, el nombre del registro sin anular más reciente y, si no, el de la indicación más reciente.
         dni: k, nombre: sus.length ? sus[0].NOMBRE : propias.length ? propias[propias.length - 1].NOMBRE
-          : ((registros.filter(r => r.DNI === k).sort((a, b) => a.FECHA < b.FECHA ? -1 : 1).pop()
+          : ((registros.filter(r => r.DNI === k && !r.ANULADO).sort((a, b) => a.FECHA < b.FECHA ? -1 : 1).pop()
             || indicaciones.filter(i => i.DNI === k).sort((a, b) => a.FECHA < b.FECHA ? -1 : 1).pop() || {}).NOMBRE || ''),
         series: sus, citas: propias,
         indicaciones: indicaciones.filter(i => i.DNI === k),

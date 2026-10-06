@@ -348,12 +348,13 @@ function getPaciente(dni) {
 }
 
 /**
- * Nombre de quien todavía no tiene consultas: el del registro más reciente y, si no hay, el de la indicación más reciente.
+ * Nombre de quien todavía no tiene consultas: el del registro sin anular más reciente y, si no hay, el de la indicación más reciente.
  * Sin esto, un paciente que solo vino por Registro abría una ficha sin nombre.
  */
 function nombreSinConsultas_(d, k) {
+  // Un registro anulado (p. ej. «paciente equivocado») no da el nombre.
   var masReciente = function (filas, cuando) {
-    return filas.filter(function (x) { return x.DNI === k && String(x.NOMBRE || '').trim(); })
+    return filas.filter(function (x) { return x.DNI === k && !anulado_(x) && String(x.NOMBRE || '').trim(); })
       .sort(function (a, b) { var x = cuando(a), y = cuando(b); return x < y ? -1 : x > y ? 1 : 0; }).pop();
   };
   var r = masReciente(d.registros || [], function (x) { return fechaIso(x.FECHA) + ' ' + String(x.FECHA_HORA || ''); });

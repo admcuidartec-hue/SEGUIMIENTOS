@@ -1100,7 +1100,8 @@ function adaptarTarjeta(t) {
     fin: col === 4 ? String(t.ETIQUETA || '') : '',
     etiqueta: String(t.ETIQUETA || ''), fechaClave: t.FECHA_CLAVE || '', atraso: n(t.ATRASO), agenda: t.AGENDA || '', intento: n(t.INTENTO),
     idRegistro: t.ID_REGISTRO || '',
-    porReevaluar: t.ESTADO === 'POR REEVALUAR',
+    // Un registro completo es una reevaluación también después de «Agendó cita» (ESTADO AGENDADO), como en validarResultado.
+    porReevaluar: t.ESTADO === 'POR REEVALUAR' || (!!t.ID_REGISTRO && t.ESTADO_REGISTRO === 'COMPLETO'),
     // Tratamiento ya empezado: la próxima sesión se agenda («Agendó cita»), ya no se «acepta».
     enCurso: !!t.ID_REGISTRO && t.ESTADO_REGISTRO === 'EN CURSO',
     oculto: false,

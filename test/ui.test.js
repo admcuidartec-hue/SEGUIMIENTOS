@@ -3475,6 +3475,13 @@ test('tablero: «Por reevaluar» de un hierro terminado reemplaza la reevaluaci�
     await esperarEstable(pagina);
     assert.equal(await colPintada(pagina, 'REG-000022'), '2');
     assert.equal(await colPintada(pagina, '43666777|HEMATOLOGÍA'), '', 'agendada, la tarjeta del registro la sigue tapando');
+    // Ya en Agendado (ESTADO AGENDADO, ESTADO_REGISTRO COMPLETO) sigue siendo una reevaluación: «Agendó cita», no «Aceptó».
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !seleccion.panel);
+    await abrirPanelDe(pagina, 'REG-000022');
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
+    assert.equal(await pagina.evaluate(() => accionDrop(S.pacientes.find(x => x.id === 'REG-000022'), 2)), null, 'ya está en Agendado');
+    assert.deepEqual(await pagina.evaluate(() => accionDrop(Object.assign({}, S.pacientes.find(x => x.id === 'REG-000022'), { col: 1 }), 2)), { paso: 'agendo' });
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

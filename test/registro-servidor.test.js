@@ -82,9 +82,12 @@ test('getRegistrosHoy: registros y altas de hoy, lo más reciente primero', () =
   const alta = { ID: 'ALT-000001', FECHA_HORA: '2026-10-05 11:00', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA',
     DOCTOR: 'Dra. Karen Matos', REGISTRADO_POR: 'MAGALY', ANULADO: '' };
   const { ctx } = servidor({ registros: [ayer, hoy1], altas: [alta] });
-  assert.deepEqual(plano(ctx.getRegistrosHoy()), [
+  const lista = plano(ctx.getRegistrosHoy());
+  const campos = x => ({ ID: x.ID, HORA: x.HORA, ASESORA: x.ASESORA, NOMBRE: x.NOMBRE, DNI: x.DNI, TEXTO: x.TEXTO, ANULADO: x.ANULADO, MOTIVO_ANULACION: x.MOTIVO_ANULACION });
+  assert.deepEqual(lista.map(campos), [
     { ID: 'ALT-000001', HORA: '11:00', ASESORA: 'MAGALY', NOMBRE: 'ROSA ELENA QUISPE HUAMAN', DNI: '40111222', TEXTO: 'Alta médica · HEMATOLOGÍA · Dra. Karen Matos', ANULADO: false, MOTIVO_ANULACION: '' },
     { ID: 'REG-000005', HORA: '09:15', ASESORA: 'MAGALY', NOMBRE: 'ROSA QUISPE', DNI: '40111222', TEXTO: 'Sangría', ANULADO: true, MOTIVO_ANULACION: 'Error de digitación' }]);
+  assert.deepEqual([lista[0].TIPO, lista[0].FECHA], ['DECISION', '2026-10-05']);
 });
 
 test('buscarPacienteRegistro: datos del paciente conocido y propuesta de doctor', () => {
@@ -203,4 +206,30 @@ test('darDeAlta: tras una «nueva reevaluación» se puede dar otra alta (la rel
   const { ctx, escrito } = servidor({}, { ALTAS: [previa] });
   ctx.darDeAlta({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05' });
   assert.deepEqual(escrito.ALTAS.map(a => a.DECISION), ['ALTA']);
+});
+
+test('editarRegistro: relee dentro del candado, escribe solo lo cambiado, marca EDITADO y deja una línea por campo', () => {
+  const { ctx, escrito, lock } = servidor({}, { REGISTROS: [REG4] });
+  const celdas = [];
+  ctx.leerRegistros_ = () => [REG4];
+  ctx.leerSesiones_ = () => [];
+  ctx.actualizarCeldas_ = (h, id, c) => { assert.equal(lock.tomado, 1); celdas.push([h, id, plano(c)]); };
+  const r = plano(ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { contacto: '912000111', sesiones: 2 } }));
+  assert.equal(r.ok, true);
+  assert.deepEqual(celdas, [['REGISTROS', 'REG-000004', { CONTACTO: '912000111', SESIONES: 2, EDITADO: '2026-10-05 10:30' }]]);
+  assert.deepEqual(escrito.BITACORA.map(b => b[2]), ['REG-000004 · CONTACTO: 987654321 → 912000111', 'REG-000004 · SESIONES: 1 → 2']);
+  assert.deepEqual(plano(ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { contacto: '987654321' } })), { ok: false, sinCambios: true });
+  ctx.leerRegistros_ = () => [Object.assign({}, REG4, { ANULADO: 'SÍ' })];
+  assert.throws(() => ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { contacto: '912000111' } }), /anulado/);
+  assert.equal(lock.tomado, 0);
+});
+
+test('getRegistros: hoy o un mes, con los datos para editar', () => {
+  const sep = Object.assign({}, REG4, { ID: 'REG-000002', FECHA_HORA: '2026-09-20 11:00', FECHA: '2026-09-20' });
+  const hoy = Object.assign({}, REG4, { FECHA_HORA: '2026-10-05 09:00' });   // el arnés usa hoy = 2026-10-05
+  const { ctx } = servidor({ registros: [hoy, sep], altas: [] });
+  assert.deepEqual(plano(ctx.getRegistros({ periodo: '2026-09' })).map(x => x.ID), ['REG-000002']);
+  const deHoy = plano(ctx.getRegistros({ periodo: 'HOY' }));
+  assert.deepEqual(deHoy.map(x => [x.ID, x.CONTACTO, x.SESIONES]), [['REG-000004', '987654321', 1]]);
+  assert.deepEqual(plano(ctx.getRegistrosHoy()).map(x => x.ID), ['REG-000004']);
 });

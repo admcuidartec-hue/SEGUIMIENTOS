@@ -170,20 +170,53 @@ function actualizarCeldas_(nombre, id, cambios) {
   throw new Error('No encontré ' + id + '.');
 }
 
-function getRegistrosHoy() {
-  var d = datos_(), nombres = {};
+function editarRegistro(p) {
+  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), id = textoLimpio_(p && p.id);
+  var lock = bloquear_();
+  try {
+    exigirColumnas_('REGISTROS', COLUMNAS_REGISTROS);
+    // Se valida con la hoja releída: otra asesora pudo anularlo o marcar una sesión entretanto.
+    var sesiones = leerSesiones_();
+    var r = leerRegistros_().filter(function (x) { return x.ID === id; })[0];
+    var v = validarEdicionRegistro(r, p.cambios, sesiones, d.catalogos, d.hoy);
+    if (v.error) throw new Error(v.error);
+    var cols = Object.keys(v.cambios);
+    if (!cols.length) return { ok: false, sinCambios: true };
+    var ahora = fechaHoraTexto_(new Date()), escribir = copia_(v.cambios, { EDITADO: ahora });
+    actualizarCeldas_('REGISTROS', id, escribir);
+    cols.forEach(function (c) { bitacora_(quien, 'EDITAR REGISTRO', id + ' · ' + c + ': ' + v.antes[c] + ' → ' + v.cambios[c]); });
+    var nuevo = copia_(copia_(r, v.cambios), { EDITADO: ahora });
+    return limpiarParaEnvio({ ok: true, registro: filaRegistrada_(nuevo, { sesiones: sesiones }) });
+  } finally {
+    soltar_(lock);
+  }
+}
+
+/** Una fila de «Registrados»: lo que muestra la lista y lo que necesita el formulario de edición. */
+function filaRegistrada_(r, d) {
+  var e = estadoRegistro(r, d.sesiones);
+  return { ID: r.ID, HORA: String(r.FECHA_HORA || '').slice(11, 16), ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegistro(r),
+    ANULADO: anulado_(r), MOTIVO_ANULACION: r.MOTIVO_ANULACION || '', EDITADO: r.EDITADO || '', FECHA: fechaIso(r.FECHA) || '', TIPO: normTexto(r.TIPO),
+    DOCTOR: r.DOCTOR || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '', SESIONES: e.total, HECHAS: e.hechas,
+    FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '', DECISION: '' };
+}
+
+function getRegistros(p) {
+  var d = datos_(), nombres = {}, periodo = textoLimpio_(p && p.periodo) || 'HOY';
   d.citas.forEach(function (c) { nombres[c.DNI] = c.NOMBRE; });
-  var hoy = function (x) { return String(x.FECHA_HORA || '').slice(0, 10) === d.hoy; };
-  var hora = function (x) { return String(x.FECHA_HORA || '').slice(11, 16); };
-  var lista = d.registros.filter(hoy).map(function (r) {
-    return { ID: r.ID, HORA: hora(r), ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegistro(r), ANULADO: anulado_(r), MOTIVO_ANULACION: r.MOTIVO_ANULACION || '' };
-  }).concat(d.altas.filter(hoy).map(function (a) {
-    return { ID: a.ID, HORA: hora(a), ASESORA: a.REGISTRADO_POR, NOMBRE: nombres[a.DNI] || '', DNI: a.DNI,
-      TEXTO: decisionDe_(a).texto + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR + (fechaIso(a.FECHA_RETORNO) ? ' · retorno ' + fechaDma_(fechaIso(a.FECHA_RETORNO)) : ''), ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '' };
+  var dentro = function (x) { var f = String(x.FECHA_HORA || ''); return periodo === 'HOY' ? f.slice(0, 10) === d.hoy : f.slice(0, 7) === periodo; };
+  var lista = d.registros.filter(dentro).map(function (r) { return filaRegistrada_(r, d); }).concat(d.altas.filter(dentro).map(function (a) {
+    var ret = fechaIso(a.FECHA_RETORNO);
+    return { ID: a.ID, HORA: String(a.FECHA_HORA || '').slice(11, 16), ASESORA: a.REGISTRADO_POR, NOMBRE: nombres[a.DNI] || '', DNI: a.DNI,
+      TEXTO: decisionDe_(a).texto + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR + (ret ? ' · retorno ' + fechaDma_(ret) : ''),
+      ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', EDITADO: '', FECHA: fechaIso(a.FECHA) || '', TIPO: 'DECISION',
+      DECISION: decisionDe_(a).nombre, FECHA_RETORNO: ret || '' };
   }));
-  lista.sort(function (a, b) { return a.HORA < b.HORA ? 1 : a.HORA > b.HORA ? -1 : (a.ID < b.ID ? 1 : -1); });
+  lista.sort(function (a, b) { var x = a.FECHA + a.HORA, y = b.FECHA + b.HORA; return x < y ? 1 : x > y ? -1 : (a.ID < b.ID ? 1 : -1); });
   return limpiarParaEnvio(lista);
 }
+
+function getRegistrosHoy() { return getRegistros({ periodo: 'HOY' }); }
 
 function buscarPacienteRegistro(dni) {
   var d = datos_(), k = normDni(dni), muerto = fallecidos(d.seguimientos)[k] || null;

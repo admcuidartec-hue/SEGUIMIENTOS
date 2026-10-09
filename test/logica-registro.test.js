@@ -439,3 +439,15 @@ test('decisionesDeAlta: 1 AÑO usa su ventana; sin fecha de retorno se trata com
   r = plano(L.decisionesDeAlta([a('ALTA 6 MESES', '')], citas, R, '2027-03-10'));
   assert.ok(r.vigentes[k] && !r.retornos[k], 'sin fecha: alta simple');
 });
+
+test('validarEdicionRegistro: lo editable, el DNI fijo, sesiones no menos que las hechas, anulado no', () => {
+  const r = REGH({ SESIONES: '3' }), ses = [SES(1, '2026-10-02'), SES(2, '2026-10-05')];
+  const v = (c, x) => plano(L.validarEdicionRegistro(x || r, c, ses, CAT3, '2026-10-09'));
+  assert.deepEqual(v({ sesiones: 4, contacto: '912 000 111' }), { error: '', cambios: { SESIONES: 4, CONTACTO: '912 000 111' }, antes: { SESIONES: '3', CONTACTO: '987654321' } });
+  assert.match(v({ dni: '40999888' }).error, /anule el registro/);
+  assert.match(v({ sesiones: 1 }).error, /Ya hizo 2 sesiones/);
+  assert.match(v({ doctor: 'Dr. Nadie' }).error, /doctor de la lista/);
+  assert.match(v({ asesora: 'X' }).error, /No se puede cambiar/);
+  assert.match(v({ nombre: 'otra' }, REGH({ ANULADO: 'SÍ' })).error, /anulado/);
+  assert.deepEqual(v({ sesiones: '3' }).cambios, {}, 'igual al actual no es un cambio');
+});

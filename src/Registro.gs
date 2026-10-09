@@ -139,6 +139,61 @@ function duplicadoReciente(registros, fila) {
   return previos.length ? previos[previos.length - 1] : null;
 }
 
+/* ---------- Editar un registro ---------- */
+
+var EDITABLES = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
+  sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO' };
+
+/** Valida los cambios pedidos a un registro. Devuelve solo lo que de verdad cambia y su valor anterior. */
+function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
+  function no(m) { return { error: m, cambios: {}, antes: {} }; }
+  if (!r) return no('No encontré ese registro. Recargue la página.');
+  if (anulado_(r)) return no('Ese registro está anulado.');
+  var out = {}, antes = {}, e = estadoRegistro(r, sesiones), control = normTexto(r.TIPO) === 'CONTROL';
+  var claves = Object.keys(cambios || {});
+  for (var i = 0; i < claves.length; i++) {
+    var k = claves[i];
+    if (k === 'dni') return no('Para cambiar el paciente, anule el registro y regístrelo de nuevo.');
+    var col = EDITABLES[k];
+    if (!col) return no('No se puede cambiar ' + k + '.');
+    var v = cambios[k], nuevo;
+    if (col === 'FECHA') { nuevo = fechaIso(v); if (!nuevo) return no('Falta la fecha.'); if (nuevo > hoy) return no('La fecha no puede ser futura.'); }
+    else if (col === 'DOCTOR') {
+      var doc = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(v); })[0];
+      if (!doc) return no('Elija el doctor de la lista.');
+      nuevo = doc.doctor;
+    } else if (col === 'NOMBRE') { nuevo = textoLimpio_(v).toUpperCase(); if (!nuevo) return no('Falta el nombre del paciente.'); }
+    else if (col === 'CONTACTO') { nuevo = textoLimpio_(v); if (!nuevo) return no('Falta el teléfono o usuario.'); }
+    else if (col === 'DETALLE') {
+      if (control) return no('Un control no tiene procedimiento ni tratamiento.');
+      nuevo = enLista_(normTexto(r.TIPO) === 'HIERRO' ? catalogos.tratamientos : catalogos.procedimientos, v);
+      if (!nuevo) return no('«' + textoLimpio_(v) + '» no está en CATALOGOS.');
+    } else if (col === 'MARCA') {
+      var marcas = (catalogos.marcas || {})[normTexto(cambios.detalle || r.DETALLE)] || [];
+      nuevo = marcas.length ? enLista_(marcas, v) : '';
+      if (marcas.length && !nuevo) return no('Elija la marca: ' + marcas.join(' o ') + '.');
+    } else if (col === 'SESIONES') {
+      var n = Number(v);
+      if (control) return no('Un control no tiene sesiones.');
+      if (!(n >= 1 && n <= MAX_SESIONES && Math.floor(n) === n)) return no('Indique cuántas sesiones (de 1 a ' + MAX_SESIONES + ').');
+      if (n < e.hechas) return no('Ya hizo ' + e.hechas + ' sesiones: el total no puede ser menor.');
+      nuevo = n;
+    } else if (col === 'FECHA_INICIO') {
+      nuevo = fechaIso(v) || '';
+      if (nuevo && e.hechas) return no('Ya empezó el tratamiento: la fecha de inicio no se cambia.');
+      if (nuevo && (nuevo < hoy || nuevo > sumarDias(hoy, 180))) return no('La fecha de la primera sesión va de hoy a 180 días.');
+    } else if (col === 'EXAMENES') { if (!control) return no('Solo un control tiene exámenes.'); nuevo = textoLimpio_(v); }
+    else if (col === 'FECHA_RETORNO') {
+      if (!control) return no('Solo un control tiene fecha de retorno.');
+      nuevo = fechaIso(v); if (!nuevo || nuevo <= hoy) return no('La fecha de retorno debe ser después de hoy.');
+    }
+    if (String(nuevo) === String(r[col] == null ? '' : r[col])) continue;
+    out[col] = nuevo;
+    antes[col] = r[col] == null ? '' : r[col];
+  }
+  return { error: '', cambios: out, antes: antes };
+}
+
 /* ---------- Sesiones y estado de un registro ---------- */
 
 function sesionesDe_(id, sesiones) {

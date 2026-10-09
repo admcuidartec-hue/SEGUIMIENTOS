@@ -207,8 +207,9 @@ test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita A
   assert.equal(cat.v[1][2], 'Dr. Elí Cabanillas');
   assert.equal(cat.v[6][3], '', 'el particular sin nombre SOFDOC');
   assert.equal(cat.v[2][1], '', 'ALTA MÉDICA quitado');
-  assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15]]);
-  assert.equal(cambios.length, 7, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los cuatro parámetros');
+  assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
+    ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30]]);
+  assert.equal(cambios.length, 10, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los siete parámetros');
   assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
 });
 
@@ -292,4 +293,19 @@ test('el menú del Sheets ofrece «Importar lo que falta de la base de hierro»'
   ctx.SpreadsheetApp = { getUi: () => ({ createMenu: () => menu }) };
   ctx.onOpen();
   assert.deepEqual(items.find(i => i[1] === 'importarLoQueFalta'), ['Importar lo que falta de la base de hierro', 'importarLoQueFalta']);
+});
+
+test('ampliarHojas_: REGISTROS y ALTAS reciben sus columnas nuevas al final, una sola vez', () => {
+  const { ctx } = contexto();
+  const COLS_REG = ['ID', 'FECHA_HORA', 'FECHA', 'ASESORA', 'DOCTOR', 'NOMBRE', 'DNI', 'CONTACTO', 'TIPO', 'DETALLE', 'MARCA', 'SESIONES', 'ANULADO', 'MOTIVO_ANULACION'];
+  const COLS_ALT = ['ID', 'FECHA_HORA', 'FECHA', 'DNI', 'ESPECIALIDAD', 'DOCTOR', 'REGISTRADO_POR', 'NOTA', 'ANULADO', 'MOTIVO_ANULACION'];
+  const reg = hojaFalsa([COLS_REG, ['REG-000001', '2026-10-01 09:00', '2026-10-01', 'MAGALY', 'Dra. X', 'ROSA PRUEBA', '40111222', '987654321', 'HIERRO', 'HIERRO SACARATO', '', 2, '', '']]);
+  const alt = hojaFalsa([COLS_ALT]);
+  ctx.ss_ = () => ({ getSheetByName: n => ({ REGISTROS: reg, ALTAS: alt })[n] || null });
+  const cambios = [...ctx.ampliarHojas_()];
+  assert.deepEqual(reg.v[0].slice(14), ['FECHA_INICIO', 'EXAMENES', 'FECHA_RETORNO', 'EDITADO']);
+  assert.deepEqual(reg.v[1].slice(0, 3), ['REG-000001', '2026-10-01 09:00', '2026-10-01'], 'no toca las filas');
+  assert.deepEqual(alt.v[0].slice(10), ['DECISION', 'FECHA_RETORNO']);
+  assert.ok(cambios.some(c => /^REGISTROS: columna FECHA_INICIO, EXAMENES, FECHA_RETORNO, EDITADO\.$/.test(c)));
+  assert.deepEqual([...ctx.ampliarHojas_()].filter(c => /REGISTROS|ALTAS/.test(c)), [], 'la segunda vez no cambia nada');
 });

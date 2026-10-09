@@ -193,7 +193,8 @@ function entero_(v, porDefecto, minimo) {
 function reglasDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
   var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60,
-    esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15 };
+    esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15,
+    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   (filas || []).forEach(function (f) {
     var esp = normTexto(celda(f, 'ESPECIALIDAD'));
@@ -209,6 +210,9 @@ function reglasDesdeFilas(encabezado, filas) {
     if (par === 'DIAS_ENTRE_SESIONES') r.diasEntreSesiones = entero_(val, 7);
     if (par === 'GRACIA_AGENDA_DIAS') r.graciaAgenda = entero_(val, 2);
     if (par === 'META_DIARIA_SEGUIMIENTOS') r.metaDiaria = entero_(val, 15, 1);
+    if (par === 'DIAS_POST_TRATAMIENTO') r.postTratamiento = entero_(val, 30);
+    if (par === 'DIAS_CONTROL_LAB') r.controlLab = entero_(val, 15, 1);
+    if (par === 'AVISO_ALTA_CONTROL_DIAS') r.avisoAltaControl = entero_(val, 30);
   });
   Object.keys(r.plazos).forEach(function (k) {
     if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;

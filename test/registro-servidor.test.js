@@ -17,6 +17,7 @@ function servidor(extra, hojas) {
   const L = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs']);
   ctx.datos_ = () => Object.assign({ hoy: '2026-10-05', catalogos: CAT, reglas: reglas(L), citas: [cita({ fecha: '2026-09-01' })],
     registros: [REG4], sesiones: [], altas: [], vigentes: {}, indicacionesTodas: [], contactos: [] }, extra);
+  ctx.exigirColumnas_ = () => {};
   ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
   ctx.leerOpcional_ = n => ((hojas || {})[n] || []).concat(escrito[n] || []);
   ctx.anexarObjeto_ = (n, cols, o) => { assert.equal(lock.tomado, 1, 'se escribe con el candado tomado'); escrito[n].push(plano(o)); };
@@ -181,4 +182,10 @@ test('asignarDniIndicacion: escribe el DNI con el candado y lo deja CONFIRMADO; 
   assert.deepEqual(sh.v[1].slice(4), ['40111222', 'CONFIRMADO']);
   assert.deepEqual(escrito.BITACORA, [['MAGALY', 'EMPAREJAMIENTO', 'IND-0120 → 40111222 (a mano)']]);
   assert.throws(() => ctx.asignarDniIndicacion({ usuario: 'MAGALY', id: 'IND-0120', dni: '40111222' }), /ya tiene paciente/);
+});
+
+test('exigirColumnas_: sin las columnas nuevas de REGISTROS no se escribe', () => {
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs']);
+  ctx.hoja_ = () => ({ getRange: () => ({ getValues: () => [['ID', 'FECHA_HORA', 'FECHA']] }), getLastColumn: () => 3 });
+  assert.throws(() => ctx.exigirColumnas_('REGISTROS', ctx.COLUMNAS_REGISTROS), /Falta preparar las hojas/);
 });

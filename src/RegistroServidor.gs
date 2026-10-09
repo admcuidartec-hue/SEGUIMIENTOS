@@ -18,6 +18,12 @@ function exigirMotivo_(p) {
   return m;
 }
 
+/** REGISTROS y ALTAS se escriben por posición: sin sus columnas nuevas, una fila quedaría desalineada. */
+function exigirColumnas_(nombre, columnas) {
+  var plan = encabezadoAmpliable(encabezado_(hoja_(nombre)), columnas);
+  if (plan.error || plan.agregar.length) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+}
+
 function guardarRegistro(p) {
   var d = datos_();
   var v = validarRegistro(p, d.catalogos, d.hoy);
@@ -30,6 +36,7 @@ function guardarRegistro(p) {
   }
   var lock = bloquear_();
   try {
+    exigirColumnas_('REGISTROS', COLUMNAS_REGISTROS);
     var ids = leerOpcional_('REGISTROS').map(function (r) { return r.ID; });
     var ahora = fechaHoraTexto_(new Date());
     v.filas.forEach(function (f) {
@@ -99,6 +106,7 @@ function darDeAlta(p) {
   if (v.error) throw new Error(v.error);
   var lock = bloquear_();
   try {
+    exigirColumnas_('ALTAS', COLUMNAS_ALTAS);
     var a = v.alta, altas = leerAltas_();
     // Otra asesora pudo dar la misma alta mientras tanto: se revisa otra vez con la hoja releída dentro del candado.
     if (altasVigentes(altas, d.seguimientos, d.citas)[claveSerie(a.DNI, a.ESPECIALIDAD)]) {

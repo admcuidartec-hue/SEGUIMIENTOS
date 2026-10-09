@@ -17,7 +17,7 @@ test('reglas: especialidad con o sin tilde es la misma', () => {
 
 test('reglas: sin filas se usan los valores por defecto', () => {
   const r = L.reglasDesdeFilas(['ESPECIALIDAD'], []);
-  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60, esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15 });
+  assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60, esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15, postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 });
 });
 
 test('reglas: META_DIARIA_SEGUIMIENTOS se lee de REGLAS', () => {
@@ -136,4 +136,11 @@ test('COLUMNAS_SEGUIMIENTOS y COLUMNAS_PACIENTES crecen solo al final', () => {
   assert.equal(C.COLUMNAS_FECHA.FECHA_AGENDA, 1);
   assert.equal(C.COLUMNAS_FECHA.FECHA_CIERRE, 1);
   assert.equal(C.COLUMNAS_NUMERICAS.INTENTO, 1);
+});
+
+test('reglas: plazos de la Etapa 2 y sus valores por omisión', () => {
+  const vacias = L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], []);
+  assert.deepEqual([vacias.postTratamiento, vacias.controlLab, vacias.avisoAltaControl], [30, 15, 30]);
+  const r = L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], [['DIAS_POST_TRATAMIENTO', 45], ['DIAS_CONTROL_LAB', 10], ['AVISO_ALTA_CONTROL_DIAS', 20]]);
+  assert.deepEqual([r.postTratamiento, r.controlLab, r.avisoAltaControl], [45, 10, 20]);
 });

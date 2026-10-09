@@ -162,10 +162,10 @@ test('un campo motivo del payload nuevo no cambia MOTIVO de un resultado normal'
   assert.equal(escrito.SEGUIMIENTOS[0].MOTIVO, 'NO DESEA CONTINUAR');
 });
 
-test('bootstrap: reglas con las siete claves y metaDiaria 15; getPaciente trae telefonos', () => {
+test('bootstrap: reglas con las diez claves y metaDiaria 15; getPaciente trae telefonos', () => {
   const { ctx } = servidor();
   const b = plano(ctx.bootstrap());
-  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno'].sort());
+  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl'].sort());
   assert.equal(b.reglas.metaDiaria, 15);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).telefonos, ['987654321', '912345678']);
 });

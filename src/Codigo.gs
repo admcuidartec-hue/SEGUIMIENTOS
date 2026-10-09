@@ -21,7 +21,8 @@ var COLUMNAS_BITACORA = ['FECHA_HORA', 'USUARIO', 'ACCION', 'DETALLE'];
 
 /** Columnas que se guardan como fecha (a mediodía) o fecha y hora. */
 var COLUMNAS_FECHA = { FECHA: 1, PRIMERA_CITA: 1, ULTIMA_CITA: 1, PROXIMA_ESPERADA: 1, VENCE: 1, PROXIMA_AGENDADA: 1, ULTIMO_SEGUIMIENTO: 1,
-  FECHA_PROXIMA: 1, FECHA_AGENDA: 1, FECHA_CIERRE: 1 };
+  FECHA_PROXIMA: 1, FECHA_AGENDA: 1, FECHA_CIERRE: 1,
+  FECHA_INICIO: 1, FECHA_RETORNO: 1 };
 var COLUMNAS_FECHA_HORA = { FECHA_HORA: 1 };
 /** El resto se guarda como texto plano, para que Sheets no convierta '2026-07' ni DNI en otra cosa. */
 var COLUMNAS_NUMERICAS = { N_REALIZADAS: 1, DIAS_ATRASO: 1, N_SEGUIMIENTOS: 1, CANTIDAD: 1, PAGO: 1, SESIONES: 1, NUMERO: 1, INTENTO: 1 };
@@ -78,6 +79,23 @@ function hoja_(nombre) {
   var sh = ss_().getSheetByName(nombre);
   if (!sh) throw new Error('Falta la hoja "' + nombre + '". Use el menú Seguimientos → Preparar hojas.');
   return sh;
+}
+
+/** Encabezado de la fila 1 sin las celdas vacías del final. */
+function encabezado_(sh) {
+  var cab = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (c) { return String(c).trim(); });
+  while (cab.length && !cab[cab.length - 1]) cab.pop();
+  return cab;
+}
+
+/** Una hoja que se escribe por posición solo se amplía al final, y solo si lo que ya tiene coincide. */
+function encabezadoAmpliable(cab, columnas) {
+  for (var i = 0; i < cab.length; i++) {
+    if (cab[i] !== columnas[i]) {
+      return { error: 'el encabezado no coincide en la columna ' + (i + 1) + ' («' + cab[i] + '», se esperaba «' + (columnas[i] || '') + '»).', agregar: [] };
+    }
+  }
+  return { error: '', agregar: columnas.slice(cab.length) };
 }
 
 function celdaATexto_(v, columna) {
@@ -287,7 +305,8 @@ function bootstrap() {
     marcas: d.catalogos.marcas,
     reglas: { espera: d.reglas.espera, maxSeguimientos: d.reglas.maxSeguimientos, graciaAgenda: d.reglas.graciaAgenda,
       diasEntreSesiones: d.reglas.diasEntreSesiones, esperaCotizacion: d.reglas.esperaCotizacion,
-      metaRetorno: d.reglas.metaRetorno, metaDiaria: d.reglas.metaDiaria }
+      metaRetorno: d.reglas.metaRetorno, metaDiaria: d.reglas.metaDiaria,
+      postTratamiento: d.reglas.postTratamiento, controlLab: d.reglas.controlLab, avisoAltaControl: d.reglas.avisoAltaControl }
   });
 }
 

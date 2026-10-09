@@ -47,24 +47,8 @@ var CATALOGO_REGISTRO_INICIAL = {
   MARCAS: ['HIERRO CARBOXIMALTOSA | FERINJECT', 'HIERRO CARBOXIMALTOSA | LIKFER', 'HIERRO DERISOMALTOSA | MONOFER']
 };
 
-var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15]];
-
-/** Encabezado de la fila 1 sin las celdas vacías del final. */
-function encabezado_(sh) {
-  var cab = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (c) { return String(c).trim(); });
-  while (cab.length && !cab[cab.length - 1]) cab.pop();
-  return cab;
-}
-
-/** Una hoja que se escribe por posición solo se amplía al final, y solo si lo que ya tiene coincide. */
-function encabezadoAmpliable(cab, columnas) {
-  for (var i = 0; i < cab.length; i++) {
-    if (cab[i] !== columnas[i]) {
-      return { error: 'el encabezado no coincide en la columna ' + (i + 1) + ' («' + cab[i] + '», se esperaba «' + (columnas[i] || '') + '»).', agregar: [] };
-    }
-  }
-  return { error: '', agregar: columnas.slice(cab.length) };
-}
+var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
+  ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30]];
 
 /** Lo que la pestaña Registro necesita en hojas que ya existen. No borra ni mueve nada. Devuelve qué cambió. */
 function ampliarHojas_() {
@@ -79,6 +63,17 @@ function ampliarHojas_() {
       cambios.push('SEGUIMIENTOS: columna ' + plan.agregar.join(', ') + '.');
     }
   }
+
+  [['REGISTROS', COLUMNAS_REGISTROS], ['ALTAS', COLUMNAS_ALTAS]].forEach(function (par) {
+    var sh = ss.getSheetByName(par[0]);
+    if (!sh) return;
+    var cab = encabezado_(sh), plan = encabezadoAmpliable(cab, par[1]);
+    if (plan.error) cambios.push('✗ ' + par[0] + ': ' + plan.error);
+    else if (plan.agregar.length) {
+      sh.getRange(1, cab.length + 1, 1, plan.agregar.length).setValues([plan.agregar]).setFontWeight('bold');
+      cambios.push(par[0] + ': columna ' + plan.agregar.join(', ') + '.');
+    }
+  });
 
   var ct = ss.getSheetByName('CATALOGOS');
   if (ct) {

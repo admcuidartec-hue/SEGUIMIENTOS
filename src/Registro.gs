@@ -270,6 +270,17 @@ function validarAnulacionSesion(id, sesiones) {
 
 /* ---------- Filas de la bandeja ---------- */
 
+/**
+ * Especialidades en que atiende el médico SOFDOC `medico`, según las citas: { 'HEMATOLOGIA': 1 }.
+ * Vacío si no aparece en ninguna (entonces cualquier especialidad vale).
+ */
+function especialidadesDeMedico_(medico, citas) {
+  var out = {}, m = normTexto(medico);
+  if (!m) return out;
+  (citas || []).forEach(function (c) { if (normTexto(c.MEDICO) === m && c.ESPECIALIDAD) out[normTexto(c.ESPECIALIDAD)] = 1; });
+  return out;
+}
+
 function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; }
 
 /**
@@ -294,11 +305,21 @@ function pendientesRegistro(d) {
     var lista = (segs[r.ID] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= desde; }).sort(porFechaHora_);
     var c = leerCiclo(lista, reglas, hoy);
     var tel = normTelefono(r.CONTACTO), usuario = tel.length === 9 ? '' : textoLimpio_(r.CONTACTO);
-    var sc = sinContacto_(dni, marcas, d.telefonos, usuario), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '';
+    // Sin teléfonos conocidos del DNI (p. ej. un control de alguien que solo vino por Registro), vale el CONTACTO del registro,
+    // salvo que esté marcado como equivocado después de registrarse.
+    var telefonos = (d.telefonos || {})[dni] || [], marcaTel = tel && marcas[dni] && marcas[dni][tel];
+    if (!telefonos.length && tel.length === 9 && !(marcaTel && !(fechaIso(r.FECHA) > marcaTel))) telefonos = [tel];
+    var mapaTel = {};
+    mapaTel[dni] = telefonos;
+    var sc = sinContacto_(dni, marcas, mapaTel, usuario), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '';
     var agenda = c.agenda;
     var dias = Math.max(0, diasEntre(desde, hoy)), espera = enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion;
-    // La consulta realizada que cierra el control (desde la fecha del registro) o la reevaluación (después de la última sesión).
-    var vuelta = control ? realizadas.filter(function (x) { return x.FECHA >= fechaIso(r.FECHA); })[0]
+    // La consulta realizada que cierra el control (después de la fecha del registro, en la especialidad de su doctor
+    // si se sabe) o la reevaluación (después de la última sesión).
+    var espDoc = control ? especialidadesDeMedico_(medicoDeRegistro(r, d.catalogos || {}), d.citas) : {};
+    var vuelta = control ? realizadas.filter(function (x) {
+      return x.FECHA > fechaIso(r.FECHA) && (!Object.keys(espDoc).length || espDoc[normTexto(x.ESPECIALIDAD)]);
+    })[0]
       : e.estado === 'COMPLETO' ? realizadas.filter(function (x) { return x.FECHA > e.ultima; })[0] : null;
     if (muertos[dni]) estado = 'FALLECIDO';
     else if (cierre) estado = 'CERRADO';
@@ -311,7 +332,10 @@ function pendientesRegistro(d) {
     } else if (programado) {
       if (hoy <= sumarDias(e.inicio, reglas.graciaAgenda)) { estado = 'AGENDADO'; agenda = { tipo: 'SESION', fecha: e.inicio, intento: 0 }; }
       else motivo = 'NO VINO';
-    } else if (e.estado === 'COMPLETO') estado = hoy < reevaluar ? 'COMPLETADO' : 'POR REEVALUAR';
+    } else if (e.estado === 'COMPLETO') {
+      // Un «por reevaluar» muy viejo no se muestra: al publicar no debe caer una avalancha de tarjetas.
+      estado = hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';
+    }
     else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
     return {
@@ -320,7 +344,7 @@ function pendientesRegistro(d) {
       ESPECIALIDAD: r.TIPO,
       TIPO_SEGUIMIENTO: control ? 'CONTROL' : r.TIPO,
       NOMBRE: ultima ? ultima.NOMBRE : r.NOMBRE,
-      TELEFONOS: ((d.telefonos || {})[dni] || []).join(' / '),
+      TELEFONOS: telefonos.join(' / '),
       USUARIO: usuario,
       MEDICO_ULTIMO: medicoDeRegistro(r, d.catalogos),
       ESPECIALIDAD_CONSULTA: ultima ? ultima.ESPECIALIDAD : '',

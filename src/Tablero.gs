@@ -155,11 +155,18 @@ function armarTablero(d) {
     if (mesDe(muertos[dni].fecha) === mes) cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: nombrePorDni[dni] || '', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: muertos[dni].fecha });
   });
 
-  // Una sola tarjeta por necesidad: «Por reevaluar» reemplaza a la reevaluación del mismo paciente.
+  // Una sola tarjeta por necesidad: un registro completo que ya toca reevaluar (en Por contactar o, si ya se agendó,
+  // en Agendado) reemplaza a la reevaluación del mismo paciente y especialidad, esté donde esté.
   var reemplaza = {};
-  col.POR_CONTACTAR.forEach(function (t) { if (t.ESTADO === 'POR REEVALUAR') reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD_CONSULTA || 'HEMATOLOGÍA')] = 1; });
-  col.POR_CONTACTAR = col.POR_CONTACTAR.filter(function (t) {
-    return !(t.TIPO_SEGUIMIENTO === 'REEVALUACION' && reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD)]);
+  col.POR_CONTACTAR.concat(col.AGENDADO).forEach(function (t) {
+    if (t.ESTADO === 'POR REEVALUAR' || (t.ID_REGISTRO && t.ESTADO_REGISTRO === 'COMPLETO' && t.FECHA_REEVALUAR && t.FECHA_REEVALUAR <= hoy)) {
+      reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD_CONSULTA || 'HEMATOLOGÍA')] = 1;
+    }
+  });
+  ['POR_CONTACTAR', 'AGENDADO'].forEach(function (c) {
+    col[c] = col[c].filter(function (t) {
+      return !(t.TIPO_SEGUIMIENTO === 'REEVALUACION' && reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD)]);
+    });
   });
 
   // Deduplicate COMPLETADO by CLAVE, keeping the card with latest FECHA_CLAVE

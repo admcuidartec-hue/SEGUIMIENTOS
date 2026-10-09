@@ -91,7 +91,7 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
 |---|---|
 | ↑ ↓ (o j k) y ← → | Moverse entre tarjetas y columnas |
 | Enter | Abrir el panel de la tarjeta |
-| 1 a 3 | «¿Qué pasó?»: 1 = No contestó, 2 = Lo pensará, 3 = Agendó cita (reevaluación, Control y Por reevaluar) o Aceptó (hierro y procedimiento). El 4 ya no hace nada. El 1 guarda sin abrir el panel. En una tarjeta En tratamiento, el 1 es «Marcar sesión k hecha» |
+| 1 a 3 | «¿Qué pasó?»: 1 = No contestó, 2 = Lo pensará, 3 = Agendó cita (reevaluación, Control, Por reevaluar y tratamiento en curso) o Aceptó (hierro y procedimiento por empezar). El 4 ya no hace nada. El 1 guarda sin abrir el panel. En una tarjeta En tratamiento, el 1 es «Marcar sesión k hecha» |
 | X | Cerrar el seguimiento (abre las opciones de cierre; nada se cierra sin confirmar) |
 | C | Copiar el teléfono |
 | / | Ir al buscador |
@@ -107,7 +107,9 @@ En un paso con fecha o motivo, Enter confirma.
 - **Parámetros nuevos de `REGLAS`:** `DIAS_POST_TRATAMIENTO` = 30 (días desde la última sesión hasta «Por reevaluar»),
   `DIAS_CONTROL_LAB` = 15 (fecha de retorno que propone Control + laboratorio) y `AVISO_ALTA_CONTROL_DIAS` = 30 (cuántos días antes
   del control vuelve el paciente a «Por contactar»). «Preparar hojas» los agrega si faltan.
-- **«Agendó cita» es solo de reevaluación** (y de Control y Por reevaluar). En hierro y procedimiento por empezar el botón es
+- **«Agendó cita» es solo de reevaluación** (y de Control, Por reevaluar y un tratamiento **en curso**, donde agenda la próxima sesión).
+  «Aceptó» sobre un registro que ya no está cotizado ni programado se rechaza: «El tratamiento ya empezó: use «Agendó cita» para la
+  próxima sesión.» (`validarResultado`). En hierro y procedimiento por empezar el botón es
   **«Aceptó tratamiento» / «Aceptó procedimiento»**, que programa la `FECHA_INICIO` (o crea el registro si venía del historial); por eso
   el atajo **3** cambia de significado. «Aceptó» no tiene «Deshacer»: el aviso dice que, para cambiar la fecha o volver atrás, se edite o se anule el registro.
 - **«Lo hizo» ya no se ofrece** en «¿Qué pasó?»: lo reemplazan «Marcar sesión k hecha» y «Anular la última» en las tarjetas En tratamiento.
@@ -115,12 +117,17 @@ En un paso con fecha o motivo, Enter confirma.
 - **Recorrido de un tratamiento:** Pendiente (cotizado) → Programado (`FECHA_INICIO`, en Agendado hasta `GRACIA_AGENDA_DIAS` después de esa
   fecha; pasado ese plazo, «No vino») → En tratamiento (con la primera sesión) → Completado → Por reevaluar a los 30 días de la última
   sesión (el estado se calcula con `estadoRegistro`, no se guarda). Un Control (Registro → Control + laboratorio) hace el mismo
-  papel con su `FECHA_RETORNO`: en Agendado hasta pasada la gracia, luego «Control vencido»; la consulta realizada lo completa.
+  papel con su `FECHA_RETORNO`: en Agendado hasta pasada la gracia, luego «Control vencido»; lo completa una consulta realizada
+  **después** de la fecha del registro (la del mismo día no cuenta) y en la especialidad de su doctor (la que tiene ese médico en
+  las citas; si no se sabe, cualquiera). Sin teléfonos conocidos del DNI, la tarjeta usa el `CONTACTO` del registro (si no está marcado).
+  Un «Por reevaluar» cuya fecha de reevaluar pasó hace más de `CORTE_INDICACIONES_DIAS` queda ANTIGUO y no se muestra (para no
+  inundar el tablero al publicar). La tarjeta de un registro por reevaluar, esté en Por contactar o ya en Agendado, tapa la
+  reevaluación del mismo paciente y especialidad.
 - **Registro tiene tres pestañas:** Indicación, Control + laboratorio y Decisión del médico. «Registrados» se ve por periodo (hoy o cada
   uno de los últimos 6 meses, `getRegistros`) y trae Anular y **Editar**.
 - **Las cuatro decisiones del médico** (`ALTAS.DECISION`, `DECISIONES` en `Registro.gs`): `ALTA` (definitiva); `ALTA 6 MESES` y
   `ALTA 1 AÑO` (la fecha de retorno se calcula: fecha del alta + 6 o 12 meses; el paciente sigue de alta y vuelve a «Por contactar»
-  `AVISO_ALTA_CONTROL_DIAS` días antes); `NUEVA REEVALUACION` (el médico da la fecha de retorno, de mañana a dos años; no deja el alta vigente).
+  `AVISO_ALTA_CONTROL_DIAS` días antes: ese día la serie ya está vencida, `estadoDeSerie` pone `vence` = `esperada`); `NUEVA REEVALUACION` (el médico da la fecha de retorno, de mañana a dos años; no deja el alta vigente).
   Una alta a 6 meses o 1 año sin fecha de retorno se trata como alta simple. Se registran en Registro → Decisión del médico o en la ficha
   («Decisión del médico…»); el mensaje sin doctor dice «Elija el doctor.» solo en la nueva reevaluación.
 - **Editar** (`editarRegistro`, validada por `validarEdicionRegistro`): se puede cambiar fecha, doctor, nombre, contacto, tratamiento o

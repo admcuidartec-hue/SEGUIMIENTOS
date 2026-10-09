@@ -154,7 +154,10 @@ function validarResultado(p, d) {
   var esIndicacion = !!TIPOS_INDICACION[normTexto(t.ESPECIALIDAD)] && tipoT !== 'CONTROL';
   var porReevaluar = t.ESTADO === 'POR REEVALUAR' || tipoT === 'CONTROL';
   if (r.soloIndicacion && (!esIndicacion || porReevaluar)) return no('«' + frase_(r.nombre) + '» es solo para hierro y procedimientos.');
-  if (r.soloReevaluacion && esIndicacion && !porReevaluar) return no('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
+  // Un tratamiento empezado ya no se «acepta»: la próxima sesión se agenda.
+  var empezado = !!t.ID_REGISTRO && esIndicacion && !porReevaluar && ['COTIZADO', 'PROGRAMADO'].indexOf(t.ESTADO_REGISTRO) < 0;
+  if (r.soloReevaluacion && esIndicacion && !porReevaluar && !empezado) return no('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
+  if (r.nombre === 'ACEPTÓ' && empezado) return no('El tratamiento ya empezó: use «Agendó cita» para la próxima sesión.');
   var hoy = d.hoy, f = fechaIso(p.fecha), nota = textoLimpio_(p.nota);
   var fila = { DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD, RESPONSABLE: quien, MOTIVO: r.grupo === 'SIGUE' ? '' : r.nombre, NOTA: nota,
     REFERENCIA: ref, RESULTADO: r.nombre, FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };

@@ -488,3 +488,38 @@ test('validarEdicionRegistro: al cambiar el tratamiento sin enviar la marca, la 
   assert.deepEqual(v(REGH({ DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'FERINJECT' }), { detalle: 'HIERRO SACARATO' }).cambios, { DETALLE: 'HIERRO SACARATO', MARCA: '' });
   assert.deepEqual(v(REGH(), { detalle: 'HIERRO CARBOXIMALTOSA', marca: 'monofer' }).cambios, { DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'MONOFER' });
 });
+
+// Ronda final de la Etapa 2.
+const KAREN = 'Dra. KAREN DIANA MATOS PEÑA', HANAMPA = 'Dr. JUVENAL HANAMPA ROQUE';
+const CTL = o => REGH(Object.assign({ TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: '0', EXAMENES: 'hemograma', FECHA_RETORNO: '2026-10-16' }, o));
+
+test('pendientesRegistro: un control vuelve solo con una consulta POSTERIOR al registro y en la especialidad de su doctor', () => {
+  const previa = cita({ fecha: '2026-09-30', medico: KAREN });
+  const mismoDia = filaH(dReg([CTL()], [], [previa, cita({ fecha: '2026-10-01', medico: KAREN })], '2026-10-10'));
+  assert.deepEqual([mismoDia.ESTADO, mismoDia.AGENDA, mismoDia.VOLVIO], ['AGENDADO', 'CONTROL', ''], 'la consulta del mismo día no es la vuelta');
+  const volvio = filaH(dReg([CTL()], [], [previa, cita({ fecha: '2026-10-20', medico: KAREN })], '2026-10-25'));
+  assert.deepEqual([volvio.ESTADO, volvio.VOLVIO], ['COMPLETADO', '2026-10-20']);
+  const otra = filaH(dReg([CTL()], [], [previa, cita({ fecha: '2026-10-20', esp: 'REUMATOLOGÍA', medico: HANAMPA })], '2026-10-25'));
+  assert.deepEqual([otra.ESTADO, otra.MOTIVO_PENDIENTE], ['PENDIENTE', 'CONTROL VENCIDO'], 'otra especialidad no cierra el control');
+  const sinDoc = filaH(dReg([CTL({ DOCTOR: 'Dr. Desconocido' })], [], [cita({ fecha: '2026-10-20', esp: 'REUMATOLOGÍA', medico: HANAMPA })], '2026-10-25'));
+  assert.deepEqual([sinDoc.ESTADO, sinDoc.VOLVIO], ['COMPLETADO', '2026-10-20'], 'si no se sabe la especialidad, cualquiera vale');
+});
+
+test('pendientesRegistro: sin teléfonos conocidos del DNI, el CONTACTO del registro es su teléfono (salvo que esté marcado)', () => {
+  const d = Object.assign(dReg([CTL({ DNI: '40999111', CONTACTO: '912000333' })], [], [], '2026-10-19'), { telefonos: {} });
+  const f = filaH(d);
+  assert.deepEqual([f.ESTADO, f.TELEFONOS], ['PENDIENTE', '912000333']);
+  const tab = plano(L.armarTablero({ reglas: d.reglas, hoy: d.hoy, pacientes: [], pendientes: [f], citas: [], seguimientos: [], telefonos: {} }));
+  assert.equal(tab.columnas.POR_CONTACTAR[0].SIN_CONTACTO, false);
+  const marca = { ID: 'SEG-9', FECHA_HORA: '2026-10-18 10:00', DNI: '40999111', ESPECIALIDAD: 'CONTROL', RESPONSABLE: 'MAGALY', ACCION: 'TELEFONO',
+    REFERENCIA: 'REG-000010', RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: '912000333', ANULADO: '' };
+  const m = filaH(Object.assign(d, { seguimientos: [marca] }));
+  assert.deepEqual([m.ESTADO, m.CIERRE, m.TELEFONOS], ['CERRADO', 'NÚMERO EQUIVOCADO', ''], 'un número marcado no vuelve por el CONTACTO');
+});
+
+test('pendientesRegistro: un completo cuya fecha de reevaluar pasó hace más de CORTE_INDICACIONES_DIAS es ANTIGUO', () => {
+  const r = REGH({ FECHA: '2026-01-02', FECHA_INICIO: '2026-01-05' }), ses = [SES(1, '2026-01-05'), SES(2, '2026-01-12')];
+  // Reevaluar el 11/02/2026; el corte es de 180 días.
+  assert.equal(filaH(dReg([r], ses, [], '2026-08-10')).ESTADO, 'POR REEVALUAR', '180 días: todavía');
+  assert.equal(filaH(dReg([r], ses, [], '2026-08-11')).ESTADO, 'ANTIGUO', '181 días: fuera del tablero');
+});

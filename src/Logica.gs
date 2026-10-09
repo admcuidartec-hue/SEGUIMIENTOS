@@ -302,8 +302,10 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
   var ret = extra.retorno;
   if (ret && ret.fecha) {
     // El médico indicó cuándo volver: esa fecha manda sobre el plazo de REGLAS.
+    // Nueva reevaluación: vence con la holgura de REGLAS. Alta a 6 meses o 1 año: desde AVISO_ALTA_CONTROL_DIAS antes
+    // del retorno ya está en Por contactar (diseño de la Etapa 2, §3.3), así que vence ese mismo día.
     out.esperada = ret.tipo === 'REEVALUACION' ? ret.fecha : sumarDias(ret.fecha, -reglas.avisoAltaControl);
-    out.vence = sumarDias(out.esperada, plazo.vence - plazo.esperado);
+    out.vence = ret.tipo === 'REEVALUACION' ? sumarDias(out.esperada, plazo.vence - plazo.esperado) : out.esperada;
   } else {
     out.esperada = sumarDias(ultima, plazo.esperado);
     out.vence = sumarDias(ultima, plazo.vence);

@@ -150,5 +150,8 @@ test('estadoDeSerie: el retorno indicado por el médico manda sobre el plazo de 
   const e = L.estadoDeSerie(s, [], R, '2026-11-10', null, { retorno: { fecha: '2026-11-20', tipo: 'REEVALUACION' } });
   assert.deepEqual([e.estado, e.esperada, e.vence], ['AL DÍA', '2026-11-20', '2026-12-05']);
   const c = L.estadoDeSerie(s, [], R, '2027-03-10', null, { retorno: { fecha: '2027-04-05', tipo: '6 MESES' } });
-  assert.deepEqual([c.esperada, c.estado], ['2027-03-06', 'POR VENCER'], 'el control de alta se espera 30 días antes');
+  assert.deepEqual([c.esperada, c.vence, c.estado], ['2027-03-06', '2027-03-06', 'VENCIDO'],
+    'el control de alta entra a Por contactar desde 30 días antes del retorno');
+  const a = L.estadoDeSerie(s, [], R, '2027-03-05', null, { retorno: { fecha: '2027-04-05', tipo: '1 AÑO' } });
+  assert.equal(a.estado, 'AL DÍA', 'el día anterior a la ventana todavía no');
 });

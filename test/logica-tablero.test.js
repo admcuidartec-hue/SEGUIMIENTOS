@@ -135,3 +135,19 @@ test('armarTablero: POR REEVALUAR reemplaza la reevaluación del mismo paciente;
   const tab = plano(L.armarTablero({ reglas: R2, hoy: '2026-10-09', pacientes: [reev], pendientes: [porReev], citas: [], seguimientos: [], telefonos: {} }));
   assert.deepEqual(tab.columnas.POR_CONTACTAR.map(t => [t.CLAVE, t.MES]), [['REG-000010', '2026-08']]);
 });
+
+test('armarTablero: la tarjeta de un registro por reevaluar reemplaza la reevaluación aunque esté en Agendado', () => {
+  const R2 = reglas(L);
+  const reev = { DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', NOMBRE: 'ROSA PRUEBA', ESTADO: 'VENCIDO', N_SEGUIMIENTOS: 0, DIAS_ATRASO: 5,
+    PROXIMA_ESPERADA: '2026-10-01', ULTIMA_CITA: '2026-08-20' };
+  const agendada = { ID_REGISTRO: 'REG-000010', DNI: '40111222', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', ESTADO: 'AGENDADO',
+    ESTADO_REGISTRO: 'COMPLETO', FECHA_REEVALUAR: '2026-10-01', AGENDA: 'CITA', FECHA_AGENDA: '2026-10-15', N_SEGUIMIENTOS: 1,
+    ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', ULTIMA_SESION: '2026-09-01', HECHAS: 2, SESIONES: 2, DIAS: 3, FECHA_COTIZACION: '2026-08-25' };
+  const tab = plano(L.armarTablero({ reglas: R2, hoy: '2026-10-09', pacientes: [reev], pendientes: [agendada], citas: [], seguimientos: [], telefonos: {} }));
+  assert.deepEqual(tab.columnas.POR_CONTACTAR.map(t => t.CLAVE), []);
+  assert.deepEqual(tab.columnas.AGENDADO.map(t => t.CLAVE), ['REG-000010']);
+  // Antes de su fecha de reevaluar (completado) no reemplaza nada.
+  const antes = Object.assign({}, agendada, { FECHA_REEVALUAR: '2026-10-20' });
+  const tab2 = plano(L.armarTablero({ reglas: R2, hoy: '2026-10-09', pacientes: [reev], pendientes: [antes], citas: [], seguimientos: [], telefonos: {} }));
+  assert.deepEqual(tab2.columnas.POR_CONTACTAR.map(t => t.CLAVE), ['40111222|HEMATOLOGÍA']);
+});

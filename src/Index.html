@@ -726,7 +726,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
             <label class="sel-chip"><i class="ph ph-heartbeat"></i><select id="fesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
             <button type="button" class="pill" id="fsin" aria-pressed="false"><i class="ph ph-phone-slash"></i>Solo sin teléfono</button>
           </div>
-          <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓ ← →</span><span class="kbd">j k</span>moverse</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">1–4</span>qué pasó</span><span><span class="kbd">X</span>cerrar seguimiento</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span><span>o arrastre una tarjeta a otra columna</span></div>
+          <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓ ← →</span><span class="kbd">j k</span>moverse</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">1–3</span>qué pasó</span><span><span class="kbd">X</span>cerrar seguimiento</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span><span>o arrastre una tarjeta a otra columna</span></div>
           <div id="err"></div>
           <div class="coltabs" id="coltabs" role="tablist" aria-label="Columnas"></div>
           <section class="tablero" id="tablero" aria-label="Tablero de seguimientos"></section>
@@ -1050,7 +1050,7 @@ const plural = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
 /* ============ TABLERO ============ */
 const COLUMNAS = { POR_CONTACTAR: 1, AGENDADO: 2, EN_TRATAMIENTO: 3, COMPLETADO: 4 };
 const TIPO_CORTO = { REEVALUACION: 'reev', HIERRO: 'hier', PROCEDIMIENTO: 'proc', CONTROL: 'ctrl' };
-const TIPO_TEXTO = { REEVALUACION: 'Reevaluación', HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento' };
+const TIPO_TEXTO = { REEVALUACION: 'Reevaluación', HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento', CONTROL: 'Control + laboratorio' };
 const AGENDA_CORTA = { CITA: 'cita', LLAMAR: 'llamar', REINTENTAR: 'reintentar', 'SIN RESPUESTA': 'sinrespuesta' };
 const COLS = [
   { id: 1, t: 'Por contactar', i: 'ph-fill ph-phone-call', vacio: 'No hay pacientes por contactar.', vi: 'ph ph-check-circle' },
@@ -1101,6 +1101,8 @@ function adaptarTarjeta(t) {
     etiqueta: String(t.ETIQUETA || ''), fechaClave: t.FECHA_CLAVE || '', atraso: n(t.ATRASO), agenda: t.AGENDA || '', intento: n(t.INTENTO),
     idRegistro: t.ID_REGISTRO || '',
     porReevaluar: t.ESTADO === 'POR REEVALUAR',
+    // Tratamiento ya empezado: la próxima sesión se agenda («Agendó cita»), ya no se «acepta».
+    enCurso: !!t.ID_REGISTRO && t.ESTADO_REGISTRO === 'EN CURSO',
     oculto: false,
     raw: t
   };
@@ -1530,7 +1532,7 @@ document.addEventListener('keydown', e => {
     if (!p) return;
     if (tecla === 'c') copiarContacto(p);
     else if (p.col === 3 && !P.paso && tecla === '1') { e.preventDefault(); marcarSesionPanel(true); }
-    else if (p.col !== 4 && p.col !== 3 && !P.paso && /^[1-4]$/.test(tecla)) {
+    else if (p.col !== 4 && p.col !== 3 && !P.paso && /^[1-3]$/.test(tecla)) {
       const a = accDe(p)[Number(tecla) - 1];
       if (a) { e.preventDefault(); elegir(a.k, true); }
     } else if (p.col !== 4 && tecla === 'x') { e.preventDefault(); resaltarCierre(); }
@@ -1559,8 +1561,8 @@ document.addEventListener('keydown', e => {
   if (ci < 0) return;
   if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrirPanel(seleccion.id, true); }   // role="button": Enter y Espacio
   else if (tecla === 'c') copiarContacto(S.pacientes.find(p => p.id === seleccion.id));
-  else if (/^[1-4]$/.test(tecla) || tecla === 'x') {
-    // 1 a 4 y X sobre la tarjeta seleccionada, con el panel cerrado. Solo «No contestó» guarda sin abrir el panel.
+  else if (/^[1-3]$/.test(tecla) || tecla === 'x') {
+    // 1 a 3 y X sobre la tarjeta seleccionada, con el panel cerrado. Solo «No contestó» guarda sin abrir el panel.
     const p = S.pacientes.find(x => x.id === seleccion.id);
     if (!p || p.col === 4) return;
     e.preventDefault();
@@ -1595,8 +1597,11 @@ ACC.concat(CIERRES, [{ k: 'lohizo', r: 'LO HIZO', l: 'Lo hizo', i: 'ph ph-check-
 // Cierres que dejan una fila en «cerrados este mes» (el alta va a Completado).
 const CIERRAN = ['NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
 const ANULAR = { seguimiento: 'anularResultado', alta: 'anularAlta', sesion: 'anularSesion', registro: 'anularRegistro' };
-/** Hierro o procedimiento por empezar: «Aceptó» y «No desea realizarse». Control y Por reevaluar se tratan como una reevaluación. */
-function esIndicacion(p) { return (p.t === 'hier' || p.t === 'proc') && !p.porReevaluar; }
+/**
+ * Hierro o procedimiento por empezar: «Aceptó» y «No desea realizarse». Control y Por reevaluar se tratan como una reevaluación;
+ * un tratamiento en curso, también («Agendó cita» para la próxima sesión, «No desea continuar»).
+ */
+function esIndicacion(p) { return (p.t === 'hier' || p.t === 'proc') && !p.porReevaluar && !p.enCurso; }
 const accDe = p => ACC.filter(a => !a.para || a.para(p))
   .map(a => a.k === 'acepto' ? Object.assign({}, a, { l: p.t === 'hier' ? 'Aceptó tratamiento' : 'Aceptó procedimiento' }) : a);
 const cierresDe = p => CIERRES.filter(c => (!c.conTel || activos(p).length) && (!c.para || c.para(p)));
@@ -1723,6 +1728,7 @@ function datosDe(p) {
     if (p.trat.ultima) d.push(['Última sesión', dmy(p.trat.ultima)]);
     return d;
   }
+  if (p.t === 'ctrl') return [['Registrado el', dmy(p.cotizo)], ['Control con resultados el', dmy(p.raw.FECHA_INICIO)]];
   return [['Cotizó el', dmy(p.cotizo)], ['Procedimiento', p.proc]];
 }
 /** Como la app anterior: «Ya se le escribió N veces · la última el dd/mm/aaaa» («por esto» en hierro y procedimiento). */
@@ -1865,11 +1871,16 @@ function prepararPaso(p, k, teclado) {
   P.anulando = '';
 }
 function htmlPaso(p) {
-  const ps = P.paso, k = ps.k, act = activos(p), para = p.t === 'reev' ? frase(p.esp) : p.t === 'hier' ? 'Hierro' : frase(p.proc) || 'Procedimiento';
+  const ps = P.paso, k = ps.k, act = activos(p);
+  const para = p.t === 'reev' ? frase(p.esp) : p.t === 'hier' ? 'Hierro' : p.t === 'ctrl' ? 'Control + laboratorio' : frase(p.proc) || 'Procedimiento';
   let t = '', icon = 'ph ph-calendar-plus', aviso = '', campos = '', boton = 'Confirmar', deshab = false;
   let cierre = ['alta', 'otrolugar', 'fallecio', 'otro', 'nodesea'].includes(k);   // el alta también cierra el seguimiento
   const fecha = l => `<label class="campo">${l}<input type="date" id="pf" value="${esc(ps.f)}"${ps.rango.min ? ` min="${esc(ps.rango.min)}"` : ''} max="${esc(ps.rango.max)}"></label>`;
-  if (k === 'agendo') { t = 'Agendó cita'; campos = fecha('Fecha de la cita'); boton = 'Pasar a Agendado'; aviso = 'Si la fecha pasa sin cita realizada en SOFDOC, vuelve a «Por contactar».'; }
+  if (k === 'agendo') {
+    t = 'Agendó cita'; boton = 'Pasar a Agendado';
+    campos = fecha(p.enCurso ? 'Fecha de la próxima sesión' : 'Fecha de la cita');
+    aviso = p.enCurso ? 'Si pasa la fecha sin marcar la sesión, vuelve a «Por contactar».' : 'Si la fecha pasa sin cita realizada en SOFDOC, vuelve a «Por contactar».';
+  }
   if (k === 'pensara') { t = 'Lo pensará'; icon = 'ph ph-clock-countdown'; campos = fecha('Volver a llamar el'); boton = 'Guardar fecha'; aviso = 'Sale de «Por contactar» hasta ese día.'; }
   if (k === 'acepto') {
     t = p.t === 'hier' ? 'Aceptó tratamiento' : 'Aceptó procedimiento'; icon = 'ph ph-handshake i-ok'; boton = 'Pasar a Agendado';
@@ -2191,7 +2202,7 @@ function textoRes(s) {
     'NÚMERO EQUIVOCADO': `número equivocado: ${s.TELEFONO}`, 'DESCARTADO': `descartado${s.MOTIVO ? ': ' + String(s.MOTIVO).toLowerCase() : ''}`,
     'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || String(r || '').toLowerCase();
 }
-const PARA = { HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento' };
+const PARA = { HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento', CONTROL: 'Control + laboratorio' };
 /**
  * Filas de seguimientos para la historia (la del panel y la de la ficha), en el orden en que llegan.
  * «Anular» va solo en la última sin anular de cada seguimiento (especialidad + referencia) y en un «Falleció».
@@ -4281,18 +4292,21 @@ const DEMO = (() => {
   const reg = (r, o) => {
     const ss = sesionesDe(r.ID), hechas = ss.length, ultima = hechas ? ss[hechas - 1].FECHA : '';
     const estadoReg = r.ANULADO ? 'ANULADO' : hechas >= r.SESIONES ? 'COMPLETO' : hechas ? 'EN CURSO' : 'COTIZADO';
-    const enCurso = estadoReg === 'EN CURSO', dias = Math.max(0, entre(enCurso ? ultima : r.FECHA, hoy));
+    // Completo: Completado hasta DIAS_POST_TRATAMIENTO después de la última sesión; desde ahí, «Por reevaluar».
+    const reevaluar = estadoReg === 'COMPLETO' && ultima ? mas(ultima, reglas.postTratamiento) : '';
+    const enCurso = estadoReg === 'EN CURSO', dias = Math.max(0, entre(enCurso ? ultima : reevaluar || r.FECHA, hoy));
     const tel = r.CONTACTO.replace(/\D/g, ''), usuario = tel.length === 9 ? '' : r.CONTACTO;
     const d = doctorDe(r.DOCTOR);
     let estado = 'PENDIENTE';
-    if (estadoReg === 'COMPLETO') estado = 'COMPLETADO';
+    if (estadoReg === 'COMPLETO') estado = reevaluar && reevaluar <= hoy ? 'POR REEVALUAR' : 'COMPLETADO';
     else if (dias < (enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion)) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     return Object.assign({ ID_REGISTRO: r.ID, DNI: r.DNI, ESPECIALIDAD: r.TIPO, TIPO_SEGUIMIENTO: r.TIPO, NOMBRE: r.NOMBRE,
       TELEFONOS: tel.length === 9 ? tel : '', USUARIO: usuario, MEDICO_ULTIMO: d && d.sofdoc ? d.sofdoc : r.DOCTOR,
       ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase(r.DETALLE) : '', MARCA: r.TIPO === 'HIERRO' ? frase(r.MARCA) : '',
       SESIONES: r.SESIONES, HECHAS: hechas, ULTIMA_SESION: ultima, ULTIMA_SESION_ID: hechas ? ss[hechas - 1].ID : '', DIAS: dias, ULTIMA_CITA: r.FECHA, N_SEGUIMIENTOS: 0,
-      ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg,
+      ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg, FECHA_REEVALUAR: reevaluar,
+      FECHA_INICIO: r.TIPO === 'CONTROL' ? r.FECHA_RETORNO || '' : r.FECHA_INICIO || '',
       ATRASO: enCurso && estado === 'PENDIENTE' ? dias - reglas.diasEntreSesiones : 0,
       CIERRE: '', FECHA_CIERRE: '', AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 }, o || {});
   };
@@ -4302,6 +4316,7 @@ const DEMO = (() => {
     const sesion = 'Sesión ' + (Number(t.HECHAS) + 1) + ' de ' + t.SESIONES;
     if (t.COLUMNA === 'POR_CONTACTAR') {
       if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') return 'Debía volver el ' + dm(t.PROXIMA_ESPERADA) + ' · hace ' + plural(entre(t.PROXIMA_ESPERADA, hoy), 'día', 'días');
+      if (t.ESTADO === 'POR REEVALUAR') return 'Por reevaluar · terminó el ' + dm(t.ULTIMA_SESION);
       if (t.ESTADO_REGISTRO === 'EN CURSO') return sesion + (t.ATRASO > 0 ? ' · atrasada ' + plural(t.ATRASO, 'día', 'días') : ' · tocaba hoy');
       return 'Cotizó hace ' + plural(t.DIAS, 'día', 'días');
     }
@@ -4344,12 +4359,14 @@ const DEMO = (() => {
     R('REG-000006', '2026-09-14 12:00', '2026-09-14', 'ANA', 'Dra. Alejandra La Torre', 'MIGUEL ÁNGEL TORRES RAMOS', '41555666', '976555666', 'PROCEDIMIENTO', 'BIOPSIA', '', 1),
     R('REG-000007', '2026-10-01 09:02', '2026-09-03', 'MAGALY', 'Dr. Elí Cabanillas', 'ROSA ELENA QUISPE HUAMÁN', '40111222', '987654321', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 3, 'SÍ', 'Registrado dos veces'),
     // Etapa 2: hierro cotizado hace 10 días y sin empezar, para «Aceptó» y «No desea realizarse» con registro.
-    R('REG-000021', '2026-09-21 10:30', '2026-09-21', 'RACHEL', 'Dr. Elí Cabanillas', 'SILVIA PRUEBA ROJAS', '43555666', '987555666', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 3)
+    R('REG-000021', '2026-09-21 10:30', '2026-09-21', 'RACHEL', 'Dr. Elí Cabanillas', 'SILVIA PRUEBA ROJAS', '43555666', '987555666', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 3),
+    // Etapa 2: hierro de una sola sesión terminado el 12/08; a los 30 días pasó a «Por reevaluar» y reemplaza su reevaluación vencida.
+    R('REG-000022', '2026-08-05 10:00', '2026-08-05', 'MAGALY', 'Dr. Elí Cabanillas', 'BEATRIZ PRUEBA SALAZAR', '43666777', '987666777', 'HIERRO', 'HIERRO SACARATO', '', 1)
   );
   const SES = (ID, ID_REGISTRO, NUMERO, FECHA, ASESORA) => ({ ID, FECHA_HORA: FECHA + ' 12:00', ID_REGISTRO, NUMERO, FECHA, ASESORA, NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' });
   sesiones.push(SES('SES-000001', 'REG-000001', 1, '2026-09-10', 'MAGALY'), SES('SES-000002', 'REG-000002', 1, '2026-09-28', 'RACHEL'),
     SES('SES-000003', 'REG-000005', 1, '2026-09-22', 'RACHEL'), SES('SES-000004', 'REG-000005', 2, '2026-09-29', 'ANA'),
-    SES('SES-000005', 'REG-000006', 1, '2026-09-22', 'ANA'));
+    SES('SES-000005', 'REG-000006', 1, '2026-09-22', 'ANA'), SES('SES-000021', 'REG-000022', 1, '2026-08-12', 'MAGALY'));
   // Tarea 9: Elena tuvo un alta en agosto y volvió el 30/09, así que esa alta quedó cerrada («volvió después»).
   altas.push({ ID: 'ALT-000001', FECHA_HORA: '2026-08-10 11:00', FECHA: '2026-08-10', DNI: '41222333', ESPECIALIDAD: 'HEMATOLOGÍA',
     DOCTOR: 'Dr. Elí Cabanillas', REGISTRADO_POR: 'RACHEL', NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' },
@@ -4438,6 +4455,9 @@ const DEMO = (() => {
     ESPECIALIDAD: i % 4 === 3 ? 'REUMATOLOGÍA' : 'HEMATOLOGÍA', MEDICO_ULTIMO: i % 4 === 3 ? HANAMPA : i % 2 ? KAREN : ELI,
     ULTIMA_CITA: mas(hoy, -(45 + i)), N_REALIZADAS: i % 3 ? 2 : 1 }));
   series.push(...relleno);
+  // Beatriz: su reevaluación de hematología está vencida, pero la tapa la tarjeta «Por reevaluar» de su hierro (armarTablero).
+  const beatrizReev = reev({ DNI: '43666777', NOMBRE: 'BEATRIZ PRUEBA SALAZAR', TELEFONOS: '987666777', ULTIMA_CITA: '2026-08-05' });
+  series.push(beatrizReev);
   const serie = (dni, esp) => series.find(s => s.DNI === dni && mismo(s.ESPECIALIDAD, esp));
 
   /* ---- Indicaciones antiguas (INDICACIONES) y sus filas de seguimiento ---- */
@@ -4484,6 +4504,8 @@ const DEMO = (() => {
     rosa: ubicar(reg(regPorId('REG-000001'), { TELEFONOS: '987654321 / 014332210' }), 'POR_CONTACTAR'),   // hierro en curso, atrasada, dos teléfonos
     ana: ubicar(reg(regPorId('REG-000003')), 'POR_CONTACTAR'),    // usuario @, sin teléfono
     silvia: ubicar(reg(regPorId('REG-000021')), 'POR_CONTACTAR'), // hierro cotizado hace 10 días, sin empezar
+    beatriz: ubicar(reg(regPorId('REG-000022')), 'POR_CONTACTAR'), // hierro completo: «Por reevaluar»
+    beatrizReev: ubicar(beatrizReev, 'POR_CONTACTAR'),            // vencida, pero getTablero no la muestra
     pedro: ubicar(antiguas[0], 'POR_CONTACTAR'),                  // procedimiento antiguo
     carmenHierro: ubicar(antiguas[4], 'POR_CONTACTAR'),           // hierro antiguo del mismo DNI que carmen
     maria: ubicar(series[3], 'AGENDADO'),                         // CITA
@@ -4575,7 +4597,10 @@ const DEMO = (() => {
     const esInd = (t.TIPO_SEGUIMIENTO === 'HIERRO' || t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO');
     const porReevaluar = t.ESTADO === 'POR REEVALUAR' || t.TIPO_SEGUIMIENTO === 'CONTROL';
     if (['LO HIZO', 'ACEPTÓ', 'NO DESEA REALIZARSE'].includes(res) && (!esInd || porReevaluar)) throw new Error('«' + frase(res) + '» es solo para hierro y procedimientos.');
-    if (res === 'AGENDÓ CITA' && esInd && !porReevaluar) throw new Error('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
+    // Un tratamiento empezado ya no se «acepta»: la próxima sesión se agenda.
+    const empezado = !!t.ID_REGISTRO && esInd && !porReevaluar && !['COTIZADO', 'PROGRAMADO'].includes(t.ESTADO_REGISTRO);
+    if (res === 'AGENDÓ CITA' && esInd && !porReevaluar && !empezado) throw new Error('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
+    if (res === 'ACEPTÓ' && empezado) throw new Error('El tratamiento ya empezó: use «Agendó cita» para la próxima sesión.');
     const f = String(x.fecha || '').slice(0, 10), nota = String(x.nota || '').trim();
     if (res === 'LO PENSARÁ' && (!f || f <= hoy || f > mas(hoy, 90))) throw new Error(f ? 'La fecha para volver a llamar va de mañana a 90 días.' : 'Falta la fecha para volver a llamar.');
     if (res === 'AGENDÓ CITA' && (!f || f < hoy || f > mas(hoy, 180))) throw new Error(f ? 'La fecha de la cita va de hoy a 180 días.' : 'Falta la fecha de la cita.');
@@ -4732,8 +4757,16 @@ const DEMO = (() => {
     getTablero: () => {
       const col = { POR_CONTACTAR: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] };
       // MES como en armarTablero (Tablero.gs): mesDe(...) = 'yyyy-mm'; reevaluación por su última cita, el resto por la cotización.
-      tarjetas.forEach(t => { t.MES = String(t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.ULTIMA_CITA : t.FECHA_COTIZACION || '').slice(0, 7); });
+      tarjetas.forEach(t => { t.MES = String((t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.ULTIMA_CITA : t.FECHA_COTIZACION) || '').slice(0, 7); });
       tarjetas.forEach(t => { if (col[t.COLUMNA]) col[t.COLUMNA].push(t); });
+      // Como armarTablero: un registro completo que ya toca reevaluar (en cualquier columna abierta) tapa la reevaluación del paciente.
+      const tapa = {};
+      col.POR_CONTACTAR.concat(col.AGENDADO).forEach(t => {
+        if (t.ESTADO === 'POR REEVALUAR' || (t.ID_REGISTRO && t.ESTADO_REGISTRO === 'COMPLETO' && t.FECHA_REEVALUAR && t.FECHA_REEVALUAR <= hoy)) {
+          tapa[t.DNI + '|' + norm(t.ESPECIALIDAD_CONSULTA || 'HEMATOLOGÍA')] = 1;
+        }
+      });
+      ['POR_CONTACTAR', 'AGENDADO'].forEach(c => { col[c] = col[c].filter(t => !(t.TIPO_SEGUIMIENTO === 'REEVALUACION' && tapa[t.DNI + '|' + norm(t.ESPECIALIDAD)])); });
       col.POR_CONTACTAR.sort(ordenPorContactar);
       col.AGENDADO.sort(asc);
       col.EN_TRATAMIENTO.sort(asc);

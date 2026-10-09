@@ -223,7 +223,7 @@ function servidorResultado(opciones) {
   }
   const registros = () => base.concat(escrito.REGISTROS);
   ctx.datos_ = () => ctx.derivar_({ hoy: '2026-10-09', catalogos: CAT, reglas: reglas(L), citas: [], indicaciones: indicaciones.slice(),
-    contactos: [], registros: registros(), sesiones: [], altas: [], seguimientosTodos: escrito.SEGUIMIENTOS.slice(), seguimientos: escrito.SEGUIMIENTOS.slice() });
+    contactos: [], registros: registros(), sesiones: (o.sesiones || []).slice(), altas: [], seguimientosTodos: escrito.SEGUIMIENTOS.slice(), seguimientos: escrito.SEGUIMIENTOS.slice() });
   ctx.leerOpcional_ = n => (n === 'REGISTROS' ? registros() : []);
   ctx.leerRegistros_ = registros;
   ctx.exigirColumnas_ = () => {};
@@ -280,4 +280,21 @@ test('getPaciente: cada registro trae su estado, la fecha de inicio y, si es con
   // Lo que necesita el formulario de Editar en la ficha (la misma forma que una fila de getRegistros).
   assert.deepEqual(p.registros.map(r => [r.TIPO, r.HECHAS, r.SESIONES, r.NOMBRE, r.CONTACTO, r.DETALLE, r.MARCA]),
     [['HIERRO', 0, 2, 'ROSA PRUEBA', '987654321', 'HIERRO CARBOXIMALTOSA', 'FERINJECT'], ['CONTROL', 0, 0, 'ROSA PRUEBA', '987654321', 'CONTROL', '']]);
+});
+
+test('«Aceptó» sobre un registro en curso se rechaza sin candado; «Agendó cita» agenda la próxima sesión', () => {
+  const ses = [{ ID: 'SES-000001', FECHA_HORA: '2026-10-01 12:00', ID_REGISTRO: 'REG-000010', NUMERO: 1, FECHA: '2026-10-01', ASESORA: 'MAGALY',
+    NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' }];
+  const { ctx, escrito, lock } = servidorResultado({ conRegistroCotizado: true, sesiones: ses });
+  const base = { usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010' };
+  // REG-000010 tiene 1 sesión: con SESIONES 2 queda en curso y atrasado (la sesión 1 fue hace 8 días).
+  ctx.leerRegistros_ = () => [];
+  const fresco = ctx.datos_;
+  ctx.datos_ = () => { const d = fresco(); d.registros.forEach(r => { r.SESIONES = 2; }); return ctx.derivar_(d); };
+  assert.throws(() => ctx.registrarResultado(Object.assign({ resultado: 'ACEPTÓ', fecha: '2026-10-12' }, base)),
+    /^Error: El tratamiento ya empezó: use «Agendó cita» para la próxima sesión\.$/);
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, lock.tomado], [0, 0]);
+  const r = plano(ctx.registrarResultado(Object.assign({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' }, base)));
+  assert.deepEqual([escrito.SEGUIMIENTOS[0].RESULTADO, escrito.SEGUIMIENTOS[0].REFERENCIA], ['AGENDÓ CITA', 'REG-000010']);
+  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.AGENDA, r.tarjeta.FECHA_AGENDA], ['AGENDADO', 'CITA', '2026-10-12']);
 });

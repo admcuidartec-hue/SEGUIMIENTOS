@@ -186,7 +186,8 @@ test('validarAnulacionResultado: una acción desconocida no rompe; solo se anula
 });
 
 test('validarResultado: «Aceptó» y «No desea realizarse» solo en hierro y procedimiento; «Agendó cita» solo en reevaluación', () => {
-  const t = (o) => Object.assign({ DNI: '40111222', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', ID_REGISTRO: 'REG-000010', ESTADO: 'PENDIENTE' }, o);
+  const t = (o) => Object.assign({ DNI: '40111222', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', ID_REGISTRO: 'REG-000010', ESTADO: 'PENDIENTE',
+    ESTADO_REGISTRO: 'COTIZADO' }, o);
   const d = tarjetas => ({ catalogos: { usuarios: ['MAGALY'], doctores: [] }, hoy: '2026-10-09', tarjetas });
   const p = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010' }, o);
   const ok = L.validarResultado(p({ resultado: 'ACEPTÓ', fecha: '2026-10-12', sesiones: 3 }), d([t()]));
@@ -206,4 +207,18 @@ test('resultadoDe y leerCiclo: «No desea realizarse» cierra; «Aceptó» sigue
   assert.equal(L.resultadoDe(s('NO DESEA REALIZARSE')).grupo, 'CIERRE');
   assert.equal(L.resultadoDe(s('ACEPTÓ', { FECHA_PROXIMA: '2026-10-12' })).grupo, 'SIGUE');
   assert.equal(L.leerCiclo([s('NO DESEA REALIZARSE')], reglas(L), '2026-10-09').cierre.motivo, 'NO DESEA REALIZARSE');
+});
+
+test('validarResultado: «Aceptó» solo en un registro cotizado o programado; en curso, «Agendó cita» agenda la próxima sesión', () => {
+  const t = (o) => Object.assign({ DNI: '40111222', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', ID_REGISTRO: 'REG-000010', ESTADO: 'PENDIENTE',
+    ESTADO_REGISTRO: 'EN CURSO', HECHAS: 1, SESIONES: 3 }, o);
+  const d = tarjetas => ({ catalogos: { usuarios: ['MAGALY'], doctores: [] }, hoy: '2026-10-09', tarjetas });
+  const p = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010' }, o);
+  assert.equal(L.validarResultado(p({ resultado: 'ACEPTÓ', fecha: '2026-10-12' }), d([t()])).error,
+    'El tratamiento ya empezó: use «Agendó cita» para la próxima sesión.');
+  const ag = L.validarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' }), d([t()]));
+  assert.deepEqual([ag.error, ag.fila.FECHA_PROXIMA, ag.fila.REFERENCIA], ['', '2026-10-12', 'REG-000010']);
+  assert.equal(L.validarResultado(p({ resultado: 'ACEPTÓ', fecha: '2026-10-12' }), d([t({ ESTADO_REGISTRO: 'PROGRAMADO', HECHAS: 0 })])).error, '');
+  assert.match(L.validarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' }), d([t({ ESTADO_REGISTRO: 'COTIZADO', HECHAS: 0 })])).error,
+    /solo para reevaluaciones/);
 });

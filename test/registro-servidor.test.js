@@ -280,6 +280,8 @@ test('marcarSesion con próxima inválida o en la última sesión: no escribe na
   assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-05', proxima: '2027-04-04' }),
     /La próxima sesión va hasta 180 días después de la sesión\./);
   assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-05', proxima: '12/10' }), /no es válida/);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-02', proxima: '2026-10-04' }),
+    /^Error: La próxima sesión no puede ser anterior a hoy\.$/, 'hoy es 05/10');
   assert.deepEqual([escrito.SESIONES.length, escrito.SEGUIMIENTOS.length, lock.tomado], [0, 0, 0]);
   // Con una sola sesión indicada, la que se marca es la última.
   assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', proxima: '2026-10-12' }),
@@ -292,10 +294,36 @@ test('anularSesion anula también la próxima que se agendó al marcarla (Deshac
   const ligada = { ID: 'SEG-1', FECHA_HORA: '2026-10-05 10:30', DNI: '40111222', ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000008', RESULTADO: 'AGENDÓ CITA',
     FECHA_PROXIMA: '2026-10-12', NOTA: 'Agendada al marcar la sesión 1 (SES-000001)', ANULADO: '' };
   const otra = Object.assign({}, ligada, { ID: 'SEG-2', NOTA: 'Agendada al marcar la sesión 1 (SES-000001)', REFERENCIA: 'REG-000099' });
-  const manual = Object.assign({}, ligada, { ID: 'SEG-3', NOTA: '' });
+  const manual = Object.assign({}, ligada, { ID: 'SEG-3', NOTA: '', FECHA_HORA: '2026-10-04 09:00' });   // anterior a la sesión
   const { ctx, escrito } = servidor({}, { REGISTROS: [REG8], SESIONES: [s1], SEGUIMIENTOS: [ligada, otra, manual] });
   ctx.anularSesion({ usuario: 'MAGALY', id: 'SES-000001', motivo: 'Deshecho al momento' });
   assert.deepEqual(escrito.anulados, [['SESIONES', 'SES-000001', 'Deshecho al momento'],
     ['SEGUIMIENTOS', 'SEG-1', 'Deshecho al momento (se anuló la sesión SES-000001)']]);
   assert.deepEqual(escrito.BITACORA.map(b => b[1]), ['ANULAR SESIÓN', 'ANULAR RESULTADO']);
+});
+
+test('marcarSesion con próxima: si falla la escritura de la agenda, la sesión queda marcada y se avisa (sin lanzar)', () => {
+  const { ctx, escrito, lock } = servidor({}, { REGISTROS: [REG8] });
+  const anexar = ctx.anexarObjeto_;
+  ctx.anexarObjeto_ = (n, cols, o) => { if (n === 'SEGUIMIENTOS') throw new Error('Servicio no disponible'); anexar(n, cols, o); };
+  const r = plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-05', proxima: '2026-10-12' }));
+  assert.deepEqual([r.ok, r.sesion.ID, r.completo, r.agenda], [true, 'SES-000001', false, undefined]);
+  assert.equal(r.agendaError, 'No se pudo agendar la próxima sesión: Servicio no disponible');
+  assert.deepEqual([escrito.SESIONES.length, escrito.SEGUIMIENTOS.length, lock.tomado], [1, 0, 0]);
+});
+
+test('anularSesion anula también un «Agendó cita» sin liga escrito después de esa sesión (agendaba la que le seguía)', () => {
+  const s1 = { ID: 'SES-000001', FECHA_HORA: '2026-10-01 10:00', ID_REGISTRO: 'REG-000008', NUMERO: '1', FECHA: '2026-10-01', ANULADO: '' };
+  const s2 = { ID: 'SES-000002', FECHA_HORA: '2026-10-03 10:00', ID_REGISTRO: 'REG-000008', NUMERO: '2', FECHA: '2026-10-03', ANULADO: '' };
+  const g = (ID, FECHA_HORA, o) => Object.assign({ ID, FECHA_HORA, DNI: '40111222', ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000008',
+    RESULTADO: 'AGENDÓ CITA', FECHA_PROXIMA: '2026-10-12', NOTA: '', ANULADO: '' }, o);
+  const hojas = { REGISTROS: [REG8], SESIONES: [s1, s2], SEGUIMIENTOS: [
+    g('SEG-1', '2026-10-02 09:00'),                               // antes de la sesión 2: agendaba la 2, ya hecha
+    g('SEG-2', '2026-10-04 11:00'),                               // después: agendaba la 3
+    g('SEG-3', '2026-10-04 12:00', { RESULTADO: 'NO CONTESTÓ', FECHA_PROXIMA: '' }),
+    g('SEG-4', '2026-10-04 13:00', { REFERENCIA: 'REG-000099' }),
+    g('SEG-5', '2026-10-04 14:00', { ANULADO: 'SÍ' })] };
+  const { ctx, escrito } = servidor({}, hojas);
+  ctx.anularSesion({ usuario: 'MAGALY', id: 'SES-000002', motivo: 'Error' });
+  assert.deepEqual(escrito.anulados, [['SESIONES', 'SES-000002', 'Error'], ['SEGUIMIENTOS', 'SEG-2', 'Error (se anuló la sesión SES-000002)']]);
 });

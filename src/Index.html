@@ -1571,11 +1571,10 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (tecla === 'x') { abrirPanel(p.id, true, { cierre: true }); return; }
     if (conSesion(p)) {
-      // La sesión se marca desde el panel (fecha y «Próxima sesión»); en Agendado, 2 = «No contestó» guarda y 3 abre «Cambiar fecha».
+      // La sesión se marca desde el panel (fecha y «Próxima sesión»); en Agendado, 2 abre «Cambiar fecha».
       const a = atajosSesion(p)[Number(tecla) - 1];
-      if (a === 'nocontesto') guardarResultado(p.id, 'NO CONTESTÓ', { teclado: true });
-      else if (a === 'cambiar') abrirPanel(p.id, true, { paso: 'cambiar' });
-      else abrirPanel(p.id, true);
+      if (a === 'cambiar') abrirPanel(p.id, true, { paso: 'cambiar' });
+      else if (a === 'marcar') abrirPanel(p.id, true);
       return;
     }
     const a = accDe(p)[Number(tecla) - 1];
@@ -1619,8 +1618,11 @@ const cierresDe = p => CIERRES.filter(c => (!c.conTel || activos(p).length) && (
 const sesionAgendada = p => p.col === 2 && p.agenda === 'SESION' && !!p.idRegistro;
 /** Tarjetas cuyo panel es el bloque de sesiones (marcar la siguiente) en vez de «¿Qué pasó?». */
 const conSesion = p => p.col === 3 || sesionAgendada(p);
-/** Atajos del bloque de sesiones, en orden: 1 = marcar; en Agendado, además 2 = «No contestó» y 3 = «Cambiar fecha». */
-const atajosSesion = p => sesionAgendada(p) ? ['marcar', 'nocontesto', 'cambiar'] : ['marcar'];
+/**
+ * Atajos del bloque de sesiones, en orden: 1 = marcar; en Agendado, además 2 = «Cambiar fecha». Sin «No contestó»: la fecha de
+ * la sesión ya está acordada, y un «No contestó» la borraría (pasaría a «Reintentar»).
+ */
+const atajosSesion = p => sesionAgendada(p) ? ['marcar', 'cambiar'] : ['marcar'];
 const EASE_IO = 'cubic-bezier(.77,0,.175,1)', EASE_OUT = 'cubic-bezier(.23,1,.32,1)';
 const esAnulado = v => v === true || norm(v) === 'SI';
 
@@ -1785,8 +1787,11 @@ function quePasoHtml(p) {
 }
 /** Rango de la fecha de una sesión: desde la última sesión (o la cotización) hasta hoy. */
 const rangoSesion = p => ({ min: String(p.raw.ULTIMA_SESION || p.cotizo || '').slice(0, 10), max: S.hoy, f: S.hoy });
-/** «Próxima sesión»: del día después de la sesión que se marca a 180 días (validarProximaSesion). */
-const rangoProxima = f => ({ min: f ? masDias(f, 1) : '', max: f ? masDias(f, 180) : '' });
+/** «Próxima sesión»: del día después de la sesión que se marca (y no antes de hoy) a 180 días de la sesión (validarProximaSesion). */
+const rangoProxima = f => {
+  const despues = f ? masDias(f, 1) : '';
+  return { min: despues && despues < S.hoy ? S.hoy : despues, max: f ? masDias(f, 180) : '' };
+};
 /** La sesión que se marca (k) y si es la última del tratamiento (entonces no hay «Próxima sesión»). */
 function sesionDe(p) {
   const hechas = p.trat ? p.trat.k : Number(p.raw.HECHAS) || 0, total = p.trat ? p.trat.n : Number(p.raw.SESIONES) || 1;
@@ -1795,7 +1800,7 @@ function sesionDe(p) {
 /**
  * En tratamiento, y en Agendado con la sesión agendada: en lugar de «¿Qué pasó?», marcar la sesión siguiente (fecha de hoy
  * por omisión, y opcionalmente la fecha exacta de la próxima) o anular la última (pide motivo en la misma línea).
- * En Agendado, además «No contestó» y «Cambiar fecha». La última sesión llega en la tarjeta como ULTIMA_SESION_ID.
+ * En Agendado, además «Cambiar fecha». La última sesión llega en la tarjeta como ULTIMA_SESION_ID.
  */
 function sesionesHtml(p) {
   const r = rangoSesion(p), f = P.sesionF || r.f, { k, ultima } = sesionDe(p), ult = p.raw.ULTIMA_SESION_ID, rp = rangoProxima(f);
@@ -1803,8 +1808,7 @@ function sesionesHtml(p) {
   return `<label class="campo">Fecha de la sesión<input type="date" id="pfs" value="${esc(f)}"${r.min ? ` min="${esc(r.min)}"` : ''} max="${esc(r.max)}"></label>`
     + (ultima ? '' : `<label class="campo">Próxima sesión (opcional)<input type="date" id="pfp" value="${esc(P.proximaF)}" min="${esc(rp.min)}" max="${esc(rp.max)}"></label>`)
     + `<div class="acc"><button type="button" data-marcar-sesion><i class="ph ph-check-square i-ok"></i><span>Marcar sesión ${k} hecha</span><span class="kbd">1</span></button>`
-    + (agendada ? `<button type="button" data-acc="nocontesto"><i class="${RES.nocontesto.i}"></i><span>No contestó</span><span class="kbd">2</span></button>`
-      + '<button type="button" data-acc="cambiar"><i class="ph ph-calendar-blank i-info"></i><span>Cambiar fecha</span><span class="kbd">3</span></button>' : '')
+    + (agendada ? '<button type="button" data-acc="cambiar"><i class="ph ph-calendar-blank i-info"></i><span>Cambiar fecha</span><span class="kbd">2</span></button>' : '')
     + `<button type="button" data-anular-ultima${ult && !P.anularUltima && !sesionSinRecargar(p) ? '' : ' disabled'}><i class="ph ph-arrow-counter-clockwise"></i><span>Anular la última</span></button></div>`
     + (P.anularUltima ? `<div class="motivo"><input id="motivo-ultima" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(P.motivoUltima)}">`
       + `<button type="button" class="btn btn-p" data-confirmar-ultima${P.ultimaEnVuelo || !P.motivoUltima.trim() ? ' disabled' : ''}>Anular</button>`
@@ -1832,7 +1836,8 @@ function marcarSesionPanel(teclado) {
   const extra = { fecha: f, teclado: !!teclado }, prox = sesionDe(p).ultima ? '' : String(P.proximaF || '').trim();
   if (prox) {
     const rp = rangoProxima(f);
-    if (prox < rp.min) { avisar(`La próxima sesión debe ser después de la sesión que marca (${dmy(f)}).`); return; }
+    if (prox <= f) { avisar(`La próxima sesión debe ser después de la sesión que marca (${dmy(f)}).`); return; }
+    if (prox < S.hoy) { avisar('La próxima sesión no puede ser anterior a hoy.'); return; }
     if (prox > rp.max) { avisar('La próxima sesión va hasta 180 días después de la sesión.'); return; }
     extra.proxima = prox;
   }
@@ -2234,6 +2239,7 @@ async function guardarResultado(clave, resultado, extra) {
   if (hechos && hechos === Number(S.reglas && S.reglas.metaDiaria)) setTimeout(() => chispas($('#metadia .barra')), 500);
   if (seleccion.panel === clave) { pintarPanel(); const pa = S.pacientes.find(x => x.id === clave); if (pa) cargarHistoria(pa); }
   const d = deshacerDe(r);
+  if (r && r.agendaError) { avisar('La sesión quedó marcada; agende la próxima con «Cambiar fecha».', d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null); return; }
   avisar(textoGuardado(p, resultado, r) + (resultado === 'ACEPTÓ' ? '. Para cambiar la fecha o deshacerlo, edite o anule el registro.' : ''), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
 }
 /** La recarga silenciosa que se descartó por un guardado en vuelo se pide de nuevo al terminar el último. */
@@ -4290,6 +4296,7 @@ async function iniciar() {
      DEMO._llamadas[fn]  cuántas veces se llamó fn
      DEMO._ultimo[fn]    copia de los argumentos de la última llamada
      DEMO._fallar[fn]    = 'mensaje': fn lanza Error('mensaje') hasta que se borre
+     DEMO._fallarAgenda  = 'mensaje': marcarSesion con próxima guarda la sesión y devuelve agendaError (la agenda no se escribe)
      window.DEMO_FALLAR  = { fn: 'mensaje' } antes de cargar: lo mismo desde el arranque (p. ej. bootstrap)
      DEMO._demora[fn]    = ms: fn responde tras esa demora
      DEMO._alPedir[fn]   = true: con _demora, fn lee los datos al pedirla y la respuesta llega después
@@ -4470,9 +4477,12 @@ const DEMO = (() => {
 
   /* ---- Seguimientos guardados (SEGUIMIENTOS) ---- */
   const seguimientos = [];
+  // El siguiente SEG-nnnn: el mayor más uno (nunca la cantidad de filas, que podría repetir un ID).
+  const idSeg = () => 'SEG-' + String(seguimientos.reduce((m, y) => Math.max(m, Number((/^SEG-(\d+)$/.exec(y.ID) || [])[1]) || 0), 0) + 1).padStart(4, '0');
+  const LIGA_SESION = /^Agendada al marcar la sesión \d+ \((SES-\d+)\)$/;
   const SEG = (FECHA_HORA, DNI, ESPECIALIDAD, RESPONSABLE, RESULTADO, extra) => {
     const g = GRUPO[RESULTADO];
-    seguimientos.push(Object.assign({ ID: 'SEG-' + String(seguimientos.length + 1).padStart(4, '0'), FECHA_HORA, DNI, ESPECIALIDAD, RESPONSABLE,
+    seguimientos.push(Object.assign({ ID: idSeg(), FECHA_HORA, DNI, ESPECIALIDAD, RESPONSABLE,
       ACCION: g === 'SIGUE' ? 'HECHO' : g === 'TELEFONO' ? 'TELEFONO' : 'DESCARTADO', MOTIVO: g === 'SIGUE' ? '' : RESULTADO, NOTA: '',
       REFERENCIA: '', RESULTADO, FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' }, extra || {}));
   };
@@ -4717,7 +4727,7 @@ const DEMO = (() => {
       quedan = !!t.TELEFONOS || !!String(t.USUARIO || '').trim();
       if (!quedan) cerrar(t, 'NÚMERO EQUIVOCADO');
     }
-    const s = { ID: 'SEG-' + String(seguimientos.length + 1).padStart(4, '0'), FECHA_HORA: ahora(), DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD,
+    const s = { ID: idSeg(), FECHA_HORA: ahora(), DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD,
       RESPONSABLE: quien, ACCION: sigue ? 'HECHO' : grupo === 'TELEFONO' && quedan ? 'TELEFONO' : 'DESCARTADO', MOTIVO: sigue ? '' : res,
       NOTA: notaFinal, REFERENCIA: t.ID_REGISTRO || '', RESULTADO: res, FECHA_PROXIMA: ['LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ'].includes(res) ? f : '',
       TELEFONO: res === 'NÚMERO EQUIVOCADO' ? tel : '', ANULADO: '', MOTIVO_ANULACION: '' };
@@ -5101,6 +5111,7 @@ const DEMO = (() => {
         if (validas.length + 1 >= r.SESIONES) throw new Error('Es la última sesión del tratamiento: no hay una próxima que agendar.');
         if (!/^\d{4}-\d{2}-\d{2}$/.test(prox)) throw new Error('La fecha de la próxima sesión no es válida.');
         if (prox <= f) throw new Error('La próxima sesión debe ser después de la sesión que marca (' + dmyDemo(f) + ').');
+        if (prox < hoy) throw new Error('La próxima sesión no puede ser anterior a hoy.');
         if (prox > mas(f, 180)) throw new Error('La próxima sesión va hasta 180 días después de la sesión.');
       }
       const cuando = ahora();
@@ -5113,9 +5124,10 @@ const DEMO = (() => {
       if (!t) tarjetas.push(t = ubicar(reg(r), ''));
       trasSesion(t, r);
       const out = { ok: true, sesion: s, completo: s.NUMERO >= r.SESIONES };
-      if (prox) {
+      if (prox && demo._fallarAgenda) out.agendaError = 'No se pudo agendar la próxima sesión: ' + demo._fallarAgenda;
+      else if (prox) {
         // La misma fila que «Agendó cita» sobre un registro en curso, ligada a esta sesión (filaProximaSesion).
-        const g = { ID: 'SEG-' + String(seguimientos.length + 1).padStart(4, '0'), FECHA_HORA: cuando, DNI: r.DNI, ESPECIALIDAD: r.TIPO, RESPONSABLE: quien,
+        const g = { ID: idSeg(), FECHA_HORA: cuando, DNI: r.DNI, ESPECIALIDAD: r.TIPO, RESPONSABLE: quien,
           ACCION: 'HECHO', MOTIVO: '', NOTA: 'Agendada al marcar la sesión ' + s.NUMERO + ' (' + s.ID + ')', REFERENCIA: r.ID, RESULTADO: 'AGENDÓ CITA',
           FECHA_PROXIMA: prox, TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
         seguimientos.push(g);
@@ -5136,9 +5148,13 @@ const DEMO = (() => {
       if (propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
       s.ANULADO = 'SÍ';
       s.MOTIVO_ANULACION = String(x.motivo).trim();
-      // Como anularSesion: la próxima que se agendó al marcar esta sesión se anula con ella.
-      seguimientos.filter(g => !g.ANULADO && g.REFERENCIA === s.ID_REGISTRO && g.RESULTADO === 'AGENDÓ CITA' && (String(g.NOTA || '').match(/\bSES-\d+\b/) || [])[0] === s.ID)
-        .forEach(g => {
+      // Como anularSesion: la próxima que se agendó al marcar esta sesión se anula con ella, y también un «Agendó cita» sin liga
+      // escrito después de registrarla (agendaba la que le seguía).
+      seguimientos.filter(g => {
+        if (g.ANULADO || g.REFERENCIA !== s.ID_REGISTRO || g.RESULTADO !== 'AGENDÓ CITA') return false;
+        const liga = (LIGA_SESION.exec(String(g.NOTA || '').trim()) || [])[1];
+        return liga ? liga === s.ID : g.FECHA_HORA >= s.FECHA_HORA;
+      }).forEach(g => {
           g.ANULADO = 'SÍ';
           g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló la sesión ' + s.ID + ')';
           sumarHecho(g.RESPONSABLE, -1, true);
@@ -5325,7 +5341,7 @@ const DEMO = (() => {
 
   // Envoltorio para las pruebas: cuenta llamadas, guarda los argumentos y puede fallar o tardar a pedido.
   // window.DEMO_FALLAR (puesto antes de cargar, p. ej. con addInitScript) permite que falle hasta bootstrap.
-  const demo = { _llamadas: {}, _ultimo: {}, _fallar: Object.assign({}, window.DEMO_FALLAR || {}), _demora: {}, _alPedir: {} };
+  const demo = { _llamadas: {}, _ultimo: {}, _fallar: Object.assign({}, window.DEMO_FALLAR || {}), _demora: {}, _alPedir: {}, _fallarAgenda: '' };
   // Para las pruebas: un hierro registrado hoy con 3 sesiones, 2 hechas; recarga «Registrados» y devuelve su ID.
   demo._registroConSesiones = () => {
     const r = R(siguiente(registros, 'REG'), ahora(), mas(hoy, -14), 'MAGALY', 'Dr. Elí Cabanillas', 'MARTA PRUEBA SALAS', '46000111', '987000111',

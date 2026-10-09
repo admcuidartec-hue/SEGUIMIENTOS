@@ -70,7 +70,7 @@ function marcarSesion(p) {
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
     if (proxima) {
-      error = validarProximaSesion(e, p.fecha, proxima);
+      error = validarProximaSesion(e, p.fecha, proxima, d.hoy);
       if (error) throw new Error(error);
       exigirHojaPreparada_();   // antes de escribir nada: SEGUIMIENTOS se escribe por posición
     }
@@ -85,9 +85,14 @@ function marcarSesion(p) {
       // Misma FECHA_HORA que la sesión: pendientesRegistro cuenta los seguimientos desde que se registró la última sesión.
       var g = copia_(filaProximaSesion(r, s, proxima, asesora), { ID: 'SEG-' + ahora.getTime() + '-' + Math.floor(Math.random() * 1000),
         FECHA_HORA: cuando, ACCION: accionPara('AGENDÓ CITA', true) });
-      anexarObjeto_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS, g);
-      bitacora_(asesora, 'RESULTADO', g.DNI + ' · ' + g.ESPECIALIDAD + ' · ' + g.RESULTADO + ' · ' + g.REFERENCIA);
-      out.agenda = g;
+      // La sesión ya está escrita: si la agenda falla, no se lanza (la app creería que nada se guardó). Se avisa y se agenda aparte.
+      try {
+        anexarObjeto_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS, g);
+        bitacora_(asesora, 'RESULTADO', g.DNI + ' · ' + g.ESPECIALIDAD + ' · ' + g.RESULTADO + ' · ' + g.REFERENCIA);
+        out.agenda = g;
+      } catch (err) {
+        out.agendaError = 'No se pudo agendar la próxima sesión: ' + (err && err.message || err);
+      }
     }
     return limpiarParaEnvio(out);
   } finally {
@@ -116,8 +121,12 @@ function anularSesion(p) {
     marcarAnulado_('SESIONES', v.sesion.ID, motivo);
     bitacora_(quien, 'ANULAR SESIÓN', v.sesion.ID + ' (' + v.sesion.ID_REGISTRO + ') · ' + motivo);
     // La próxima sesión que se agendó al marcar esta pertenece a esta: se anula con ella (Deshacer no deja una agenda que miente).
+    // También un «Agendó cita» sin liga escrito después de registrarla: agendaba la sesión que le seguía.
+    var desde = String(v.sesion.FECHA_HORA || '');
     leerSeguimientos_().filter(function (g) {
-      return !anulado_(g) && textoLimpio_(g.REFERENCIA) === v.sesion.ID_REGISTRO && sesionLigada(g) === v.sesion.ID;
+      if (anulado_(g) || textoLimpio_(g.REFERENCIA) !== v.sesion.ID_REGISTRO || normTexto(g.RESULTADO) !== 'AGENDO CITA') return false;
+      var ligada = sesionLigada(g);
+      return ligada ? ligada === v.sesion.ID : !!desde && String(g.FECHA_HORA || '') >= desde;
     }).forEach(function (g) {
       marcarAnulado_('SEGUIMIENTOS', g.ID, motivo + ' (se anuló la sesión ' + v.sesion.ID + ')');
       bitacora_(quien, 'ANULAR RESULTADO', g.ID + ' · con la sesión ' + v.sesion.ID);

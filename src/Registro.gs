@@ -259,14 +259,15 @@ function validarSesion(r, sesiones, fecha, hoy) {
 }
 
 /**
- * «Próxima sesión» al marcar una: después de la sesión que se marca y hasta 180 días; nunca en la última (no hay próxima).
+ * «Próxima sesión» al marcar una: después de la sesión que se marca, no antes de hoy y hasta 180 días; nunca en la última (no hay próxima).
  * `e` es el estado ANTES de marcar. '' si vale, o el mensaje.
  */
-function validarProximaSesion(e, fechaSesion, proxima) {
+function validarProximaSesion(e, fechaSesion, proxima, hoy) {
   if (e.hechas + 1 >= e.total) return 'Es la última sesión del tratamiento: no hay una próxima que agendar.';
   var f = fechaIso(proxima), s = fechaIso(fechaSesion);
   if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(proxima).trim().slice(0, 10))) return 'La fecha de la próxima sesión no es válida.';
   if (f <= s) return 'La próxima sesión debe ser después de la sesión que marca (' + fechaDma_(s) + ').';
+  if (hoy && f < hoy) return 'La próxima sesión no puede ser anterior a hoy.';
   if (f > sumarDias(s, 180)) return 'La próxima sesión va hasta 180 días después de la sesión.';
   return '';
 }
@@ -281,11 +282,14 @@ function filaProximaSesion(r, sesion, proxima, asesora) {
     FECHA_PROXIMA: fechaIso(proxima), TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
 }
 
+/** El texto exacto que escribe filaProximaSesion: una nota escrita a mano no liga. */
+var LIGA_SESION = /^Agendada al marcar la sesión \d+ \((SES-\d+)\)$/;
+
 /** El ID de la sesión a la que está ligado un «Agendó cita» (agendado al marcarla), o ''. */
 function sesionLigada(s) {
   if (!s || normTexto(s.RESULTADO) !== 'AGENDO CITA') return '';
-  var m = String(s.NOTA || '').match(/\bSES-\d+\b/);
-  return m ? m[0] : '';
+  var m = String(s.NOTA || '').trim().match(LIGA_SESION);
+  return m ? m[1] : '';
 }
 
 /** Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. */
@@ -369,12 +373,13 @@ function pendientesRegistro(d) {
     else if (enCurso && c.citaVencida) {
       // La próxima sesión agendada pasó (más la gracia) sin marcarse: como un programado que no vino.
       motivo = 'NO VINO'; falta = c.citaVencida; dias = Math.max(0, diasEntre(falta, hoy));
+      if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';   // al publicar no debe volver una avalancha de «No vino» viejos
     } else if (control) {
       if (hoy <= sumarDias(e.inicio, reglas.graciaAgenda)) { estado = 'AGENDADO'; agenda = { tipo: 'CONTROL', fecha: e.inicio, intento: 0 }; }
       else { motivo = 'CONTROL VENCIDO'; dias = Math.max(0, diasEntre(e.inicio, hoy)); }
     } else if (programado) {
       if (hoy <= sumarDias(e.inicio, reglas.graciaAgenda)) { estado = 'AGENDADO'; agenda = { tipo: 'SESION', fecha: e.inicio, intento: 0 }; }
-      else { motivo = 'NO VINO'; falta = e.inicio; }
+      else { motivo = 'NO VINO'; falta = e.inicio; if (diasEntre(falta, hoy) > reglas.corteIndicaciones) estado = 'ANTIGUO'; }
     } else if (e.estado === 'COMPLETO') {
       // Un «por reevaluar» muy viejo no se muestra: al publicar no debe caer una avalancha de tarjetas.
       estado = hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';

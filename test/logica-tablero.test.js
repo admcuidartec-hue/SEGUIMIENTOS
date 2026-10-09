@@ -36,7 +36,7 @@ test('etiquetaDe: textos de cada columna', () => {
   assert.equal(et(pac({ AGENDA: 'REINTENTAR', FECHA_AGENDA: '2026-10-21', INTENTO: 1 }), 'AGENDADO'), 'Reintentar el 21/10 · intento 1 de 2');
   assert.equal(et(pac({ AGENDA: 'SIN RESPUESTA', FECHA_AGENDA: '2026-10-21', INTENTO: 2 }), 'AGENDADO'), 'Sin respuesta · se cierra el 21/10');
   assert.equal(et(pac({ AGENDA: '', FECHA_AGENDA: '', PROXIMA_AGENDADA: '2026-10-08' }), 'AGENDADO'), 'Cita el jue 08/10');
-  assert.equal(et(reg(), 'EN_TRATAMIENTO'), 'Sesión 2 de 3 · próxima ~09/10');
+  assert.equal(et(reg(), 'EN_TRATAMIENTO'), 'Sesión 1 de 3 · faltan 2 · próxima ~09/10');
 });
 
 test('armarTablero: reparte, ordena y cuenta', () => {
@@ -111,4 +111,27 @@ test('armarTablero: nombre en cerrados de fallecidos y en altas sin serie; proce
   assert.equal(t.cerrados.find(x => x.DNI === '11').NOMBRE, 'ANA PRUEBA UNO');
   assert.equal(t.columnas.COMPLETADO.find(x => x.DNI === '12').NOMBRE, 'LUIS PRUEBA DOS');
   assert.equal(t.columnas.COMPLETADO.find(x => x.DNI === '13').ETIQUETA, 'Se hizo el 03/10');
+});
+
+test('etiquetaDe y columnaDe: sesión programada, no vino, por reevaluar, control y en tratamiento', () => {
+  const R2 = reglas(L), hoy = '2026-10-15';
+  const f = o => Object.assign({ TIPO_SEGUIMIENTO: 'HIERRO', HECHAS: 0, SESIONES: 3 }, o);
+  const et = o => { const t = f(o); t.COLUMNA = L.columnaDe(t); return [t.COLUMNA, L.etiquetaDe(t, R2, hoy)]; };
+  assert.deepEqual(et({ ESTADO: 'AGENDADO', AGENDA: 'SESION', FECHA_AGENDA: '2026-10-16' }), ['AGENDADO', 'Sesión 1 el vie 16/10']);
+  assert.deepEqual(et({ ESTADO: 'PENDIENTE', MOTIVO_PENDIENTE: 'NO VINO', FECHA_INICIO: '2026-10-12' }), ['POR_CONTACTAR', 'No vino a su sesión 1 (12/10)']);
+  assert.deepEqual(et({ ESTADO: 'POR REEVALUAR', ULTIMA_SESION: '2026-09-10', HECHAS: 3 }), ['POR_CONTACTAR', 'Por reevaluar · terminó el 10/09']);
+  assert.deepEqual(et({ TIPO_SEGUIMIENTO: 'CONTROL', ESTADO: 'AGENDADO', AGENDA: 'CONTROL', FECHA_AGENDA: '2026-10-16' }), ['AGENDADO', 'Control con resultados el vie 16/10']);
+  assert.deepEqual(et({ TIPO_SEGUIMIENTO: 'CONTROL', ESTADO: 'PENDIENTE', MOTIVO_PENDIENTE: 'CONTROL VENCIDO', FECHA_INICIO: '2026-10-10' }),
+    ['POR_CONTACTAR', 'Debía volver con resultados el 10/10']);
+  assert.deepEqual(et({ ESTADO: 'EN TRATAMIENTO', HECHAS: 1, ULTIMA_SESION: '2026-10-12' }), ['EN_TRATAMIENTO', 'Sesión 1 de 3 · faltan 2 · próxima ~19/10']);
+});
+
+test('armarTablero: POR REEVALUAR reemplaza la reevaluación del mismo paciente; cada tarjeta trae su MES', () => {
+  const R2 = reglas(L);
+  const reev = { DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', NOMBRE: 'ROSA PRUEBA', ESTADO: 'VENCIDO', N_SEGUIMIENTOS: 0, DIAS_ATRASO: 5,
+    PROXIMA_ESPERADA: '2026-10-01', ULTIMA_CITA: '2026-08-20' };
+  const porReev = { ID_REGISTRO: 'REG-000010', DNI: '40111222', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', ESTADO: 'POR REEVALUAR',
+    ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', ULTIMA_SESION: '2026-09-01', HECHAS: 2, SESIONES: 2, N_SEGUIMIENTOS: 0, DIAS: 3, FECHA_COTIZACION: '2026-08-25' };
+  const tab = plano(L.armarTablero({ reglas: R2, hoy: '2026-10-09', pacientes: [reev], pendientes: [porReev], citas: [], seguimientos: [], telefonos: {} }));
+  assert.deepEqual(tab.columnas.POR_CONTACTAR.map(t => [t.CLAVE, t.MES]), [['REG-000010', '2026-08']]);
 });

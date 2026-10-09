@@ -126,7 +126,7 @@ test('«lo hizo» de un registro va a marcarSesion y no escribe en SEGUIMIENTOS'
   assert.equal(escrito.SEGUIMIENTOS.length, 0);
   assert.ok('tarjeta' in r, 'devuelve la tarjeta recalculada');
   assert.equal(r.tarjeta.COLUMNA, 'COMPLETADO', 'era la última sesión');
-  assert.match(r.tarjeta.ETIQUETA, /Completó el tratamiento/);
+  assert.match(r.tarjeta.ETIQUETA, /Completó el 06\/10 · reevaluar el 05\/11/);
 });
 
 test('«lo hizo» de una sesión que no es la última deja la tarjeta en tratamiento', () => {

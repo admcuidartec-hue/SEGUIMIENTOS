@@ -184,3 +184,26 @@ test('validarAnulacionResultado: una acción desconocida no rompe; solo se anula
   assert.equal(L.validarAnulacionResultado('SEG-2', lista), '');
   assert.match(L.validarAnulacionResultado('SEG-1', lista), /Solo se puede anular el último/);
 });
+
+test('validarResultado: «Aceptó» y «No desea realizarse» solo en hierro y procedimiento; «Agendó cita» solo en reevaluación', () => {
+  const t = (o) => Object.assign({ DNI: '40111222', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', ID_REGISTRO: 'REG-000010', ESTADO: 'PENDIENTE' }, o);
+  const d = tarjetas => ({ catalogos: { usuarios: ['MAGALY'], doctores: [] }, hoy: '2026-10-09', tarjetas });
+  const p = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010' }, o);
+  const ok = L.validarResultado(p({ resultado: 'ACEPTÓ', fecha: '2026-10-12', sesiones: 3 }), d([t()]));
+  assert.deepEqual([ok.error, ok.fila.RESULTADO, ok.fila.FECHA_PROXIMA, ok.fila.NOTA], ['', 'ACEPTÓ', '2026-10-12', 'Sesiones: 3']);
+  assert.match(L.validarResultado(p({ resultado: 'ACEPTÓ', fecha: '2026-10-01' }), d([t()])).error, /de hoy a 180 días/);
+  assert.match(L.validarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' }), d([t()])).error, /solo para reevaluaciones/);
+  assert.equal(L.validarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' }), d([t({ ESTADO: 'POR REEVALUAR' })])).error, '');
+  const no = L.validarResultado(p({ resultado: 'NO DESEA REALIZARSE', motivo: 'precio' }), d([t()]));
+  assert.deepEqual([no.error, no.fila.MOTIVO, no.fila.NOTA], ['', 'NO DESEA REALIZARSE', 'Motivo: precio']);
+  const reev = { DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', TIPO_SEGUIMIENTO: 'REEVALUACION' };
+  assert.match(L.validarResultado(p({ especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'ACEPTÓ', fecha: '2026-10-12' }), d([reev])).error,
+    /solo para hierro y procedimientos/);
+});
+
+test('resultadoDe y leerCiclo: «No desea realizarse» cierra; «Aceptó» sigue', () => {
+  const s = (r, o) => Object.assign({ ID: 'SEG-' + r, FECHA_HORA: '2026-10-09 10:00', RESULTADO: r, ANULADO: '' }, o);
+  assert.equal(L.resultadoDe(s('NO DESEA REALIZARSE')).grupo, 'CIERRE');
+  assert.equal(L.resultadoDe(s('ACEPTÓ', { FECHA_PROXIMA: '2026-10-12' })).grupo, 'SIGUE');
+  assert.equal(L.leerCiclo([s('NO DESEA REALIZARSE')], reglas(L), '2026-10-09').cierre.motivo, 'NO DESEA REALIZARSE');
+});

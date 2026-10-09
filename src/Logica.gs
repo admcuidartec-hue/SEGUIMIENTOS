@@ -782,7 +782,7 @@ function ordenarBandeja(pacientes, pendientes) {
     t.TIPO_SEGUIMIENTO = 'REEVALUACION';
     return t;
   });
-  var otros = (pendientes || []).filter(function (p) { return p.ESTADO === 'PENDIENTE'; });
+  var otros = (pendientes || []).filter(function (p) { return p.ESTADO === 'PENDIENTE' || p.ESTADO === 'POR REEVALUAR'; });
   var conPendiente = function (t) { return t.TIPO_SEGUIMIENTO !== 'REEVALUACION' || t.PENDIENTE ? 0 : 1; };
   var dias = function (t) { return t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.DIAS_ATRASO : t.DIAS; };
   return reeval.concat(otros).sort(function (a, b) {
@@ -985,7 +985,8 @@ function kpiRecuperacion(seguimientos, citas, hoy) {
 function kpiMotivos(seguimientos) {
   var acc = {};
   (seguimientos || []).forEach(function (s) {
-    if (normTexto(s.ACCION) !== 'DESCARTADO' || TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)]) return;
+    var indicacion = TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)];
+    if (normTexto(s.ACCION) !== 'DESCARTADO' || (indicacion && normTexto(s.RESULTADO) !== 'NO DESEA REALIZARSE')) return;
     var m = s.MOTIVO || 'SIN MOTIVO';
     acc[m] = (acc[m] || 0) + 1;
   });

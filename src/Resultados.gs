@@ -9,16 +9,18 @@
 var RESULTADOS = {
   'NO CONTESTO':              { nombre: 'NO CONTESTÓ',              grupo: 'SIGUE',    pide: '',         soloIndicacion: false },
   'LO PENSARA':               { nombre: 'LO PENSARÁ',               grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: false },
-  'AGENDO CITA':              { nombre: 'AGENDÓ CITA',              grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: false },
+  'AGENDO CITA':              { nombre: 'AGENDÓ CITA',              grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: false, soloReevaluacion: true },
   'LO HIZO':                  { nombre: 'LO HIZO',                  grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: true },
+  'ACEPTO':                   { nombre: 'ACEPTÓ',                   grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: true },
   'ALTA MEDICA':              { nombre: 'ALTA MÉDICA',              grupo: 'CIERRE',   pide: 'DOCTOR',   soloIndicacion: false },
   'NUMERO EQUIVOCADO':        { nombre: 'NÚMERO EQUIVOCADO',        grupo: 'TELEFONO', pide: 'TELEFONO', soloIndicacion: false },
   'SE ATIENDE EN OTRO LUGAR': { nombre: 'SE ATIENDE EN OTRO LUGAR', grupo: 'CIERRE',   pide: '',         soloIndicacion: false },
   'FALLECIO':                 { nombre: 'FALLECIÓ',                 grupo: 'CIERRE',   pide: '',         soloIndicacion: false },
-  'NO DESEA CONTINUAR':       { nombre: 'NO DESEA CONTINUAR',       grupo: 'CIERRE',   pide: 'MOTIVO',   soloIndicacion: false }
+  'NO DESEA CONTINUAR':       { nombre: 'NO DESEA CONTINUAR',       grupo: 'CIERRE',   pide: 'MOTIVO',   soloIndicacion: false },
+  'NO DESEA REALIZARSE':      { nombre: 'NO DESEA REALIZARSE',      grupo: 'CIERRE',   pide: 'MOTIVO',   soloIndicacion: true }
 };
-var ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
-  'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'];
+var ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
+  'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
 
 /**
  * Qué significa una fila de SEGUIMIENTOS. Las antiguas (sin RESULTADO) se leen
@@ -148,7 +150,11 @@ function validarResultado(p, d) {
   if (!t) return no('Ese paciente no está en la lista. Recargue la página.');
   var r = RESULTADOS[normTexto(p.resultado)];
   if (!r) return no('Elija qué pasó.');
-  if (r.soloIndicacion && !TIPOS_INDICACION[normTexto(t.ESPECIALIDAD)]) return no('«Lo hizo» es solo para hierro y procedimientos.');
+  var tipoT = t.TIPO_SEGUIMIENTO || normTexto(t.ESPECIALIDAD);
+  var esIndicacion = !!TIPOS_INDICACION[normTexto(t.ESPECIALIDAD)] && tipoT !== 'CONTROL';
+  var porReevaluar = t.ESTADO === 'POR REEVALUAR' || tipoT === 'CONTROL';
+  if (r.soloIndicacion && (!esIndicacion || porReevaluar)) return no('«' + frase_(r.nombre) + '» es solo para hierro y procedimientos.');
+  if (r.soloReevaluacion && esIndicacion && !porReevaluar) return no('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
   var hoy = d.hoy, f = fechaIso(p.fecha), nota = textoLimpio_(p.nota);
   var fila = { DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD, RESPONSABLE: quien, MOTIVO: r.grupo === 'SIGUE' ? '' : r.nombre, NOTA: nota,
     REFERENCIA: ref, RESULTADO: r.nombre, FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
@@ -166,6 +172,21 @@ function validarResultado(p, d) {
     if (!f) return no('Falta la fecha de la sesión.');
     if (f > hoy) return no('La fecha de la sesión no puede ser futura.');
     fila.FECHA_PROXIMA = f;
+  }
+  if (r.nombre === 'ACEPTÓ') {
+    if (!f) return no('Falta la fecha de inicio.');
+    if (f < hoy || f > sumarDias(hoy, 180)) return no('La fecha de inicio va de hoy a 180 días.');
+    fila.FECHA_PROXIMA = f;
+    if (p.sesiones !== undefined && p.sesiones !== '') {
+      var n = Number(p.sesiones);
+      if (!(n >= 1 && n <= MAX_SESIONES && Math.floor(n) === n)) return no('Indique cuántas sesiones (de 1 a ' + MAX_SESIONES + ').');
+      fila.NOTA = unirNota_('Sesiones: ' + n, nota);
+    }
+  }
+  if (r.nombre === 'NO DESEA REALIZARSE') {
+    var motivoR = textoLimpio_(p.motivo);
+    if (!motivoR) return no('Escriba el motivo.');
+    fila.NOTA = unirNota_('Motivo: ' + motivoR, nota);
   }
   if (r.nombre === 'ALTA MÉDICA') {
     var doc = (d.catalogos.doctores || []).filter(function (x) { return normTexto(x.doctor) === normTexto(p.doctor); })[0];

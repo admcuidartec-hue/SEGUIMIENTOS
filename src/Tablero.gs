@@ -51,6 +51,7 @@ function columnaDe(t) {
     // Una cita de SOFDOC sin seguimiento es rutina, no trabajo de la asesora.
     return e === 'AGENDADO' && Number(t.N_SEGUIMIENTOS) > 0 ? 'AGENDADO' : '';
   }
+  if (e === 'POR REEVALUAR') return 'POR_CONTACTAR';
   if (e === 'PENDIENTE') return 'POR_CONTACTAR';
   if (e === 'AGENDADO') return 'AGENDADO';
   if (e === 'EN TRATAMIENTO') return 'EN_TRATAMIENTO';
@@ -61,10 +62,15 @@ function etiquetaDe(t, reglas, hoy) {
   var sesion = 'Sesión ' + (Number(t.HECHAS) + 1) + ' de ' + t.SESIONES;
   if (t.COLUMNA === 'POR_CONTACTAR') {
     if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') return 'Debía volver el ' + dm_(t.PROXIMA_ESPERADA) + ' · hace ' + plural_(diasEntre(t.PROXIMA_ESPERADA, hoy), 'día', 'días');
+    if (t.ESTADO === 'POR REEVALUAR') return 'Por reevaluar · terminó el ' + dm_(t.ULTIMA_SESION);
+    if (t.MOTIVO_PENDIENTE === 'NO VINO') return 'No vino a su sesión ' + (Number(t.HECHAS) + 1) + ' (' + dm_(t.FECHA_INICIO) + ')';
+    if (t.MOTIVO_PENDIENTE === 'CONTROL VENCIDO') return 'Debía volver con resultados el ' + dm_(t.FECHA_INICIO);
     if (t.ESTADO_REGISTRO === 'EN CURSO') return sesion + (t.ATRASO > 0 ? ' · atrasada ' + plural_(t.ATRASO, 'día', 'días') : ' · tocaba hoy');
     return 'Cotizó hace ' + plural_(t.DIAS, 'día', 'días');
   }
   if (t.COLUMNA === 'AGENDADO') {
+    if (t.AGENDA === 'SESION') return 'Sesión ' + (Number(t.HECHAS) + 1) + ' el ' + diaCorto_(t.FECHA_AGENDA);
+    if (t.AGENDA === 'CONTROL') return 'Control con resultados el ' + diaCorto_(t.FECHA_AGENDA);
     if (t.AGENDA === 'CITA') return 'Cita el ' + diaCorto_(t.FECHA_AGENDA);
     if (t.AGENDA === 'LLAMAR') return 'Llamar el ' + diaCorto_(t.FECHA_AGENDA);
     if (t.AGENDA === 'REINTENTAR') return 'Reintentar el ' + dm_(t.FECHA_AGENDA) + ' · intento ' + t.INTENTO + ' de ' + reglas.maxSeguimientos;
@@ -72,7 +78,8 @@ function etiquetaDe(t, reglas, hoy) {
     if (t.PROXIMA_AGENDADA) return 'Cita el ' + diaCorto_(t.PROXIMA_AGENDADA);
     return '';
   }
-  if (t.COLUMNA === 'EN_TRATAMIENTO') return sesion + ' · próxima ~' + dm_(sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones));
+  if (t.COLUMNA === 'EN_TRATAMIENTO') return 'Sesión ' + t.HECHAS + ' de ' + t.SESIONES + ' · faltan ' + (Number(t.SESIONES) - Number(t.HECHAS)) +
+    ' · próxima ~' + dm_(sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones));
   return t.ETIQUETA || '';
 }
 
@@ -118,9 +125,12 @@ function armarTablero(d) {
     if (c === 'AGENDADO') col.AGENDADO.push(tarjeta_(t, c, reglas, hoy, t.FECHA_AGENDA || t.PROXIMA_AGENDADA));
     if (c === 'EN_TRATAMIENTO') col.EN_TRATAMIENTO.push(tarjeta_(t, c, reglas, hoy, sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones)));
     if (t.ESTADO === 'COMPLETADO') {
-      var f = t.ULTIMA_SESION && t.ESTADO_REGISTRO === 'COMPLETO' ? t.ULTIMA_SESION : t.FECHA_LOHIZO;
-      if (mesDe(f) === mes) col.COMPLETADO.push(tarjeta_(t, 'COMPLETADO', reglas, hoy, f,
-        t.ESTADO_REGISTRO === 'COMPLETO' ? (t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm_(f) : 'Completó el tratamiento') : 'Lo hizo el ' + dm_(f)));
+      var f = t.VOLVIO || (t.ULTIMA_SESION && t.ESTADO_REGISTRO === 'COMPLETO' ? t.ULTIMA_SESION : t.FECHA_LOHIZO);
+      var etq = t.VOLVIO ? 'Volvió el ' + dm_(t.VOLVIO)
+        : t.ESTADO_REGISTRO === 'COMPLETO' ? (t.FECHA_REEVALUAR ? 'Completó el ' + dm_(t.ULTIMA_SESION) + ' · reevaluar el ' + dm_(t.FECHA_REEVALUAR)
+          : (t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm_(f) : 'Completó el tratamiento'))
+        : 'Lo hizo el ' + dm_(f);
+      if (mesDe(f) === mes) col.COMPLETADO.push(tarjeta_(t, 'COMPLETADO', reglas, hoy, f, etq));
     }
     if (t.ESTADO === 'CERRADO' && mesDe(t.FECHA_CIERRE) === mes) {
       if (t.CIERRE === 'ALTA MÉDICA') col.COMPLETADO.push(tarjeta_(t, 'COMPLETADO', reglas, hoy, t.FECHA_CIERRE, 'Alta médica'));
@@ -139,6 +149,13 @@ function armarTablero(d) {
   var muertos = fallecidos(d.seguimientos);
   Object.keys(muertos).forEach(function (dni) {
     if (mesDe(muertos[dni].fecha) === mes) cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: nombrePorDni[dni] || '', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: muertos[dni].fecha });
+  });
+
+  // Una sola tarjeta por necesidad: «Por reevaluar» reemplaza a la reevaluación del mismo paciente.
+  var reemplaza = {};
+  col.POR_CONTACTAR.forEach(function (t) { if (t.ESTADO === 'POR REEVALUAR') reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD_CONSULTA || 'HEMATOLOGÍA')] = 1; });
+  col.POR_CONTACTAR = col.POR_CONTACTAR.filter(function (t) {
+    return !(t.TIPO_SEGUIMIENTO === 'REEVALUACION' && reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD)]);
   });
 
   // Deduplicate COMPLETADO by CLAVE, keeping the card with latest FECHA_CLAVE
@@ -163,6 +180,7 @@ function armarTablero(d) {
     col[c].forEach(function (t) {
       var dni = normDni(t.DNI);
       t.TELEFONOS_DESCARTADOS = marcadas[dni] || [];
+      t.MES = mesDe(t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.ULTIMA_CITA : t.FECHA_COTIZACION) || '';
       t.SIN_CONTACTO = !((d.telefonos || {})[dni] || []).length && !String(t.TELEFONOS || '').trim() && !textoLimpio_(t.USUARIO);
     });
   });

@@ -96,3 +96,9 @@ test('filasHojaKpi: todas las filas tienen 7 columnas y la tasa es una fracción
   assert.equal(f[2][6], 0.5);
   assert.equal(f[f.length - 1][6], '');
 });
+
+test('kpiMotivos: «No desea realizarse» de hierro y procedimiento también cuenta', () => {
+  const s = { ID: 'S1', FECHA_HORA: '2026-10-09 10:00', DNI: '1', ESPECIALIDAD: 'HIERRO', ACCION: 'DESCARTADO', MOTIVO: 'NO DESEA REALIZARSE',
+    RESULTADO: 'NO DESEA REALIZARSE', ANULADO: '' };
+  assert.deepEqual(plano(L.kpiMotivos([s])), [{ MOTIVO: 'NO DESEA REALIZARSE', N: 1 }]);
+});

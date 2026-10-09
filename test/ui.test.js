@@ -638,6 +638,101 @@ async function esperarEstable(pagina) {
   await pagina.waitForFunction(() => !S.enVuelo.size);
 }
 
+const HOY_DEMO = HOY;
+const masDiasIso = (f, n) => new Date(Date.parse(f + 'T12:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+
+test('panel: hierro y procedimiento ofrecen «Aceptó» y «No desea realizarse»; reevaluación ofrece «Agendó cita»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, 'REG-000021');
+    const botones = await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc));
+    assert.deepEqual(botones, ['nocontesto', 'pensara', 'acepto']);
+    const cierres = await pagina.locator('#panel .acc.cierra [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc));
+    assert.ok(cierres.includes('nodesea') && !cierres.includes('otro') && !cierres.includes('alta'));
+    await pagina.keyboard.press('Escape');
+    await abrirPanelDe(pagina, '40444555|HEMATOLOGÍA');
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: «Aceptó» con la fecha de la primera sesión pasa la tarjeta a Agendado y llama al servidor', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, 'REG-000021');
+    await pagina.locator('#panel [data-acc="acepto"]').click();
+    await confirmarPaso(pagina, masDiasIso(HOY_DEMO, 3));
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarResultado > 0);
+    const u = await ultimo(pagina, 'registrarResultado');
+    assert.deepEqual([u.resultado, u.referencia, u.fecha], ['ACEPTÓ', 'REG-000021', masDiasIso(HOY_DEMO, 3)]);
+    assert.match(await pagina.locator('#tablero [data-card="REG-000021"]').textContent(), /Sesión 1 el/);
+    assert.equal(await pagina.locator('#tablero [data-card="REG-000021"]').evaluate(e => e.closest('[data-col]').dataset.col), '2');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: «No desea realizarse» pide motivo y cierra; en tratamiento se marca la sesión siguiente', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, 'REG-000021');
+    await pagina.locator('#panel [data-acc="nodesea"]').click();
+    assert.equal(await pagina.locator('#panel [data-confirmar]').isDisabled(), true);
+    await pagina.locator('#panel #pm').fill('Por el precio');
+    await pagina.locator('#panel [data-confirmar]').click();
+    await pagina.waitForFunction(() => !document.querySelector('#tablero [data-card="REG-000021"]'));
+    assert.deepEqual([(await ultimo(pagina, 'registrarResultado')).resultado, (await ultimo(pagina, 'registrarResultado')).motivo], ['NO DESEA REALIZARSE', 'Por el precio']);
+    const enTrat = await pagina.locator('#tablero [data-col="3"] [data-card]').first().getAttribute('data-card');
+    await abrirPanelDe(pagina, enTrat);
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.marcarSesion > 0);
+    assert.equal((await ultimo(pagina, 'marcarSesion')).id, enTrat);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: «Aceptó» en una cotización del historial pide las sesiones y crea el registro; el DEMO rechaza «Agendó cita» en hierro', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, CARMEN_H);
+    await pagina.locator('#panel [data-acc="acepto"]').click();
+    assert.match(await pagina.locator('#panel .paso').textContent(), /Fecha de la primera sesión/);
+    assert.match(await pagina.locator('#panel .paso').textContent(), /Si pasa la fecha sin marcar la sesión, vuelve a «Por contactar»\./);
+    assert.equal(await pagina.locator('#panel #pf').getAttribute('min'), HOY_DEMO);
+    assert.equal(await pagina.locator('#panel #pf').getAttribute('max'), masDiasIso(HOY_DEMO, 180));
+    await pagina.locator('#panel #ps').fill('2');
+    await confirmarPaso(pagina, masDiasIso(HOY_DEMO, 5));
+    await esperarEstable(pagina);
+    const u = await ultimo(pagina, 'registrarResultado');
+    assert.deepEqual([u.resultado, u.referencia, u.sesiones], ['ACEPTÓ', '', 2]);
+    const nuevo = await pagina.evaluate(() => S.pacientes.find(x => x.dni === '40333444' && x.t === 'hier').id);
+    assert.match(nuevo, /^REG-/, 'la tarjeta ahora es la del registro');
+    assert.equal(await colPintada(pagina, nuevo), '2');
+    assert.match(await textoTarjeta(pagina, nuevo), /Sesión 1 el/);
+    assert.equal(await pagina.locator(`#tablero [data-card="${CARMEN_H}"]`).count(), 0);
+    const r = await pagina.evaluate(() => llamar('registrarResultado', { usuario: 'MAGALY', dni: '43555666', especialidad: 'HIERRO', referencia: 'REG-000021',
+      resultado: 'AGENDÓ CITA', fecha: '2026-10-05' }).then(() => 'ok', e => e.message));
+    assert.equal(r, '«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('panel: En tratamiento «Anular la última» pide motivo y anula ULTIMA_SESION_ID', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel [data-anular-ultima]').click();
+    assert.equal(await pagina.locator('#panel [data-confirmar-ultima]').isDisabled(), true, 'sin motivo no se anula');
+    await pagina.locator('#panel #motivo-ultima').fill('Se marcó por error');
+    await pagina.locator('#panel [data-confirmar-ultima]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularSesion > 0);
+    assert.deepEqual(await ultimo(pagina, 'anularSesion'), { usuario: 'MAGALY', id: 'SES-000002', motivo: 'Se marcó por error' });
+    // Sin sesiones vuelve a ser una cotización de hace 10 días: el tablero recargado la pone en Por contactar.
+    await esperarCol(pagina, SOFIA, '1');
+    assert.match(await textoTarjeta(pagina, SOFIA), /Cotizó hace 10 días/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
@@ -671,19 +766,20 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
     assert.equal(await pagina.evaluate(() => seleccion.panel), '', '1 no abre el panel');
     assert.equal(await llamadas(pagina, 'registrarResultado'), antes + 1);
     assert.match(await textoTarjeta(pagina, PEDRO), /Reintentar el 16\/10 · intento 1 de 3/);
-    // «Lo hizo» en hierro a tiempo: sigue en En tratamiento con la sesión siguiente; la última pasa a Completado.
+    // «Marcar sesión» en hierro a tiempo: sigue en En tratamiento con la sesión siguiente; la última pasa a Completado.
     await abrirPanelDe(pagina, SOFIA);
-    await pagina.locator('#panel [data-acc="lohizo"]').click();
-    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Lo hizo · sesión 2 de 3/);
-    await confirmarPaso(pagina, '2026-10-01');
+    assert.equal(await pagina.locator('#panel [data-acc]:not(.cierra [data-acc])').count(), 0, 'En tratamiento no ofrece «¿Qué pasó?»');
+    assert.match(await pagina.locator('#panel [data-marcar-sesion]').textContent(), /Marcar sesión 2 hecha/);
+    assert.equal(await pagina.locator('#panel #pfs').inputValue(), '2026-10-01', 'hoy por omisión');
+    await pagina.locator('#panel #pfs').fill('2026-10-01');
+    await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
     await esperarCol(pagina, SOFIA, '3');
     assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
     await abrirPanelDe(pagina, SOFIA);
-    await pagina.locator('#panel [data-acc="lohizo"]').click();
-    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Lo hizo · sesión 3 de 3/);
-    assert.match(await pagina.locator('#panel [data-confirmar]').textContent(), /Marcar como completado/);
-    await confirmarPaso(pagina, '2026-10-01');
+    assert.match(await pagina.locator('#panel [data-marcar-sesion]').textContent(), /Marcar sesión 3 hecha/);
+    await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
     await esperarCol(pagina, SOFIA, '4');
     assert.match(await textoTarjeta(pagina, SOFIA), /Completó el tratamiento/);
@@ -723,8 +819,7 @@ test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corres
     await pagina.waitForFunction(() => /Hoy: 6 de 15/.test(document.getElementById('metadia').textContent));
     // Sesión: anularSesion.
     await abrirPanelDe(pagina, SOFIA);
-    await pagina.locator('#panel [data-acc="lohizo"]').click();
-    await confirmarPaso(pagina);
+    await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
     assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
     await deshacer();
@@ -1158,7 +1253,9 @@ test('panel: atajos (1 guarda sin panel, X abre el cierre sin guardar, Esc cierr
     assert.equal(await pagina.evaluate(() => seleccion.panel), c1[1]);
     // 2 a 4 con el panel abierto abren su paso.
     await pagina.keyboard.press('3');
-    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Agendó cita/);
+    // La tercera es «Agendó cita» en una reevaluación y «Aceptó …» en hierro o procedimiento.
+    const tercera = await pagina.evaluate(id => accDe(S.pacientes.find(x => x.id === id))[2].l, c1[1]);
+    assert.equal((await pagina.locator('#panel .paso h4').textContent()).trim(), tercera);
     await pagina.keyboard.press('Escape');
     await pagina.keyboard.press('Escape');
     assert.equal(await pagina.evaluate(() => seleccion.panel), '');
@@ -1251,16 +1348,14 @@ test('panel: si el servidor falla y la asesora ya está en otra cosa, el panel n
   } finally { await navegador.close(); }
 });
 
-test('panel: el alta de hierro o procedimiento no pide fecha; «Agendó cita» propone PROXIMA_AGENDADA', async () => {
+test('panel: hierro y procedimiento no ofrecen «Alta médica» ni «Agendó cita»; «Agendó cita» propone PROXIMA_AGENDADA', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     for (const id of [PEDRO, ROSA]) {
       await abrirPanelDe(pagina, id);
-      await pagina.locator('#panel [data-acc="alta"]').click();
-      assert.equal(await pagina.locator('#panel #pd').count(), 1, `${id}: pide el doctor`);
-      assert.equal(await pagina.locator('#panel #pf').count(), 0, `${id}: sin fecha`);
-      assert.ok(await pagina.locator('#panel .paso.cierre').isVisible());
-      await pagina.keyboard.press('Escape');
+      assert.equal(await pagina.locator('#panel [data-acc="alta"]').count(), 0, `${id}: sin alta`);
+      assert.equal(await pagina.locator('#panel [data-acc="agendo"]').count(), 0, `${id}: sin «Agendó cita»`);
+      assert.match(await pagina.locator('#panel [data-acc="acepto"]').textContent(), id === ROSA ? /Aceptó tratamiento/ : /Aceptó procedimiento/);
       await pagina.keyboard.press('Escape');
       await pagina.waitForFunction(() => !seleccion.panel);
     }
@@ -1304,14 +1399,15 @@ test('arrastrar: soltar una reevaluación en Agendado abre «Agendó cita» y no
     assert.equal(await colPintada(pagina, LUIS), '1', 'la tarjeta sigue en su columna hasta confirmar');
     assert.equal(await llamadas(pagina, 'registrarResultado'), antes, 'soltar no guarda');
     assert.equal(await pagina.locator('.col.puede, .col.no, .col.sobre').count(), 0);
-    // Reevaluación a Completado: «Alta médica». Procedimiento: «Lo hizo». Hierro con sesiones pendientes a Completado: no vale.
+    // Reevaluación a Completado: «Alta médica». Procedimiento a Completado: avisa (llega con la última sesión).
     await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
     await arrastrar(pagina, LUIS, 4);
     await pagina.waitForFunction(() => P.paso && P.paso.k === 'alta');
     await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
     await arrastrar(pagina, PEDRO, 4);
-    await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
-    await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
+    assert.equal(await aviso(pagina), 'Completado llega con la última sesión.');
+    assert.equal(await panelAbierto(pagina), false);
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
     // Hierro con sesiones pendientes a En tratamiento: abre «Lo hizo».
     await arrastrar(pagina, ROSA, 3);
     await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
@@ -1361,19 +1457,25 @@ test('arrastrar: a 390 px no hay arrastre', async () => {
   } finally { await navegador.close(); }
 });
 
-test('arrastrar: Completado con hierro (última sesión o cotización antigua) abre «Lo hizo»; con sesiones pendientes avisa', async () => {
+test('arrastrar: hierro a Completado avisa (llega con la última sesión); a Agendado abre «Aceptó»', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     await arrastrar(pagina, ROSA, 4);   // sesión 2 de 3 en el DEMO: faltan sesiones
-    assert.equal(await aviso(pagina), 'Completado llega con la última sesión del tratamiento.');
+    assert.equal(await aviso(pagina), 'Completado llega con la última sesión.');
     assert.equal(await panelAbierto(pagina), false);
     await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
     await pagina.evaluate(id => { const p = S.pacientes.find(x => x.id === id); p.trat.k = p.trat.n - 1; }, ROSA);
-    await arrastrar(pagina, ROSA, 4);
-    await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
-    await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
+    await arrastrar(pagina, ROSA, 4);   // ni en la última: la sesión se marca desde el panel
+    assert.equal(await panelAbierto(pagina), false);
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
     await arrastrar(pagina, CARMEN_H, 4);   // cotización antigua de hierro, sin registro
-    await pagina.waitForFunction(() => P.paso && P.paso.k === 'lohizo');
+    assert.equal(await aviso(pagina), 'Completado llega con la última sesión.');
+    assert.equal(await panelAbierto(pagina), false);
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
+    await arrastrar(pagina, CARMEN_H, 2);   // a Agendado: «Aceptó»
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'acepto');
+    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Aceptó tratamiento/);
+    assert.equal(await pagina.locator('#panel #ps').inputValue(), '1', 'del historial: pide las sesiones');
     assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -1475,8 +1577,8 @@ test('registro: un DNI de fallecido muestra el aviso y deja registrar', async ()
     assert.equal(await pagina.locator('#rgo').isDisabled(), false, 'el aviso no bloquea');
     assert.equal(await falta(pagina), 'Se creará 1 registro.');
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
-    assert.equal(await aviso(pagina), 'Registrado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000008');
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
+    assert.equal(await aviso(pagina), 'Registrado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000009');
     const p = await ultimo(pagina, 'guardarRegistro');
     assert.equal(p.dni, '41999000');
     assert.equal(p.contacto, '933999000', 'el teléfono va sin espacios');
@@ -1498,7 +1600,7 @@ test('registro: el carné de extranjería AB123456X se acepta y no pierde las le
     await llenarIndicacion(pagina, { nombre: 'Juan Carlos Pérez Rojas', contacto: '@juan.perez', doctor: 'Dra. Karen Matos', procs: ['AMO'] });
     assert.doesNotMatch(await falta(pagina), /DNI/);
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
     const p = await ultimo(pagina, 'guardarRegistro');
     assert.equal(p.dni, 'AB123456X');
     assert.equal(p.contacto, '@juan.perez');
@@ -1530,14 +1632,14 @@ test('registro: dos procedimientos y un tratamiento con sesiones y marca crean t
     await pagina.locator('#rses [data-marca="FERINJECT"]').click();
     await pagina.evaluate(() => { S.kpi = { viejo: 1 }; S.resumen = { viejo: 1 }; });
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000010"]');
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000011"]');
     assert.deepEqual(await ultimo(pagina, 'guardarRegistro'), { usuario: 'MAGALY', dni: '45678901', nombre: 'Juana Pérez Soto', contacto: '987111333',
       fecha: '2026-10-01', doctor: 'Dra. Karen Matos', procedimientos: ['AMO', 'BIOPSIA'], tratamiento: 'HIERRO CARBOXIMALTOSA', sesiones: 2, marca: 'FERINJECT' });
     assert.equal(await aviso(pagina),
-      'Registrado: Amo + Biopsia + Hierro carboximaltosa · Ferinject × 2 sesiones · Juana Pérez Soto · REG-000008, REG-000009, REG-000010');
-    for (const id of ['REG-000008', 'REG-000009', 'REG-000010']) assert.match(await filaHoy(pagina, id).textContent(), /JUANA PÉREZ SOTO/);
-    assert.match(await filaHoy(pagina, 'REG-000010').textContent(), /Hierro carboximaltosa · Ferinject × 2 sesiones/);
-    assert.match(await filaHoy(pagina, 'REG-000010').textContent(), /REG-000010 · registró Magaly/);
+      'Registrado: Amo + Biopsia + Hierro carboximaltosa · Ferinject × 2 sesiones · Juana Pérez Soto · REG-000009, REG-000010, REG-000011');
+    for (const id of ['REG-000009', 'REG-000010', 'REG-000011']) assert.match(await filaHoy(pagina, id).textContent(), /JUANA PÉREZ SOTO/);
+    assert.match(await filaHoy(pagina, 'REG-000011').textContent(), /Hierro carboximaltosa · Ferinject × 2 sesiones/);
+    assert.match(await filaHoy(pagina, 'REG-000011').textContent(), /REG-000011 · registró Magaly/);
     assert.equal(await pagina.locator('#nhoy').textContent(), '4');
     // El formulario se limpia, salvo la fecha; los indicadores se vuelven a pedir.
     assert.equal(await pagina.locator('#rdni').inputValue(), '');
@@ -1559,14 +1661,14 @@ test('registro: «Posible duplicado» del servidor; «Revisar» la cierra y «Re
     };
     await llenar();
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
     await llenar();
     const antes = await llamadas(pagina, 'guardarRegistro');
     await pagina.locator('#rgo').click();
     await pagina.waitForSelector('#rdup .dup');
     assert.match(await pagina.locator('#rdup').textContent(), /Posible duplicado/);
-    assert.match(await pagina.locator('#rdup').textContent(), /Ya se registró el 01\/10\/2026 \(REG-000008\): Sangría\./);
-    assert.equal(await filaHoy(pagina, 'REG-000009').count(), 0);
+    assert.match(await pagina.locator('#rdup').textContent(), /Ya se registró el 01\/10\/2026 \(REG-000009\): Sangría\./);
+    assert.equal(await filaHoy(pagina, 'REG-000010').count(), 0);
     assert.equal((await ultimo(pagina, 'guardarRegistro')).confirmado, undefined);
     await pagina.locator('#rrevisar').click();
     assert.equal(await pagina.locator('#rdup .dup').count(), 0);
@@ -1574,10 +1676,10 @@ test('registro: «Posible duplicado» del servidor; «Revisar» la cierra y «Re
     await pagina.locator('#rgo').click();
     await pagina.waitForSelector('#rdup .dup');
     await pagina.locator('#rforzar').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000010"]');
     assert.equal(await llamadas(pagina, 'guardarRegistro'), antes + 3);
     assert.equal((await ultimo(pagina, 'guardarRegistro')).confirmado, true);
-    assert.match(await aviso(pagina), /REG-000009$/);
+    assert.match(await aviso(pagina), /REG-000010$/);
     assert.equal(await pagina.locator('#rdup .dup').count(), 0);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -1713,7 +1815,7 @@ test('registro: Enter envía una sola vez, no reenvía con la caja de duplicado 
     await pagina.waitForFunction(() => RG.enviando);
     assert.equal(await pagina.locator('#rseg [data-rmodo="alta"]').isDisabled(), true);
     await pagina.locator('#rnom').press('Enter');
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000008"]');
+    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
     assert.equal(await llamadas(pagina, 'guardarRegistro'), 1, 'Enter envía una sola vez');
     assert.equal((await ultimo(pagina, 'guardarRegistro')).contacto, '+51987654321', 'el + se conserva y los espacios no');
     assert.equal(await pagina.locator('#rseg [data-rmodo="alta"]').isDisabled(), false);

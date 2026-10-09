@@ -114,7 +114,7 @@ html.con-vt .vista{animation:none}
 .tag{font-size:11px;font-weight:600;line-height:1;padding:4px 8px;border-radius:999px;white-space:nowrap;max-width:50%;overflow:hidden;text-overflow:ellipsis}
 .t-reev{background:var(--info-soft);color:var(--info)}
 .t-hier{background:var(--warn-soft);color:var(--warn)}
-.t-proc{background:var(--accent-soft);color:var(--accent)}
+.t-proc,.t-ctrl{background:var(--accent-soft);color:var(--accent)}
 
 /* Tablero */
 .cab{display:flex;align-items:flex-end;justify-content:space-between;gap:16px 24px;flex-wrap:wrap}
@@ -1033,7 +1033,7 @@ const plural = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
 
 /* ============ TABLERO ============ */
 const COLUMNAS = { POR_CONTACTAR: 1, AGENDADO: 2, EN_TRATAMIENTO: 3, COMPLETADO: 4 };
-const TIPO_CORTO = { REEVALUACION: 'reev', HIERRO: 'hier', PROCEDIMIENTO: 'proc' };
+const TIPO_CORTO = { REEVALUACION: 'reev', HIERRO: 'hier', PROCEDIMIENTO: 'proc', CONTROL: 'ctrl' };
 const TIPO_TEXTO = { REEVALUACION: 'Reevaluación', HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento' };
 const AGENDA_CORTA = { CITA: 'cita', LLAMAR: 'llamar', REINTENTAR: 'reintentar', 'SIN RESPUESTA': 'sinrespuesta' };
 const COLS = [
@@ -1084,6 +1084,7 @@ function adaptarTarjeta(t) {
     fin: col === 4 ? String(t.ETIQUETA || '') : '',
     etiqueta: String(t.ETIQUETA || ''), fechaClave: t.FECHA_CLAVE || '', atraso: n(t.ATRASO), agenda: t.AGENDA || '', intento: n(t.INTENTO),
     idRegistro: t.ID_REGISTRO || '',
+    porReevaluar: t.ESTADO === 'POR REEVALUAR',
     oculto: false,
     raw: t
   };
@@ -1100,6 +1101,7 @@ const nombreDe = p => p.n || 'DNI ' + p.dni;
 function tagDe(p) {
   if (p.t === 'reev') return 'Reevaluación';
   if (p.t === 'proc') return p.proc || 'Procedimiento';
+  if (p.t === 'ctrl') return 'Control + lab.';
   const tr = p.trat, entre = /\(([^)]+)\)/.exec(tr.nombre);
   const corto = tr.marca || (entre ? entre[1] : frase(tr.nombre.replace(/^hierro\s*/i, '')) || 'Hierro');
   return corto + (tr.n ? ' × ' + tr.n : '');
@@ -1118,7 +1120,7 @@ function chipDe(p) {
 }
 function tarjetaHtml(p) {
   const tag = tagDe(p);
-  const sub = [medicoCorto(p.med), p.t === 'reev' ? p.perfil : p.t === 'hier' ? p.trat.nombre : 'Procedimiento',
+  const sub = [medicoCorto(p.med), p.t === 'reev' ? p.perfil : p.t === 'hier' ? p.trat.nombre : p.t === 'ctrl' ? 'Control' : 'Procedimiento',
     p.col === 1 && p.intentos ? plural(p.intentos, 'intento', 'intentos') : ''].filter(Boolean).join(' · ');
   const mal = p.atraso > 0 || p.agenda === 'SIN RESPUESTA';
   const etq = p.col !== 2 && p.col !== 4 && p.etiqueta ? `<div class="etq${mal ? ' mal' : ''}">${esc(p.etiqueta)}</div>` : '';
@@ -1382,15 +1384,13 @@ document.addEventListener('click', e => { const c = e.target.closest('#tablero [
 function accionDrop(p, col) {
   if (!p || !col || col === p.col || p.col === 4) return null;
   if (col === 1) return { aviso: 'Vuelve sola a «Por contactar» si pasa la fecha sin cita.' };
-  if (col === 2) return { paso: 'agendo' };
+  if (col === 2) return { paso: esIndicacion(p) ? 'acepto' : 'agendo' };
   if (col === 3) {
     if (p.t === 'hier' && p.idRegistro && p.trat && p.trat.k + 1 < p.trat.n) return { paso: 'lohizo' };
     return { aviso: 'En tratamiento es solo para hierro con sesiones pendientes.' };
   }
   if (p.t === 'reev') return { paso: 'alta' };
-  if (p.t === 'proc') return { paso: 'lohizo' };
-  if (!p.idRegistro || (p.trat && p.trat.k + 1 >= p.trat.n)) return { paso: 'lohizo' };   // cotización antigua o última sesión
-  return { aviso: 'Completado llega con la última sesión del tratamiento.' };
+  return { aviso: 'Completado llega con la última sesión.' };
 }
 let arrastre = null, arrastrando = false;
 const ARRASTRE_UMBRAL = 6, MULTICOL = matchMedia('(min-width: 761px)');   // la misma consulta que deja el tablero en una sola columna
@@ -1488,6 +1488,7 @@ document.addEventListener('keydown', e => {
     if (seleccion.panel) {
       e.preventDefault();
       if (P.anulando) { if (!P.anulandoEnVuelo) { P.anulando = ''; pintarHistoria(); $('#panel').focus({ preventScroll: true }); } }
+      else if (P.anularUltima) { if (!P.ultimaEnVuelo) { P.anularUltima = false; pintarPanel(); $('#panel').focus({ preventScroll: true }); } }
       else if (P.paso) cerrarPaso(true);
       else cerrarPanel(false, true);
     } else if (enCampo) e.target.blur();
@@ -1498,7 +1499,8 @@ document.addEventListener('keydown', e => {
     const p = S.pacientes.find(x => x.id === seleccion.panel);
     if (!p) return;
     if (tecla === 'c') copiarContacto(p);
-    else if (p.col !== 4 && !P.paso && /^[1-4]$/.test(tecla)) {
+    else if (p.col === 3 && !P.paso && tecla === '1') { e.preventDefault(); marcarSesionPanel(true); }
+    else if (p.col !== 4 && p.col !== 3 && !P.paso && /^[1-4]$/.test(tecla)) {
       const a = accDe(p)[Number(tecla) - 1];
       if (a) { e.preventDefault(); elegir(a.k, true); }
     } else if (p.col !== 4 && tecla === 'x') { e.preventDefault(); resaltarCierre(); }
@@ -1533,6 +1535,7 @@ document.addEventListener('keydown', e => {
     if (!p || p.col === 4) return;
     e.preventDefault();
     if (tecla === 'x') { abrirPanel(p.id, true, { cierre: true }); return; }
+    if (p.col === 3) { abrirPanel(p.id, true); return; }   // En tratamiento: la sesión se marca desde el panel
     const a = accDe(p)[Number(tecla) - 1];
     if (!a) return;
     if (a.k === 'nocontesto') guardarResultado(p.id, a.r, { teclado: true });
@@ -1545,28 +1548,34 @@ document.addEventListener('keydown', e => {
 const ACC = [
   { k: 'nocontesto', r: 'NO CONTESTÓ', l: 'No contestó', i: 'ph ph-phone-x i-gris' },
   { k: 'pensara', r: 'LO PENSARÁ', l: 'Lo pensará', i: 'ph ph-clock-countdown i-info' },
-  { k: 'agendo', r: 'AGENDÓ CITA', l: 'Agendó cita', i: 'ph ph-calendar-plus i-info' },
-  { k: 'lohizo', r: 'LO HIZO', l: 'Lo hizo', i: 'ph ph-check-square i-ok', solo: ['hier', 'proc'] }
+  { k: 'agendo', r: 'AGENDÓ CITA', l: 'Agendó cita', i: 'ph ph-calendar-plus i-info', para: p => !esIndicacion(p) },
+  { k: 'acepto', r: 'ACEPTÓ', l: 'Aceptó', i: 'ph ph-handshake i-ok', para: esIndicacion }
 ];
 const CIERRES = [
-  { k: 'alta', r: 'ALTA MÉDICA', l: 'Alta médica', i: 'ph ph-seal-check' },
+  { k: 'alta', r: 'ALTA MÉDICA', l: 'Alta médica', i: 'ph ph-seal-check', para: p => p.t === 'reev' },
   { k: 'numero', r: 'NÚMERO EQUIVOCADO', l: 'Número equivocado', i: 'ph ph-phone-disconnect', conTel: true },
   { k: 'otrolugar', r: 'SE ATIENDE EN OTRO LUGAR', l: 'Se atiende en otro lugar', i: 'ph ph-buildings' },
   { k: 'fallecio', r: 'FALLECIÓ', l: 'Falleció', i: 'ph ph-flower-lotus' },
-  { k: 'otro', r: 'NO DESEA CONTINUAR', l: 'No desea continuar', i: 'ph ph-dots-three-outline' }
+  { k: 'otro', r: 'NO DESEA CONTINUAR', l: 'No desea continuar', i: 'ph ph-dots-three-outline', para: p => !esIndicacion(p) },
+  { k: 'nodesea', r: 'NO DESEA REALIZARSE', l: 'No desea realizarse', i: 'ph ph-hand-palm', para: esIndicacion }
 ];
 const RES = {};
-ACC.concat(CIERRES).forEach(a => { RES[a.k] = a; RES[a.r] = a; });
+// «Lo hizo» ya no es un botón de «¿Qué pasó?»: lo usan «Marcar sesión» (En tratamiento) y la ficha.
+ACC.concat(CIERRES, [{ k: 'lohizo', r: 'LO HIZO', l: 'Lo hizo', i: 'ph ph-check-square i-ok' }]).forEach(a => { RES[a.k] = a; RES[a.r] = a; });
 // Cierres que dejan una fila en «cerrados este mes» (el alta va a Completado).
-const CIERRAN = ['NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'];
+const CIERRAN = ['NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
 const ANULAR = { seguimiento: 'anularResultado', alta: 'anularAlta', sesion: 'anularSesion', registro: 'anularRegistro' };
-const accDe = p => ACC.filter(a => !a.solo || a.solo.includes(p.t));
-const cierresDe = p => CIERRES.filter(c => !c.conTel || activos(p).length);
+/** Hierro o procedimiento por empezar: «Aceptó» y «No desea realizarse». Control y Por reevaluar se tratan como una reevaluación. */
+function esIndicacion(p) { return (p.t === 'hier' || p.t === 'proc') && !p.porReevaluar; }
+const accDe = p => ACC.filter(a => !a.para || a.para(p))
+  .map(a => a.k === 'acepto' ? Object.assign({}, a, { l: p.t === 'hier' ? 'Aceptó tratamiento' : 'Aceptó procedimiento' }) : a);
+const cierresDe = p => CIERRES.filter(c => (!c.conTel || activos(p).length) && (!c.para || c.para(p)));
 const EASE_IO = 'cubic-bezier(.77,0,.175,1)', EASE_OUT = 'cubic-bezier(.23,1,.32,1)';
 const esAnulado = v => v === true || norm(v) === 'SI';
 
 /** Estado del panel abierto. La nota vive aquí mientras el panel siga abierto en ese paciente. */
-const P = { clave: '', paso: null, nota: '', cierre: false, anulando: '', motivoAnular: '', anulandoEnVuelo: '', hist: null };
+const P = { clave: '', paso: null, nota: '', cierre: false, anulando: '', motivoAnular: '', anulandoEnVuelo: '', hist: null,
+  sesionF: '', anularUltima: false, motivoUltima: '', ultimaEnVuelo: false };
 
 /* ---- Movimiento: FLIP, salida y chispas (README §7). Solo transform y opacity ---- */
 function conFlip(fn, llega, celebra, sinAnim) {
@@ -1627,7 +1636,7 @@ function abrirPanel(clave, teclado, opciones) {
   const ya = seleccion.panel === clave && P.clave === clave;
   seleccion.panel = clave;
   if (!ya) {
-    Object.assign(P, { clave, paso: null, nota: '', cierre: false, anulando: '', hist: null });
+    Object.assign(P, { clave, paso: null, nota: '', cierre: false, anulando: '', hist: null, sesionF: '', anularUltima: false, motivoUltima: '' });
     cargarHistoria(p);
   }
   const inst = !!teclado || reducido;
@@ -1716,9 +1725,46 @@ function quePasoHtml(p) {
   if (p.col === 4) return `<p class="ok-cerrado"><i class="ph-fill ph-check-circle"></i><span><b>Seguimiento cerrado.</b> ${esc(p.fin)}</span></p>`;
   if (P.paso) return htmlPaso(p);
   return '<section><h3 class="grande">¿Qué pasó?</h3>'
-    + `<div class="acc">${accDe(p).map((a, i) => `<button type="button" data-acc="${a.k}"><i class="${a.i}"></i><span>${a.l}</span><span class="kbd">${i + 1}</span></button>`).join('')}</div>`
+    + (p.col === 3 ? sesionesHtml(p) : `<div class="acc">${accDe(p).map((a, i) => `<button type="button" data-acc="${a.k}"><i class="${a.i}"></i><span>${a.l}</span><span class="kbd">${i + 1}</span></button>`).join('')}</div>`)
     + '<h3>Cerrar el seguimiento <span class="kbd">X</span></h3>'
     + `<div class="acc cierra${P.cierre ? ' resaltado' : ''}">${cierresDe(p).map(c => `<button type="button" data-acc="${c.k}"><i class="${c.i}"></i><span>${c.l}</span></button>`).join('')}</div></section>`;
+}
+/** Rango de la fecha de una sesión: desde la última sesión (o la cotización) hasta hoy. */
+const rangoSesion = p => ({ min: String(p.raw.ULTIMA_SESION || p.cotizo || '').slice(0, 10), max: S.hoy, f: S.hoy });
+/**
+ * En tratamiento: en lugar de «¿Qué pasó?», marcar la sesión siguiente (fecha de hoy por omisión) o anular la última
+ * (pide motivo en la misma línea). La última sesión llega en la tarjeta como ULTIMA_SESION_ID.
+ */
+function sesionesHtml(p) {
+  const r = rangoSesion(p), f = P.sesionF || r.f, k = (p.trat ? p.trat.k : Number(p.raw.HECHAS) || 0) + 1, ult = p.raw.ULTIMA_SESION_ID;
+  return `<label class="campo">Fecha de la sesión<input type="date" id="pfs" value="${esc(f)}"${r.min ? ` min="${esc(r.min)}"` : ''} max="${esc(r.max)}"></label>`
+    + `<div class="acc"><button type="button" data-marcar-sesion><i class="ph ph-check-square i-ok"></i><span>Marcar sesión ${k} hecha</span><span class="kbd">1</span></button>`
+    + `<button type="button" data-anular-ultima${ult && !P.anularUltima ? '' : ' disabled'}><i class="ph ph-arrow-counter-clockwise"></i><span>Anular la última</span></button></div>`
+    + (P.anularUltima ? `<div class="motivo"><input id="motivo-ultima" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(P.motivoUltima)}">`
+      + `<button type="button" class="btn btn-p" data-confirmar-ultima${P.ultimaEnVuelo || !P.motivoUltima.trim() ? ' disabled' : ''}>Anular</button>`
+      + '<button type="button" class="btn btn-s" data-cancelar-ultima>Cancelar</button></div>' : '');
+}
+/** «Marcar sesión k hecha»: guarda como «Lo hizo», que para un registro va a marcarSesion. */
+function marcarSesionPanel(teclado) {
+  const p = S.pacientes.find(x => x.id === seleccion.panel);
+  if (!p || p.col !== 3) return;
+  const r = rangoSesion(p), f = P.sesionF || r.f, m = validarFecha('lohizo', f, r);
+  if (m) { avisar(m); return; }
+  guardarResultado(p.id, 'LO HIZO', { fecha: f, teclado: !!teclado });
+}
+/** «Anular la última»: anula ULTIMA_SESION_ID con su motivo y recarga el tablero y la historia. */
+async function anularUltimaSesion(boton) {
+  const p = S.pacientes.find(x => x.id === seleccion.panel);
+  if (!p || P.ultimaEnVuelo || !p.raw.ULTIMA_SESION_ID) return;
+  const campo = $('#motivo-ultima'), motivo = ((campo ? campo.value : P.motivoUltima) || '').trim();
+  P.ultimaEnVuelo = !!motivo;
+  const ok = await anularConMotivo('sesion', p.raw.ULTIMA_SESION_ID, motivo, boton, '#motivo-ultima');
+  P.ultimaEnVuelo = false;
+  if (!ok) return;
+  Object.assign(P, { anularUltima: false, motivoUltima: '' });
+  S.historiaTrasRecarga = seleccion.panel || '';
+  await cargarTablero(null, true);
+  if (seleccion.panel === p.id) pintarPanel();
 }
 /** Pinta el panel de la tarjeta abierta. Conserva el foco si el elemento sigue existiendo. */
 function pintarPanel() {
@@ -1759,16 +1805,19 @@ function rangoPaso(p, k) {
     const max = masDias(hoy, 180), pa = String(p.raw.PROXIMA_AGENDADA || '').slice(0, 10);
     return { min: hoy, max, f: pa && pa >= hoy && pa <= max ? pa : hoy };
   }
+  if (k === 'acepto') return { min: hoy, max: masDias(hoy, 180), f: hoy };
   if (k === 'lohizo') return { min: p.idRegistro ? String(p.raw.ULTIMA_SESION || p.cotizo || '').slice(0, 10) : '', max: hoy, f: hoy };
   if (k === 'alta' && p.t === 'reev') return { min: String(p.ultima || '').slice(0, 10), max: hoy, f: hoy };   // solo en reevaluación (MAPEO §3 G)
   return null;
 }
 /** Los mensajes de validarResultado: lo que falte se avisa sin llamar al servidor. */
 function validarFecha(k, f, r) {
-  const falta = { pensara: 'Falta la fecha para volver a llamar.', agendo: 'Falta la fecha de la cita.', lohizo: 'Falta la fecha de la sesión.', alta: 'Falta la fecha del alta.' };
+  const falta = { pensara: 'Falta la fecha para volver a llamar.', agendo: 'Falta la fecha de la cita.', lohizo: 'Falta la fecha de la sesión.', alta: 'Falta la fecha del alta.',
+    acepto: 'Falta la fecha de la primera sesión.' };
   if (!f) return falta[k];
   if (k === 'pensara' && (f < r.min || f > r.max)) return 'La fecha para volver a llamar va de mañana a 90 días.';
   if (k === 'agendo' && (f < r.min || f > r.max)) return 'La fecha de la cita va de hoy a 180 días.';
+  if (k === 'acepto' && (f < r.min || f > r.max)) return 'La fecha de inicio va de hoy a 180 días.';
   if (f > r.max) return k === 'lohizo' ? 'La fecha de la sesión no puede ser futura.' : 'La fecha no puede ser futura.';
   if (r.min && f < r.min) return k === 'alta' ? 'El alta no puede ser anterior a la última consulta.' : 'La fecha no puede ser anterior al ' + dmy(r.min) + '.';
   return '';
@@ -1776,17 +1825,26 @@ function validarFecha(k, f, r) {
 function prepararPaso(p, k, teclado) {
   const rango = rangoPaso(p, k), act = activos(p);
   const doc = k === 'alta' ? ((S.boot && S.boot.doctores) || []).find(d => d.sofdoc && norm(d.sofdoc) === norm(p.med)) : null;
-  P.paso = { k, rango, f: rango ? rango.f : '', tel: k === 'numero' && act.length === 1 ? act[0] : '', motivo: '', doctor: doc ? doc.doctor : '', visto: !!teclado };
+  // Sesiones: solo si «Aceptó» crea el registro (cotización del historial); por omisión, la CANTIDAD o el «×N» del detalle.
+  const sesiones = p.idRegistro ? '' : String(Number(p.raw.CANTIDAD) || Number((/×\s*(\d+)/.exec(String(p.raw.DETALLE || '')) || [])[1]) || 1);
+  P.paso = { k, rango, f: rango ? rango.f : '', tel: k === 'numero' && act.length === 1 ? act[0] : '', motivo: '', doctor: doc ? doc.doctor : '',
+    sesiones, visto: !!teclado };
   P.cierre = false;
   P.anulando = '';
 }
 function htmlPaso(p) {
   const ps = P.paso, k = ps.k, act = activos(p), para = p.t === 'reev' ? frase(p.esp) : p.t === 'hier' ? 'Hierro' : frase(p.proc) || 'Procedimiento';
   let t = '', icon = 'ph ph-calendar-plus', aviso = '', campos = '', boton = 'Confirmar', deshab = false;
-  let cierre = ['alta', 'otrolugar', 'fallecio', 'otro'].includes(k);   // el alta también cierra el seguimiento
+  let cierre = ['alta', 'otrolugar', 'fallecio', 'otro', 'nodesea'].includes(k);   // el alta también cierra el seguimiento
   const fecha = l => `<label class="campo">${l}<input type="date" id="pf" value="${esc(ps.f)}"${ps.rango.min ? ` min="${esc(ps.rango.min)}"` : ''} max="${esc(ps.rango.max)}"></label>`;
   if (k === 'agendo') { t = 'Agendó cita'; campos = fecha('Fecha de la cita'); boton = 'Pasar a Agendado'; aviso = 'Si la fecha pasa sin cita realizada en SOFDOC, vuelve a «Por contactar».'; }
   if (k === 'pensara') { t = 'Lo pensará'; icon = 'ph ph-clock-countdown'; campos = fecha('Volver a llamar el'); boton = 'Guardar fecha'; aviso = 'Sale de «Por contactar» hasta ese día.'; }
+  if (k === 'acepto') {
+    t = p.t === 'hier' ? 'Aceptó tratamiento' : 'Aceptó procedimiento'; icon = 'ph ph-handshake i-ok'; boton = 'Pasar a Agendado';
+    campos = fecha('Fecha de la primera sesión') + (p.idRegistro ? ''
+      : `<label class="campo">Sesiones<input type="number" id="ps" min="1" max="20" value="${esc(ps.sesiones)}"></label>`);
+    aviso = 'Si pasa la fecha sin marcar la sesión, vuelve a «Por contactar».';
+  }
   if (k === 'lohizo') {
     icon = 'ph ph-check-square i-ok';
     if (p.t === 'hier' && p.idRegistro && p.trat.n) {
@@ -1826,6 +1884,11 @@ function htmlPaso(p) {
     aviso = 'Escriba el motivo. Se cierra el seguimiento.';
     deshab = !ps.motivo.trim();
   }
+  if (k === 'nodesea') {
+    t = 'No desea realizarse'; icon = 'ph ph-hand-palm';
+    campos = `<label class="campo">Motivo<input id="pm" autocomplete="off" placeholder="Por ejemplo: por el precio" value="${esc(ps.motivo)}"></label>`;
+    aviso = 'Escriba el motivo. Se cierra el seguimiento.'; deshab = !ps.motivo.trim();
+  }
   if (cierre && k !== 'numero' && k !== 'alta') boton = 'Cerrar el seguimiento';
   const pregunta = cierre ? `<p><b>¿Cerrar el seguimiento de ${esc(nombreDe(p))} (${esc(para)})?</b>${k === 'fallecio' ? ' Se cerrarán todos sus seguimientos.' : ''}</p>` : '';
   return `<section class="paso${cierre ? ' cierre' : ''}${ps.visto ? ' instantaneo' : ''}" aria-labelledby="paso-t">`
@@ -1838,7 +1901,7 @@ function htmlPaso(p) {
 function enfocarPaso() {
   const k = P.paso && P.paso.k;
   // Grupo de cierre: el foco va al título (o a lo que hay que elegir o escribir), nunca a un campo donde Enter haga algo.
-  const lista = k === 'otro' ? ['#pm'] : k === 'numero' ? ['#panel input[name="pn"]:checked', '#panel input[name="pn"]']
+  const lista = k === 'otro' || k === 'nodesea' ? ['#pm'] : k === 'numero' ? ['#panel input[name="pn"]:checked', '#panel input[name="pn"]']
     : CIERRES.some(c => c.k === k) ? [] : ['#pf'];
   enfocar(lista.find(sel => $(sel)) || '#paso-t');
 }
@@ -1869,7 +1932,12 @@ function confirmarPaso(teclado) {
   if (ps.rango) { extra.fecha = ps.f; const m = validarFecha(k, ps.f, ps.rango); if (m) { avisar(m); return; } }
   if (k === 'alta') { extra.doctor = ps.doctor; if (!extra.doctor) { avisar('Elija el doctor que da el alta.'); return; } }
   if (k === 'numero') { if (!ps.tel) { avisar('Elija cuál teléfono está equivocado.'); return; } extra.telefono = ps.tel; }
-  if (k === 'otro') { extra.motivo = ps.motivo.trim(); if (!extra.motivo) { avisar('Escriba el motivo.'); return; } }
+  if (k === 'otro' || k === 'nodesea') { extra.motivo = ps.motivo.trim(); if (!extra.motivo) { avisar('Escriba el motivo.'); return; } }
+  if (k === 'acepto' && !p.idRegistro) {
+    const n = Number(ps.sesiones);
+    if (!(n >= 1 && n <= 20 && Math.floor(n) === n)) { avisar('Indique cuántas sesiones (de 1 a 20).'); return; }
+    extra.sesiones = n;
+  }
   guardarResultado(p.id, RES[k].r, extra);
 }
 
@@ -1892,6 +1960,7 @@ function previsto(p, res, extra) {
       : agendar('REINTENTAR', fa, k, `Reintentar el ${dm(fa)} · intento ${k} de ${N}`);
   }
   if (res === 'LO PENSARÁ') return agendar('LLAMAR', f, 0, `Llamar el ${diaSem(f)} ${dm(f)}`);
+  if (res === 'ACEPTÓ') return agendar('SESION', f, 0, `Sesión ${Number(t.HECHAS || 0) + 1} el ${diaSem(f)} ${dm(f)}`);
   if (res === 'AGENDÓ CITA') { if (p.t === 'reev') t.PROXIMA_AGENDADA = f; return agendar('CITA', f, 0, `Cita el ${diaSem(f)} ${dm(f)}`); }
   if (res === 'LO HIZO') {
     if (p.idRegistro && Number(t.SESIONES)) {
@@ -2006,9 +2075,13 @@ async function guardarResultado(clave, resultado, extra) {
   else if (sig) seleccionar(sig, true);
   const payload = { usuario: quien, dni: p.dni, especialidad: String(p.raw.ESPECIALIDAD || ''), referencia: p.idRegistro || '', resultado, nota,
     fecha: extra.fecha || '', telefono: String(extra.telefono || '').replace(/\D/g, ''), motivo: extra.motivo || '', doctor: extra.doctor || '' };
+  if (extra.sesiones !== undefined) payload.sesiones = extra.sesiones;
+  // La sesión de un registro va directo a marcarSesion (el servidor la delegaría igual): no devuelve la tarjeta.
+  const viaSesion = resultado === 'LO HIZO' && !!p.idRegistro;
   let r;
   try {
-    r = await llamar('registrarResultado', payload);
+    r = viaSesion ? await llamar('marcarSesion', { usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota })
+      : await llamar('registrarResultado', payload);
   } catch (e) {
     S.enVuelo.delete(clave);
     recargarSiPendiente();
@@ -2040,7 +2113,8 @@ async function guardarResultado(clave, resultado, extra) {
   invalidarIndicadores();
   // Manda el servidor: r.tarjeta es la tarjeta recalculada, o '' si salió del tablero.
   const actual = S.pacientes.find(x => x.id === clave), t = r && r.tarjeta;
-  if (t) {
+  if (viaSesion) cargarTablero(null, true);   // sin r.tarjeta: queda la previsión hasta que llegue el tablero
+  else if (t) {
     const nueva = adaptarTarjeta(t), mueve = !actual || actual.col !== nueva.col;
     colocar(actual || null, nueva);
     repintar({ llega: mueve ? clave : '', celebra: !!r.completo && p.t === 'hier', sinAnim: teclado || !mueve });
@@ -2197,9 +2271,14 @@ async function confirmarAnulacion(boton) {
 
 /* ---- Eventos del panel ---- */
 $('#panel').addEventListener('click', e => {
-  const t = e.target.closest('[data-acc],[data-confirmar],[data-volverpaso],[data-cerrar],[data-copiar],[data-ficha],[data-anular],[data-confirmar-anular],[data-cancelar-anular],[data-rehist]');
+  const t = e.target.closest('[data-acc],[data-confirmar],[data-volverpaso],[data-cerrar],[data-copiar],[data-ficha],[data-anular],[data-confirmar-anular],[data-cancelar-anular],[data-rehist],'
+    + '[data-marcar-sesion],[data-anular-ultima],[data-confirmar-ultima],[data-cancelar-ultima]');
   if (!t) return;
-  if (t.dataset.acc) elegir(t.dataset.acc);
+  if (t.hasAttribute('data-marcar-sesion')) marcarSesionPanel(e.detail === 0);
+  else if (t.hasAttribute('data-anular-ultima')) { P.anularUltima = true; P.motivoUltima = ''; pintarPanel(); enfocar('#motivo-ultima'); }
+  else if (t.hasAttribute('data-confirmar-ultima')) anularUltimaSesion(t);
+  else if (t.hasAttribute('data-cancelar-ultima')) { if (P.ultimaEnVuelo) return; P.anularUltima = false; pintarPanel(); enfocar('#panel [data-marcar-sesion]'); }
+  else if (t.dataset.acc) elegir(t.dataset.acc);
   else if (t.hasAttribute('data-confirmar')) confirmarPaso(e.detail === 0);
   else if (t.hasAttribute('data-volverpaso')) cerrarPaso();
   else if (t.hasAttribute('data-cerrar')) cerrarPanel();
@@ -2220,7 +2299,9 @@ $('#panel').addEventListener('click', e => {
 $('#panel').addEventListener('keydown', e => {
   // Enter en el motivo de una anulación la confirma, como en Registro y en la ficha (confirmarAnulacion se protege sola).
   if (e.key === 'Enter' && e.target.id === 'motivo-anular') { e.preventDefault(); confirmarAnulacion($('#panel [data-confirmar-anular]')); return; }
-  if (e.key !== 'Enter' || !P.paso || !e.target.matches('#pf, #pm')) return;
+  if (e.key === 'Enter' && e.target.id === 'motivo-ultima') { e.preventDefault(); anularUltimaSesion($('#panel [data-confirmar-ultima]')); return; }
+  if (e.key === 'Enter' && e.target.id === 'pfs') { e.preventDefault(); marcarSesionPanel(true); return; }
+  if (e.key !== 'Enter' || !P.paso || !e.target.matches('#pf, #pm, #ps')) return;
   e.preventDefault();
   const b = $('#panel [data-confirmar]');
   if (b && !b.disabled) confirmarPaso(true);
@@ -2229,11 +2310,15 @@ $('#panel').addEventListener('input', e => {
   const id = e.target.id;
   if (id === 'nota') P.nota = e.target.value;
   if (id === 'motivo-anular') P.motivoAnular = e.target.value;
+  if (id === 'pfs') P.sesionF = e.target.value;
+  if (id === 'motivo-ultima') { P.motivoUltima = e.target.value; const b = $('#panel [data-confirmar-ultima]'); if (b) b.disabled = !e.target.value.trim() || P.ultimaEnVuelo; }
   if (!P.paso) return;
+  if (id === 'ps') P.paso.sesiones = e.target.value;
   if (id === 'pf') P.paso.f = e.target.value;
   if (id === 'pm') { P.paso.motivo = e.target.value; const b = $('#panel [data-confirmar]'); if (b) b.disabled = !e.target.value.trim(); }
 });
 $('#panel').addEventListener('change', e => {
+  if (e.target.id === 'pfs') P.sesionF = e.target.value;
   if (!P.paso) return;
   if (e.target.id === 'pd') P.paso.doctor = e.target.value;
   if (e.target.id === 'pf') P.paso.f = e.target.value;
@@ -3806,10 +3891,11 @@ const DEMO = (() => {
   const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS'];
   const reglas = { espera: 15, maxSeguimientos: 3, graciaAgenda: 2, diasEntreSesiones: 7, esperaCotizacion: 7, metaRetorno: 60, metaDiaria: 15 };
   const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
-  const ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
-    'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR'];
-  const GRUPO = { 'NO CONTESTÓ': 'SIGUE', 'LO PENSARÁ': 'SIGUE', 'AGENDÓ CITA': 'SIGUE', 'LO HIZO': 'SIGUE', 'ALTA MÉDICA': 'CIERRE',
-    'NÚMERO EQUIVOCADO': 'TELEFONO', 'SE ATIENDE EN OTRO LUGAR': 'CIERRE', 'FALLECIÓ': 'CIERRE', 'NO DESEA CONTINUAR': 'CIERRE' };
+  const ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
+    'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
+  const GRUPO = { 'NO CONTESTÓ': 'SIGUE', 'LO PENSARÁ': 'SIGUE', 'AGENDÓ CITA': 'SIGUE', 'LO HIZO': 'SIGUE', 'ACEPTÓ': 'SIGUE', 'ALTA MÉDICA': 'CIERRE',
+    'NÚMERO EQUIVOCADO': 'TELEFONO', 'SE ATIENDE EN OTRO LUGAR': 'CIERRE', 'FALLECIÓ': 'CIERRE', 'NO DESEA CONTINUAR': 'CIERRE',
+    'NO DESEA REALIZARSE': 'CIERRE' };
   const ELI = 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA', KAREN = 'Dra. KAREN DIANA MATOS PEÑA',
     LATORRE = 'Dra. ALEJANDRA LA TORRE MATUK', HANAMPA = 'Dr. JUVENAL HANAMPA ROQUE';
   const doctores = [{ doctor: 'Dr. Elí Cabanillas', sofdoc: ELI }, { doctor: 'Dra. Karen Matos', sofdoc: KAREN },
@@ -3874,7 +3960,7 @@ const DEMO = (() => {
       TELEFONOS: tel.length === 9 ? tel : '', USUARIO: usuario, MEDICO_ULTIMO: d && d.sofdoc ? d.sofdoc : r.DOCTOR,
       ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase(r.DETALLE) : '', MARCA: r.TIPO === 'HIERRO' ? frase(r.MARCA) : '',
-      SESIONES: r.SESIONES, HECHAS: hechas, ULTIMA_SESION: ultima, DIAS: dias, ULTIMA_CITA: r.FECHA, N_SEGUIMIENTOS: 0,
+      SESIONES: r.SESIONES, HECHAS: hechas, ULTIMA_SESION: ultima, ULTIMA_SESION_ID: hechas ? ss[hechas - 1].ID : '', DIAS: dias, ULTIMA_CITA: r.FECHA, N_SEGUIMIENTOS: 0,
       ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg,
       ATRASO: enCurso && estado === 'PENDIENTE' ? dias - reglas.diasEntreSesiones : 0,
       CIERRE: '', FECHA_CIERRE: '', AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 }, o || {});
@@ -3889,6 +3975,7 @@ const DEMO = (() => {
       return 'Cotizó hace ' + plural(t.DIAS, 'día', 'días');
     }
     if (t.COLUMNA === 'AGENDADO') {
+      if (t.AGENDA === 'SESION') return 'Sesión ' + (Number(t.HECHAS) + 1) + ' el ' + diaCorto(t.FECHA_AGENDA);
       if (t.AGENDA === 'CITA') return 'Cita el ' + diaCorto(t.FECHA_AGENDA);
       if (t.AGENDA === 'LLAMAR') return 'Llamar el ' + diaCorto(t.FECHA_AGENDA);
       if (t.AGENDA === 'REINTENTAR') return 'Reintentar el ' + dm(t.FECHA_AGENDA) + ' · intento ' + t.INTENTO + ' de ' + reglas.maxSeguimientos;
@@ -3923,7 +4010,9 @@ const DEMO = (() => {
     R('REG-000004', '2026-08-28 15:05', '2026-08-28', 'ANA', 'Dra. Karen Matos', 'RAÚL ANDRÉS VEGA MORALES', '41000111', '965000111', 'PROCEDIMIENTO', 'SANGRÍA', '', 1),
     R('REG-000005', '2026-09-15 09:30', '2026-09-15', 'RACHEL', 'Dr. Elí Cabanillas', 'CARLOS ENRIQUE NÚÑEZ LEÓN', '41333444', '987333444', 'HIERRO', 'HIERRO DERISOMALTOSA', 'MONOFER', 2),
     R('REG-000006', '2026-09-14 12:00', '2026-09-14', 'ANA', 'Dra. Alejandra La Torre', 'MIGUEL ÁNGEL TORRES RAMOS', '41555666', '976555666', 'PROCEDIMIENTO', 'BIOPSIA', '', 1),
-    R('REG-000007', '2026-10-01 09:02', '2026-09-03', 'MAGALY', 'Dr. Elí Cabanillas', 'ROSA ELENA QUISPE HUAMÁN', '40111222', '987654321', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 3, 'SÍ', 'Registrado dos veces')
+    R('REG-000007', '2026-10-01 09:02', '2026-09-03', 'MAGALY', 'Dr. Elí Cabanillas', 'ROSA ELENA QUISPE HUAMÁN', '40111222', '987654321', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 3, 'SÍ', 'Registrado dos veces'),
+    // Etapa 2: hierro cotizado hace 10 días y sin empezar, para «Aceptó» y «No desea realizarse» con registro.
+    R('REG-000021', '2026-09-21 10:30', '2026-09-21', 'RACHEL', 'Dr. Elí Cabanillas', 'SILVIA PRUEBA ROJAS', '43555666', '987555666', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 3)
   );
   const SES = (ID, ID_REGISTRO, NUMERO, FECHA, ASESORA) => ({ ID, FECHA_HORA: FECHA + ' 12:00', ID_REGISTRO, NUMERO, FECHA, ASESORA, NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' });
   sesiones.push(SES('SES-000001', 'REG-000001', 1, '2026-09-10', 'MAGALY'), SES('SES-000002', 'REG-000002', 1, '2026-09-28', 'RACHEL'),
@@ -4040,6 +4129,7 @@ const DEMO = (() => {
     jorge: ubicar(series[2], 'POR_CONTACTAR'),                    // sin teléfono
     rosa: ubicar(reg(regPorId('REG-000001'), { TELEFONOS: '987654321 / 014332210' }), 'POR_CONTACTAR'),   // hierro en curso, atrasada, dos teléfonos
     ana: ubicar(reg(regPorId('REG-000003')), 'POR_CONTACTAR'),    // usuario @, sin teléfono
+    silvia: ubicar(reg(regPorId('REG-000021')), 'POR_CONTACTAR'), // hierro cotizado hace 10 días, sin empezar
     pedro: ubicar(antiguas[0], 'POR_CONTACTAR'),                  // procedimiento antiguo
     carmenHierro: ubicar(antiguas[4], 'POR_CONTACTAR'),           // hierro antiguo del mismo DNI que carmen
     maria: ubicar(series[3], 'AGENDADO'),                         // CITA
@@ -4108,7 +4198,7 @@ const DEMO = (() => {
   /* ---- Tras una sesión: la tarjeta del registro, como la recalcula el servidor ---- */
   function trasSesion(t, r) {
     const nueva = reg(r);
-    ['HECHAS', 'ULTIMA_SESION', 'DIAS', 'ESTADO', 'ESTADO_REGISTRO', 'ATRASO'].forEach(k => { t[k] = nueva[k]; });
+    ['HECHAS', 'ULTIMA_SESION', 'ULTIMA_SESION_ID', 'DIAS', 'ESTADO', 'ESTADO_REGISTRO', 'ATRASO'].forEach(k => { t[k] = nueva[k]; });
     Object.assign(t, { N_SEGUIMIENTOS: 0, ULTIMO_SEGUIMIENTO: '', AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 });
     if (t.ESTADO_REGISTRO === 'COMPLETO') {
       ubicar(t, 'COMPLETADO', t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm(t.ULTIMA_SESION) : 'Completó el tratamiento', t.ULTIMA_SESION);
@@ -4126,11 +4216,20 @@ const DEMO = (() => {
     const res = ORDEN_RESULTADOS.find(r => mismo(r, x.resultado));
     if (!res) throw new Error('Elija qué pasó.');
     const indicacion = t.TIPO_SEGUIMIENTO !== 'REEVALUACION';
-    if (res === 'LO HIZO' && !indicacion) throw new Error('«Lo hizo» es solo para hierro y procedimientos.');
+    // Como validarResultado: «Lo hizo», «Aceptó» y «No desea realizarse» solo en hierro y procedimiento por empezar;
+    // «Agendó cita», no en ellos (sí en Por reevaluar y en control).
+    const esInd = (t.TIPO_SEGUIMIENTO === 'HIERRO' || t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO');
+    const porReevaluar = t.ESTADO === 'POR REEVALUAR' || t.TIPO_SEGUIMIENTO === 'CONTROL';
+    if (['LO HIZO', 'ACEPTÓ', 'NO DESEA REALIZARSE'].includes(res) && (!esInd || porReevaluar)) throw new Error('«' + frase(res) + '» es solo para hierro y procedimientos.');
+    if (res === 'AGENDÓ CITA' && esInd && !porReevaluar) throw new Error('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
     const f = String(x.fecha || '').slice(0, 10), nota = String(x.nota || '').trim();
     if (res === 'LO PENSARÁ' && (!f || f <= hoy || f > mas(hoy, 90))) throw new Error(f ? 'La fecha para volver a llamar va de mañana a 90 días.' : 'Falta la fecha para volver a llamar.');
     if (res === 'AGENDÓ CITA' && (!f || f < hoy || f > mas(hoy, 180))) throw new Error(f ? 'La fecha de la cita va de hoy a 180 días.' : 'Falta la fecha de la cita.');
     if (res === 'LO HIZO' && (!f || f > hoy)) throw new Error(f ? 'La fecha de la sesión no puede ser futura.' : 'Falta la fecha de la sesión.');
+    if (res === 'ACEPTÓ' && (!f || f < hoy || f > mas(hoy, 180))) throw new Error(f ? 'La fecha de inicio va de hoy a 180 días.' : 'Falta la fecha de inicio.');
+    const nSes = x.sesiones === undefined || x.sesiones === '' ? null : Number(x.sesiones);
+    if (res === 'ACEPTÓ' && nSes !== null && !(nSes >= 1 && nSes <= 20 && Math.floor(nSes) === nSes)) throw new Error('Indique cuántas sesiones (de 1 a 20).');
+    if (res === 'NO DESEA REALIZARSE' && !String(x.motivo || '').trim()) throw new Error('Escriba el motivo.');
     if (res === 'ALTA MÉDICA' && !doctorDe(x.doctor)) throw new Error('Elija el doctor que da el alta.');
     const tel = String(x.telefono || '').replace(/\D/g, '');
     if (res === 'NÚMERO EQUIVOCADO' && !tel) throw new Error('Elija cuál teléfono está equivocado.');
@@ -4147,7 +4246,19 @@ const DEMO = (() => {
     const antes = foto(dni, quien, 1, sigue);
     let notaFinal = nota;
     if (res === 'ALTA MÉDICA') notaFinal = 'Alta: ' + doctorDe(x.doctor).doctor + (nota ? '. ' + nota : '');
-    if (res === 'NO DESEA CONTINUAR') notaFinal = 'Motivo: ' + String(x.motivo).trim() + (nota ? '. ' + nota : '');
+    if (res === 'NO DESEA CONTINUAR' || res === 'NO DESEA REALIZARSE') notaFinal = 'Motivo: ' + String(x.motivo).trim() + (nota ? '. ' + nota : '');
+    if (res === 'ACEPTÓ' && nSes !== null) notaFinal = 'Sesiones: ' + nSes + (notaFinal ? '. ' + notaFinal : '');
+    // «Aceptó» programa el registro (FECHA_INICIO) o, si viene del historial, crea uno nuevo, como registrarResultado_.
+    let registro = null;
+    if (res === 'ACEPTÓ' && t.ID_REGISTRO) regPorId(t.ID_REGISTRO).FECHA_INICIO = f;
+    else if (res === 'ACEPTÓ') {
+      const hierro = t.TIPO_SEGUIMIENTO === 'HIERRO';
+      registro = Object.assign(R(siguiente(registros, 'REG'), ahora(), hoy, quien, '', String(t.NOMBRE || '').toUpperCase(), dni,
+        String(t.TELEFONOS || '').split(' / ')[0] || '', hierro ? 'HIERRO' : 'PROCEDIMIENTO',
+        hierro ? 'HIERRO CARBOXIMALTOSA' : String(t.DETALLE || '').replace(/ ×\d+$/, ''), hierro ? 'FERINJECT' : '', nSes || 1), { FECHA_INICIO: f });
+      registros.push(registro);
+      notaFinal = 'Registro ' + registro.ID + (notaFinal ? '. ' + notaFinal : '');
+    }
     let quedan = true;
     if (res === 'NÚMERO EQUIVOCADO') {
       tarjetas.filter(y => y.DNI === dni).forEach(y => {
@@ -4160,7 +4271,7 @@ const DEMO = (() => {
     }
     const s = { ID: 'SEG-' + String(seguimientos.length + 1).padStart(4, '0'), FECHA_HORA: ahora(), DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD,
       RESPONSABLE: quien, ACCION: sigue ? 'HECHO' : grupo === 'TELEFONO' && quedan ? 'TELEFONO' : 'DESCARTADO', MOTIVO: sigue ? '' : res,
-      NOTA: notaFinal, REFERENCIA: t.ID_REGISTRO || '', RESULTADO: res, FECHA_PROXIMA: ['LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO'].includes(res) ? f : '',
+      NOTA: notaFinal, REFERENCIA: t.ID_REGISTRO || '', RESULTADO: res, FECHA_PROXIMA: ['LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ'].includes(res) ? f : '',
       TELEFONO: res === 'NÚMERO EQUIVOCADO' ? tel : '', ANULADO: '', MOTIVO_ANULACION: '' };
     seguimientos.push(s);
     fotos[s.ID] = antes;
@@ -4186,13 +4297,21 @@ const DEMO = (() => {
     }
     if (res === 'LO HIZO') { Object.assign(t, { ESTADO: 'COMPLETADO', FECHA_LOHIZO: f }); ubicar(t, f.slice(0, 7) === hoy.slice(0, 7) ? 'COMPLETADO' : '', 'Lo hizo el ' + dm(f), f); }
     if (res === 'ALTA MÉDICA') { Object.assign(t, { ESTADO: 'CERRADO', CIERRE: 'ALTA MÉDICA', FECHA_CIERRE: hoy }); ubicar(t, 'COMPLETADO', 'Alta médica', hoy); }
-    if (res === 'SE ATIENDE EN OTRO LUGAR' || res === 'NO DESEA CONTINUAR') cerrar(t, res);
+    if (res === 'ACEPTÓ') {
+      // Programado: Agendado «Sesión 1 el …» hasta que pase la fecha (los seguimientos se cuentan desde FECHA_INICIO).
+      const prog = { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'PROGRAMADO', FECHA_INICIO: f, AGENDA: 'SESION', FECHA_AGENDA: f, INTENTO: 0, N_SEGUIMIENTOS: 0, ATRASO: 0 };
+      if (registro) {
+        t.ESTADO = 'ACEPTÓ'; t.COLUMNA = '';   // la cotización del historial la cierra el registro
+        tarjetas.push(ubicar(reg(registro, prog), 'AGENDADO'));
+      } else { Object.assign(t, prog); ubicar(t, 'AGENDADO'); }
+    }
+    if (res === 'SE ATIENDE EN OTRO LUGAR' || res === 'NO DESEA CONTINUAR' || res === 'NO DESEA REALIZARSE') cerrar(t, res);
     if (res === 'FALLECIÓ') {
       tarjetas.filter(y => y.DNI === dni && ABIERTAS.includes(y.COLUMNA)).forEach(y => { y.ESTADO = 'CERRADO'; y.COLUMNA = ''; });
       muertos[dni] = { fecha: hoy, quien, id: s.ID };
       cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: t.NOMBRE, TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: hoy });
     }
-    return { ok: true, seguimiento: s, tarjeta: tarjetaDe(t.CLAVE) };
+    return { ok: true, seguimiento: s, registro, tarjeta: tarjetaDe(registro ? registro.ID : t.CLAVE) };
   }
 
   /* ---- Pacientes: personas, citas y teléfonos que salen de lo de arriba ---- */

@@ -324,6 +324,7 @@ function pendientesRegistro(d) {
       SESIONES: e.total,
       HECHAS: e.hechas,
       ULTIMA_SESION: e.ultima,
+      ULTIMA_SESION_ID: (sesionesDe_(r.ID, d.sesiones).slice(-1)[0] || {}).ID || '',
       DIAS: dias,
       ULTIMA_CITA: ultima ? ultima.FECHA : '',
       N_SEGUIMIENTOS: c.intentos,

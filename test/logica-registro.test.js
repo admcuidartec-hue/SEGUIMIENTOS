@@ -157,6 +157,12 @@ test('pendientesRegistro: en curso es EN TRATAMIENTO hasta los 7 días de la úl
   assert.deepEqual(pend([reg({ ANULADO: 'SÍ' })]), []);
 });
 
+test('pendientesRegistro: trae ULTIMA_SESION_ID, la última sesión válida, para «Anular la última»', () => {
+  assert.equal(pend([reg()])[0].ULTIMA_SESION_ID, '', 'sin sesiones, vacío');
+  assert.equal(pend([reg()], [ses(1, '2026-09-26'), ses(2, '2026-09-29')])[0].ULTIMA_SESION_ID, 'SES-000002');
+  assert.equal(pend([reg()], [ses(1, '2026-09-26'), ses(2, '2026-09-29', { ANULADO: 'SÍ' })])[0].ULTIMA_SESION_ID, 'SES-000001', 'la anulada no cuenta');
+});
+
 test('pendientesRegistro: seguimientos por REFERENCIA, contados desde la fecha que corresponde', () => {
   const r = [reg({ FECHA: '2026-09-01' })];
   const sg = (fecha, o) => Object.assign(seg({ fecha, esp: 'HIERRO' }), { REFERENCIA: 'REG-000001' }, o);

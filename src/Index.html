@@ -339,8 +339,20 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .hoy ol{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 .hoy li{position:relative;display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:4px 12px;padding:14px 0;border-bottom:1px solid var(--line)}
 .hoy li>*{position:relative}
-/* La fila nueva se tiñe un momento: se anima solo la opacidad de esta capa. */
-.hoy li::before{content:'';position:absolute;inset:0;border-radius:var(--r-s);background:var(--accent-soft);opacity:0;pointer-events:none}
+/* La fila recién guardada, editada o anulada se tiñe 3 s (ok-reciente): solo cambia la opacidad de esta capa. */
+.hoy li::before{content:'';position:absolute;inset:0;border-radius:var(--r-s);background:var(--good-soft);opacity:0;pointer-events:none;transition:opacity .6s ease-out}
+.hoy li.ok-reciente::before{opacity:1;transition:none}
+.hoy-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hoy .fila-acc{display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+.edita{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface);animation:subir .2s var(--ease-out)}
+.edita .campo.ancho,.edita .botones{grid-column:1/-1}
+.edita .botones{display:flex;gap:8px;flex-wrap:wrap}
+.decs{display:flex;flex-direction:column;gap:8px}
+.dec{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);cursor:pointer}
+.dec:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.dec input{accent-color:var(--accent);width:18px;height:18px;margin:0}
+.nota-dec{margin:0;display:flex;gap:8px;align-items:center;padding:10px 12px;border-radius:var(--r-s);background:var(--info-soft);font-size:13.5px}
+.nota-dec i{font-size:18px;color:var(--info)}
 .hoy li .hora{font-family:var(--mono);font-size:13px;color:var(--muted)}
 .hoy li .det{display:flex;flex-direction:column;gap:3px;min-width:0}
 .hoy li .det b .mono{font-weight:400;font-size:12.5px;color:var(--muted);white-space:nowrap}
@@ -720,13 +732,13 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
       </section>
       <section class="vista" id="v-registro" hidden>
         <h1>Registro</h1>
-        <p class="sub">Lo que indica el doctor: procedimientos, tratamientos y altas médicas.</p>
+        <p class="sub">Lo que indica el doctor: procedimientos, tratamientos, controles y sus decisiones.</p>
         <p class="cargando" role="status">Cargando…</p>
         <div id="reg-cuerpo" hidden>
-          <div class="seg seg-reg" id="rseg" role="tablist" aria-label="Qué se registra"><span class="pastilla" aria-hidden="true"></span><button type="button" role="tab" aria-selected="true" data-rmodo="ind"><i class="ph ph-prescription"></i>Indicación</button><button type="button" role="tab" aria-selected="false" data-rmodo="alta"><i class="ph ph-seal-check"></i>Alta médica</button></div>
+          <div class="seg seg-reg" id="rseg" role="tablist" aria-label="Qué se registra"><span class="pastilla" aria-hidden="true"></span><button type="button" role="tab" aria-selected="true" data-rtab="indicacion"><i class="ph ph-prescription"></i>Indicación</button><button type="button" role="tab" aria-selected="false" data-rtab="control"><i class="ph ph-flask"></i>Control + laboratorio</button><button type="button" role="tab" aria-selected="false" data-rtab="decision"><i class="ph ph-seal-check"></i>Decisión del médico</button></div>
           <div class="reg">
             <form id="rform" novalidate></form>
-            <section class="hoy" aria-labelledby="hoyt"><h2 id="hoyt">Registrados hoy <span class="mono" id="nhoy"></span></h2><ol id="lhoy"></ol></section>
+            <section class="hoy" aria-labelledby="hoyt"><div class="hoy-cab"><h2 id="hoyt">Registrados <span class="mono" id="nhoy"></span></h2><label class="sel-chip"><i class="ph ph-calendar-blank"></i><select id="rperiodo" aria-label="Periodo"></select><i class="ph ph-caret-down"></i></label></div><ol id="rlista"></ol></section>
           </div>
         </div>
       </section>
@@ -2354,13 +2366,16 @@ VISTAS.tablero.mostrar = () => pastilla($('#seg'), true);
 function invalidarIndicadores() { S.kpi = null; S.resumen = null; S.indGen++; }
 
 const RG = {
-  listo: false, modo: 'ind',     // 'ind' (indicación) | 'alta'
+  listo: false, modo: 'indicacion',   // pestaña (data-rtab): 'indicacion' | 'control' | 'decision'
   procs: [], trat: '', ses: 0, otro: '', marca: '',
   dni: '', pac: null,            // el último DNI pedido y lo que devolvió buscarPacienteRegistro
   auto: {},                      // lo que se completó solo, por campo: se reemplaza si cambia el DNI
-  aEsp: '', enviando: false, teclado: false,
-  hoy: null, anulando: '', motivo: '',
-  anulandoEnVuelo: ''            // ID con una anulación sin respuesta: no se manda dos veces
+  aEsp: '', dec: 'ALTA', enviando: false, teclado: false,
+  periodo: 'HOY',                // «Registrados»: 'HOY' o un mes 'yyyy-mm' (getRegistros)
+  lista: null, anulando: '', motivo: '',
+  anulandoEnVuelo: '',           // ID con una anulación sin respuesta: no se manda dos veces
+  editando: '', borrador: {}, guardandoEdicion: false,   // la fila con el formulario de Editar y lo escrito en él
+  recientes: {}                  // ID -> temporizador: la fila recién guardada, editada o anulada se tiñe 3 s
 };
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres (documentoValido del servidor). Nunca borra letras. */
 const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '').slice(0, 12);
@@ -2377,8 +2392,29 @@ function etiquetaCat(t) {
 }
 const sinMarca = t => etiquetaCat(t) + ': no lleva marca.';
 const sesionesElegidas = () => RG.ses === 'otro' ? Number(RG.otro) : RG.ses;
-const opcionesDoctores = () => '<option value="">— Elija —</option>'
-  + ((S.boot && S.boot.doctores) || []).map(d => `<option value="${esc(d.doctor)}">${esc(d.doctor)}</option>`).join('');
+const opcionesDoctores = actual => {
+  const docs = ((S.boot && S.boot.doctores) || []).map(d => d.doctor);
+  if (actual && !docs.includes(actual)) docs.unshift(actual);
+  return '<option value="">— Elija —</option>' + docs.map(d => `<option value="${esc(d)}"${d === actual ? ' selected' : ''}>${esc(d)}</option>`).join('');
+};
+const esDecision = () => RG.modo === 'decision';
+/** La decisión del médico (DECISIONES de Registro.gs): valor que recibe darDeAlta, rótulo del radio y texto del aviso. */
+const DECISIONES_UI = [
+  { v: 'ALTA', rot: 'Alta', texto: 'Alta médica' },
+  { v: 'ALTA 6 MESES', rot: 'Alta · control en 6 meses', texto: 'Alta con reevaluación a 6 meses', meses: 6 },
+  { v: 'ALTA 1 AÑO', rot: 'Alta · control en 1 año', texto: 'Alta con reevaluación a 1 año', meses: 12 },
+  { v: 'NUEVA REEVALUACION', rot: 'Nueva reevaluación', texto: 'Nueva reevaluación', pideFecha: true }
+];
+const decisionUi = v => DECISIONES_UI.find(d => d.v === v) || DECISIONES_UI[0];
+/** 'yyyy-mm-dd' + n meses; el 31 de un mes corto pasa a su último día (sumarMeses_ del servidor). */
+function sumarMesesIso(iso, n) {
+  let y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1 + n;
+  const d = Number(iso.slice(8, 10));
+  y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  const ultimo = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(Math.min(d, ultimo)).padStart(2, '0');
+}
+const reglaRG = (k, def) => { const n = Number(S.reglas && S.reglas[k]); return Number.isFinite(n) && n > 0 ? n : def; };
 
 /** Una vez, tras bootstrap. Los contenedores son fijos: los eventos se conectan aquí y el contenido se repinta. */
 function iniciarRegistro() {
@@ -2389,24 +2425,50 @@ function iniciarRegistro() {
   f.addEventListener('change', cambioRegistro);
   f.addEventListener('click', clicRegistro);
   $('#rseg').addEventListener('click', e => {
-    const b = e.target.closest('[data-rmodo]');
-    if (!b || b.disabled || RG.enviando || b.dataset.rmodo === RG.modo) return;
-    RG.modo = b.dataset.rmodo;
-    $$('#rseg [data-rmodo]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+    const b = e.target.closest('[data-rtab]');
+    if (!b || b.disabled || RG.enviando || b.dataset.rtab === RG.modo) return;
+    RG.modo = b.dataset.rtab;
+    $$('#rseg [data-rtab]').forEach(x => x.setAttribute('aria-selected', String(x === b)));
     pastilla($('#rseg'));
     limpiarRegistro(e.detail !== 0);
   });
-  $('#lhoy').addEventListener('click', clicHoy);
-  $('#lhoy').addEventListener('input', e => {
+  // «Registrados»: hoy y los últimos 6 meses (el mes en curso primero).
+  const per = $('#rperiodo'), meses = [];
+  for (let i = 0; i < 6; i++) meses.push(sumarMesesIso(S.hoy.slice(0, 7) + '-01', -i).slice(0, 7));
+  per.innerHTML = '<option value="HOY">Hoy</option>' + meses.map(m => `<option value="${m}">${esc(frase(nombreMes(m)))}</option>`).join('');
+  per.addEventListener('change', () => {
+    RG.periodo = per.value;
+    Object.assign(RG, { lista: null, editando: '', borrador: {}, anulando: '', motivo: '' });
+    cargarRegistros();
+  });
+  const L = $('#rlista');
+  L.addEventListener('click', clicLista);
+  L.addEventListener('input', e => {
+    if (e.target.matches('[data-campo]')) { RG.borrador[e.target.dataset.campo] = e.target.value; return; }
     if (!e.target.matches('.anula input')) return;
     RG.motivo = e.target.value;
     const ok = e.target.parentNode.querySelector('[data-confirmar-anular]');
     if (ok) ok.disabled = !RG.motivo.trim() || !!RG.anulandoEnVuelo;
   });
-  $('#lhoy').addEventListener('keydown', e => {
+  L.addEventListener('change', e => {
+    if (!e.target.matches('[data-campo="detalle"]')) return;
+    // Otro tratamiento: la marca se vuelve a elegir (la única, si tiene una sola).
+    RG.borrador.detalle = e.target.value;
+    const m = marcasDe(e.target.value);
+    RG.borrador.marca = m.length === 1 ? m[0] : '';
+    pintarRegistrados();
+    const el = $('#rlista [data-campo="detalle"]');
+    if (el) el.focus();
+  });
+  L.addEventListener('keydown', e => {
+    if (e.target.matches('[data-campo]')) {
+      if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); guardarEdicion(); }
+      if (e.key === 'Escape') { e.preventDefault(); cerrarEdicion(true); }
+      return;
+    }
     if (!e.target.matches('.anula input')) return;
-    if (e.key === 'Enter') { e.preventDefault(); confirmarAnulacionHoy(e.target.parentNode.querySelector('[data-confirmar-anular]')); }
-    if (e.key === 'Escape') { e.preventDefault(); cancelarAnulacionHoy(); }
+    if (e.key === 'Enter') { e.preventDefault(); confirmarAnulacion_(e.target.parentNode.querySelector('[data-confirmar-anular]')); }
+    if (e.key === 'Escape') { e.preventDefault(); cancelarAnulacion_(); }
   });
   $('#v-registro .cargando').hidden = true;
   $('#reg-cuerpo').hidden = false;
@@ -2417,49 +2479,72 @@ function iniciarRegistro() {
 VISTAS.registro.mostrar = () => {
   if (!RG.listo) return;
   pastilla($('#rseg'), true);
-  cargarRegistrosHoy();
+  cargarRegistros();
 };
 
 /* ---- Formulario ---- */
 function pintarFormRegistro(anim) {
   const f = $('#rform'), hoy = esc(S.hoy), doc = opcionesDoctores();
   const dni = id => `<label class="campo">DNI o carné de extranjería<input id="${id}" class="dni" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="8 dígitos"></label>`;
-  if (RG.modo === 'ind') f.innerHTML = `
-    <fieldset><legend><span class="k">1</span>Paciente</legend>
+  const paciente = `<fieldset><legend><span class="k">1</span>Paciente</legend>
       ${dni('rdni')}<div class="avisos-dni" id="rcon" aria-live="polite"></div>
       <label class="campo">Nombres y apellidos<input id="rnom" autocomplete="off"></label>
       <div class="dos"><label class="campo">Teléfono o usuario<input id="rtel" class="mono" autocomplete="off" placeholder="987 654 321 o @usuario"></label>
         <label class="campo">Fecha<input id="rfec" type="date" value="${hoy}" max="${hoy}"></label></div>
     </fieldset>
-    <fieldset><legend><span class="k">2</span>Doctor</legend><label class="campo"><select id="rmed" aria-label="Doctor">${doc}</select></label></fieldset>
+    <fieldset><legend><span class="k">2</span>Doctor</legend><label class="campo"><select id="rmed" aria-label="Doctor">${doc}</select></label></fieldset>`;
+  const barra = txt => `<div class="barra-reg"><button type="submit" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>${txt}</button><span id="rfalta" aria-live="polite"></span></div>`;
+  if (RG.modo === 'indicacion') f.innerHTML = paciente + `
     <fieldset><legend><span class="k">3</span>Procedimiento<small>si aplica, puede elegir varios</small></legend>
       <div class="chips" id="rprocs">${((S.boot && S.boot.procedimientos) || []).map(p => `<button type="button" class="chip" data-proc="${esc(p)}" aria-pressed="false"><i class="ph ph-plus"></i>${esc(etiquetaCat(p))}</button>`).join('')}</div></fieldset>
     <fieldset><legend><span class="k">4</span>Tratamiento<small>si aplica</small></legend>
       <div class="chips" id="rtrats">${[''].concat((S.boot && S.boot.tratamientos) || []).map(t => `<button type="button" class="chip" data-trat="${esc(t)}" aria-pressed="${t === RG.trat}">${t ? esc(etiquetaCat(t)) : 'Ninguno'}</button>`).join('')}</div>
       <div id="rses"></div></fieldset>
-    <div id="rdup"></div>
-    <div class="barra-reg"><button type="submit" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar</button><span id="rfalta" aria-live="polite"></span></div>`;
+    <fieldset><legend><span class="k">5</span>Primera sesión<small>opcional, si ya la agendó</small></legend>
+      <label class="campo">Fecha de la primera sesión<input id="rinicio" type="date" min="${hoy}" max="${esc(masDias(S.hoy, 180))}"></label></fieldset>
+    <div id="rdup"></div>${barra('Registrar')}`;
+  else if (RG.modo === 'control') f.innerHTML = paciente + `
+    <fieldset><legend><span class="k">3</span>Control + laboratorio</legend>
+      <label class="campo">Exámenes indicados <small>opcional</small><textarea id="rexamenes" rows="2" placeholder="Hemograma, ferritina…"></textarea></label>
+      <label class="campo">Fecha de retorno<input id="rretorno" type="date" value="${esc(masDias(S.hoy, reglaRG('controlLab', 15)))}" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 365))}"></label></fieldset>
+    <div id="rdup"></div>${barra('Registrar control')}`;
   else f.innerHTML = `
     <fieldset><legend><span class="k">1</span>Paciente</legend>${dni('adni')}<div class="avisos-dni" id="acon" aria-live="polite"></div></fieldset>
-    <fieldset><legend><span class="k">2</span>Especialidad del alta<small>solo las que tiene</small></legend><div class="chips" id="aesps"></div></fieldset>
+    <fieldset><legend><span class="k">2</span>Especialidad<small>solo las que tiene</small></legend><div class="chips" id="aesps"></div></fieldset>
     <fieldset><legend><span class="k">3</span>Doctor y fecha</legend>
-      <div class="dos"><label class="campo">Doctor que da el alta<select id="amed">${doc}</select></label>
-        <label class="campo">Fecha del alta<input id="afec" type="date" value="${hoy}" max="${hoy}"></label></div></fieldset>
+      <div class="dos"><label class="campo">Doctor<select id="amed">${doc}</select></label>
+        <label class="campo">Fecha de la consulta<input id="afec" type="date" value="${hoy}" max="${hoy}"></label></div></fieldset>
+    <fieldset><legend><span class="k">4</span>Decisión</legend>
+      <div class="decs" role="radiogroup" aria-label="Decisión del médico">${DECISIONES_UI.map(d => `<label class="dec"><input type="radio" name="rdec" value="${esc(d.v)}"${d.v === RG.dec ? ' checked' : ''}><span>${esc(d.rot)}</span></label>`).join('')}</div>
+      <div id="adecx"></div></fieldset>
     <label class="campo">Nota (opcional)<textarea id="anota" rows="2"></textarea></label>
-    <div class="barra-reg"><button type="submit" class="btn btn-p" id="rgo"><i class="ph ph-check"></i>Registrar alta</button><span id="rfalta" aria-live="polite"></span></div>`;
-  if (RG.modo === 'alta') pintarEspecialidades();
+    ${barra('Registrar decisión')}`;
+  if (esDecision()) { pintarEspecialidades(); pintarDecision(); }
   if (anim && !reducido) f.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: EASE_OUT });
   validarRegistro();
+}
+
+/** Debajo de los radios: cuándo vuelve a «Por contactar» (6 meses, 1 año) o la fecha de retorno (nueva reevaluación). */
+function pintarDecision() {
+  const box = $('#adecx');
+  if (!box) return;
+  const d = decisionUi(RG.dec), fecha = ($('#afec') || {}).value || S.hoy;
+  if (d.pideFecha) {
+    if (!$('#aretorno')) box.innerHTML = `<label class="campo">Fecha de retorno<input id="aretorno" type="date" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 730))}"></label>`;
+    return;
+  }
+  box.innerHTML = d.meses ? `<p class="nota-dec"><i class="ph ph-calendar-check"></i>Volverá a «Por contactar» el ${esc(dmy(masDias(sumarMesesIso(fecha, d.meses), -reglaRG('avisoAltaControl', 30))))} para agendar su control.</p>` : '';
 }
 
 /** Deja el formulario vacío, salvo la fecha: se suelen registrar varios pacientes del mismo día seguidos. */
 function limpiarRegistro(anim, enfocarDni) {
   const fecha = ($('#rfec') || $('#afec') || {}).value;
-  Object.assign(RG, { procs: [], trat: '', ses: 0, otro: '', marca: '', dni: '', pac: null, auto: {}, aEsp: '' });
+  Object.assign(RG, { procs: [], trat: '', ses: 0, otro: '', marca: '', dni: '', pac: null, auto: {}, aEsp: '', dec: 'ALTA' });
   clearTimeout(RG.espera);
   pintarFormRegistro(anim);
   const f = $('#rfec') || $('#afec');
   if (fecha && f) f.value = fecha;
+  if (esDecision()) pintarDecision();
   validarRegistro();
   if (enfocarDni) ($('#rdni') || $('#adni')).focus({ preventScroll: true });
 }
@@ -2468,6 +2553,8 @@ function cambioRegistro(e) {
   const id = e.target.id;
   if (id === 'rdni' || id === 'adni') cambioDni(e.target);
   if (id === 'rsesotro') RG.otro = e.target.value;
+  if (e.target.name === 'rdec') { RG.dec = e.target.value; pintarDecision(); }
+  if (id === 'afec') pintarDecision();
   if (e.type === 'input' && $('#rdup')) $('#rdup').innerHTML = '';
   validarRegistro();
 }
@@ -2496,7 +2583,7 @@ async function buscarDniRegistro(v) {
   if (RG.dni !== v) return;
   RG.pac = r;
   const ok = !!r.encontrado;
-  if (RG.modo === 'ind') {
+  if (!esDecision()) {
     completar('#rnom', ok ? r.nombre : '');
     completar('#rtel', ok && r.telefonos && r.telefonos.length ? telBonito(r.telefonos[0]) : '');
     completar('#rmed', ok ? r.doctor : '');
@@ -2515,7 +2602,7 @@ function completar(sel, valor) {
 }
 
 function pintarConocido() {
-  const box = $(RG.modo === 'ind' ? '#rcon' : '#acon');
+  const box = $(esDecision() ? '#acon' : '#rcon');
   if (!box) return;
   const p = RG.pac;
   let h = '';
@@ -2524,23 +2611,24 @@ function pintarConocido() {
       + `${p.fallecido.quien ? ' (' + esc(nombreBonito(p.fallecido.quien)) + ')' : ''}. Si es un error, anúlelo desde su ficha.</span></p>`;
   }
   if (p && p.encontrado) {
-    h += RG.modo === 'ind'
+    h += !esDecision()
       ? `<p class="conocido"><i class="ph ph-user-check"></i><span>Paciente conocido · última consulta ${esc(dmy(p.ultimaFecha))} con ${esc(medicoCorto(p.ultimoMedico))}</span></p>`
       : `<p class="conocido"><i class="ph ph-user-check"></i><span>${esc(nombreBonito(p.nombre))} · última consulta ${esc(dmy(p.ultimaFecha))}</span></p>`;
   } else if (p) {
-    h += RG.modo === 'ind'
+    h += !esDecision()
       ? '<p class="nuevo"><i class="ph ph-user-plus"></i><span>Paciente nuevo: todavía no tiene consultas. Puede registrarlo igual.</span></p>'
-      : '<p class="sin-tel">No encontramos ese DNI. El alta solo se registra para pacientes que ya tienen consultas.</p>';
+      : '<p class="sin-tel">No encontramos ese DNI. La decisión del médico solo se registra para pacientes que ya tienen consultas.</p>';
   }
   box.innerHTML = h;
-  if (RG.modo === 'alta') pintarEspecialidades();
+  if (esDecision()) pintarEspecialidades();
 }
 
-/** Alta: solo las especialidades del paciente; las que ya tienen alta vigente, deshabilitadas (como la app anterior). */
+/** Decisión: solo las especialidades del paciente; las que ya tienen alta vigente, deshabilitadas. Si tiene una sola, va elegida. */
 function pintarEspecialidades() {
   const box = $('#aesps');
   if (!box) return;
   const esps = RG.pac && RG.pac.encontrado ? RG.pac.especialidades || [] : [];
+  if (esps.length === 1 && !esps[0].alta && !RG.aEsp) RG.aEsp = esps[0].especialidad;
   box.innerHTML = esps.length ? esps.map(e => `<button type="button" class="chip cuadro" data-esp="${esc(e.especialidad)}" aria-pressed="${RG.aEsp === e.especialidad}"`
     + `${e.alta ? ' disabled' : ''}>${esc(frase(e.especialidad))}${e.alta ? '<small>· ya tiene alta</small>' : ''}</button>`).join('')
     : '<span class="nota-chips">Escriba un DNI para ver sus especialidades.</span>';
@@ -2596,18 +2684,22 @@ function clicRegistro(e) {
 
 function faltanRegistro() {
   const f = [], v = s => ($(s) ? $(s).value.trim() : '');
-  if (RG.modo === 'ind') {
+  if (!esDecision()) {
     if (!documentoOk(v('#rdni'))) f.push('DNI');
     if (!v('#rnom')) f.push('nombres');
     if (!v('#rtel')) f.push('teléfono o usuario');
     if (!v('#rfec')) f.push('fecha');
     if (!v('#rmed')) f.push('doctor');
+  }
+  if (RG.modo === 'indicacion') {
     if (!RG.procs.length && !RG.trat) f.push('un procedimiento o tratamiento');
     if (RG.trat) {
       const n = sesionesElegidas();
       if (!(Number.isInteger(n) && n >= (RG.ses === 'otro' ? 6 : 1) && n <= 20)) f.push('sesiones');
       if (marcasDe(RG.trat).length && !RG.marca) f.push('marca');
     }
+  } else if (RG.modo === 'control') {
+    if (!v('#rretorno')) f.push('fecha de retorno');
   } else {
     if (!(RG.pac && RG.pac.encontrado)) f.push('DNI de un paciente');
     if (!RG.aEsp) f.push('especialidad');
@@ -2616,14 +2708,19 @@ function faltanRegistro() {
   }
   return f;
 }
+/** La fecha de retorno de una nueva reevaluación no bloquea el botón: al pulsarlo, el aviso dice que falta. */
+const faltaRetorno = () => esDecision() && decisionUi(RG.dec).pideFecha && !($('#aretorno') && $('#aretorno').value);
 function validarRegistro() {
   const b = $('#rgo');
   if (!b) return;
-  const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0);
+  const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0), d = decisionUi(RG.dec);
   b.disabled = f.length > 0 || RG.enviando;
-  $$('#rseg [data-rmodo]').forEach(x => { x.disabled = RG.enviando; });
+  $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
   $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.`
-    : RG.modo === 'ind' ? (n === 1 ? 'Se creará 1 registro.' : `Se crearán ${n} registros.`) : 'Cierra el seguimiento de esa especialidad.';
+    : RG.modo === 'indicacion' ? (n === 1 ? 'Se creará 1 registro.' : `Se crearán ${n} registros.`)
+    : RG.modo === 'control' ? 'Volverá con sus resultados en la fecha de retorno.'
+    : d.pideFecha ? (faltaRetorno() ? 'Elija la fecha de retorno.' : 'Lo esperamos en la fecha de retorno.')
+    : d.meses ? 'Cierra el seguimiento hasta su control.' : 'Cierra el seguimiento de esa especialidad.';
 }
 
 /** Botón «Registrar» o Enter. Nunca reenvía con un envío en vuelo ni con la caja de duplicado abierta: ahí decide la asesora. */
@@ -2635,28 +2732,33 @@ function enviarRegistro() {
   if (forzar) { forzar.focus(); return; }
   registrar(false, teclado);
 }
-/** guardarRegistro (MAPEO §1.4) o darDeAlta (§1.8). Los ID son los que devuelve el servidor. */
+/** guardarRegistro (MAPEO §1.4; también el control) o darDeAlta (§1.8, con la decisión). Los ID son los que devuelve el servidor. */
 async function registrar(forzar, teclado) {
   if (RG.enviando || faltanRegistro().length) return;
+  if (faltaRetorno()) { avisar('Falta la fecha de retorno.'); $('#aretorno').focus(); return; }
   if (!exigirUsuario()) return;
   RG.enviando = true;
   validarRegistro();
   try {
-    if (RG.modo === 'ind') {
+    if (!esDecision()) {
       const datos = { usuario: S.usuario, dni: dniLimpio($('#rdni').value), nombre: $('#rnom').value.trim(), contacto: contactoEnvio($('#rtel').value),
-        fecha: $('#rfec').value, doctor: $('#rmed').value, procedimientos: RG.procs.slice(), tratamiento: RG.trat,
-        sesiones: RG.trat ? sesionesElegidas() : '', marca: RG.trat ? RG.marca : '' };
+        fecha: $('#rfec').value, doctor: $('#rmed').value };
+      if (RG.modo === 'control') Object.assign(datos, { tipo: 'CONTROL', examenes: $('#rexamenes').value.trim(), fechaRetorno: $('#rretorno').value });
+      else {
+        Object.assign(datos, { procedimientos: RG.procs.slice(), tratamiento: RG.trat, sesiones: RG.trat ? sesionesElegidas() : '', marca: RG.trat ? RG.marca : '' });
+        if ($('#rinicio').value) datos.fechaInicio = $('#rinicio').value;
+      }
       if (forzar) datos.confirmado = true;
       const r = await llamar('guardarRegistro', datos);
       if (!r.ok && r.duplicado) { pintarDuplicado(r.duplicado); return; }
       const regs = r.registros || [];
-      avisar(`Registrado: ${regs.map(x => x.TEXTO).join(' + ')} · ${nombreBonito(regs.length ? regs[0].NOMBRE : datos.nombre)} · ${regs.map(x => x.ID).join(', ')}`);
+      avisar(`Registro guardado: ${regs.map(x => x.TEXTO).join(' + ')} · ${nombreBonito(regs.length ? regs[0].NOMBRE : datos.nombre)} · ${regs.map(x => x.ID).join(', ')}`);
       trasEscribirRegistro(regs.map(x => x.ID), teclado);
     } else {
-      const nombre = RG.pac && RG.pac.nombre, esp = RG.aEsp;
+      const nombre = RG.pac && RG.pac.nombre, esp = RG.aEsp, d = decisionUi(RG.dec), ret = d.pideFecha ? $('#aretorno').value : '';
       const r = await llamar('darDeAlta', { usuario: S.usuario, dni: dniLimpio($('#adni').value), especialidad: esp,
-        doctor: $('#amed').value, fecha: $('#afec').value, nota: $('#anota').value.trim() });
-      avisar(`Alta médica registrada: ${nombreBonito(nombre)} · ${frase(esp)} · ${r.alta.ID}`);
+        doctor: $('#amed').value, fecha: $('#afec').value, nota: $('#anota').value.trim(), decision: d.v, fechaRetorno: ret });
+      avisar(`Registro guardado: ${d.texto} · ${nombreBonito(nombre)} · ${frase(esp)}${ret ? ' · retorno ' + dmy(ret) : ''} · ${r.alta.ID}`);
       trasEscribirRegistro([r.alta.ID], teclado);
     }
   } catch (e) {
@@ -2671,78 +2773,193 @@ function pintarDuplicado(d) {
     + `Ya se registró el ${esc(dmy(d.FECHA))} (${esc(d.ID)}): ${esc(d.TEXTO)}. ¿Registrar de todos modos?</div></div>`
     + '<div class="botones"><button type="button" class="btn btn-s" id="rforzar">Registrar de todos modos</button><button type="button" class="ghost" id="rrevisar">Revisar</button></div></div>';
 }
-/** Tras escribir: formulario limpio, indicadores viejos, «Registrados hoy» y el tablero al día. */
+/** Tras escribir: formulario limpio, indicadores viejos, «Registrados» (con la fila nueva teñida) y el tablero al día. */
 function trasEscribirRegistro(ids, teclado) {
   RG.enviando = false;
   limpiarRegistro(false, true);
   invalidarIndicadores();
-  cargarRegistrosHoy(teclado ? null : ids);
+  marcarReciente(ids);
+  cargarRegistros(teclado ? null : ids);
   if (S.fase === 'listo') cargarTablero(null, true);
 }
 
-/* ---- Registrados hoy (getRegistrosHoy; anular con anularRegistro o anularAlta según el prefijo) ---- */
-async function cargarRegistrosHoy(nuevos) {
-  const n = cargarRegistrosHoy.n = (cargarRegistrosHoy.n || 0) + 1;
-  if (!RG.hoy) $('#lhoy').innerHTML = '<li class="sin-fila" aria-hidden="true"><div class="hist-skel"><i></i><i></i><i></i></div></li>';
+/* ---- Registrados (getRegistros por día o por mes; anular con anularRegistro o anularAlta según el prefijo; editarRegistro) ---- */
+async function cargarRegistros(nuevos) {
+  const n = cargarRegistros.n = (cargarRegistros.n || 0) + 1;
+  if (!RG.lista) $('#rlista').innerHTML = '<li class="sin-fila" aria-hidden="true"><div class="hist-skel"><i></i><i></i><i></i></div></li>';
   let lista;
   try {
-    lista = await llamar('getRegistrosHoy');
+    lista = await llamar('getRegistros', { periodo: RG.periodo });
   } catch (e) {
-    if (n !== cargarRegistrosHoy.n) return;
-    if (RG.hoy) { avisar('No se pudo actualizar «Registrados hoy»: ' + e.message); return; }
-    $('#lhoy').innerHTML = `<li class="sin-fila"><p class="vacio">No se pudo cargar: ${esc(e.message)} <button type="button" class="enlace" data-rehoy>Reintentar</button></p></li>`;
+    if (n !== cargarRegistros.n) return;
+    if (RG.lista) { avisar('No se pudo actualizar «Registrados»: ' + e.message); return; }
+    $('#rlista').innerHTML = `<li class="sin-fila"><p class="vacio">No se pudo cargar: ${esc(e.message)} <button type="button" class="enlace" data-rehoy>Reintentar</button></p></li>`;
     return;
   }
-  if (n !== cargarRegistrosHoy.n) return;
-  RG.hoy = lista || [];
-  if (RG.anulando && !RG.hoy.some(x => x.ID === RG.anulando && !x.ANULADO)) RG.anulando = '';
-  pintarHoy(nuevos);
+  if (n !== cargarRegistros.n) return;
+  RG.lista = lista || [];
+  if (RG.anulando && !RG.lista.some(x => x.ID === RG.anulando && !x.ANULADO)) RG.anulando = '';
+  if (RG.editando && !RG.lista.some(x => x.ID === RG.editando && editable(x))) { RG.editando = ''; RG.borrador = {}; }
+  pintarRegistrados(nuevos);
 }
-function pintarHoy(nuevos) {
-  const L = RG.hoy || [];
-  $('#nhoy').textContent = L.filter(x => !x.ANULADO).length;
-  $('#lhoy').innerHTML = L.length ? L.map(x => {
-    const anulado = !!x.ANULADO, abierto = !anulado && RG.anulando === x.ID;
-    return `<li class="${anulado ? 'anulado' : ''}" data-reg="${esc(x.ID)}"><span class="hora">${esc(x.HORA)}</span>
-      <div class="det"><b class="tx">${esc(x.NOMBRE)}<span class="mono"> · DNI ${esc(x.DNI)}</span></b><span class="tx texto">${esc(x.TEXTO)}</span>
-        <span class="quien">${esc(x.ID)} · ${anulado ? 'anulado' + (x.MOTIVO_ANULACION ? ': ' + esc(x.MOTIVO_ANULACION) : '') : 'registró ' + esc(nombreBonito(x.ASESORA))}</span>
-        <div class="anula">${abierto ? `<input class="ctl" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(RG.motivo)}">`
-          + `<button type="button" class="btn btn-p" data-confirmar-anular${RG.motivo.trim() && !RG.anulandoEnVuelo ? '' : ' disabled'}>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button>` : ''}</div></div>
-      ${anulado ? '<span class="marca-anulado">Anulado</span>' : abierto ? '<span></span>' : `<button type="button" class="ghost" data-anular="${esc(x.ID)}">Anular</button>`}</li>`;
-  }).join('') : '<li class="sin-fila"><p class="vacio">Todavía no hay registros hoy.</p></li>';
-  if (nuevos && !reducido) nuevos.forEach(id => {
-    const el = $$('#lhoy [data-reg]').find(x => x.dataset.reg === id);
-    if (!el) return;
-    el.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT });
-    el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 1400, easing: 'ease-out', pseudoElement: '::before' });
+/** Se edita lo que no está anulado y no es una decisión del médico (esa se anula y se registra de nuevo). */
+const editable = x => !x.ANULADO && x.TIPO !== 'DECISION' && String(x.ID).indexOf('ALT-') !== 0;
+/** La fila confirmada se tiñe 3 s (ok-reciente); sin transición si se prefiere menos movimiento (regla global). */
+function marcarReciente(ids) {
+  (ids || []).forEach(id => {
+    clearTimeout(RG.recientes[id]);
+    RG.recientes[id] = setTimeout(() => {
+      delete RG.recientes[id];
+      const el = filaEl(id);
+      if (el) el.classList.remove('ok-reciente');
+    }, 3000);
+    const el = filaEl(id);
+    if (el) el.classList.add('ok-reciente');
   });
 }
-const filaHoyEl = id => $$('#lhoy [data-reg]').find(x => x.dataset.reg === id);
-function clicHoy(e) {
+function pintarRegistrados(nuevos) {
+  const L = RG.lista || [], hoy = RG.periodo === 'HOY';
+  $('#nhoy').textContent = L.filter(x => !x.ANULADO).length;
+  $('#rlista').innerHTML = L.length ? L.map(x => {
+    const anulado = !!x.ANULADO, abierto = !anulado && RG.anulando === x.ID, editando = !anulado && RG.editando === x.ID;
+    const clase = [anulado ? 'anulado' : '', RG.recientes[x.ID] ? 'ok-reciente' : ''].filter(Boolean).join(' ');
+    const acciones = anulado ? '<span class="marca-anulado">Anulado</span>' : abierto || editando ? '<span></span>'
+      : `<div class="fila-acc">${editable(x) ? `<button type="button" class="ghost" data-editar="${esc(x.ID)}">Editar</button>` : ''}<button type="button" class="ghost" data-anular="${esc(x.ID)}">Anular</button></div>`;
+    return `<li class="${clase}" data-reg="${esc(x.ID)}"><span class="hora">${esc(hoy ? x.HORA : dm(x.FECHA))}</span>
+      <div class="det"><b class="tx">${esc(x.NOMBRE)}<span class="mono"> · DNI ${esc(x.DNI)}</span></b><span class="tx texto">${esc(x.TEXTO)}</span>
+        <span class="quien">${esc(x.ID)} · ${anulado ? 'anulado' + (x.MOTIVO_ANULACION ? ': ' + esc(x.MOTIVO_ANULACION) : '') : 'registró ' + esc(nombreBonito(x.ASESORA))}${x.EDITADO && !anulado ? ' · editado' : ''}</span>
+        ${editando ? formEdicion(x) : ''}
+        <div class="anula">${abierto ? `<input class="ctl" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(RG.motivo)}">`
+          + `<button type="button" class="btn btn-p" data-confirmar-anular${RG.motivo.trim() && !RG.anulandoEnVuelo ? '' : ' disabled'}>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button>` : ''}</div></div>
+      ${acciones}</li>`;
+  }).join('') : `<li class="sin-fila"><p class="vacio">${hoy ? 'Todavía no hay registros hoy.' : 'No hay registros en ' + esc(nombreMes(RG.periodo)) + '.'}</p></li>`;
+  if (nuevos && !reducido) nuevos.forEach(id => {
+    const el = filaEl(id);
+    if (el) el.animate([{ opacity: 0, transform: 'translateY(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 220, easing: EASE_OUT });
+  });
+}
+const filaEl = id => $$('#rlista [data-reg]').find(x => x.dataset.reg === id);
+
+/* ---- Editar un registro (editarRegistro): los campos según el tipo; se manda solo lo cambiado ---- */
+const COL_EDICION = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
+  sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO' };
+function camposEdicion(x) {
+  const c = ['fecha', 'doctor', 'nombre', 'contacto'];
+  if (x.TIPO === 'CONTROL') return c.concat('examenes', 'fechaRetorno');
+  c.push('detalle');
+  if (x.TIPO === 'HIERRO') c.push('marca', 'sesiones');
+  if (!Number(x.HECHAS)) c.push('fechaInicio');   // ya empezado, la fecha de inicio no se cambia
+  return c;
+}
+const valorOriginal = (x, k) => x[COL_EDICION[k]] == null ? '' : String(x[COL_EDICION[k]]);
+const valorEdicion = (x, k) => k in RG.borrador ? RG.borrador[k] : valorOriginal(x, k);
+/** El formulario en línea. Lo reutiliza la ficha del paciente (Tarea 11) con la misma fila de getRegistros. */
+function formEdicion(x) {
+  const v = k => valorEdicion(x, k), hoy = S.hoy, hierro = x.TIPO === 'HIERRO';
+  const campo = (k, rot, ctl, ancho) => `<label class="campo${ancho ? ' ancho' : ''}">${rot}${ctl}</label>`;
+  const fecha = (k, rot, min, max) => campo(k, rot, `<input type="date" data-campo="${k}" value="${esc(v(k))}"${min ? ` min="${esc(min)}"` : ''}${max ? ` max="${esc(max)}"` : ''}>`);
+  const sel = (k, lista, actual) => `<select data-campo="${k}">${(!lista.includes(actual) ? [actual] : []).concat(lista)
+    .map(o => `<option value="${esc(o)}"${o === actual ? ' selected' : ''}>${esc(etiquetaCat(o))}</option>`).join('')}</select>`;
+  const html = { fecha: () => fecha('fecha', 'Fecha', '', hoy),
+    doctor: () => campo('doctor', 'Doctor', `<select data-campo="doctor">${opcionesDoctores(v('doctor'))}</select>`),
+    nombre: () => campo('nombre', 'Nombres y apellidos', `<input data-campo="nombre" autocomplete="off" value="${esc(v('nombre'))}">`, true),
+    contacto: () => campo('contacto', 'Teléfono o usuario', `<input data-campo="contacto" class="mono" autocomplete="off" value="${esc(v('contacto'))}">`),
+    detalle: () => campo('detalle', hierro ? 'Tratamiento' : 'Procedimiento', sel('detalle', (S.boot && (hierro ? S.boot.tratamientos : S.boot.procedimientos)) || [], v('detalle'))),
+    marca: () => { const m = marcasDe(v('detalle')); return m.length ? campo('marca', 'Marca', sel('marca', m, v('marca'))) : ''; },
+    sesiones: () => campo('sesiones', 'Sesiones', `<input type="number" data-campo="sesiones" class="mono" min="${Math.max(1, Number(x.HECHAS) || 0)}" max="20" value="${esc(v('sesiones'))}">`),
+    fechaInicio: () => fecha('fechaInicio', 'Primera sesión', hoy, masDias(hoy, 180)),
+    examenes: () => campo('examenes', 'Exámenes indicados', `<textarea data-campo="examenes" rows="2">${esc(v('examenes'))}</textarea>`, true),
+    fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), masDias(hoy, 365)) };
+  return `<div class="edita">${camposEdicion(x).map(k => html[k]()).join('')}
+    <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${RG.guardandoEdicion ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
+}
+function abrirEdicion(id) {
+  if (RG.anulandoEnVuelo || RG.guardandoEdicion) return;
+  Object.assign(RG, { editando: id, borrador: {}, anulando: '', motivo: '' });
+  pintarRegistrados();
+  const el = filaEl(id), c = el && el.querySelector('[data-campo]');
+  if (c) c.focus();
+}
+function cerrarEdicion(enfocar) {
+  if (RG.guardandoEdicion) return;
+  const id = RG.editando;
+  RG.editando = '';
+  RG.borrador = {};
+  pintarRegistrados();
+  const el = enfocar && id && filaEl(id), b = el && el.querySelector('[data-editar]');
+  if (b) b.focus();
+}
+/** Solo los campos que cambiaron, como se escribieron (el servidor normaliza y descarta lo que resulte igual). */
+function cambiosEdicion(x) {
+  const out = {};
+  camposEdicion(x).forEach(k => {
+    if (!(k in RG.borrador)) return;
+    const nuevo = String(RG.borrador[k]).trim(), antes = valorOriginal(x, k).trim();
+    if (k === 'sesiones' ? Number(nuevo) === Number(antes) : nuevo === antes) return;
+    out[k] = k === 'sesiones' ? Number(nuevo) : nuevo;
+  });
+  return out;
+}
+async function guardarEdicion() {
+  const id = RG.editando, x = (RG.lista || []).find(y => y.ID === id);
+  if (!x || RG.guardandoEdicion) return;
+  const cambios = cambiosEdicion(x);
+  if (!Object.keys(cambios).length) { avisar('No hay cambios.'); return; }
+  if (!exigirUsuario()) return;
+  RG.guardandoEdicion = true;
+  const b = $('#rlista [data-guardar-edicion]');
+  if (b) b.disabled = true;
+  let r;
+  try {
+    r = await llamar('editarRegistro', { usuario: S.usuario, id, cambios });
+  } catch (e) {
+    // Lo escrito se queda: el formulario sigue abierto para corregirlo.
+    RG.guardandoEdicion = false;
+    const b2 = $('#rlista [data-guardar-edicion]');
+    if (b2) b2.disabled = false;
+    avisar('No se guardó: ' + e.message);
+    return;
+  }
+  RG.guardandoEdicion = false;
+  RG.editando = '';
+  RG.borrador = {};
+  if (!r.ok && r.sinCambios) { pintarRegistrados(); avisar('No hay cambios.'); return; }
+  const i = RG.lista.findIndex(y => y.ID === id);
+  if (i >= 0 && r.registro) RG.lista[i] = Object.assign({}, RG.lista[i], r.registro);
+  marcarReciente([id]);
+  pintarRegistrados();
+  avisar('Registro editado: ' + ((r.registro && r.registro.TEXTO) || x.TEXTO) + ' · ' + id);
+  invalidarIndicadores();
+  if (S.fase === 'listo') cargarTablero(null, true);
+}
+
+function clicLista(e) {
   const t = e.target.closest('button');
   if (!t) return;
-  if (t.hasAttribute('data-rehoy')) { cargarRegistrosHoy(); return; }
-  if (t.dataset.anular) {
-    if (RG.anulandoEnVuelo) return;
-    RG.anulando = t.dataset.anular;
-    RG.motivo = '';
-    pintarHoy();
-    const el = filaHoyEl(RG.anulando);
+  if (t.hasAttribute('data-rehoy')) { cargarRegistros(); return; }
+  if (t.dataset.editar) abrirEdicion(t.dataset.editar);
+  else if (t.hasAttribute('data-guardar-edicion')) guardarEdicion();
+  else if (t.hasAttribute('data-cancelar-edicion')) cerrarEdicion(true);
+  else if (t.dataset.anular) {
+    if (RG.anulandoEnVuelo || RG.guardandoEdicion) return;
+    Object.assign(RG, { anulando: t.dataset.anular, motivo: '', editando: '', borrador: {} });
+    pintarRegistrados();
+    const el = filaEl(RG.anulando);
     if (el) el.querySelector('.anula input').focus();
-  } else if (t.hasAttribute('data-cancelar-anular')) cancelarAnulacionHoy();
-  else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacionHoy(t);
+  } else if (t.hasAttribute('data-cancelar-anular')) cancelarAnulacion_();
+  else if (t.hasAttribute('data-confirmar-anular')) confirmarAnulacion_(t);
 }
-function cancelarAnulacionHoy() {
+function cancelarAnulacion_() {
   if (RG.anulandoEnVuelo) return;
   const id = RG.anulando;
   RG.anulando = '';
   RG.motivo = '';
-  pintarHoy();
-  const el = id && filaHoyEl(id), b = el && el.querySelector('[data-anular]');
+  pintarRegistrados();
+  const el = id && filaEl(id), b = el && el.querySelector('[data-anular]');
   if (b) b.focus();
 }
 /** Anula con su motivo (obligatorio). La fila se tacha solo cuando el servidor respondió que sí. */
-async function confirmarAnulacionHoy(boton) {
+async function confirmarAnulacion_(boton) {
   const id = RG.anulando, motivo = RG.motivo.trim();
   if (!id || !boton || RG.anulandoEnVuelo) return;
   if (!motivo) { avisar('Escriba el motivo de la anulación.'); return; }
@@ -2753,7 +2970,7 @@ async function confirmarAnulacionHoy(boton) {
     await llamar(id.indexOf('ALT-') === 0 ? 'anularAlta' : 'anularRegistro', { usuario: S.usuario, id, motivo });
   } catch (e) {
     RG.anulandoEnVuelo = '';
-    const ok = filaHoyEl(id) && filaHoyEl(id).querySelector('[data-confirmar-anular]');
+    const ok = filaEl(id) && filaEl(id).querySelector('[data-confirmar-anular]');
     if (ok) ok.disabled = !RG.motivo.trim();
     avisar('No se anuló: ' + e.message);
     return;
@@ -2761,12 +2978,13 @@ async function confirmarAnulacionHoy(boton) {
   RG.anulandoEnVuelo = '';
   RG.anulando = '';
   RG.motivo = '';
-  const x = (RG.hoy || []).find(y => y.ID === id);
+  const x = (RG.lista || []).find(y => y.ID === id);
   if (x) { x.ANULADO = true; x.MOTIVO_ANULACION = motivo; }
-  pintarHoy();
-  avisar('Anulado: ' + id + '.');
+  marcarReciente([id]);
+  pintarRegistrados();
+  avisar('Registro anulado: ' + (x ? x.TEXTO + ' · ' : '') + id);
   invalidarIndicadores();
-  cargarRegistrosHoy();
+  cargarRegistros();
   if (S.fase === 'listo') cargarTablero(null, true);
 }
 
@@ -3908,7 +4126,8 @@ async function iniciar() {
 const DEMO = (() => {
   const hoy = '2026-10-01';
   const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS'];
-  const reglas = { espera: 15, maxSeguimientos: 3, graciaAgenda: 2, diasEntreSesiones: 7, esperaCotizacion: 7, metaRetorno: 60, metaDiaria: 15 };
+  const reglas = { espera: 15, maxSeguimientos: 3, graciaAgenda: 2, diasEntreSesiones: 7, esperaCotizacion: 7, metaRetorno: 60, metaDiaria: 15,
+    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
   const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
   const ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
     'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
@@ -3931,7 +4150,8 @@ const DEMO = (() => {
   const diaCorto = iso => ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][new Date(iso + 'T12:00:00Z').getUTCDay()] + ' ' + dm(iso);
   const plural = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
   const frase = s => { const t = String(s || '').trim().toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
-  const textoRegistro = r => r.TIPO !== 'HIERRO' ? frase(r.DETALLE)
+  const textoRegistro = r => r.TIPO === 'CONTROL' ? 'Control + laboratorio' + (String(r.EXAMENES || '').trim() ? ' · ' + String(r.EXAMENES).trim() : '')
+    : r.TIPO !== 'HIERRO' ? frase(r.DETALLE)
     : frase(r.DETALLE) + (r.MARCA ? ' · ' + frase(r.MARCA) : '') + ' × ' + r.SESIONES + (Number(r.SESIONES) === 1 ? ' sesión' : ' sesiones');
   const clonar = x => JSON.parse(JSON.stringify(x));
   const siguiente = (lista, prefijo) => prefijo + '-' + String(lista.length + 1).padStart(6, '0');
@@ -3996,6 +4216,7 @@ const DEMO = (() => {
     if (t.COLUMNA === 'AGENDADO') {
       if (t.AGENDA === 'SESION') return 'Sesión ' + (Number(t.HECHAS) + 1) + ' el ' + diaCorto(t.FECHA_AGENDA);
       if (t.AGENDA === 'CITA') return 'Cita el ' + diaCorto(t.FECHA_AGENDA);
+      if (t.AGENDA === 'CONTROL') return 'Control con resultados el ' + diaCorto(t.FECHA_AGENDA);
       if (t.AGENDA === 'LLAMAR') return 'Llamar el ' + diaCorto(t.FECHA_AGENDA);
       if (t.AGENDA === 'REINTENTAR') return 'Reintentar el ' + dm(t.FECHA_AGENDA) + ' · intento ' + t.INTENTO + ' de ' + reglas.maxSeguimientos;
       if (t.AGENDA === 'SIN RESPUESTA') return 'Sin respuesta · se cierra el ' + dm(t.FECHA_AGENDA);
@@ -4043,6 +4264,28 @@ const DEMO = (() => {
   { ID: 'ALT-000002', FECHA_HORA: '2026-09-18 16:40', FECHA: '2026-09-18', DNI: '41666777', ESPECIALIDAD: 'HEMATOLOGÍA',
     DOCTOR: 'Dr. Elí Cabanillas', REGISTRADO_POR: 'MAGALY', NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' });
   const regPorId = id => registros.find(r => r.ID === id);
+  /* ---- «Registrados» y la decisión del médico, como RegistroServidor.gs y Registro.gs ---- */
+  const dmyDemo = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
+  const DECISIONES = { 'ALTA': { nombre: 'ALTA', texto: 'Alta médica', meses: 0 },
+    'ALTA 6 MESES': { nombre: 'ALTA 6 MESES', texto: 'Alta con reevaluación a 6 meses', meses: 6 },
+    'ALTA 1 ANO': { nombre: 'ALTA 1 AÑO', texto: 'Alta con reevaluación a 1 año', meses: 12 },
+    'NUEVA REEVALUACION': { nombre: 'NUEVA REEVALUACION', texto: 'Nueva reevaluación', meses: 0, pideFecha: true } };
+  const decisionDe = a => DECISIONES[norm(a && a.DECISION) || 'ALTA'] || DECISIONES.ALTA;
+  const sumarMeses = (iso, n) => {
+    let y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1 + n;
+    const d = Number(iso.slice(8, 10));
+    y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+    return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(Math.min(d, new Date(Date.UTC(y, m + 1, 0)).getUTCDate())).padStart(2, '0');
+  };
+  /** filaRegistrada_: lo que muestra «Registrados» y lo que necesita el formulario de Editar. */
+  const filaRegistrada = r => {
+    const hechas = sesionesDe(r.ID).length;
+    return { ID: r.ID, HORA: r.FECHA_HORA.slice(11, 16), ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegistro(r),
+      ANULADO: !!r.ANULADO, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '', EDITADO: r.EDITADO || '', FECHA: r.FECHA, TIPO: r.TIPO,
+      DOCTOR: r.DOCTOR || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
+      SESIONES: r.TIPO === 'CONTROL' ? 0 : Math.max(1, Number(r.SESIONES) || 1), HECHAS: hechas,
+      FECHA_INICIO: r.FECHA_INICIO || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: r.FECHA_RETORNO || '', DECISION: '' };
+  };
   // Tarea 9: Ana María vino solo por Registro y todavía no tiene consultas en SOFDOC (en el servidor real ningún registro
   // crea consultas; el DEMO las inventa para los demás). Su ficha toma el nombre del registro.
   regPorId('REG-000003').SIN_CONSULTA = true;
@@ -4368,8 +4611,15 @@ const DEMO = (() => {
       ESTADO: hoy < esperada ? 'AL DÍA' : hoy < vence ? 'POR VENCER' : 'VENCIDO' }));
   });
   // Como altasVigentes: sin anular y sin ninguna consulta realizada después del alta.
-  const vigente = (dni, esp) => altas.filter(a => !a.ANULADO && a.DNI === dni && mismo(a.ESPECIALIDAD, esp)
-    && !citas.some(c => c.DNI === dni && mismo(c.ESPECIALIDAD, esp) && c.ESTADO === 'REALIZADO' && c.FECHA > a.FECHA)).pop() || null;
+  // Una nueva reevaluación no deja alta; la de 6 meses o 1 año, hasta AVISO_ALTA_CONTROL_DIAS antes del retorno (decisionesDeAlta).
+  const vigente = (dni, esp) => {
+    const a = altas.filter(x => !x.ANULADO && x.DNI === dni && mismo(x.ESPECIALIDAD, esp)
+      && !citas.some(c => c.DNI === dni && mismo(c.ESPECIALIDAD, esp) && c.ESTADO === 'REALIZADO' && c.FECHA > x.FECHA)).pop();
+    if (!a) return null;
+    const d = decisionDe(a);
+    if (d.pideFecha) return null;
+    return !d.meses || !a.FECHA_RETORNO || hoy < mas(a.FECHA_RETORNO, -reglas.avisoAltaControl) ? a : null;
+  };
 
   // Filas de getKpi (Indicadores). coh: una fila por etapa, [ELEGIBLES, VOLVIERON, EN_CURSO, ALTAS].
   const coh = (COHORTE, ESPECIALIDAD, MEDICO, etapas) => etapas.map((e, i) => ({ COHORTE, ESPECIALIDAD, MEDICO, ETAPA: i + 1,
@@ -4482,11 +4732,25 @@ const DEMO = (() => {
       if (fecha > hoy) throw new Error('La fecha no puede ser futura.');
       const doc = doctorDe(x.doctor);
       if (!doc) throw new Error('Elija el doctor de la lista.');
-      const procs = (Array.isArray(x.procedimientos) ? x.procedimientos : []).concat(x.procedimiento ? [x.procedimiento] : []).map(p => String(p).trim()).filter(Boolean);
-      const trat = String(x.tratamiento || '').trim();
-      if (!procs.length && !trat) throw new Error('Elija un procedimiento, un tratamiento o ambos.');
-      const base = { FECHA: fecha, ASESORA: quien, DOCTOR: doc.doctor, NOMBRE: nombre, DNI: dni, CONTACTO: contacto, MARCA: '', ANULADO: '', MOTIVO_ANULACION: '' };
+      const base = { FECHA: fecha, ASESORA: quien, DOCTOR: doc.doctor, NOMBRE: nombre, DNI: dni, CONTACTO: contacto, MARCA: '', ANULADO: '', MOTIVO_ANULACION: '',
+        FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '' };
       const filas = [];
+      // Como validarRegistro (Registro.gs): el control no lleva procedimiento ni tratamiento, sí la fecha de retorno.
+      if (norm(x.tipo) === 'CONTROL') {
+        const ret = String(x.fechaRetorno || '').slice(0, 10);
+        if (!ret) throw new Error('Falta la fecha de retorno a control.');
+        if (ret <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
+        if (ret > mas(hoy, 365)) throw new Error('La fecha de retorno va hasta un año desde hoy.');
+        filas.push(Object.assign({}, base, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: String(x.examenes || '').trim(), FECHA_RETORNO: ret }));
+      }
+      const inicio = String(x.fechaInicio || '').trim().slice(0, 10);
+      if (!filas.length && inicio && !/^\d{4}-\d{2}-\d{2}$/.test(inicio)) throw new Error('La fecha de la primera sesión no es válida.');
+      if (!filas.length && inicio && inicio < hoy) throw new Error('La fecha de la primera sesión no puede ser pasada.');
+      if (!filas.length && inicio && inicio > mas(hoy, 180)) throw new Error('La fecha de la primera sesión va hasta 180 días desde hoy.');
+      base.FECHA_INICIO = inicio;
+      const procs = filas.length ? [] : (Array.isArray(x.procedimientos) ? x.procedimientos : []).concat(x.procedimiento ? [x.procedimiento] : []).map(p => String(p).trim()).filter(Boolean);
+      const trat = filas.length ? '' : String(x.tratamiento || '').trim();
+      if (!filas.length && !procs.length && !trat) throw new Error('Elija un procedimiento, un tratamiento o ambos.');
       procs.forEach(p => {
         const p1 = procedimientos.find(y => mismo(y, p));
         if (!p1) throw new Error('El procedimiento «' + p + '» no está en CATALOGOS.');
@@ -4514,19 +4778,99 @@ const DEMO = (() => {
         f.ID = siguiente(registros, 'REG');
         f.FECHA_HORA = cuando;
         registros.push(f);
-        const t = reg(f);
-        tarjetas.push(ubicar(t, t.ESTADO === 'PENDIENTE' ? 'POR_CONTACTAR' : ''));
+        // Control: Agendado «Control con resultados el …»; con fecha de inicio: Agendado «Sesión 1 el …» (pendientesRegistro).
+        if (f.TIPO === 'CONTROL') tarjetas.push(ubicar(reg(f, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'PROGRAMADO', AGENDA: 'CONTROL', FECHA_AGENDA: f.FECHA_RETORNO }), 'AGENDADO'));
+        else if (f.FECHA_INICIO) tarjetas.push(ubicar(reg(f, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'PROGRAMADO', AGENDA: 'SESION', FECHA_AGENDA: f.FECHA_INICIO }), 'AGENDADO'));
+        else { const t = reg(f); tarjetas.push(ubicar(t, t.ESTADO === 'PENDIENTE' ? 'POR_CONTACTAR' : '')); }
         f.TEXTO = textoRegistro(f);
       });
       return { ok: true, registros: filas };
     },
 
-    getRegistrosHoy: () => registros.filter(r => r.FECHA_HORA.startsWith(hoy)).map(r => ({ ID: r.ID, HORA: r.FECHA_HORA.slice(11, 16),
-      ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegistro(r), ANULADO: !!r.ANULADO, MOTIVO_ANULACION: r.MOTIVO_ANULACION }))
-      .concat(altas.filter(a => a.FECHA_HORA.startsWith(hoy)).map(a => ({ ID: a.ID, HORA: a.FECHA_HORA.slice(11, 16), ASESORA: a.REGISTRADO_POR,
-        NOMBRE: (citas.find(c => c.DNI === a.DNI) || {}).NOMBRE || '', DNI: a.DNI, TEXTO: 'Alta médica · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR,
-        ANULADO: !!a.ANULADO, MOTIVO_ANULACION: a.MOTIVO_ANULACION })))
-      .sort((a, b) => a.HORA < b.HORA ? 1 : a.HORA > b.HORA ? -1 : (a.ID < b.ID ? 1 : -1)),
+    // Como getRegistros (RegistroServidor.gs): 'HOY' o un mes 'yyyy-mm' según FECHA_HORA; lo más reciente (FECHA + HORA) primero.
+    getRegistros: x => {
+      const periodo = String((x && x.periodo) || '').trim() || 'HOY';
+      const dentro = r => periodo === 'HOY' ? r.FECHA_HORA.slice(0, 10) === hoy : r.FECHA_HORA.slice(0, 7) === periodo;
+      return registros.filter(dentro).map(filaRegistrada)
+        .concat(altas.filter(dentro).map(a => {
+          const d = decisionDe(a), ret = a.FECHA_RETORNO || '';
+          return { ID: a.ID, HORA: a.FECHA_HORA.slice(11, 16), ASESORA: a.REGISTRADO_POR, NOMBRE: (citas.find(c => c.DNI === a.DNI) || {}).NOMBRE || '', DNI: a.DNI,
+            TEXTO: d.texto + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR + (ret ? ' · retorno ' + dmyDemo(ret) : ''),
+            ANULADO: !!a.ANULADO, MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', EDITADO: '', FECHA: a.FECHA, TIPO: 'DECISION', DECISION: d.nombre, FECHA_RETORNO: ret };
+        }))
+        .sort((a, b) => { const p = a.FECHA + a.HORA, q = b.FECHA + b.HORA; return p < q ? 1 : p > q ? -1 : (a.ID < b.ID ? 1 : -1); });
+    },
+    getRegistrosHoy: () => api.getRegistros({ periodo: 'HOY' }),
+
+    // Como editarRegistro + validarEdicionRegistro: lo igual se descarta antes de validar; mismos mensajes.
+    editarRegistro: x => {
+      exigir(x);
+      const r = regPorId(String((x && x.id) || '').trim());
+      if (!r) throw new Error('No encontré ese registro. Recargue la página.');
+      if (r.ANULADO) throw new Error('Ese registro está anulado.');
+      const control = r.TIPO === 'CONTROL', hechas = sesionesDe(r.ID).length, cambios = (x && x.cambios) || {}, out = {};
+      const COL = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
+        sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO' };
+      const lista = () => r.TIPO === 'HIERRO' ? tratamientos : procedimientos;
+      for (const k of Object.keys(cambios)) {
+        if (k === 'dni') throw new Error('Para cambiar el paciente, anule el registro y regístrelo de nuevo.');
+        const col = COL[k];
+        if (!col) throw new Error('No se puede cambiar ' + k + '.');
+        const v = cambios[k], t = String(v == null ? '' : v).trim(), actual = r[col] == null ? '' : String(r[col]);
+        // iguales_: el valor normalizado que ya tiene no cuenta.
+        const igual = col === 'DOCTOR' ? !!doctorDe(t) && doctorDe(t).doctor === actual : col === 'NOMBRE' ? t.toUpperCase() === actual
+          : col === 'SESIONES' ? Number(t) === Number(actual) : col === 'DETALLE' ? (lista().find(y => mismo(y, t)) || '\u0000') === actual
+          : col === 'MARCA' ? ((marcas[norm(r.DETALLE)] || []).find(y => mismo(y, t)) || (t ? '\u0000' : '')) === actual
+          : /^FECHA/.test(col) ? t.slice(0, 10) === actual.slice(0, 10) : t === actual;
+        if (igual) continue;
+        let nuevo;
+        if (col === 'FECHA') { nuevo = t.slice(0, 10); if (!nuevo) throw new Error('Falta la fecha.'); if (nuevo > hoy) throw new Error('La fecha no puede ser futura.'); }
+        else if (col === 'DOCTOR') { const d = doctorDe(t); if (!d) throw new Error('Elija el doctor de la lista.'); nuevo = d.doctor; }
+        else if (col === 'NOMBRE') { nuevo = t.toUpperCase(); if (!nuevo) throw new Error('Falta el nombre del paciente.'); }
+        else if (col === 'CONTACTO') { nuevo = t; if (!nuevo) throw new Error('Falta el teléfono o usuario.'); }
+        else if (col === 'DETALLE') {
+          if (control) throw new Error('Un control no tiene procedimiento ni tratamiento.');
+          nuevo = lista().find(y => mismo(y, t));
+          if (!nuevo) throw new Error('«' + t + '» no está en CATALOGOS.');
+        } else if (col === 'MARCA') {
+          const m = marcas[norm(cambios.detalle || r.DETALLE)] || [];
+          nuevo = m.length ? m.find(y => mismo(y, t)) || '' : '';
+          if (m.length && !nuevo) throw new Error('Elija la marca: ' + m.join(' o ') + '.');
+        } else if (col === 'SESIONES') {
+          const n = Number(t);
+          if (control) throw new Error('Un control no tiene sesiones.');
+          if (!(n >= 1 && n <= 20 && Math.floor(n) === n)) throw new Error('Indique cuántas sesiones (de 1 a 20).');
+          if (n < hechas) throw new Error('Ya hizo ' + hechas + ' sesiones: el total no puede ser menor.');
+          nuevo = n;
+        } else if (col === 'FECHA_INICIO') {
+          nuevo = t.slice(0, 10);
+          if (nuevo && hechas) throw new Error('Ya empezó el tratamiento: la fecha de inicio no se cambia.');
+          if (nuevo && (nuevo < hoy || nuevo > mas(hoy, 180))) throw new Error('La fecha de la primera sesión va de hoy a 180 días.');
+        } else if (col === 'EXAMENES') { if (!control) throw new Error('Solo un control tiene exámenes.'); nuevo = t; }
+        else if (col === 'FECHA_RETORNO') {
+          if (!control) throw new Error('Solo un control tiene fecha de retorno.');
+          nuevo = t.slice(0, 10);
+          if (!nuevo || nuevo <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
+        }
+        if (String(nuevo) !== actual) out[col] = nuevo;
+      }
+      if (out.DETALLE !== undefined && !('MARCA' in out)) {
+        const m = marcas[norm(out.DETALLE)] || [];
+        if (m.length && !m.some(y => mismo(y, r.MARCA))) throw new Error('Elija la marca de ' + out.DETALLE + ': ' + m.join(' o ') + '.');
+        if (!m.length && r.MARCA) out.MARCA = '';
+      }
+      if (!Object.keys(out).length) return { ok: false, sinCambios: true };
+      Object.assign(r, out, { EDITADO: ahora() });
+      // La tarjeta del registro toma los datos nuevos (el servidor la recalcula al leer).
+      tarjetas.filter(t => t.ID_REGISTRO === r.ID).forEach(t => {
+        const n = reg(r);
+        ['NOMBRE', 'MEDICO_ULTIMO', 'FECHA_COTIZACION', 'DETALLE', 'TRATAMIENTO', 'MARCA', 'SESIONES', 'TELEFONOS', 'USUARIO'].forEach(k => { t[k] = n[k]; });
+        if (r.FECHA_INICIO && t.AGENDA === 'SESION') t.FECHA_AGENDA = r.FECHA_INICIO;
+        if (control && t.AGENDA === 'CONTROL') t.FECHA_AGENDA = r.FECHA_RETORNO;
+        ubicar(t, t.COLUMNA, t.ETIQUETA, t.COLUMNA === 'COMPLETADO' ? t.FECHA_CLAVE : '');
+      });
+      return { ok: true, registro: filaRegistrada(r) };
+    },
 
     anularRegistro: x => {
       exigir(x, true);
@@ -4588,17 +4932,33 @@ const DEMO = (() => {
       if (!f) throw new Error('Falta la fecha del alta.');
       if (f > hoy) throw new Error('La fecha no puede ser futura.');
       if (f < hechas[hechas.length - 1].FECHA) throw new Error('El alta no puede ser anterior a la última consulta.');
+      // Como validarAlta: la decisión (ALTA por omisión) y, si es una nueva reevaluación, su fecha de retorno.
+      const dec = DECISIONES[norm(x.decision) || 'ALTA'];
+      if (!dec) throw new Error('Elija la decisión del médico.');
+      let retorno = dec.meses ? sumarMeses(f, dec.meses) : '';
+      if (dec.pideFecha) {
+        retorno = String(x.fechaRetorno || '').slice(0, 10);
+        if (!retorno) throw new Error('Falta la fecha de retorno.');
+        if (retorno <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
+        if (retorno > mas(hoy, 730)) throw new Error('La fecha de retorno va hasta dos años desde hoy.');
+      }
       if (vigente(dni, esp)) throw new Error('Ese paciente ya tiene un alta vigente en ' + esp + '.');
       const a = { ID: siguiente(altas, 'ALT'), FECHA_HORA: ahora(), FECHA: f, DNI: dni, ESPECIALIDAD: esp, DOCTOR: doc.doctor, REGISTRADO_POR: quien,
-        NOTA: String(x.nota || '').trim(), ANULADO: '', MOTIVO_ANULACION: '' };
+        NOTA: String(x.nota || '').trim(), ANULADO: '', MOTIVO_ANULACION: '', DECISION: dec.nombre, FECHA_RETORNO: retorno };
       fotos[a.ID] = foto(dni, quien, 1, false);
       altas.push(a);
       sumarHecho(quien, 1, false);
       const s = serie(dni, esp);
-      if (s) s.ESTADO = 'ALTA';
       let t = tarjetas.find(y => y.DNI === dni && !y.ID_REGISTRO && mismo(y.ESPECIALIDAD, esp));
+      // Nueva reevaluación: no es alta; se le espera en la fecha de retorno (fuera del tablero hasta entonces).
+      if (dec.pideFecha) {
+        if (s) Object.assign(s, { ESTADO: 'AL DÍA', PROXIMA_ESPERADA: retorno });
+        if (t) t.COLUMNA = '';
+        return { ok: true, alta: a };
+      }
+      if (s) s.ESTADO = 'ALTA';
       if (!t) tarjetas.push(t = s || reev({ DNI: dni, ESPECIALIDAD: esp, NOMBRE: hechas[0].NOMBRE, ULTIMA_CITA: hechas[hechas.length - 1].FECHA, ESTADO: 'ALTA' }));
-      ubicar(t, f.slice(0, 7) === hoy.slice(0, 7) ? 'COMPLETADO' : '', 'Alta médica · ' + doc.doctor, f);
+      ubicar(t, f.slice(0, 7) === hoy.slice(0, 7) ? 'COMPLETADO' : '', (dec.meses ? dec.texto : 'Alta médica') + ' · ' + doc.doctor, f);
       return { ok: true, alta: a };
     },
 
@@ -4737,6 +5097,19 @@ const DEMO = (() => {
   // Envoltorio para las pruebas: cuenta llamadas, guarda los argumentos y puede fallar o tardar a pedido.
   // window.DEMO_FALLAR (puesto antes de cargar, p. ej. con addInitScript) permite que falle hasta bootstrap.
   const demo = { _llamadas: {}, _ultimo: {}, _fallar: Object.assign({}, window.DEMO_FALLAR || {}), _demora: {}, _alPedir: {} };
+  // Para las pruebas: un hierro registrado hoy con 3 sesiones, 2 hechas; recarga «Registrados» y devuelve su ID.
+  demo._registroConSesiones = () => {
+    const r = R(siguiente(registros, 'REG'), ahora(), mas(hoy, -14), 'MAGALY', 'Dr. Elí Cabanillas', 'MARTA PRUEBA SALAS', '46000111', '987000111',
+      'HIERRO', 'HIERRO SACARATO', '', 3);
+    registros.push(r);
+    sesiones.push(SES(siguiente(sesiones, 'SES'), r.ID, 1, mas(hoy, -14), 'MAGALY'));
+    sesiones.push(SES(siguiente(sesiones, 'SES'), r.ID, 2, mas(hoy, -7), 'MAGALY'));
+    const t = ubicar(reg(r), '');
+    tarjetas.push(t);
+    trasSesion(t, r);
+    if (typeof cargarRegistros === 'function') cargarRegistros();
+    return r.ID;
+  };
   Object.keys(api).forEach(fn => {
     demo[fn] = (...args) => {
       demo._llamadas[fn] = (demo._llamadas[fn] || 0) + 1;

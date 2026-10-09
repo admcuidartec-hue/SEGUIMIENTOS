@@ -1519,19 +1519,19 @@ test('arrastrar: Esc y pointercancel cancelan sin abrir paso ni guardar, y no de
 
 /* ============ Registro (Tarea 8) ============ */
 
-/** Abre Registro (con seg.usuario = 'MAGALY', salvo que `usuario` sea '') y espera «Registrados hoy». */
+/** Abre Registro (con seg.usuario = 'MAGALY', salvo que `usuario` sea '') y espera «Registrados». */
 async function abrirRegistro(opciones = {}) {
   const usuario = 'usuario' in opciones ? opciones.usuario : 'MAGALY';
   const r = await abrir(Object.assign({}, opciones, usuario ? { guardado: { 'seg.usuario': usuario } } : {}));
   try {
     await r.pagina.locator('.menu [data-sec="registro"]').click();
     await r.pagina.waitForSelector('#rform #rdni', { state: 'visible' });
-    await r.pagina.waitForSelector('#lhoy li[data-reg]');
+    await r.pagina.waitForSelector('#rlista li[data-reg]');
   } catch (e) { await r.navegador.close(); throw e; }
   return r;
 }
 const falta = pagina => pagina.locator('#rfalta').textContent();
-const filaHoy = (pagina, id) => pagina.locator(`#lhoy li[data-reg="${id}"]`);
+const filaHoy = (pagina, id) => pagina.locator(`#rlista li[data-reg="${id}"]`);
 /** Llena lo mínimo de una indicación (sin DNI ni contacto, que cada prueba pone). */
 async function llenarIndicacion(pagina, o = {}) {
   if (o.nombre) await pagina.locator('#rnom').fill(o.nombre);
@@ -1583,8 +1583,8 @@ test('registro: un DNI de fallecido muestra el aviso y deja registrar', async ()
     assert.equal(await pagina.locator('#rgo').isDisabled(), false, 'el aviso no bloquea');
     assert.equal(await falta(pagina), 'Se creará 1 registro.');
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
-    assert.equal(await aviso(pagina), 'Registrado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000009');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000009"]');
+    assert.equal(await aviso(pagina), 'Registro guardado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000009');
     const p = await ultimo(pagina, 'guardarRegistro');
     assert.equal(p.dni, '41999000');
     assert.equal(p.contacto, '933999000', 'el teléfono va sin espacios');
@@ -1606,7 +1606,7 @@ test('registro: el carné de extranjería AB123456X se acepta y no pierde las le
     await llenarIndicacion(pagina, { nombre: 'Juan Carlos Pérez Rojas', contacto: '@juan.perez', doctor: 'Dra. Karen Matos', procs: ['AMO'] });
     assert.doesNotMatch(await falta(pagina), /DNI/);
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000009"]');
     const p = await ultimo(pagina, 'guardarRegistro');
     assert.equal(p.dni, 'AB123456X');
     assert.equal(p.contacto, '@juan.perez');
@@ -1614,7 +1614,7 @@ test('registro: el carné de extranjería AB123456X se acepta y no pierde las le
   } finally { await navegador.close(); }
 });
 
-test('registro: dos procedimientos y un tratamiento con sesiones y marca crean tres REG y «Registrados hoy» los lista', async () => {
+test('registro: dos procedimientos y un tratamiento con sesiones y marca crean tres REG y «Registrados» los lista', async () => {
   const { navegador, pagina, errores } = await abrirRegistro();
   try {
     assert.equal(await pagina.locator('#nhoy').textContent(), '1');
@@ -1638,11 +1638,11 @@ test('registro: dos procedimientos y un tratamiento con sesiones y marca crean t
     await pagina.locator('#rses [data-marca="FERINJECT"]').click();
     await pagina.evaluate(() => { S.kpi = { viejo: 1 }; S.resumen = { viejo: 1 }; });
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000011"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000011"]');
     assert.deepEqual(await ultimo(pagina, 'guardarRegistro'), { usuario: 'MAGALY', dni: '45678901', nombre: 'Juana Pérez Soto', contacto: '987111333',
       fecha: '2026-10-01', doctor: 'Dra. Karen Matos', procedimientos: ['AMO', 'BIOPSIA'], tratamiento: 'HIERRO CARBOXIMALTOSA', sesiones: 2, marca: 'FERINJECT' });
     assert.equal(await aviso(pagina),
-      'Registrado: Amo + Biopsia + Hierro carboximaltosa · Ferinject × 2 sesiones · Juana Pérez Soto · REG-000009, REG-000010, REG-000011');
+      'Registro guardado: Amo + Biopsia + Hierro carboximaltosa · Ferinject × 2 sesiones · Juana Pérez Soto · REG-000009, REG-000010, REG-000011');
     for (const id of ['REG-000009', 'REG-000010', 'REG-000011']) assert.match(await filaHoy(pagina, id).textContent(), /JUANA PÉREZ SOTO/);
     assert.match(await filaHoy(pagina, 'REG-000011').textContent(), /Hierro carboximaltosa · Ferinject × 2 sesiones/);
     assert.match(await filaHoy(pagina, 'REG-000011').textContent(), /REG-000011 · registró Magaly/);
@@ -1667,7 +1667,7 @@ test('registro: «Posible duplicado» del servidor; «Revisar» la cierra y «Re
     };
     await llenar();
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000009"]');
     await llenar();
     const antes = await llamadas(pagina, 'guardarRegistro');
     await pagina.locator('#rgo').click();
@@ -1682,7 +1682,7 @@ test('registro: «Posible duplicado» del servidor; «Revisar» la cierra y «Re
     await pagina.locator('#rgo').click();
     await pagina.waitForSelector('#rdup .dup');
     await pagina.locator('#rforzar').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000010"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000010"]');
     assert.equal(await llamadas(pagina, 'guardarRegistro'), antes + 3);
     assert.equal((await ultimo(pagina, 'guardarRegistro')).confirmado, true);
     assert.match(await aviso(pagina), /REG-000010$/);
@@ -1725,13 +1725,13 @@ test('registro: sin contacto «Registrar» está deshabilitado y la barra dice q
 test('registro: alta médica con las especialidades del paciente; la que ya tiene alta está deshabilitada', async () => {
   const { navegador, pagina, errores } = await abrirRegistro();
   try {
-    await pagina.locator('#rseg [data-rmodo="alta"]').click();
+    await pagina.locator('#rseg [data-rtab="decision"]').click();
     await pagina.waitForSelector('#adni');
-    assert.match(await pagina.locator('#rgo').textContent(), /Registrar alta/);
+    assert.match(await pagina.locator('#rgo').textContent(), /Registrar decisión/);
     // Un DNI sin consultas no tiene alta.
     await pagina.locator('#adni').fill('45678904');
     await pagina.waitForFunction(() => /No encontramos ese DNI/.test(document.querySelector('#acon').textContent));
-    assert.equal((await pagina.locator('#acon').textContent()).trim(), 'No encontramos ese DNI. El alta solo se registra para pacientes que ya tienen consultas.');
+    assert.equal((await pagina.locator('#acon').textContent()).trim(), 'No encontramos ese DNI. La decisión del médico solo se registra para pacientes que ya tienen consultas.');
     assert.equal(await pagina.locator('#rgo').isDisabled(), true);
     await pagina.locator('#adni').fill('41666777');
     await pagina.waitForSelector('#aesps [data-esp]');
@@ -1743,17 +1743,17 @@ test('registro: alta médica con las especialidades del paciente; la que ya tien
     await pagina.locator('#aesps [data-esp="REUMATOLOGÍA"]').click();
     await pagina.locator('#anota').fill('Controles en otra sede');
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#lhoy li[data-reg="ALT-000003"]');
+    await pagina.waitForSelector('#rlista li[data-reg="ALT-000003"]');
     assert.deepEqual(await ultimo(pagina, 'darDeAlta'), { usuario: 'MAGALY', dni: '41666777', especialidad: 'REUMATOLOGÍA',
-      doctor: 'Dr. Juvenal Hanampa', fecha: '2026-10-01', nota: 'Controles en otra sede' });
-    assert.equal(await aviso(pagina), 'Alta médica registrada: Teresa del Pilar Rojas Vargas · Reumatología · ALT-000003');
+      doctor: 'Dr. Juvenal Hanampa', fecha: '2026-10-01', nota: 'Controles en otra sede', decision: 'ALTA', fechaRetorno: '' });
+    assert.equal(await aviso(pagina), 'Registro guardado: Alta médica · Teresa del Pilar Rojas Vargas · Reumatología · ALT-000003');
     assert.match(await filaHoy(pagina, 'ALT-000003').textContent(), /Alta médica · REUMATOLOGÍA · Dr\. Juvenal Hanampa/);
     assert.equal(await pagina.locator('#adni').inputValue(), '', 'el formulario se limpia');
     // Su anulación va por anularAlta.
     await filaHoy(pagina, 'ALT-000003').locator('[data-anular]').click();
     await filaHoy(pagina, 'ALT-000003').locator('.anula input').fill('Especialidad equivocada');
     await filaHoy(pagina, 'ALT-000003').locator('[data-confirmar-anular]').click();
-    await pagina.waitForSelector('#lhoy li.anulado[data-reg="ALT-000003"]');
+    await pagina.waitForSelector('#rlista li.anulado[data-reg="ALT-000003"]');
     assert.deepEqual(await ultimo(pagina, 'anularAlta'), { usuario: 'MAGALY', id: 'ALT-000003', motivo: 'Especialidad equivocada' });
     assert.equal(await llamadas(pagina, 'anularRegistro'), 0);
     assert.deepEqual(errores, []);
@@ -1794,15 +1794,15 @@ test('registro: «Anular» pide motivo en la fila, espera al servidor y deja la 
     await pagina.evaluate(() => { delete DEMO._fallar.anularRegistro; DEMO._demora.anularRegistro = 400; });
     await ok.click();
     await pagina.waitForTimeout(150);
-    assert.equal(await pagina.locator('#lhoy li.anulado[data-reg="REG-000003"]').count(), 0, 'no se tacha antes de la respuesta');
-    await pagina.waitForSelector('#lhoy li.anulado[data-reg="REG-000003"]');
+    assert.equal(await pagina.locator('#rlista li.anulado[data-reg="REG-000003"]').count(), 0, 'no se tacha antes de la respuesta');
+    await pagina.waitForSelector('#rlista li.anulado[data-reg="REG-000003"]');
     assert.deepEqual(await ultimo(pagina, 'anularRegistro'), { usuario: 'MAGALY', id: 'REG-000003', motivo: 'Paciente equivocado' });
     assert.equal(await llamadas(pagina, 'anularAlta'), 0);
-    assert.equal(await pagina.locator('#lhoy li[data-reg="REG-000003"] .tx').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
+    assert.equal(await pagina.locator('#rlista li[data-reg="REG-000003"] .tx').first().evaluate(el => getComputedStyle(el).textDecorationLine), 'line-through');
     assert.match(await filaHoy(pagina, 'REG-000003').textContent(), /anulado: Paciente equivocado/);
     assert.match(await filaHoy(pagina, 'REG-000003').textContent(), /Anulado/);
     assert.equal(await pagina.locator('#nhoy').textContent(), '0');
-    assert.equal(await aviso(pagina), 'Anulado: REG-000003.');
+    assert.equal(await aviso(pagina), 'Registro anulado: Hierro carboximaltosa · Likfer × 2 sesiones · REG-000003');
     // El tablero se actualiza: la tarjeta de ese registro sale.
     await pagina.waitForFunction(() => !S.pacientes.some(p => p.id === 'REG-000003'));
     assert.deepEqual(errores, []);
@@ -1819,12 +1819,12 @@ test('registro: Enter envía una sola vez, no reenvía con la caja de duplicado 
     await pagina.evaluate(() => { DEMO._demora.guardarRegistro = 400; });
     await pagina.locator('#rnom').press('Enter');
     await pagina.waitForFunction(() => RG.enviando);
-    assert.equal(await pagina.locator('#rseg [data-rmodo="alta"]').isDisabled(), true);
+    assert.equal(await pagina.locator('#rseg [data-rtab="decision"]').isDisabled(), true);
     await pagina.locator('#rnom').press('Enter');
-    await pagina.waitForSelector('#lhoy li[data-reg="REG-000009"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000009"]');
     assert.equal(await llamadas(pagina, 'guardarRegistro'), 1, 'Enter envía una sola vez');
     assert.equal((await ultimo(pagina, 'guardarRegistro')).contacto, '+51987654321', 'el + se conserva y los espacios no');
-    assert.equal(await pagina.locator('#rseg [data-rmodo="alta"]').isDisabled(), false);
+    assert.equal(await pagina.locator('#rseg [data-rtab="decision"]').isDisabled(), false);
     await pagina.evaluate(() => { delete DEMO._demora.guardarRegistro; });
     // Con la caja de duplicado abierta, Enter no reenvía: decide la asesora.
     await pagina.locator('#rdni').fill('45678905');
@@ -1853,14 +1853,14 @@ test('registro: una anulación en vuelo no se manda dos veces y la fila abierta 
     assert.equal(await fila.locator('[data-confirmar-anular]').isDisabled(), true, 'escribir no lo rehabilita');
     await fila.locator('.anula input').press('Enter');
     await fila.locator('[data-confirmar-anular]').click({ force: true });
-    await pagina.waitForSelector('#lhoy li.anulado[data-reg="REG-000003"]');
+    await pagina.waitForSelector('#rlista li.anulado[data-reg="REG-000003"]');
     assert.equal(await llamadas(pagina, 'anularRegistro'), 1);
     assert.equal(await pagina.evaluate(() => RG.anulandoEnVuelo), '');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
 
-test('registro: si anular falla en «Registrados hoy», la fila no se tacha, el botón vuelve y se avisa', async () => {
+test('registro: si anular falla en «Registrados», la fila no se tacha, el botón vuelve y se avisa', async () => {
   const { navegador, pagina, errores } = await abrirRegistro();
   try {
     const fila = filaHoy(pagina, 'REG-000003');
@@ -1872,12 +1872,133 @@ test('registro: si anular falla en «Registrados hoy», la fila no se tacha, el 
     assert.equal(await ok.isDisabled(), true, 'en vuelo, deshabilitado');
     await pagina.waitForFunction(() => /No se anuló/.test(document.querySelector('#aviso span').textContent));
     assert.equal(await aviso(pagina), 'No se anuló: Sin conexión con el servidor.');
-    assert.equal(await pagina.locator('#lhoy li.anulado[data-reg="REG-000003"]').count(), 0, 'la fila no se tacha');
+    assert.equal(await pagina.locator('#rlista li.anulado[data-reg="REG-000003"]').count(), 0, 'la fila no se tacha');
     assert.doesNotMatch(await fila.textContent(), /anulado:/);
     assert.equal(await ok.isDisabled(), false, 'el botón vuelve');
     assert.equal(await fila.locator('.anula input').inputValue(), 'Paciente equivocado');
     assert.equal(await pagina.evaluate(() => RG.anulandoEnVuelo), '');
     assert.equal(await llamadas(pagina, 'anularRegistro'), 1);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ---- Etapa 2 (Tarea 10): tres pestañas, «Registrados» por periodo, Editar y confirmación ---- */
+
+test('registro: control + laboratorio propone el retorno a 15 días y lo registra', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('[data-rtab="control"]').click();
+    await pagina.locator('#rdni').fill('40111222');
+    await pagina.waitForSelector('text=Paciente conocido');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    assert.equal(await pagina.locator('#rretorno').inputValue(), masDiasIso(HOY_DEMO, 15));
+    await pagina.locator('#rexamenes').fill('Hemograma');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.guardarRegistro > 0);
+    const u = await ultimo(pagina, 'guardarRegistro');
+    assert.deepEqual([u.tipo, u.examenes, u.fechaRetorno], ['CONTROL', 'Hemograma', masDiasIso(HOY_DEMO, 15)]);
+    assert.match(await aviso(pagina), /Registro guardado: Control \+ laboratorio · Hemograma/);
+    assert.equal(await pagina.locator('#rlista .ok-reciente').count(), 1);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: «Decisión del médico» con nueva reevaluación exige la fecha de retorno', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('[data-rtab="decision"]').click();
+    await pagina.locator('#adni').fill('40111222');
+    await pagina.locator('#amed').selectOption({ index: 1 });
+    await pagina.locator('input[name="rdec"][value="NUEVA REEVALUACION"]').check();
+    await pagina.locator('#rgo').click();
+    assert.match(await aviso(pagina), /fecha de retorno/);
+    await pagina.locator('#aretorno').fill(masDiasIso(HOY_DEMO, 40));
+    await pagina.locator('#rgo').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.darDeAlta > 0);
+    const u = await ultimo(pagina, 'darDeAlta');
+    assert.deepEqual([u.decision, u.fechaRetorno], ['NUEVA REEVALUACION', masDiasIso(HOY_DEMO, 40)]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: «Decisión del médico» a 6 meses avisa cuándo vuelve a «Por contactar»; la indicación manda la primera sesión', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('[data-rtab="decision"]').click();
+    assert.equal(await pagina.locator('input[name="rdec"]:checked').getAttribute('value'), 'ALTA');
+    assert.deepEqual(await pagina.locator('input[name="rdec"]').evaluateAll(l => l.map(x => x.value)),
+      ['ALTA', 'ALTA 6 MESES', 'ALTA 1 AÑO', 'NUEVA REEVALUACION']);
+    assert.equal(await pagina.locator('#aretorno').count(), 0, 'sin reevaluación no pide la fecha');
+    await pagina.locator('input[name="rdec"][value="ALTA 6 MESES"]').check();
+    // 01/10/2026 + 6 meses = 01/04/2027, menos 30 días = 02/03/2027.
+    assert.match(await pagina.locator('#rform').textContent(), /Volverá a «Por contactar» el 02\/03\/2027 para agendar su control\./);
+    await pagina.locator('input[name="rdec"][value="ALTA 1 AÑO"]').check();
+    assert.match(await pagina.locator('#rform').textContent(), /Volverá a «Por contactar» el 01\/09\/2027 para agendar su control\./);
+    // Indicación: la fecha de la primera sesión es opcional y va desde hoy.
+    await pagina.locator('[data-rtab="indicacion"]').click();
+    assert.equal(await pagina.locator('#rinicio').getAttribute('min'), HOY_DEMO);
+    await pagina.locator('#rdni').fill('45678906');
+    await pagina.waitForSelector('#rcon .nuevo');
+    await llenarIndicacion(pagina, { nombre: 'Elsa Prueba Mora', contacto: '987000222', doctor: 'Dr. Elí Cabanillas', procs: ['SANGRÍA'] });
+    await pagina.locator('#rinicio').fill(masDiasIso(HOY_DEMO, 3));
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000009"]');
+    assert.equal((await ultimo(pagina, 'guardarRegistro')).fechaInicio, masDiasIso(HOY_DEMO, 3));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: «Registrados» por mes, Editar manda solo lo cambiado y confirma', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const periodos = await pagina.locator('#rperiodo option').evaluateAll(o => o.map(x => x.value));
+    assert.equal(periodos[0], 'HOY');
+    assert.deepEqual(periodos.slice(1), ['2026-10', '2026-09', '2026-08', '2026-07', '2026-06', '2026-05']);
+    await pagina.locator('#rperiodo').selectOption(periodos[1]);
+    await pagina.waitForFunction(() => DEMO._llamadas.getRegistros > 1);
+    assert.equal((await ultimo(pagina, 'getRegistros')).periodo, periodos[1]);
+    await pagina.locator('#rperiodo').selectOption('HOY');
+    const id = await pagina.locator('#rlista [data-editar]').first().getAttribute('data-editar');
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    await pagina.locator('#rlista [data-campo="contacto"]').fill('912 000 111');
+    await pagina.locator('#rlista [data-guardar-edicion]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.editarRegistro > 0);
+    assert.deepEqual(await ultimo(pagina, 'editarRegistro'), { usuario: 'MAGALY', id, cambios: { contacto: '912 000 111' } });
+    assert.match(await aviso(pagina), /Registro editado/);
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').count(), 0, 'el formulario se cierra');
+    assert.equal(await pagina.locator(`#rlista li.ok-reciente[data-reg="${id}"]`).count(), 1);
+    // Ni las anuladas ni las decisiones se editan.
+    assert.equal(await filaHoy(pagina, 'REG-000007').locator('[data-editar]').count(), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: Editar sin cambios avisa «No hay cambios.» y no llama al servidor', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await filaHoy(pagina, 'REG-000003').locator('[data-editar]').click();
+    await pagina.locator('#rlista [data-guardar-edicion]').click();
+    assert.equal(await aviso(pagina), 'No hay cambios.');
+    assert.equal(await llamadas(pagina, 'editarRegistro'), 0);
+    // Si el servidor dice que no hay cambios (lo igual se descarta allí), también.
+    await pagina.locator('#rlista [data-campo="nombre"]').fill('ana maría flores ríos');
+    await pagina.locator('#rlista [data-guardar-edicion]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.editarRegistro > 0);
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'No hay cambios.' && !document.querySelector('#rlista [data-guardar-edicion]'));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: Editar no deja bajar las sesiones de las hechas (el servidor lo rechaza y el formulario sigue abierto)', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const id = await pagina.evaluate(() => DEMO._registroConSesiones());
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    await pagina.locator('#rlista [data-campo="sesiones"]').fill('1');
+    await pagina.locator('#rlista [data-guardar-edicion]').click();
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.match(await aviso(pagina), /Ya hizo 2 sesiones/);
+    assert.equal(await pagina.locator('#rlista [data-campo="sesiones"]').inputValue(), '1');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

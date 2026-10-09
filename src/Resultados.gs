@@ -128,8 +128,9 @@ function leerCiclo(lista, reglas, hoy) {
   if (u.resultado === 'LO PENSARÁ' && u.fechaProxima && hoy < u.fechaProxima) {
     out.agenda = { tipo: 'LLAMAR', fecha: u.fechaProxima, intento: 0 };
   }
-  if (u.resultado === 'AGENDÓ CITA' && u.fechaProxima && hoy <= sumarDias(u.fechaProxima, reglas.graciaAgenda)) {
-    out.agenda = { tipo: 'CITA', fecha: u.fechaProxima, intento: 0 };
+  if (u.resultado === 'AGENDÓ CITA' && u.fechaProxima) {
+    if (hoy <= sumarDias(u.fechaProxima, reglas.graciaAgenda)) out.agenda = { tipo: 'CITA', fecha: u.fechaProxima, intento: 0 };
+    else out.citaVencida = u.fechaProxima;   // pasó sin que nadie la marcara: pendientesRegistro lo lee como «No vino»
   }
   return out;
 }

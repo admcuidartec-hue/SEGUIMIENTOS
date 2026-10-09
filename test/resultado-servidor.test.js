@@ -296,5 +296,6 @@ test('«Aceptó» sobre un registro en curso se rechaza sin candado; «Agendó c
   assert.deepEqual([escrito.SEGUIMIENTOS.length, lock.tomado], [0, 0]);
   const r = plano(ctx.registrarResultado(Object.assign({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' }, base)));
   assert.deepEqual([escrito.SEGUIMIENTOS[0].RESULTADO, escrito.SEGUIMIENTOS[0].REFERENCIA], ['AGENDÓ CITA', 'REG-000010']);
-  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.AGENDA, r.tarjeta.FECHA_AGENDA], ['AGENDADO', 'CITA', '2026-10-12']);
+  // Un tratamiento en curso agenda su próxima sesión: la tarjeta lo dice así, «Sesión 2 el …», como al marcar con «Próxima sesión».
+  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.AGENDA, r.tarjeta.FECHA_AGENDA, r.tarjeta.ETIQUETA], ['AGENDADO', 'SESION', '2026-10-12', 'Sesión 2 el lun 12/10']);
 });

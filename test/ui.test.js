@@ -3519,3 +3519,141 @@ test('tablero: la ayuda de atajos dice «1–3 qué pasó»', async () => {
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+/* ---------- Marcar la sesión y agendar la siguiente en un paso ---------- */
+test('En tratamiento: «Próxima sesión» opcional; con fecha, marcar la sesión la deja en Agendado «Sesión k+1 el …»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, SOFIA);
+    const pfp = pagina.locator('#panel #pfp');
+    assert.ok(await pfp.isVisible(), 'la sesión 2 de 3 no es la última');
+    assert.equal(await pfp.inputValue(), '', 'vacía por omisión');
+    assert.equal(await pfp.getAttribute('min'), '2026-10-02', 'el día después de la fecha de la sesión');
+    assert.equal(await pfp.getAttribute('max'), masDiasIso('2026-10-01', 180));
+    assert.match(await pagina.locator('#panel label:has(#pfp)').textContent(), /Próxima sesión/);
+    // Si cambia la fecha de la sesión, el rango de la próxima la sigue.
+    await pagina.locator('#panel #pfs').fill('2026-09-30');
+    await pagina.locator('#panel #pfs').dispatchEvent('change');
+    assert.equal(await pfp.getAttribute('min'), '2026-10-01');
+    await pagina.locator('#panel #pfs').fill('2026-10-01');
+    await pfp.fill('2026-10-08');
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await esperarEstable(pagina);
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', proxima: '2026-10-08' });
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0, 'una sola llamada: marcarSesion');
+    await esperarCol(pagina, SOFIA, '2');
+    await pagina.waitForFunction(id => /Sesión 3 el jue 08\/10/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
+    assert.match(await aviso(pagina), /próxima sesión el jue 08\/10/);
+    const d = await datosDemo(pagina);
+    const t = d.columnas.AGENDADO.find(x => x.CLAVE === SOFIA);
+    assert.deepEqual([t.AGENDA, t.FECHA_AGENDA, t.HECHAS, t.ETIQUETA], ['SESION', '2026-10-08', 2, 'Sesión 3 el jue 08/10']);
+    // En Agendado, el panel ofrece marcar la sesión agendada, «No contestó» y «Cambiar fecha», con 1, 2 y 3.
+    await abrirPanelDe(pagina, SOFIA);
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) button').evaluateAll(l => l.map(b => [...b.querySelectorAll('span')].map(x => x.textContent.trim()).join(' '))),
+      ['Marcar sesión 3 hecha 1', 'No contestó 2', 'Cambiar fecha 3', 'Anular la última']);
+    assert.equal(await pagina.locator('#panel #pfp').count(), 0, 'la sesión 3 de 3 es la última: sin «Próxima sesión»');
+    // Marcar la sesión agendada la saca de Agendado: es la última, pasa a Completado.
+    await pagina.keyboard.press('1');
+    await esperarEstable(pagina);
+    await esperarCol(pagina, SOFIA, '4');
+    assert.match(await textoTarjeta(pagina, SOFIA), /Completó el tratamiento/);
+    assert.equal((await datosDemo(pagina)).columnas.AGENDADO.some(x => x.CLAVE === SOFIA), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('En tratamiento: sin «Próxima sesión» todo sigue igual, y en la última sesión el campo no aparece', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await esperarEstable(pagina);
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
+    await esperarCol(pagina, SOFIA, '3');
+    await pagina.waitForFunction(id => !S.sinRecargar.has(id), SOFIA);
+    await abrirPanelDe(pagina, SOFIA);
+    assert.match(await pagina.locator('#panel [data-marcar-sesion]').textContent(), /Marcar sesión 3 hecha/);
+    assert.equal(await pagina.locator('#panel #pfp').count(), 0);
+    // El DEMO rechaza una próxima en la última sesión, como el servidor.
+    const r = await pagina.evaluate(id => llamar('marcarSesion', { usuario: 'MAGALY', id, fecha: '2026-10-01', proxima: '2026-10-08' }).then(() => 'ok', e => e.message), SOFIA);
+    assert.equal(r, 'Es la última sesión del tratamiento: no hay una próxima que agendar.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('«Deshacer» tras marcar con próxima: anula la sesión y con ella la agenda; la tarjeta vuelve a En tratamiento', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel #pfp').fill('2026-10-08');
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await esperarEstable(pagina);
+    await esperarCol(pagina, SOFIA, '2');
+    await pagina.waitForSelector('#aviso button:not([hidden])');
+    assert.equal(await pagina.locator('#aviso button').textContent(), 'Deshacer');
+    await pagina.locator('#aviso button').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularSesion === 1);
+    assert.equal(await llamadas(pagina, 'anularResultado'), 0, 'se deshace la sesión, no solo la agenda');
+    await esperarCol(pagina, SOFIA, '3');
+    await pagina.waitForFunction(id => /Sesión 2 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
+    const segs = await pagina.evaluate(() => llamar('getPaciente', '41111222').then(p => p.seguimientos.filter(s => s.REFERENCIA === 'REG-000002')));
+    assert.deepEqual(segs.map(s => [s.RESULTADO, !!s.ANULADO]), [['AGENDÓ CITA', true]], 'la agenda quedó anulada con su sesión');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Agendado: un registro programado ofrece marcar la sesión 1, «No contestó» y «Cambiar fecha» (que es «Aceptó» con la fecha nueva)', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, 'REG-000021');
+    await pagina.locator('#panel [data-acc="acepto"]').click();
+    await confirmarPaso(pagina, masDiasIso(HOY_DEMO, 3));
+    await esperarEstable(pagina);
+    await esperarCol(pagina, 'REG-000021', '2');
+    await abrirPanelDe(pagina, 'REG-000021');
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) button').evaluateAll(l => l.map(b => [...b.querySelectorAll('span')].map(x => x.textContent.trim()).join(' '))),
+      ['Marcar sesión 1 hecha 1', 'No contestó 2', 'Cambiar fecha 3', 'Anular la última']);
+    assert.equal(await pagina.locator('#panel [data-anular-ultima]').isDisabled(), true, 'sin sesiones no hay qué anular');
+    assert.ok(await pagina.locator('#panel #pfp').isVisible(), 'la sesión 1 de 3 admite «Próxima sesión»');
+    // 3: «Cambiar fecha» abre el paso con la fecha agendada y guarda «Aceptó» con la nueva.
+    await pagina.keyboard.press('3');
+    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Cambiar fecha/);
+    assert.equal(await pagina.locator('#panel #pf').inputValue(), masDiasIso(HOY_DEMO, 3), 'propone la fecha agendada');
+    await confirmarPaso(pagina, masDiasIso(HOY_DEMO, 6));
+    await esperarEstable(pagina);
+    const u = await ultimo(pagina, 'registrarResultado');
+    assert.deepEqual([u.resultado, u.referencia, u.fecha], ['ACEPTÓ', 'REG-000021', masDiasIso(HOY_DEMO, 6)]);
+    await pagina.waitForFunction(() => /Sesión 1 el mié 07\/10/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === 'REG-000021').textContent));
+    // 2 en el panel: «No contestó».
+    await abrirPanelDe(pagina, 'REG-000021');
+    const antes = await llamadas(pagina, 'registrarResultado');
+    await pagina.keyboard.press('2');
+    await esperarEstable(pagina);
+    assert.equal(await llamadas(pagina, 'registrarResultado'), antes + 1);
+    assert.equal((await ultimo(pagina, 'registrarResultado')).resultado, 'NO CONTESTÓ');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Agendado: en un tratamiento en curso «Cambiar fecha» es «Agendó cita» y la tarjeta dice «Sesión k+1 el …»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel #pfp').fill('2026-10-08');
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await esperarEstable(pagina);
+    await esperarCol(pagina, SOFIA, '2');
+    await pagina.waitForFunction(id => !S.sinRecargar.has(id), SOFIA);
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel [data-acc="cambiar"]').click();
+    assert.match(await pagina.locator('#panel .paso').textContent(), /Fecha de la sesión 3/);
+    assert.equal(await pagina.locator('#panel #pf').inputValue(), '2026-10-08');
+    await confirmarPaso(pagina, '2026-10-09');
+    await esperarEstable(pagina);
+    const u = await ultimo(pagina, 'registrarResultado');
+    assert.deepEqual([u.resultado, u.referencia, u.fecha], ['AGENDÓ CITA', SOFIA, '2026-10-09']);
+    await pagina.waitForFunction(id => /Sesión 3 el vie 09\/10/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
+    assert.equal((await datosDemo(pagina)).columnas.AGENDADO.find(x => x.CLAVE === SOFIA).AGENDA, 'SESION');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

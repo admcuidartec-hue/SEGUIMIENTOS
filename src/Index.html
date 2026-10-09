@@ -1532,8 +1532,10 @@ document.addEventListener('keydown', e => {
     const p = S.pacientes.find(x => x.id === seleccion.panel);
     if (!p) return;
     if (tecla === 'c') copiarContacto(p);
-    else if (p.col === 3 && !P.paso && tecla === '1') { e.preventDefault(); marcarSesionPanel(true); }
-    else if (p.col !== 4 && p.col !== 3 && !P.paso && /^[1-3]$/.test(tecla)) {
+    else if (conSesion(p) && !P.paso && /^[1-3]$/.test(tecla)) {
+      const a = atajosSesion(p)[Number(tecla) - 1];
+      if (a) { e.preventDefault(); if (a === 'marcar') marcarSesionPanel(true); else elegir(a, true); }
+    } else if (p.col !== 4 && !conSesion(p) && !P.paso && /^[1-3]$/.test(tecla)) {
       const a = accDe(p)[Number(tecla) - 1];
       if (a) { e.preventDefault(); elegir(a.k, true); }
     } else if (p.col !== 4 && tecla === 'x') { e.preventDefault(); resaltarCierre(); }
@@ -1568,7 +1570,14 @@ document.addEventListener('keydown', e => {
     if (!p || p.col === 4) return;
     e.preventDefault();
     if (tecla === 'x') { abrirPanel(p.id, true, { cierre: true }); return; }
-    if (p.col === 3) { abrirPanel(p.id, true); return; }   // En tratamiento: la sesión se marca desde el panel
+    if (conSesion(p)) {
+      // La sesión se marca desde el panel (fecha y «Próxima sesión»); en Agendado, 2 = «No contestó» guarda y 3 abre «Cambiar fecha».
+      const a = atajosSesion(p)[Number(tecla) - 1];
+      if (a === 'nocontesto') guardarResultado(p.id, 'NO CONTESTÓ', { teclado: true });
+      else if (a === 'cambiar') abrirPanel(p.id, true, { paso: 'cambiar' });
+      else abrirPanel(p.id, true);
+      return;
+    }
     const a = accDe(p)[Number(tecla) - 1];
     if (!a) return;
     if (a.k === 'nocontesto') guardarResultado(p.id, a.r, { teclado: true });
@@ -1606,12 +1615,18 @@ function esIndicacion(p) { return (p.t === 'hier' || p.t === 'proc') && !p.porRe
 const accDe = p => ACC.filter(a => !a.para || a.para(p))
   .map(a => a.k === 'acepto' ? Object.assign({}, a, { l: p.t === 'hier' ? 'Aceptó tratamiento' : 'Aceptó procedimiento' }) : a);
 const cierresDe = p => CIERRES.filter(c => (!c.conTel || activos(p).length) && (!c.para || c.para(p)));
+/** Un registro en Agendado con su sesión agendada («Sesión k el …»): programado o en curso. */
+const sesionAgendada = p => p.col === 2 && p.agenda === 'SESION' && !!p.idRegistro;
+/** Tarjetas cuyo panel es el bloque de sesiones (marcar la siguiente) en vez de «¿Qué pasó?». */
+const conSesion = p => p.col === 3 || sesionAgendada(p);
+/** Atajos del bloque de sesiones, en orden: 1 = marcar; en Agendado, además 2 = «No contestó» y 3 = «Cambiar fecha». */
+const atajosSesion = p => sesionAgendada(p) ? ['marcar', 'nocontesto', 'cambiar'] : ['marcar'];
 const EASE_IO = 'cubic-bezier(.77,0,.175,1)', EASE_OUT = 'cubic-bezier(.23,1,.32,1)';
 const esAnulado = v => v === true || norm(v) === 'SI';
 
 /** Estado del panel abierto. La nota vive aquí mientras el panel siga abierto en ese paciente. */
 const P = { clave: '', paso: null, nota: '', cierre: false, anulando: '', motivoAnular: '', anulandoEnVuelo: '', hist: null,
-  sesionF: '', anularUltima: false, motivoUltima: '', ultimaEnVuelo: false };
+  sesionF: '', proximaF: '', anularUltima: false, motivoUltima: '', ultimaEnVuelo: false };
 
 /* ---- Movimiento: FLIP, salida y chispas (README §7). Solo transform y opacity ---- */
 function conFlip(fn, llega, celebra, sinAnim) {
@@ -1672,7 +1687,7 @@ function abrirPanel(clave, teclado, opciones) {
   const ya = seleccion.panel === clave && P.clave === clave;
   seleccion.panel = clave;
   if (!ya) {
-    Object.assign(P, { clave, paso: null, nota: '', cierre: false, anulando: '', hist: null, sesionF: '', anularUltima: false, motivoUltima: '' });
+    Object.assign(P, { clave, paso: null, nota: '', cierre: false, anulando: '', hist: null, sesionF: '', proximaF: '', anularUltima: false, motivoUltima: '' });
     cargarHistoria(p);
   }
   const inst = !!teclado || reducido;
@@ -1764,34 +1779,64 @@ function quePasoHtml(p) {
   if (p.col === 4) return `<p class="ok-cerrado"><i class="ph-fill ph-check-circle"></i><span><b>Seguimiento cerrado.</b> ${esc(p.fin)}</span></p>`;
   if (P.paso) return htmlPaso(p);
   return '<section><h3 class="grande">¿Qué pasó?</h3>'
-    + (p.col === 3 ? sesionesHtml(p) : `<div class="acc">${accDe(p).map((a, i) => `<button type="button" data-acc="${a.k}"><i class="${a.i}"></i><span>${a.l}</span><span class="kbd">${i + 1}</span></button>`).join('')}</div>`)
+    + (conSesion(p) ? sesionesHtml(p) : `<div class="acc">${accDe(p).map((a, i) => `<button type="button" data-acc="${a.k}"><i class="${a.i}"></i><span>${a.l}</span><span class="kbd">${i + 1}</span></button>`).join('')}</div>`)
     + '<h3>Cerrar el seguimiento <span class="kbd">X</span></h3>'
     + `<div class="acc cierra${P.cierre ? ' resaltado' : ''}">${cierresDe(p).map(c => `<button type="button" data-acc="${c.k}"><i class="${c.i}"></i><span>${c.l}</span></button>`).join('')}</div></section>`;
 }
 /** Rango de la fecha de una sesión: desde la última sesión (o la cotización) hasta hoy. */
 const rangoSesion = p => ({ min: String(p.raw.ULTIMA_SESION || p.cotizo || '').slice(0, 10), max: S.hoy, f: S.hoy });
+/** «Próxima sesión»: del día después de la sesión que se marca a 180 días (validarProximaSesion). */
+const rangoProxima = f => ({ min: f ? masDias(f, 1) : '', max: f ? masDias(f, 180) : '' });
+/** La sesión que se marca (k) y si es la última del tratamiento (entonces no hay «Próxima sesión»). */
+function sesionDe(p) {
+  const hechas = p.trat ? p.trat.k : Number(p.raw.HECHAS) || 0, total = p.trat ? p.trat.n : Number(p.raw.SESIONES) || 1;
+  return { k: hechas + 1, ultima: hechas + 1 >= total };
+}
 /**
- * En tratamiento: en lugar de «¿Qué pasó?», marcar la sesión siguiente (fecha de hoy por omisión) o anular la última
- * (pide motivo en la misma línea). La última sesión llega en la tarjeta como ULTIMA_SESION_ID.
+ * En tratamiento, y en Agendado con la sesión agendada: en lugar de «¿Qué pasó?», marcar la sesión siguiente (fecha de hoy
+ * por omisión, y opcionalmente la fecha exacta de la próxima) o anular la última (pide motivo en la misma línea).
+ * En Agendado, además «No contestó» y «Cambiar fecha». La última sesión llega en la tarjeta como ULTIMA_SESION_ID.
  */
 function sesionesHtml(p) {
-  const r = rangoSesion(p), f = P.sesionF || r.f, k = (p.trat ? p.trat.k : Number(p.raw.HECHAS) || 0) + 1, ult = p.raw.ULTIMA_SESION_ID;
+  const r = rangoSesion(p), f = P.sesionF || r.f, { k, ultima } = sesionDe(p), ult = p.raw.ULTIMA_SESION_ID, rp = rangoProxima(f);
+  const agendada = sesionAgendada(p);
   return `<label class="campo">Fecha de la sesión<input type="date" id="pfs" value="${esc(f)}"${r.min ? ` min="${esc(r.min)}"` : ''} max="${esc(r.max)}"></label>`
+    + (ultima ? '' : `<label class="campo">Próxima sesión (opcional)<input type="date" id="pfp" value="${esc(P.proximaF)}" min="${esc(rp.min)}" max="${esc(rp.max)}"></label>`)
     + `<div class="acc"><button type="button" data-marcar-sesion><i class="ph ph-check-square i-ok"></i><span>Marcar sesión ${k} hecha</span><span class="kbd">1</span></button>`
+    + (agendada ? `<button type="button" data-acc="nocontesto"><i class="${RES.nocontesto.i}"></i><span>No contestó</span><span class="kbd">2</span></button>`
+      + '<button type="button" data-acc="cambiar"><i class="ph ph-calendar-blank i-info"></i><span>Cambiar fecha</span><span class="kbd">3</span></button>' : '')
     + `<button type="button" data-anular-ultima${ult && !P.anularUltima && !sesionSinRecargar(p) ? '' : ' disabled'}><i class="ph ph-arrow-counter-clockwise"></i><span>Anular la última</span></button></div>`
     + (P.anularUltima ? `<div class="motivo"><input id="motivo-ultima" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(P.motivoUltima)}">`
       + `<button type="button" class="btn btn-p" data-confirmar-ultima${P.ultimaEnVuelo || !P.motivoUltima.trim() ? ' disabled' : ''}>Anular</button>`
       + '<button type="button" class="btn btn-s" data-cancelar-ultima>Cancelar</button></div>' : '');
 }
+/** Al cambiar la fecha de la sesión, el rango de «Próxima sesión» la sigue (sin repintar: el foco sigue en el campo). */
+function seguirProxima(f) {
+  const c = $('#panel #pfp');
+  if (!c) return;
+  const rp = rangoProxima(f);
+  c.setAttribute('min', rp.min);
+  c.setAttribute('max', rp.max);
+}
 /** Mientras se guarda una sesión y hasta que llega el tablero, ULTIMA_SESION_ID de la tarjeta está viejo. */
 const sesionSinRecargar = p => S.enVuelo.has(p.id) || S.sinRecargar.has(p.id);
-/** «Marcar sesión k hecha»: guarda como «Lo hizo», que para un registro va a marcarSesion. */
+/**
+ * «Marcar sesión k hecha»: guarda como «Lo hizo», que para un registro va a marcarSesion. Con «Próxima sesión», la misma
+ * llamada agenda la siguiente (los mensajes son los de validarProximaSesion).
+ */
 function marcarSesionPanel(teclado) {
   const p = S.pacientes.find(x => x.id === seleccion.panel);
-  if (!p || p.col !== 3) return;
+  if (!p || !conSesion(p)) return;
   const r = rangoSesion(p), f = P.sesionF || r.f, m = validarFecha('lohizo', f, r);
   if (m) { avisar(m); return; }
-  guardarResultado(p.id, 'LO HIZO', { fecha: f, teclado: !!teclado });
+  const extra = { fecha: f, teclado: !!teclado }, prox = sesionDe(p).ultima ? '' : String(P.proximaF || '').trim();
+  if (prox) {
+    const rp = rangoProxima(f);
+    if (prox < rp.min) { avisar(`La próxima sesión debe ser después de la sesión que marca (${dmy(f)}).`); return; }
+    if (prox > rp.max) { avisar('La próxima sesión va hasta 180 días después de la sesión.'); return; }
+    extra.proxima = prox;
+  }
+  guardarResultado(p.id, 'LO HIZO', extra);
 }
 /** «Anular la última»: anula ULTIMA_SESION_ID con su motivo y recarga el tablero y la historia. */
 async function anularUltimaSesion(boton) {
@@ -1847,6 +1892,10 @@ function rangoPaso(p, k) {
     return { min: hoy, max, f: pa && pa >= hoy && pa <= max ? pa : hoy };
   }
   if (k === 'acepto') return { min: hoy, max: masDias(hoy, 180), f: hoy };
+  if (k === 'cambiar') {   // la sesión agendada: propone su fecha si sigue en rango
+    const max = masDias(hoy, 180), fa = String(p.raw.FECHA_AGENDA || '').slice(0, 10);
+    return { min: hoy, max, f: fa && fa >= hoy && fa <= max ? fa : hoy };
+  }
   if (k === 'lohizo') return { min: p.idRegistro ? String(p.raw.ULTIMA_SESION || p.cotizo || '').slice(0, 10) : '', max: hoy, f: hoy };
   if (k === 'alta' && p.t === 'reev') return { min: String(p.ultima || '').slice(0, 10), max: hoy, f: hoy };   // solo en reevaluación (MAPEO §3 G)
   return null;
@@ -1854,11 +1903,12 @@ function rangoPaso(p, k) {
 /** Los mensajes de validarResultado: lo que falte se avisa sin llamar al servidor. */
 function validarFecha(k, f, r) {
   const falta = { pensara: 'Falta la fecha para volver a llamar.', agendo: 'Falta la fecha de la cita.', lohizo: 'Falta la fecha de la sesión.', alta: 'Falta la fecha del alta.',
-    acepto: 'Falta la fecha de la primera sesión.' };
+    acepto: 'Falta la fecha de la primera sesión.', cambiar: 'Falta la fecha de la sesión.' };
   if (!f) return falta[k];
   if (k === 'pensara' && (f < r.min || f > r.max)) return 'La fecha para volver a llamar va de mañana a 90 días.';
   if (k === 'agendo' && (f < r.min || f > r.max)) return 'La fecha de la cita va de hoy a 180 días.';
   if (k === 'acepto' && (f < r.min || f > r.max)) return 'La fecha de inicio va de hoy a 180 días.';
+  if (k === 'cambiar' && (f < r.min || f > r.max)) return r.enCurso ? 'La fecha de la cita va de hoy a 180 días.' : 'La fecha de inicio va de hoy a 180 días.';
   if (f > r.max) return k === 'lohizo' ? 'La fecha de la sesión no puede ser futura.' : 'La fecha no puede ser futura.';
   if (r.min && f < r.min) return k === 'alta' ? 'El alta no puede ser anterior a la última consulta.' : 'La fecha no puede ser anterior al ' + dmy(r.min) + '.';
   return '';
@@ -1883,6 +1933,12 @@ function htmlPaso(p) {
     t = 'Agendó cita'; boton = 'Pasar a Agendado';
     campos = fecha(p.enCurso ? 'Fecha de la próxima sesión' : 'Fecha de la cita');
     aviso = p.enCurso ? 'Si pasa la fecha sin marcar la sesión, vuelve a «Por contactar».' : 'Si la fecha pasa sin cita realizada en SOFDOC, vuelve a «Por contactar».';
+  }
+  if (k === 'cambiar') {
+    // Programado: es «Aceptó» con la fecha nueva de la primera sesión; en curso, «Agendó cita» para la próxima.
+    t = 'Cambiar fecha'; icon = 'ph ph-calendar-blank'; boton = 'Guardar fecha';
+    campos = fecha(`Fecha de la sesión ${sesionDe(p).k}`);
+    aviso = 'Si pasa la fecha sin marcar la sesión, vuelve a «Por contactar».';
   }
   if (k === 'pensara') { t = 'Lo pensará'; icon = 'ph ph-clock-countdown'; campos = fecha('Volver a llamar el'); boton = 'Guardar fecha'; aviso = 'Sale de «Por contactar» hasta ese día.'; }
   if (k === 'acepto') {
@@ -1975,7 +2031,7 @@ function confirmarPaso(teclado) {
   const p = S.pacientes.find(x => x.id === seleccion.panel), ps = P.paso;
   if (!p || !ps) return;
   const k = ps.k, extra = { teclado: !!teclado };
-  if (ps.rango) { extra.fecha = ps.f; const m = validarFecha(k, ps.f, ps.rango); if (m) { avisar(m); return; } }
+  if (ps.rango) { extra.fecha = ps.f; const m = validarFecha(k, ps.f, Object.assign({ enCurso: p.enCurso }, ps.rango)); if (m) { avisar(m); return; } }
   if (k === 'alta') { extra.doctor = ps.doctor; if (!extra.doctor) { avisar('Elija el doctor que da el alta.'); return; } }
   if (k === 'numero') { if (!ps.tel) { avisar('Elija cuál teléfono está equivocado.'); return; } extra.telefono = ps.tel; }
   if (k === 'otro' || k === 'nodesea') { extra.motivo = ps.motivo.trim(); if (!extra.motivo) { avisar('Escriba el motivo.'); return; } }
@@ -1984,7 +2040,7 @@ function confirmarPaso(teclado) {
     if (!(n >= 1 && n <= 20 && Math.floor(n) === n)) { avisar('Indique cuántas sesiones (de 1 a 20).'); return; }
     extra.sesiones = n;
   }
-  guardarResultado(p.id, RES[k].r, extra);
+  guardarResultado(p.id, k === 'cambiar' ? (p.enCurso ? 'AGENDÓ CITA' : 'ACEPTÓ') : RES[k].r, extra);
 }
 
 /* ---- Guardado optimista (MAPEO §2.3) ---- */
@@ -2007,12 +2063,16 @@ function previsto(p, res, extra) {
   }
   if (res === 'LO PENSARÁ') return agendar('LLAMAR', f, 0, `Llamar el ${diaSem(f)} ${dm(f)}`);
   if (res === 'ACEPTÓ') return agendar('SESION', f, 0, `Sesión ${Number(t.HECHAS || 0) + 1} el ${diaSem(f)} ${dm(f)}`);
+  if (res === 'AGENDÓ CITA' && p.enCurso) return agendar('SESION', f, 0, `Sesión ${Number(t.HECHAS || 0) + 1} el ${diaSem(f)} ${dm(f)}`);
   if (res === 'AGENDÓ CITA') { if (p.t === 'reev') t.PROXIMA_AGENDADA = f; return agendar('CITA', f, 0, `Cita el ${diaSem(f)} ${dm(f)}`); }
   if (res === 'LO HIZO') {
     if (p.idRegistro && Number(t.SESIONES)) {
       const N = Number(t.SESIONES), hechas = Number(t.HECHAS || 0) + 1;
       Object.assign(t, { HECHAS: hechas, ULTIMA_SESION: f, N_SEGUIMIENTOS: 0, AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 });
       if (hechas >= N) return en('COMPLETADO', p.t === 'proc' ? `Se hizo el ${dm(f)}` : 'Completó el tratamiento', f, { ESTADO_REGISTRO: 'COMPLETO', ATRASO: 0 });
+      const fp = String(extra.proxima || '').slice(0, 10);
+      if (fp) return en('AGENDADO', `Sesión ${hechas + 1} el ${diaSem(fp)} ${dm(fp)}`, fp, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'EN CURSO', AGENDA: 'SESION',
+        FECHA_AGENDA: fp, INTENTO: 0, ATRASO: 0, N_SEGUIMIENTOS: 1 });
       const entre = Number(R.diasEntreSesiones) || 7, dias = diasEntre(f, hoy), sig = `Sesión ${hechas + 1} de ${N}`;
       if (dias < entre) return en('EN_TRATAMIENTO', `${sig} · próxima ~${dm(masDias(f, entre))}`, masDias(f, entre), { ESTADO_REGISTRO: 'EN CURSO', ATRASO: 0 });
       const atr = dias - entre;
@@ -2082,6 +2142,8 @@ function sumarMeta(cifras, quien, n) {
 function textoGuardado(p, res, r) {
   const nombre = nombreDe(p), t = r && r.tarjeta, base = `Guardado: ${nombre} · ${RES[res].l.toLowerCase()}`;
   if (r && r.completo) return p.t === 'proc' ? `${base}. Pasa a Completado.` : `${nombre} completó el tratamiento.`;
+  const fp = r && r.agenda ? String(r.agenda.FECHA_PROXIMA || '').slice(0, 10) : '';
+  if (fp) return `${base} · próxima sesión el ${diaSem(fp)} ${dm(fp)}.`;
   if (!t) return res === 'FALLECIÓ' ? `${base}. Se cerraron todos sus seguimientos.` : CIERRAN.includes(res) ? `${base}. Seguimiento cerrado.` : `${base}.`;
   if (res === 'NO CONTESTÓ' && t.AGENDA === 'SIN RESPUESTA') return `${base}. Se cerrará el ${dm(t.FECHA_AGENDA)} si no responde.`;
   if (res === 'NÚMERO EQUIVOCADO') return `${base}. El seguimiento sigue con el otro contacto.`;
@@ -2126,7 +2188,7 @@ async function guardarResultado(clave, resultado, extra) {
   const viaSesion = resultado === 'LO HIZO' && !!p.idRegistro;
   let r;
   try {
-    r = viaSesion ? await llamar('marcarSesion', { usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota })
+    r = viaSesion ? await llamar('marcarSesion', Object.assign({ usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota }, extra.proxima ? { proxima: extra.proxima } : {}))
       : await llamar('registrarResultado', payload);
   } catch (e) {
     S.enVuelo.delete(clave);
@@ -2182,6 +2244,8 @@ function recargarSiPendiente() {
 }
 /** Qué anula «Deshacer», según lo que devolvió registrarResultado (MAPEO §2.4). */
 // «Aceptó» no se deshace aquí: anular el seguimiento no quita la FECHA_INICIO ni el registro creado.
+// Una sesión marcada con «Próxima sesión» trae su agenda en r.agenda (no en r.seguimiento): se deshace la sesión, y
+// anularSesion anula con ella la agenda que se creó al marcarla.
 const deshacerDe = r => r && !(r.seguimiento && r.seguimiento.RESULTADO === 'ACEPTÓ') && (r.seguimiento && r.seguimiento.ID ? ['anularResultado', r.seguimiento.ID]
   : r.alta && r.alta.ID ? ['anularAlta', r.alta.ID] : r.sesion && r.sesion.ID ? ['anularSesion', r.sesion.ID] : null);
 /** Anula lo recién guardado y recarga el tablero: entretanto otra asesora pudo cambiar algo. */
@@ -2347,7 +2411,7 @@ $('#panel').addEventListener('keydown', e => {
   // Enter en el motivo de una anulación la confirma, como en Registro y en la ficha (confirmarAnulacion se protege sola).
   if (e.key === 'Enter' && e.target.id === 'motivo-anular') { e.preventDefault(); confirmarAnulacion($('#panel [data-confirmar-anular]')); return; }
   if (e.key === 'Enter' && e.target.id === 'motivo-ultima') { e.preventDefault(); anularUltimaSesion($('#panel [data-confirmar-ultima]')); return; }
-  if (e.key === 'Enter' && e.target.id === 'pfs') { e.preventDefault(); marcarSesionPanel(true); return; }
+  if (e.key === 'Enter' && (e.target.id === 'pfs' || e.target.id === 'pfp')) { e.preventDefault(); marcarSesionPanel(true); return; }
   if (e.key !== 'Enter' || !P.paso || !e.target.matches('#pf, #pm, #ps')) return;
   e.preventDefault();
   const b = $('#panel [data-confirmar]');
@@ -2357,7 +2421,8 @@ $('#panel').addEventListener('input', e => {
   const id = e.target.id;
   if (id === 'nota') P.nota = e.target.value;
   if (id === 'motivo-anular') P.motivoAnular = e.target.value;
-  if (id === 'pfs') P.sesionF = e.target.value;
+  if (id === 'pfs') { P.sesionF = e.target.value; seguirProxima(e.target.value); }
+  if (id === 'pfp') P.proximaF = e.target.value;
   if (id === 'motivo-ultima') { P.motivoUltima = e.target.value; const b = $('#panel [data-confirmar-ultima]'); if (b) b.disabled = !e.target.value.trim() || P.ultimaEnVuelo; }
   if (!P.paso) return;
   if (id === 'ps') P.paso.sesiones = e.target.value;
@@ -2365,7 +2430,8 @@ $('#panel').addEventListener('input', e => {
   if (id === 'pm') { P.paso.motivo = e.target.value; const b = $('#panel [data-confirmar]'); if (b) b.disabled = !e.target.value.trim(); }
 });
 $('#panel').addEventListener('change', e => {
-  if (e.target.id === 'pfs') P.sesionF = e.target.value;
+  if (e.target.id === 'pfs') { P.sesionF = e.target.value; seguirProxima(e.target.value); }
+  if (e.target.id === 'pfp') P.proximaF = e.target.value;
   if (!P.paso) return;
   if (e.target.id === 'pd') P.paso.doctor = e.target.value;
   if (e.target.id === 'pf') P.paso.f = e.target.value;
@@ -4673,7 +4739,8 @@ const DEMO = (() => {
     }
     if (res === 'LO PENSARÁ') { Object.assign(t, { ESTADO: 'AGENDADO', AGENDA: 'LLAMAR', FECHA_AGENDA: f, INTENTO: 0 }); ubicar(t, 'AGENDADO'); }
     if (res === 'AGENDÓ CITA') {
-      Object.assign(t, { ESTADO: 'AGENDADO', AGENDA: 'CITA', FECHA_AGENDA: f, INTENTO: 0 });
+      // En un tratamiento en curso, lo agendado es la próxima sesión (pendientesRegistro: «Sesión k+1 el …»).
+      Object.assign(t, { ESTADO: 'AGENDADO', AGENDA: t.ESTADO_REGISTRO === 'EN CURSO' ? 'SESION' : 'CITA', FECHA_AGENDA: f, INTENTO: 0 });
       if (!indicacion) t.PROXIMA_AGENDADA = f;
       ubicar(t, 'AGENDADO');
     }
@@ -5028,7 +5095,16 @@ const DEMO = (() => {
       if (f > hoy) throw new Error('La fecha no puede ser futura.');
       if (f < r.FECHA) throw new Error('La sesión no puede ser anterior al registro.');
       if (validas.length && f < validas[validas.length - 1].FECHA) throw new Error('La sesión no puede ser anterior a la sesión previa.');
-      const s = { ID: siguiente(sesiones, 'SES'), FECHA_HORA: ahora(), ID_REGISTRO: r.ID, NUMERO: validas.length + 1, FECHA: f, ASESORA: quien,
+      // Como validarProximaSesion: la próxima, después de la sesión y hasta 180 días; nunca tras la última.
+      const prox = String(x.proxima || '').trim();
+      if (prox) {
+        if (validas.length + 1 >= r.SESIONES) throw new Error('Es la última sesión del tratamiento: no hay una próxima que agendar.');
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(prox)) throw new Error('La fecha de la próxima sesión no es válida.');
+        if (prox <= f) throw new Error('La próxima sesión debe ser después de la sesión que marca (' + dmyDemo(f) + ').');
+        if (prox > mas(f, 180)) throw new Error('La próxima sesión va hasta 180 días después de la sesión.');
+      }
+      const cuando = ahora();
+      const s = { ID: siguiente(sesiones, 'SES'), FECHA_HORA: cuando, ID_REGISTRO: r.ID, NUMERO: validas.length + 1, FECHA: f, ASESORA: quien,
         NOTA: String(x.nota || '').trim(), ANULADO: '', MOTIVO_ANULACION: '' };
       fotos[s.ID] = foto(r.DNI, quien, 1, false);
       sesiones.push(s);
@@ -5036,7 +5112,19 @@ const DEMO = (() => {
       let t = tarjetas.find(y => y.ID_REGISTRO === r.ID);
       if (!t) tarjetas.push(t = ubicar(reg(r), ''));
       trasSesion(t, r);
-      return { ok: true, sesion: s, completo: s.NUMERO >= r.SESIONES };
+      const out = { ok: true, sesion: s, completo: s.NUMERO >= r.SESIONES };
+      if (prox) {
+        // La misma fila que «Agendó cita» sobre un registro en curso, ligada a esta sesión (filaProximaSesion).
+        const g = { ID: 'SEG-' + String(seguimientos.length + 1).padStart(4, '0'), FECHA_HORA: cuando, DNI: r.DNI, ESPECIALIDAD: r.TIPO, RESPONSABLE: quien,
+          ACCION: 'HECHO', MOTIVO: '', NOTA: 'Agendada al marcar la sesión ' + s.NUMERO + ' (' + s.ID + ')', REFERENCIA: r.ID, RESULTADO: 'AGENDÓ CITA',
+          FECHA_PROXIMA: prox, TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
+        seguimientos.push(g);
+        sumarHecho(quien, 1, true);
+        Object.assign(t, { ESTADO: 'AGENDADO', AGENDA: 'SESION', FECHA_AGENDA: prox, INTENTO: 0, N_SEGUIMIENTOS: 1, ULTIMO_SEGUIMIENTO: hoy, ATRASO: 0 });
+        ubicar(t, 'AGENDADO');
+        out.agenda = g;
+      }
+      return out;
     },
 
     anularSesion: x => {
@@ -5048,6 +5136,13 @@ const DEMO = (() => {
       if (propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
       s.ANULADO = 'SÍ';
       s.MOTIVO_ANULACION = String(x.motivo).trim();
+      // Como anularSesion: la próxima que se agendó al marcar esta sesión se anula con ella.
+      seguimientos.filter(g => !g.ANULADO && g.REFERENCIA === s.ID_REGISTRO && g.RESULTADO === 'AGENDÓ CITA' && (String(g.NOTA || '').match(/\bSES-\d+\b/) || [])[0] === s.ID)
+        .forEach(g => {
+          g.ANULADO = 'SÍ';
+          g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló la sesión ' + s.ID + ')';
+          sumarHecho(g.RESPONSABLE, -1, true);
+        });
       if (fotos[s.ID]) { restaurar(fotos[s.ID]); delete fotos[s.ID]; } else {
         const t = tarjetas.find(y => y.ID_REGISTRO === s.ID_REGISTRO);
         if (t) trasSesion(t, regPorId(s.ID_REGISTRO));

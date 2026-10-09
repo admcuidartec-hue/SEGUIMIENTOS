@@ -258,6 +258,36 @@ function validarSesion(r, sesiones, fecha, hoy) {
   return '';
 }
 
+/**
+ * «Próxima sesión» al marcar una: después de la sesión que se marca y hasta 180 días; nunca en la última (no hay próxima).
+ * `e` es el estado ANTES de marcar. '' si vale, o el mensaje.
+ */
+function validarProximaSesion(e, fechaSesion, proxima) {
+  if (e.hechas + 1 >= e.total) return 'Es la última sesión del tratamiento: no hay una próxima que agendar.';
+  var f = fechaIso(proxima), s = fechaIso(fechaSesion);
+  if (!f || !/^\d{4}-\d{2}-\d{2}$/.test(String(proxima).trim().slice(0, 10))) return 'La fecha de la próxima sesión no es válida.';
+  if (f <= s) return 'La próxima sesión debe ser después de la sesión que marca (' + fechaDma_(s) + ').';
+  if (f > sumarDias(s, 180)) return 'La próxima sesión va hasta 180 días después de la sesión.';
+  return '';
+}
+
+/**
+ * La fila de SEGUIMIENTOS que agenda la próxima sesión: la misma que deja «Agendó cita» sobre un registro en curso,
+ * con la sesión que la originó en la NOTA. Esa liga es la que hace que anular la sesión anule también la agenda.
+ */
+function filaProximaSesion(r, sesion, proxima, asesora) {
+  return { DNI: normDni(r.DNI), ESPECIALIDAD: normTexto(r.TIPO), RESPONSABLE: asesora, MOTIVO: '',
+    NOTA: 'Agendada al marcar la sesión ' + sesion.NUMERO + ' (' + sesion.ID + ')', REFERENCIA: r.ID, RESULTADO: 'AGENDÓ CITA',
+    FECHA_PROXIMA: fechaIso(proxima), TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
+}
+
+/** El ID de la sesión a la que está ligado un «Agendó cita» (agendado al marcarla), o ''. */
+function sesionLigada(s) {
+  if (!s || normTexto(s.RESULTADO) !== 'AGENDO CITA') return '';
+  var m = String(s.NOTA || '').match(/\bSES-\d+\b/);
+  return m ? m[0] : '';
+}
+
 /** Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. */
 function validarAnulacionSesion(id, sesiones) {
   var s = (sesiones || []).filter(function (x) { return x.ID === id; })[0];
@@ -302,7 +332,15 @@ function pendientesRegistro(d) {
     var enCurso = e.estado === 'EN CURSO', programado = e.estado === 'PROGRAMADO';
     var reevaluar = e.estado === 'COMPLETO' && e.ultima ? sumarDias(e.ultima, reglas.postTratamiento) : '';
     var desde = control ? fechaIso(r.FECHA) : enCurso ? e.ultima : programado ? e.inicio : reevaluar || fechaIso(r.FECHA);
-    var lista = (segs[r.ID] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= desde; }).sort(porFechaHora_);
+    // Un tratamiento en curso cuenta sus seguimientos desde que se REGISTRÓ la última sesión (su FECHA_HORA), no solo desde su
+    // fecha: un «Agendó cita» de esa misma mañana era para la sesión que se acaba de marcar. Y una agenda ligada a una sesión
+    // (la que se agendó al marcarla) vale solo mientras esa sesión siga siendo la última válida: si se anuló, la agenda no cuenta.
+    var ultimaSes = sesionesDe_(r.ID, d.sesiones).slice(-1)[0] || null, corte = enCurso && ultimaSes ? String(ultimaSes.FECHA_HORA || '') : '';
+    var lista = (segs[r.ID] || []).filter(function (s) {
+      var ligada = sesionLigada(s);
+      if (ligada && (!ultimaSes || ligada !== ultimaSes.ID)) return false;
+      return fechaIso(s.FECHA_HORA) >= desde && String(s.FECHA_HORA || '') >= corte;
+    }).sort(porFechaHora_);
     var c = leerCiclo(lista, reglas, hoy);
     var tel = normTelefono(r.CONTACTO), usuario = tel.length === 9 ? '' : textoLimpio_(r.CONTACTO);
     // Sin teléfonos conocidos del DNI (p. ej. un control de alguien que solo vino por Registro), vale el CONTACTO del registro,
@@ -311,8 +349,10 @@ function pendientesRegistro(d) {
     if (!telefonos.length && tel.length === 9 && !(marcaTel && !(fechaIso(r.FECHA) > marcaTel))) telefonos = [tel];
     var mapaTel = {};
     mapaTel[dni] = telefonos;
-    var sc = sinContacto_(dni, marcas, mapaTel, usuario), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '';
+    var sc = sinContacto_(dni, marcas, mapaTel, usuario), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '', falta = '';
     var agenda = c.agenda;
+    // En un tratamiento en curso, la cita que se agenda es su próxima sesión: «Sesión k+1 el …».
+    if (agenda && enCurso && agenda.tipo === 'CITA') agenda = { tipo: 'SESION', fecha: agenda.fecha, intento: agenda.intento };
     var dias = Math.max(0, diasEntre(desde, hoy)), espera = enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion;
     // La consulta realizada que cierra el control (después de la fecha del registro, en la especialidad de su doctor
     // si se sabe) o la reevaluación (después de la última sesión).
@@ -326,12 +366,15 @@ function pendientesRegistro(d) {
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
     else if (vuelta) { estado = 'COMPLETADO'; volvio = vuelta.FECHA; }
     else if (agenda) estado = 'AGENDADO';
-    else if (control) {
+    else if (enCurso && c.citaVencida) {
+      // La próxima sesión agendada pasó (más la gracia) sin marcarse: como un programado que no vino.
+      motivo = 'NO VINO'; falta = c.citaVencida; dias = Math.max(0, diasEntre(falta, hoy));
+    } else if (control) {
       if (hoy <= sumarDias(e.inicio, reglas.graciaAgenda)) { estado = 'AGENDADO'; agenda = { tipo: 'CONTROL', fecha: e.inicio, intento: 0 }; }
       else { motivo = 'CONTROL VENCIDO'; dias = Math.max(0, diasEntre(e.inicio, hoy)); }
     } else if (programado) {
       if (hoy <= sumarDias(e.inicio, reglas.graciaAgenda)) { estado = 'AGENDADO'; agenda = { tipo: 'SESION', fecha: e.inicio, intento: 0 }; }
-      else motivo = 'NO VINO';
+      else { motivo = 'NO VINO'; falta = e.inicio; }
     } else if (e.estado === 'COMPLETO') {
       // Un «por reevaluar» muy viejo no se muestra: al publicar no debe caer una avalancha de tarjetas.
       estado = hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';
@@ -362,7 +405,7 @@ function pendientesRegistro(d) {
       ULTIMO_SEGUIMIENTO: lista.length ? fechaIso(lista[lista.length - 1].FECHA_HORA) : '',
       ESTADO: estado,
       ESTADO_REGISTRO: e.estado,
-      ATRASO: enCurso && estado === 'PENDIENTE' ? dias - reglas.diasEntreSesiones : 0,
+      ATRASO: enCurso && estado === 'PENDIENTE' && !motivo ? dias - reglas.diasEntreSesiones : 0,
       CIERRE: cierre ? cierre.motivo : '',
       FECHA_CIERRE: cierre ? cierre.fecha : '',
       AGENDA: agenda ? agenda.tipo : '',
@@ -372,7 +415,8 @@ function pendientesRegistro(d) {
       FECHA_REEVALUAR: reevaluar,
       VOLVIO: volvio,
       EXAMENES: textoLimpio_(r.EXAMENES),
-      FECHA_INICIO: e.inicio
+      FECHA_INICIO: e.inicio,
+      FECHA_FALTA: falta
     };
   }).filter(Boolean);
 }

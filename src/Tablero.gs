@@ -67,7 +67,7 @@ function etiquetaDe(t, reglas, hoy) {
       return 'Debía volver el ' + dm_(t.PROXIMA_ESPERADA) + ' · hace ' + plural_(diasEntre(t.PROXIMA_ESPERADA, hoy), 'día', 'días');
     }
     if (t.ESTADO === 'POR REEVALUAR') return 'Por reevaluar · terminó el ' + dm_(t.ULTIMA_SESION);
-    if (t.MOTIVO_PENDIENTE === 'NO VINO') return 'No vino a su sesión ' + (Number(t.HECHAS) + 1) + ' (' + dm_(t.FECHA_INICIO) + ')';
+    if (t.MOTIVO_PENDIENTE === 'NO VINO') return 'No vino a su sesión ' + (Number(t.HECHAS) + 1) + ' (' + dm_(t.FECHA_FALTA || t.FECHA_INICIO) + ')';
     if (t.MOTIVO_PENDIENTE === 'CONTROL VENCIDO') return 'Debía volver con resultados el ' + dm_(t.FECHA_INICIO);
     if (t.ESTADO_REGISTRO === 'EN CURSO') return sesion + (t.ATRASO > 0 ? ' · atrasada ' + plural_(t.ATRASO, 'día', 'días') : ' · tocaba hoy');
     return 'Cotizó hace ' + plural_(t.DIAS, 'día', 'días');

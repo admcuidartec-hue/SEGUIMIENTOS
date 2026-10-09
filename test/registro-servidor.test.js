@@ -12,7 +12,7 @@ const REG4 = { ID: 'REG-000004', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10
 
 function servidor(extra, hojas) {
   const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs']);
-  const escrito = { REGISTROS: [], SESIONES: [], ALTAS: [], BITACORA: [], anulados: [] };
+  const escrito = { REGISTROS: [], SESIONES: [], ALTAS: [], SEGUIMIENTOS: [], BITACORA: [], anulados: [] };
   const lock = { tomado: 0 };
   const L = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs']);
   ctx.datos_ = () => Object.assign({ hoy: '2026-10-05', catalogos: CAT, reglas: reglas(L), citas: [cita({ fecha: '2026-09-01' })],
@@ -20,6 +20,8 @@ function servidor(extra, hojas) {
   ctx.exigirColumnas_ = () => {};
   ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
   ctx.leerOpcional_ = n => ((hojas || {})[n] || []).concat(escrito[n] || []);
+  ctx.leerSeguimientos_ = () => ((hojas || {}).SEGUIMIENTOS || []).concat(escrito.SEGUIMIENTOS);
+  ctx.exigirHojaPreparada_ = () => {};
   ctx.anexarObjeto_ = (n, cols, o) => { assert.equal(lock.tomado, 1, 'se escribe con el candado tomado'); escrito[n].push(plano(o)); };
   ctx.bitacora_ = (u, a, d) => escrito.BITACORA.push([u, a, d]);
   ctx.fechaHoraTexto_ = () => '2026-10-05 10:30';
@@ -232,4 +234,68 @@ test('getRegistros: hoy o un mes, con los datos para editar', () => {
   const deHoy = plano(ctx.getRegistros({ periodo: 'HOY' }));
   assert.deepEqual(deHoy.map(x => [x.ID, x.CONTACTO, x.SESIONES]), [['REG-000004', '987654321', 1]]);
   assert.deepEqual(plano(ctx.getRegistrosHoy()).map(x => x.ID), ['REG-000004']);
+});
+
+/* ---------- Marcar la sesión y agendar la siguiente en un paso ---------- */
+const REG8 = Object.assign({}, REG4, { ID: 'REG-000008', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', SESIONES: '3' });
+
+test('marcarSesion con próxima: guarda la sesión y agenda la siguiente en la misma llamada y el mismo candado', () => {
+  const { ctx, escrito, lock } = servidor({}, { REGISTROS: [REG8] });
+  let tomas = 0;
+  const bloquear = ctx.bloquear_;
+  ctx.bloquear_ = () => { tomas++; return bloquear(); };
+  const r = plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-05', nota: 'bien', proxima: '2026-10-12' }));
+  assert.equal(tomas, 1, 'un solo candado');
+  assert.equal(lock.tomado, 0);
+  assert.deepEqual([r.ok, r.completo, r.sesion.ID, r.sesion.NUMERO], [true, false, 'SES-000001', 1]);
+  assert.deepEqual(escrito.SESIONES.map(s => [s.ID, s.NUMERO, s.FECHA, s.NOTA]), [['SES-000001', 1, '2026-10-05', 'bien']]);
+  const g = escrito.SEGUIMIENTOS[0];
+  assert.equal(escrito.SEGUIMIENTOS.length, 1);
+  assert.match(g.ID, /^SEG-\d+-\d+$/);
+  assert.deepEqual([g.FECHA_HORA, g.DNI, g.ESPECIALIDAD, g.RESPONSABLE, g.ACCION, g.RESULTADO, g.FECHA_PROXIMA, g.REFERENCIA, g.NOTA],
+    ['2026-10-05 10:30', '40111222', 'HIERRO', 'MAGALY', 'HECHO', 'AGENDÓ CITA', '2026-10-12', 'REG-000008', 'Agendada al marcar la sesión 1 (SES-000001)']);
+  assert.deepEqual(r.agenda, g, 'la respuesta trae la agenda (no «seguimiento»: Deshacer anula la sesión, no solo la agenda)');
+  assert.equal(r.seguimiento, undefined);
+  assert.deepEqual(escrito.BITACORA.map(b => b[1]), ['SESIÓN', 'RESULTADO']);
+  // El tablero, con lo escrito: Agendado «Sesión 2 el lun 12/10».
+  const d = { registros: [REG8], sesiones: escrito.SESIONES, seguimientos: escrito.SEGUIMIENTOS, citas: [cita({ fecha: '2026-09-01' })], reglas: reglas(ctx),
+    hoy: '2026-10-05', telefonos: { 40111222: ['987654321'] }, catalogos: CAT };
+  const f = plano(ctx.pendientesRegistro(d))[0];
+  assert.deepEqual([f.ESTADO, f.AGENDA, f.FECHA_AGENDA], ['AGENDADO', 'SESION', '2026-10-12']);
+  assert.equal(ctx.etiquetaDe(Object.assign(f, { COLUMNA: 'AGENDADO' }), reglas(ctx), '2026-10-05'), 'Sesión 2 el lun 12/10');
+  // La sesión 2 se marca después (sin próxima): sale de Agendado.
+  ctx.fechaHoraTexto_ = () => '2026-10-12 11:00';
+  const antes = ctx.datos_;
+  ctx.datos_ = () => Object.assign(antes(), { hoy: '2026-10-12' });
+  plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-12' }));
+  assert.equal(escrito.SEGUIMIENTOS.length, 1, 'sin próxima no se agenda nada');
+  const f2 = plano(ctx.pendientesRegistro(Object.assign(d, { hoy: '2026-10-12', sesiones: escrito.SESIONES })))[0];
+  assert.deepEqual([f2.ESTADO, f2.AGENDA, f2.HECHAS], ['EN TRATAMIENTO', '', 2]);
+});
+
+test('marcarSesion con próxima inválida o en la última sesión: no escribe nada y lo dice en español', () => {
+  const { ctx, escrito, lock } = servidor({}, { REGISTROS: [REG8, REG4] });
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-05', proxima: '2026-10-05' }),
+    /^Error: La próxima sesión debe ser después de la sesión que marca \(05\/10\/2026\)\.$/);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-05', proxima: '2027-04-04' }),
+    /La próxima sesión va hasta 180 días después de la sesión\./);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000008', fecha: '2026-10-05', proxima: '12/10' }), /no es válida/);
+  assert.deepEqual([escrito.SESIONES.length, escrito.SEGUIMIENTOS.length, lock.tomado], [0, 0, 0]);
+  // Con una sola sesión indicada, la que se marca es la última.
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', proxima: '2026-10-12' }),
+    /Es la última sesión del tratamiento: no hay una próxima que agendar\./);
+  assert.deepEqual([escrito.SESIONES.length, escrito.SEGUIMIENTOS.length], [0, 0]);
+});
+
+test('anularSesion anula también la próxima que se agendó al marcarla (Deshacer deshace las dos cosas)', () => {
+  const s1 = { ID: 'SES-000001', FECHA_HORA: '2026-10-05 10:30', ID_REGISTRO: 'REG-000008', NUMERO: '1', FECHA: '2026-10-05', ANULADO: '' };
+  const ligada = { ID: 'SEG-1', FECHA_HORA: '2026-10-05 10:30', DNI: '40111222', ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000008', RESULTADO: 'AGENDÓ CITA',
+    FECHA_PROXIMA: '2026-10-12', NOTA: 'Agendada al marcar la sesión 1 (SES-000001)', ANULADO: '' };
+  const otra = Object.assign({}, ligada, { ID: 'SEG-2', NOTA: 'Agendada al marcar la sesión 1 (SES-000001)', REFERENCIA: 'REG-000099' });
+  const manual = Object.assign({}, ligada, { ID: 'SEG-3', NOTA: '' });
+  const { ctx, escrito } = servidor({}, { REGISTROS: [REG8], SESIONES: [s1], SEGUIMIENTOS: [ligada, otra, manual] });
+  ctx.anularSesion({ usuario: 'MAGALY', id: 'SES-000001', motivo: 'Deshecho al momento' });
+  assert.deepEqual(escrito.anulados, [['SESIONES', 'SES-000001', 'Deshecho al momento'],
+    ['SEGUIMIENTOS', 'SEG-1', 'Deshecho al momento (se anuló la sesión SES-000001)']]);
+  assert.deepEqual(escrito.BITACORA.map(b => b[1]), ['ANULAR SESIÓN', 'ANULAR RESULTADO']);
 });

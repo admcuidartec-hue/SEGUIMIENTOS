@@ -523,3 +523,84 @@ test('pendientesRegistro: un completo cuya fecha de reevaluar pasó hace más de
   assert.equal(filaH(dReg([r], ses, [], '2026-08-10')).ESTADO, 'POR REEVALUAR', '180 días: todavía');
   assert.equal(filaH(dReg([r], ses, [], '2026-08-11')).ESTADO, 'ANTIGUO', '181 días: fuera del tablero');
 });
+
+/* ---------- Marcar la sesión y agendar la siguiente en un paso ---------- */
+const SESH = (n, f, hora, o) => Object.assign({ ID: 'SES-00000' + n, FECHA_HORA: hora || f + ' 12:00', ID_REGISTRO: 'REG-000010', NUMERO: String(n), FECHA: f,
+  ASESORA: 'MAGALY', NOTA: '', ANULADO: '' }, o);
+const AGENDA_SES = (hora, proxima, o) => Object.assign({ ID: 'SEG-' + hora.replace(/\D/g, ''), FECHA_HORA: hora, DNI: '40111222', ESPECIALIDAD: 'HIERRO',
+  RESPONSABLE: 'MAGALY', ACCION: 'HECHO', MOTIVO: '', NOTA: '', REFERENCIA: 'REG-000010', RESULTADO: 'AGENDÓ CITA', FECHA_PROXIMA: proxima,
+  TELEFONO: '', ANULADO: '' }, o);
+const R3 = () => REGH({ SESIONES: '3' });
+const etqAgendado = f => L.etiquetaDe(Object.assign({}, f, { COLUMNA: 'AGENDADO' }), reglas(L), f.hoy);
+
+test('validarProximaSesion: después de la sesión, hasta 180 días, y nunca tras la última', () => {
+  const e = L.estadoRegistro(R3(), [SESH(1, '2026-10-02')]);
+  assert.equal(L.validarProximaSesion(e, '2026-10-09', '2026-10-16'), '');
+  assert.equal(L.validarProximaSesion(e, '2026-10-09', 'mañana'), 'La fecha de la próxima sesión no es válida.');
+  assert.equal(L.validarProximaSesion(e, '2026-10-09', '2026-10-09'), 'La próxima sesión debe ser después de la sesión que marca (09/10/2026).');
+  assert.equal(L.validarProximaSesion(e, '2026-10-09', '2026-10-01'), 'La próxima sesión debe ser después de la sesión que marca (09/10/2026).');
+  assert.equal(L.validarProximaSesion(e, '2026-10-09', '2027-04-08'), 'La próxima sesión va hasta 180 días después de la sesión.');
+  assert.equal(L.validarProximaSesion(e, '2026-10-09', '2027-04-07'), '', '180 días justos');
+  const penultima = L.estadoRegistro(R3(), [SESH(1, '2026-10-02'), SESH(2, '2026-10-05')]);
+  assert.equal(L.validarProximaSesion(penultima, '2026-10-09', '2026-10-16'), 'Es la última sesión del tratamiento: no hay una próxima que agendar.');
+});
+
+test('filaProximaSesion: la misma fila que «Agendó cita» sobre un registro en curso, ligada a su sesión', () => {
+  const f = plano(L.filaProximaSesion(R3(), { ID: 'SES-000007', NUMERO: 1 }, '2026-10-16', 'MAGALY'));
+  assert.deepEqual(f, { DNI: '40111222', ESPECIALIDAD: 'HIERRO', RESPONSABLE: 'MAGALY', MOTIVO: '', NOTA: 'Agendada al marcar la sesión 1 (SES-000007)',
+    REFERENCIA: 'REG-000010', RESULTADO: 'AGENDÓ CITA', FECHA_PROXIMA: '2026-10-16', TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' });
+  assert.equal(L.sesionLigada(f), 'SES-000007');
+  assert.equal(L.sesionLigada({ RESULTADO: 'NO CONTESTÓ', NOTA: 'SES-000007' }), '', 'solo un «Agendó cita» se liga a una sesión');
+  assert.equal(L.sesionLigada({ RESULTADO: 'AGENDÓ CITA', NOTA: '' }), '');
+});
+
+test('pendientesRegistro: sesión marcada con la próxima agendada → Agendado «Sesión 2 el …»; al marcar la 2, sale de Agendado', () => {
+  const ses1 = SESH(1, '2026-10-09', '2026-10-09 10:30');
+  const ag = AGENDA_SES('2026-10-09 10:30', '2026-10-16', { NOTA: 'Agendada al marcar la sesión 1 (SES-000001)' });
+  const a = filaH(dReg([R3()], [ses1], [], '2026-10-09', [ag]));
+  assert.deepEqual([a.ESTADO, a.ESTADO_REGISTRO, a.AGENDA, a.FECHA_AGENDA, a.HECHAS], ['AGENDADO', 'EN CURSO', 'SESION', '2026-10-16', 1]);
+  assert.equal(etqAgendado(Object.assign(a, { hoy: '2026-10-09' })), 'Sesión 2 el vie 16/10');
+  // Vino el 16 y se marca la sesión 2: deja Agendado y vuelve a En tratamiento con la próxima estimada.
+  const ses2 = SESH(2, '2026-10-16', '2026-10-16 11:00');
+  const b = filaH(dReg([R3()], [ses1, ses2], [], '2026-10-16', [ag]));
+  assert.deepEqual([b.ESTADO, b.AGENDA, b.HECHAS], ['EN TRATAMIENTO', '', 2]);
+  // La última sesión lo completa.
+  const c = filaH(dReg([R3()], [ses1, ses2, SESH(3, '2026-10-20', '2026-10-20 09:00')], [], '2026-10-20', [ag]));
+  assert.deepEqual([c.ESTADO, c.ESTADO_REGISTRO, c.AGENDA], ['COMPLETADO', 'COMPLETO', '']);
+});
+
+test('pendientesRegistro: un «Agendó cita» del mismo día deja de valer cuando se registra después la sesión agendada', () => {
+  // A las 9 agendó la sesión 2 para hoy; a las 15 vino y se marcó con fecha de hoy. Antes, la fecha sola lo dejaba en Agendado.
+  const ses1 = SESH(1, '2026-10-02', '2026-10-02 10:00');
+  const ag = AGENDA_SES('2026-10-09 09:00', '2026-10-09');
+  assert.equal(filaH(dReg([R3()], [ses1], [], '2026-10-09', [ag])).AGENDA, 'SESION', 'antes de marcarla, agendada');
+  const b = filaH(dReg([R3()], [ses1, SESH(2, '2026-10-09', '2026-10-09 15:00')], [], '2026-10-09', [ag]));
+  assert.deepEqual([b.ESTADO, b.AGENDA, b.HECHAS], ['EN TRATAMIENTO', '', 2]);
+  // Marcada en el mismo minuto que se agendó: la liga con su sesión la deja fuera igual.
+  const ligada = AGENDA_SES('2026-10-09 10:30', '2026-10-16', { NOTA: 'Agendada al marcar la sesión 1 (SES-000001)' });
+  const c = filaH(dReg([R3()], [SESH(1, '2026-10-09', '2026-10-09 10:30'), SESH(2, '2026-10-09', '2026-10-09 10:30')], [], '2026-10-09', [ligada]));
+  assert.deepEqual([c.ESTADO, c.AGENDA], ['EN TRATAMIENTO', '']);
+});
+
+test('pendientesRegistro: la próxima agendada al marcar una sesión anulada no cuenta (Deshacer no deja una agenda mentirosa)', () => {
+  const ag = AGENDA_SES('2026-10-09 10:30', '2026-10-16', { NOTA: 'Agendada al marcar la sesión 2 (SES-000002)' });
+  const s1 = SESH(1, '2026-10-05', '2026-10-05 10:00'), s2 = SESH(2, '2026-10-09', '2026-10-09 10:30', { ANULADO: 'SÍ' });
+  const f = filaH(dReg([R3()], [s1, s2], [], '2026-10-09', [ag]));
+  assert.deepEqual([f.ESTADO, f.AGENDA, f.HECHAS], ['EN TRATAMIENTO', '', 1]);
+  // Sin sesiones válidas (se anuló la primera) tampoco: el registro programado vuelve a su «Sesión 1».
+  const ag1 = AGENDA_SES('2026-10-09 10:30', '2026-10-16', { NOTA: 'Agendada al marcar la sesión 1 (SES-000001)' });
+  const p = filaH(dReg([REGH({ SESIONES: '3', FECHA_INICIO: '2026-10-09' })], [SESH(1, '2026-10-09', '2026-10-09 10:30', { ANULADO: 'SÍ' })], [], '2026-10-09', [ag1]));
+  assert.deepEqual([p.ESTADO, p.ESTADO_REGISTRO, p.AGENDA, p.FECHA_AGENDA], ['AGENDADO', 'PROGRAMADO', 'SESION', '2026-10-09']);
+});
+
+test('pendientesRegistro: si pasa la fecha agendada sin marcar la sesión, vuelve a Por contactar «No vino a su sesión 2»', () => {
+  const ses1 = SESH(1, '2026-10-09', '2026-10-09 10:30');
+  const ag = AGENDA_SES('2026-10-09 10:30', '2026-10-12', { NOTA: 'Agendada al marcar la sesión 1 (SES-000001)' });
+  assert.equal(filaH(dReg([R3()], [ses1], [], '2026-10-14', [ag])).ESTADO, 'AGENDADO', 'dentro de la gracia de 2 días');
+  const f = filaH(dReg([R3()], [ses1], [], '2026-10-15', [ag]));
+  assert.deepEqual([f.ESTADO, f.MOTIVO_PENDIENTE, f.FECHA_FALTA, f.DIAS, f.ATRASO], ['PENDIENTE', 'NO VINO', '2026-10-12', 3, 0]);
+  assert.equal(L.etiquetaDe(Object.assign({}, f, { COLUMNA: 'POR_CONTACTAR' }), reglas(L), '2026-10-15'), 'No vino a su sesión 2 (12/10)');
+  // El programado que no vino sigue diciendo su primera sesión.
+  const p = filaH(dReg([REGH({ FECHA_INICIO: '2026-10-12' })], [], [], '2026-10-15'));
+  assert.equal(L.etiquetaDe(Object.assign({}, p, { COLUMNA: 'POR_CONTACTAR' }), reglas(L), '2026-10-15'), 'No vino a su sesión 1 (12/10)');
+});

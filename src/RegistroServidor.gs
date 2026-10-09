@@ -53,9 +53,15 @@ function guardarRegistro(p) {
   }
 }
 
+/**
+ * Marca la sesión siguiente. Con `proxima` ('yyyy-mm-dd'), en la misma llamada y bajo el mismo candado agenda la sesión
+ * que sigue: la misma fila de SEGUIMIENTOS que «Agendó cita» sobre un registro en curso, ligada a esta sesión
+ * (filaProximaSesion). La respuesta la trae en `agenda`, no en `seguimiento`: «Deshacer» anula la sesión, y anularSesion
+ * anula con ella su agenda.
+ */
 function marcarSesion(p) {
   var d = datos_();
-  var asesora = exigirUsuario_(d.catalogos, p && p.usuario);
+  var asesora = exigirUsuario_(d.catalogos, p && p.usuario), proxima = textoLimpio_(p && p.proxima);
   var lock = bloquear_();
   try {
     var sesiones = leerSesiones_(), id = textoLimpio_(p.id);
@@ -63,12 +69,27 @@ function marcarSesion(p) {
     var error = validarSesion(r, sesiones, p.fecha, d.hoy);
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
-    var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }), 'SES'), FECHA_HORA: fechaHoraTexto_(new Date()),
+    if (proxima) {
+      error = validarProximaSesion(e, p.fecha, proxima);
+      if (error) throw new Error(error);
+      exigirHojaPreparada_();   // antes de escribir nada: SEGUIMIENTOS se escribe por posición
+    }
+    var ahora = new Date(), cuando = fechaHoraTexto_(ahora);
+    var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }), 'SES'), FECHA_HORA: cuando,
       ID_REGISTRO: r.ID, NUMERO: e.hechas + 1, FECHA: fechaIso(p.fecha), ASESORA: asesora, NOTA: textoLimpio_(p.nota),
       ANULADO: '', MOTIVO_ANULACION: '' };
     anexarObjeto_('SESIONES', COLUMNAS_SESIONES, s);
     bitacora_(asesora, 'SESIÓN', r.ID + ' · sesión ' + s.NUMERO + ' de ' + e.total);
-    return limpiarParaEnvio({ ok: true, sesion: s, completo: s.NUMERO >= e.total });
+    var out = { ok: true, sesion: s, completo: s.NUMERO >= e.total };
+    if (proxima) {
+      // Misma FECHA_HORA que la sesión: pendientesRegistro cuenta los seguimientos desde que se registró la última sesión.
+      var g = copia_(filaProximaSesion(r, s, proxima, asesora), { ID: 'SEG-' + ahora.getTime() + '-' + Math.floor(Math.random() * 1000),
+        FECHA_HORA: cuando, ACCION: accionPara('AGENDÓ CITA', true) });
+      anexarObjeto_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS, g);
+      bitacora_(asesora, 'RESULTADO', g.DNI + ' · ' + g.ESPECIALIDAD + ' · ' + g.RESULTADO + ' · ' + g.REFERENCIA);
+      out.agenda = g;
+    }
+    return limpiarParaEnvio(out);
   } finally {
     soltar_(lock);
   }
@@ -94,6 +115,13 @@ function anularSesion(p) {
     if (v.error) throw new Error(v.error);
     marcarAnulado_('SESIONES', v.sesion.ID, motivo);
     bitacora_(quien, 'ANULAR SESIÓN', v.sesion.ID + ' (' + v.sesion.ID_REGISTRO + ') · ' + motivo);
+    // La próxima sesión que se agendó al marcar esta pertenece a esta: se anula con ella (Deshacer no deja una agenda que miente).
+    leerSeguimientos_().filter(function (g) {
+      return !anulado_(g) && textoLimpio_(g.REFERENCIA) === v.sesion.ID_REGISTRO && sesionLigada(g) === v.sesion.ID;
+    }).forEach(function (g) {
+      marcarAnulado_('SEGUIMIENTOS', g.ID, motivo + ' (se anuló la sesión ' + v.sesion.ID + ')');
+      bitacora_(quien, 'ANULAR RESULTADO', g.ID + ' · con la sesión ' + v.sesion.ID);
+    });
     return { ok: true };
   } finally {
     soltar_(lock);

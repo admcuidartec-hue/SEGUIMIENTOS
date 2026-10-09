@@ -112,6 +112,8 @@ En un paso con fecha o motivo, Enter confirma.
   próxima sesión.» (`validarResultado`). En hierro y procedimiento por empezar el botón es
   **«Aceptó tratamiento» / «Aceptó procedimiento»**, que programa la `FECHA_INICIO` (o crea el registro si venía del historial); por eso
   el atajo **3** cambia de significado. «Aceptó» no tiene «Deshacer»: el aviso dice que, para cambiar la fecha o volver atrás, se edite o se anule el registro.
+- **«Próxima sesión» (`#pfp`, opcional):** `marcarSesion({ proxima })` guarda la sesión y, en el mismo candado, un «Agendó cita» ligado a ella (la sesión va en `NOTA`): la tarjeta pasa a Agendado
+  «Sesión k+1 el …». Anular la sesión (o «Deshacer») anula esa agenda; si la fecha pasa sin marcarla, «No vino a su sesión k». Agendado con sesión: 1 marcar, 2 No contestó, 3 Cambiar fecha.
 - **«Lo hizo» ya no se ofrece** en «¿Qué pasó?»: lo reemplazan «Marcar sesión k hecha» y «Anular la última» en las tarjetas En tratamiento.
   Las filas antiguas con `LO HIZO` se leen igual (`resultadoDe`) y no se reescriben.
 - **Recorrido de un tratamiento:** Pendiente (cotizado) → Programado (`FECHA_INICIO`, en Agendado hasta `GRACIA_AGENDA_DIAS` después de esa

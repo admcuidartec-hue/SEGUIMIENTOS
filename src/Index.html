@@ -833,6 +833,7 @@ const S = {
   medico: '', medicoPropuesto: '', esp: '', sinTel: false, q: '',
   lim: { rec: 6, mes: 4, ant: 3 },
   colMovil: 1,
+  sinRecargar: new Set(), // CLAVE de tarjetas con una sesión marcada cuya tarjeta aún no trae el tablero recargado
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
   escrituras: 0,      // sube cuando sale cada guardado: una recarga pedida antes puede traer el tablero de antes
   recargaPendiente: false, // una recarga silenciosa descartada que se repide cuando enVuelo quede vacío
@@ -1091,6 +1092,7 @@ function adaptarTarjeta(t) {
 }
 function adaptarTablero(r) {
   S.tablero = r || null;
+  S.sinRecargar.clear();   // ya llegó la tarjeta del servidor, con su ULTIMA_SESION_ID
   const cols = (r && r.columnas) || {};
   S.pacientes = Object.keys(COLUMNAS).flatMap(c => (cols[c] || []).map(adaptarTarjeta));
   S.cerrados = (r && Array.isArray(r.cerrados)) ? r.cerrados : [];
@@ -1739,11 +1741,13 @@ function sesionesHtml(p) {
   const r = rangoSesion(p), f = P.sesionF || r.f, k = (p.trat ? p.trat.k : Number(p.raw.HECHAS) || 0) + 1, ult = p.raw.ULTIMA_SESION_ID;
   return `<label class="campo">Fecha de la sesión<input type="date" id="pfs" value="${esc(f)}"${r.min ? ` min="${esc(r.min)}"` : ''} max="${esc(r.max)}"></label>`
     + `<div class="acc"><button type="button" data-marcar-sesion><i class="ph ph-check-square i-ok"></i><span>Marcar sesión ${k} hecha</span><span class="kbd">1</span></button>`
-    + `<button type="button" data-anular-ultima${ult && !P.anularUltima ? '' : ' disabled'}><i class="ph ph-arrow-counter-clockwise"></i><span>Anular la última</span></button></div>`
+    + `<button type="button" data-anular-ultima${ult && !P.anularUltima && !sesionSinRecargar(p) ? '' : ' disabled'}><i class="ph ph-arrow-counter-clockwise"></i><span>Anular la última</span></button></div>`
     + (P.anularUltima ? `<div class="motivo"><input id="motivo-ultima" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(P.motivoUltima)}">`
       + `<button type="button" class="btn btn-p" data-confirmar-ultima${P.ultimaEnVuelo || !P.motivoUltima.trim() ? ' disabled' : ''}>Anular</button>`
       + '<button type="button" class="btn btn-s" data-cancelar-ultima>Cancelar</button></div>' : '');
 }
+/** Mientras se guarda una sesión y hasta que llega el tablero, ULTIMA_SESION_ID de la tarjeta está viejo. */
+const sesionSinRecargar = p => S.enVuelo.has(p.id) || S.sinRecargar.has(p.id);
 /** «Marcar sesión k hecha»: guarda como «Lo hizo», que para un registro va a marcarSesion. */
 function marcarSesionPanel(teclado) {
   const p = S.pacientes.find(x => x.id === seleccion.panel);
@@ -1755,7 +1759,7 @@ function marcarSesionPanel(teclado) {
 /** «Anular la última»: anula ULTIMA_SESION_ID con su motivo y recarga el tablero y la historia. */
 async function anularUltimaSesion(boton) {
   const p = S.pacientes.find(x => x.id === seleccion.panel);
-  if (!p || P.ultimaEnVuelo || !p.raw.ULTIMA_SESION_ID) return;
+  if (!p || P.ultimaEnVuelo || !p.raw.ULTIMA_SESION_ID || sesionSinRecargar(p)) return;
   const campo = $('#motivo-ultima'), motivo = ((campo ? campo.value : P.motivoUltima) || '').trim();
   P.ultimaEnVuelo = !!motivo;
   const ok = await anularConMotivo('sesion', p.raw.ULTIMA_SESION_ID, motivo, boton, '#motivo-ultima');
@@ -2113,7 +2117,7 @@ async function guardarResultado(clave, resultado, extra) {
   invalidarIndicadores();
   // Manda el servidor: r.tarjeta es la tarjeta recalculada, o '' si salió del tablero.
   const actual = S.pacientes.find(x => x.id === clave), t = r && r.tarjeta;
-  if (viaSesion) cargarTablero(null, true);   // sin r.tarjeta: queda la previsión hasta que llegue el tablero
+  if (viaSesion) { S.sinRecargar.add(clave); cargarTablero(null, true); }   // sin r.tarjeta: queda la previsión hasta que llegue el tablero
   else if (t) {
     const nueva = adaptarTarjeta(t), mueve = !actual || actual.col !== nueva.col;
     colocar(actual || null, nueva);
@@ -2126,7 +2130,7 @@ async function guardarResultado(clave, resultado, extra) {
   if (hechos && hechos === Number(S.reglas && S.reglas.metaDiaria)) setTimeout(() => chispas($('#metadia .barra')), 500);
   if (seleccion.panel === clave) { pintarPanel(); const pa = S.pacientes.find(x => x.id === clave); if (pa) cargarHistoria(pa); }
   const d = deshacerDe(r);
-  avisar(textoGuardado(p, resultado, r), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
+  avisar(textoGuardado(p, resultado, r) + (resultado === 'ACEPTÓ' ? ' Para cambiar la fecha o deshacerlo, edite o anule el registro.' : ''), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
 }
 /** La recarga silenciosa que se descartó por un guardado en vuelo se pide de nuevo al terminar el último. */
 function recargarSiPendiente() {
@@ -2135,7 +2139,8 @@ function recargarSiPendiente() {
   cargarTablero(null, true);
 }
 /** Qué anula «Deshacer», según lo que devolvió registrarResultado (MAPEO §2.4). */
-const deshacerDe = r => r && (r.seguimiento && r.seguimiento.ID ? ['anularResultado', r.seguimiento.ID]
+// «Aceptó» no se deshace aquí: anular el seguimiento no quita la FECHA_INICIO ni el registro creado.
+const deshacerDe = r => r && !(r.seguimiento && r.seguimiento.RESULTADO === 'ACEPTÓ') && (r.seguimiento && r.seguimiento.ID ? ['anularResultado', r.seguimiento.ID]
   : r.alta && r.alta.ID ? ['anularAlta', r.alta.ID] : r.sesion && r.sesion.ID ? ['anularSesion', r.sesion.ID] : null);
 /** Anula lo recién guardado y recarga el tablero: entretanto otra asesora pudo cambiar algo. */
 async function deshacer(fn, id, quien, nombre) {

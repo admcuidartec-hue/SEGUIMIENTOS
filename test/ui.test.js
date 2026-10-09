@@ -667,6 +667,11 @@ test('panel: «Aceptó» con la fecha de la primera sesión pasa la tarjeta a Ag
     assert.deepEqual([u.resultado, u.referencia, u.fecha], ['ACEPTÓ', 'REG-000021', masDiasIso(HOY_DEMO, 3)]);
     assert.match(await pagina.locator('#tablero [data-card="REG-000021"]').textContent(), /Sesión 1 el/);
     assert.equal(await pagina.locator('#tablero [data-card="REG-000021"]').evaluate(e => e.closest('[data-col]').dataset.col), '2');
+    // Sin «Deshacer»: anular el seguimiento no quitaría la fecha de inicio del registro.
+    await esperarEstable(pagina);
+    await pagina.waitForFunction(() => /edite o anule el registro\.$/.test(document.querySelector('#aviso span').textContent));
+    assert.match(await aviso(pagina), /^Guardado: .* · aceptó.* Para cambiar la fecha o deshacerlo, edite o anule el registro\.$/);
+    assert.equal(await pagina.locator('#aviso button:not([hidden])').count(), 0, 'sin Deshacer');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -1253,9 +1258,9 @@ test('panel: atajos (1 guarda sin panel, X abre el cierre sin guardar, Esc cierr
     assert.equal(await pagina.evaluate(() => seleccion.panel), c1[1]);
     // 2 a 4 con el panel abierto abren su paso.
     await pagina.keyboard.press('3');
-    // La tercera es «Agendó cita» en una reevaluación y «Aceptó …» en hierro o procedimiento.
-    const tercera = await pagina.evaluate(id => accDe(S.pacientes.find(x => x.id === id))[2].l, c1[1]);
-    assert.equal((await pagina.locator('#panel .paso h4').textContent()).trim(), tercera);
+    // La segunda de Por contactar en el DEMO es el hierro de Ana María (REG-000003): su 3 es «Aceptó tratamiento».
+    assert.equal(c1[1], 'REG-000003');
+    assert.equal((await pagina.locator('#panel .paso h4').textContent()).trim(), 'Aceptó tratamiento');
     await pagina.keyboard.press('Escape');
     await pagina.keyboard.press('Escape');
     assert.equal(await pagina.evaluate(() => seleccion.panel), '');
@@ -1466,6 +1471,7 @@ test('arrastrar: hierro a Completado avisa (llega con la última sesión); a Age
     await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
     await pagina.evaluate(id => { const p = S.pacientes.find(x => x.id === id); p.trat.k = p.trat.n - 1; }, ROSA);
     await arrastrar(pagina, ROSA, 4);   // ni en la última: la sesión se marca desde el panel
+    assert.equal(await aviso(pagina), 'Completado llega con la última sesión.');
     assert.equal(await panelAbierto(pagina), false);
     await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
     await arrastrar(pagina, CARMEN_H, 4);   // cotización antigua de hierro, sin registro

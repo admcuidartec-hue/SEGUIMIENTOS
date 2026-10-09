@@ -1742,6 +1742,8 @@ function alertaDe(p) {
   if (p.col === 1) {
     const mal = p.dias > 30 || p.atraso > 0 ? 'mal' : '';
     if (p.t === 'reev') return [`hace ${plural(p.dias, 'día', 'días')} que no vuelve`, mal];
+    // Por reevaluar, control vencido o «no vino»: la etiqueta del servidor ya dice qué pasó.
+    if ((p.porReevaluar || p.t === 'ctrl' || p.raw.MOTIVO_PENDIENTE) && p.etiqueta) return [p.etiqueta, mal];
     if (p.t === 'hier' && p.trat.k && p.trat.n) return [`sesión ${p.trat.k + 1} de ${p.trat.n} pendiente · hace ${plural(p.dias, 'día', 'días')}`, mal];
     return [p.t === 'hier' ? `cotizó hace ${plural(p.dias, 'día', 'días')} y no empezó` : `cotizó hace ${plural(p.dias, 'día', 'días')} y no lo hizo`, mal];
   }
@@ -2170,7 +2172,7 @@ async function guardarResultado(clave, resultado, extra) {
   if (hechos && hechos === Number(S.reglas && S.reglas.metaDiaria)) setTimeout(() => chispas($('#metadia .barra')), 500);
   if (seleccion.panel === clave) { pintarPanel(); const pa = S.pacientes.find(x => x.id === clave); if (pa) cargarHistoria(pa); }
   const d = deshacerDe(r);
-  avisar(textoGuardado(p, resultado, r) + (resultado === 'ACEPTÓ' ? ' Para cambiar la fecha o deshacerlo, edite o anule el registro.' : ''), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
+  avisar(textoGuardado(p, resultado, r) + (resultado === 'ACEPTÓ' ? '. Para cambiar la fecha o deshacerlo, edite o anule el registro.' : ''), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
 }
 /** La recarga silenciosa que se descartó por un guardado en vuelo se pide de nuevo al terminar el último. */
 function recargarSiPendiente() {

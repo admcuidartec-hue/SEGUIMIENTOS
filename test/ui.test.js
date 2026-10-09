@@ -670,7 +670,7 @@ test('panel: «Aceptó» con la fecha de la primera sesión pasa la tarjeta a Ag
     // Sin «Deshacer»: anular el seguimiento no quitaría la fecha de inicio del registro.
     await esperarEstable(pagina);
     await pagina.waitForFunction(() => /edite o anule el registro\.$/.test(document.querySelector('#aviso span').textContent));
-    assert.match(await aviso(pagina), /^Guardado: .* · aceptó.* Para cambiar la fecha o deshacerlo, edite o anule el registro\.$/);
+    assert.match(await aviso(pagina), /^Guardado: .* · aceptó.*[^.]\. Para cambiar la fecha o deshacerlo, edite o anule el registro\.$/);
     assert.equal(await pagina.locator('#aviso button:not([hidden])').count(), 0, 'sin Deshacer');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -3469,6 +3469,7 @@ test('tablero: «Por reevaluar» de un hierro terminado reemplaza la reevaluaci�
     assert.match(await textoTarjeta(pagina, 'REG-000022'), /Por reevaluar · terminó el 12\/08/);
     assert.equal(await colPintada(pagina, '43666777|HEMATOLOGÍA'), '', 'la reevaluación vencida no se muestra');
     await abrirPanelDe(pagina, 'REG-000022');
+    assert.equal(await pagina.locator('#panel .alerta').textContent(), 'Por reevaluar · terminó el 12/08', 'el panel no dice «sesión 2 de 1 pendiente»');
     assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
     await pagina.locator('#panel [data-acc="agendo"]').click();
     await confirmarPaso(pagina, masDiasIso(HOY_DEMO, 7));

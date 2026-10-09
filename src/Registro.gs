@@ -51,6 +51,7 @@ function documentoValido(dni) {
 
 /** 'Hierro carboximaltosa · Ferinject × 3 sesiones' o 'Sangría'. */
 function textoRegistro(r) {
+  if (normTexto(r.TIPO) === 'CONTROL') return 'Control + laboratorio' + (textoLimpio_(r.EXAMENES) ? ' · ' + textoLimpio_(r.EXAMENES) : '');
   if (r.TIPO !== 'HIERRO') return frase_(r.DETALLE);
   var n = Number(r.SESIONES) || 1;
   return frase_(r.DETALLE) + (r.MARCA ? ' · ' + frase_(r.MARCA) : '') + ' × ' + n + (n === 1 ? ' sesión' : ' sesiones');
@@ -83,12 +84,25 @@ function validarRegistro(p, catalogos, hoy) {
   if (fecha > hoy) return no('La fecha no puede ser futura.');
   var doctor = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(p.doctor); })[0];
   if (!doctor) return no('Elija el doctor de la lista.');
+  var base0 = { FECHA: fecha, ASESORA: asesora, DOCTOR: doctor.doctor, NOMBRE: nombre, DNI: normDni(p.dni), CONTACTO: contacto,
+    MARCA: '', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '' };
+  if (normTexto(p.tipo) === 'CONTROL') {
+    var ret = fechaIso(p.fechaRetorno);
+    if (!ret) return no('Falta la fecha de retorno a control.');
+    if (ret <= hoy) return no('La fecha de retorno debe ser después de hoy.');
+    if (ret > sumarDias(hoy, 365)) return no('La fecha de retorno va hasta un año desde hoy.');
+    return { error: '', filas: [copia_(base0, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: textoLimpio_(p.examenes), FECHA_RETORNO: ret })] };
+  }
+  var inicio = fechaIso(p.fechaInicio);
+  if (textoLimpio_(p.fechaInicio) && !inicio) return no('La fecha de la primera sesión no es válida.');
+  if (inicio && inicio < hoy) return no('La fecha de la primera sesión no puede ser pasada.');
+  if (inicio && inicio > sumarDias(hoy, 180)) return no('La fecha de la primera sesión va hasta 180 días desde hoy.');
+  base0.FECHA_INICIO = inicio || '';
   var proc = textoLimpio_(p.procedimiento), trat = textoLimpio_(p.tratamiento);
   var procs = (Array.isArray(p.procedimientos) ? p.procedimientos : []).concat(proc ? [proc] : [])
     .map(textoLimpio_).filter(Boolean);
   if (!procs.length && !trat) return no('Elija un procedimiento, un tratamiento o ambos.');
-  var base = { FECHA: fecha, ASESORA: asesora, DOCTOR: doctor.doctor, NOMBRE: nombre, DNI: normDni(p.dni), CONTACTO: contacto,
-    MARCA: '', ANULADO: '', MOTIVO_ANULACION: '' };
+  var base = base0;
   var filas = [];
   var vistos = {};
   for (var i = 0; i < procs.length; i++) {
@@ -135,10 +149,13 @@ function sesionesDe_(id, sesiones) {
 /** El estado no se guarda en ninguna celda: se calcula con las sesiones válidas. */
 function estadoRegistro(r, sesiones) {
   var propias = sesionesDe_(r.ID, sesiones);
-  var total = Math.max(1, Number(r.SESIONES) || 1);
+  var control = normTexto(r.TIPO) === 'CONTROL';
+  var total = control ? 0 : Math.max(1, Number(r.SESIONES) || 1);
   var ultima = propias.length ? fechaIso(propias[propias.length - 1].FECHA) : '';
-  var estado = anulado_(r) ? 'ANULADO' : propias.length >= total ? 'COMPLETO' : propias.length ? 'EN CURSO' : 'COTIZADO';
-  return { estado: estado, hechas: propias.length, total: total, ultima: ultima };
+  var inicio = fechaIso(control ? r.FECHA_RETORNO : r.FECHA_INICIO) || '';
+  var estado = anulado_(r) ? 'ANULADO' : control ? 'PROGRAMADO' : propias.length >= total ? 'COMPLETO' : propias.length ? 'EN CURSO'
+    : inicio ? 'PROGRAMADO' : 'COTIZADO';
+  return { estado: estado, hechas: propias.length, total: total, ultima: ultima, inicio: inicio };
 }
 
 function validarSesion(r, sesiones, fecha, hoy) {
@@ -282,6 +299,7 @@ function altasVigentes(altas, seguimientos, citas) {
 
 function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {
   return (registros || []).map(function (r) {
+    if (normTexto(r.TIPO) === 'CONTROL') return null;
     var e = estadoRegistro(r, sesiones);
     if (e.estado === 'ANULADO') return null;
     var tel = normTelefono(r.CONTACTO), fecha = fechaIso(r.FECHA);

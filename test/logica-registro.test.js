@@ -42,9 +42,9 @@ test('validarRegistro: procedimiento y tratamiento en un formulario son dos fila
   assert.equal(r.error, '');
   assert.deepEqual(r.filas, [
     { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987 654 321',
-      MARCA: '', ANULADO: '', MOTIVO_ANULACION: '', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', SESIONES: 1 },
+      MARCA: '', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', SESIONES: 1 },
     { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987 654 321',
-      MARCA: 'FERINJECT', ANULADO: '', MOTIVO_ANULACION: '', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', SESIONES: 3 }]);
+      MARCA: 'FERINJECT', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', SESIONES: 3 }]);
 });
 
 test('validarRegistro rechaza lo que no se puede guardar', () => {
@@ -92,8 +92,8 @@ const ses = (numero, fecha, o) => Object.assign({ ID: 'SES-00000' + numero, ID_R
 
 test('estadoRegistro: cotizado, en curso, completo y anulado; una sesión anulada no cuenta', () => {
   const e = (r, s) => plano(L.estadoRegistro(r, s));
-  assert.deepEqual(e(reg(), []), { estado: 'COTIZADO', hechas: 0, total: 3, ultima: '' });
-  assert.deepEqual(e(reg(), [ses(1, '2026-09-25')]), { estado: 'EN CURSO', hechas: 1, total: 3, ultima: '2026-09-25' });
+  assert.deepEqual(e(reg(), []), { estado: 'COTIZADO', hechas: 0, total: 3, ultima: '', inicio: '' });
+  assert.deepEqual(e(reg(), [ses(1, '2026-09-25')]), { estado: 'EN CURSO', hechas: 1, total: 3, ultima: '2026-09-25', inicio: '' });
   assert.equal(e(reg(), [ses(1, '2026-09-25'), ses(2, '2026-10-01'), ses(3, '2026-10-04')]).estado, 'COMPLETO');
   assert.equal(e(reg(), [ses(1, '2026-09-25', { ANULADO: 'SÍ' })]).estado, 'COTIZADO');
   assert.equal(e(reg({ ANULADO: 'SÍ' }), []).estado, 'ANULADO');
@@ -307,4 +307,39 @@ test('pendientesRegistro: un registro de hierro trae TRATAMIENTO y MARCA en fras
   const h = p.find(x => x.ID_REGISTRO === 'REG-000001'), s = p.find(x => x.ID_REGISTRO === 'REG-000002');
   assert.deepEqual([h.TRATAMIENTO, h.MARCA], ['Hierro carboximaltosa', 'Ferinject']);
   assert.deepEqual([s.TRATAMIENTO, s.MARCA], ['', '']);
+});
+
+const CAT3 = { usuarios: ['MAGALY'], doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: 'Dra. KAREN DIANA MATOS PEÑA' }],
+  procedimientos: ['SANGRÍA'], tratamientos: ['HIERRO SACARATO'], marcas: {} };
+const base3 = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', nombre: 'Rosa Prueba', contacto: '987654321', fecha: '2026-10-09', doctor: 'Dra. Karen Matos' }, o);
+
+test('validarRegistro: control + laboratorio con exámenes y fecha de retorno', () => {
+  const v = L.validarRegistro(base3({ tipo: 'CONTROL', examenes: ' hemograma,  ferritina ', fechaRetorno: '2026-10-24' }), CAT3, '2026-10-09');
+  assert.equal(v.error, '');
+  assert.deepEqual(plano(v.filas).map(f => [f.TIPO, f.DETALLE, f.EXAMENES, f.FECHA_RETORNO, f.SESIONES]),
+    [['CONTROL', 'CONTROL', 'hemograma, ferritina', '2026-10-24', 0]]);
+  assert.match(L.validarRegistro(base3({ tipo: 'CONTROL', fechaRetorno: '' }), CAT3, '2026-10-09').error, /fecha de retorno/);
+  assert.match(L.validarRegistro(base3({ tipo: 'CONTROL', fechaRetorno: '2026-10-09' }), CAT3, '2026-10-09').error, /después de hoy/);
+});
+
+test('validarRegistro: la fecha de la primera sesión es opcional, de hoy en adelante', () => {
+  const v = L.validarRegistro(base3({ tratamiento: 'HIERRO SACARATO', sesiones: 3, fechaInicio: '2026-10-12' }), CAT3, '2026-10-09');
+  assert.equal(plano(v.filas)[0].FECHA_INICIO, '2026-10-12');
+  assert.equal(plano(L.validarRegistro(base3({ procedimiento: 'SANGRÍA' }), CAT3, '2026-10-09').filas)[0].FECHA_INICIO, '');
+  assert.match(L.validarRegistro(base3({ procedimiento: 'SANGRÍA', fechaInicio: '2026-10-01' }), CAT3, '2026-10-09').error, /no puede ser pasada/);
+});
+
+test('estadoRegistro: COTIZADO, PROGRAMADO, EN CURSO y COMPLETO; los antiguos sin fecha de inicio no cambian', () => {
+  const r = o => Object.assign({ ID: 'REG-1', FECHA: '2026-10-01', SESIONES: '3', ANULADO: '', FECHA_INICIO: '' }, o);
+  const s = n => ({ ID: 'SES-' + n, ID_REGISTRO: 'REG-1', NUMERO: String(n), FECHA: '2026-10-0' + (n + 1), ANULADO: '' });
+  assert.equal(L.estadoRegistro(r(), []).estado, 'COTIZADO');
+  assert.deepEqual(plano(L.estadoRegistro(r({ FECHA_INICIO: '2026-10-12' }), [])), { estado: 'PROGRAMADO', hechas: 0, total: 3, ultima: '', inicio: '2026-10-12' });
+  assert.equal(L.estadoRegistro(r(), [s(1)]).estado, 'EN CURSO', 'un registro antiguo con sesiones sigue EN CURSO');
+  assert.equal(L.estadoRegistro(r({ FECHA_INICIO: '2026-10-12' }), [s(1), s(2), s(3)]).estado, 'COMPLETO');
+  assert.equal(L.estadoRegistro(r({ TIPO: 'CONTROL', SESIONES: '0', FECHA_RETORNO: '2026-10-24' }), []).estado, 'PROGRAMADO');
+});
+
+test('textoRegistro de un control', () => {
+  assert.equal(L.textoRegistro({ TIPO: 'CONTROL', DETALLE: 'CONTROL', EXAMENES: 'hemograma' }), 'Control + laboratorio · hemograma');
+  assert.equal(L.textoRegistro({ TIPO: 'CONTROL', DETALLE: 'CONTROL', EXAMENES: '' }), 'Control + laboratorio');
 });

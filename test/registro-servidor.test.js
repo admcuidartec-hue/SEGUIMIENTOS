@@ -137,7 +137,7 @@ test('guardarRegistro: procedimientos[] y un tratamiento en el mismo envío escr
   const r = plano(ctx.guardarRegistro({ usuario: 'MAGALY', dni: '40111222', nombre: 'Rosa Quispe', contacto: '+51987654321', fecha: '2026-10-05',
     doctor: 'Dra. Karen Matos', procedimientos: ['SANGRÍA', 'AMO'], tratamiento: 'HIERRO CARBOXIMALTOSA', sesiones: 2, marca: 'FERINJECT' }));
   const base = { FECHA_HORA: '2026-10-05 10:30', FECHA: '2026-10-05', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ROSA QUISPE',
-    DNI: '40111222', CONTACTO: '+51987654321', ANULADO: '', MOTIVO_ANULACION: '' };
+    DNI: '40111222', CONTACTO: '+51987654321', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '' };
   assert.deepEqual(escrito.REGISTROS.map(x => Object.fromEntries(Object.entries(x).sort())), [
     Object.assign({ ID: 'REG-000001', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: 1 }, base),
     Object.assign({ ID: 'REG-000002', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO', MARCA: '', SESIONES: 1 }, base),

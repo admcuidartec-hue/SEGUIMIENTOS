@@ -3016,7 +3016,7 @@ const TONO_REG = { COTIZADO: 'e-pend', PROGRAMADO: 'e-curso', 'EN CURSO': 'e-cur
 function lineaEstadoRegistro(x) {
   const e = String(x.ESTADO_REGISTRO || x.ESTADO || '');
   if (e === 'ANULADO') return '';
-  if (x.TIPO === 'CONTROL') return 'Control el ' + dm(x.FECHA_RETORNO) + (String(x.EXAMENES || '').trim() ? ' · exámenes: ' + String(x.EXAMENES).trim() : '');
+  if (x.TIPO === 'CONTROL') return (x.FECHA_RETORNO ? 'Control el ' + dm(x.FECHA_RETORNO) : 'Control') + (String(x.EXAMENES || '').trim() ? ' · exámenes: ' + String(x.EXAMENES).trim() : '');
   if (e === 'PROGRAMADO') return 'Programado el ' + dm(x.FECHA_INICIO);
   if (e === 'EN CURSO') return `Sesión ${Number(x.HECHAS) || 0} de ${Number(x.SESIONES) || 0}`;
   return e === 'COMPLETO' ? 'Completo' : e === 'COTIZADO' ? 'Cotizado' : '';
@@ -3355,7 +3355,7 @@ function cerrarAlta() {
 function confirmarAlta(b) {
   const a = PA.alta;
   if (!a || PA.enVuelo) return;
-  if (!a.doctor) { avisar('Elija el doctor que da el alta.'); $('#falta-doc').focus(); return; }
+  if (!a.doctor) { avisar(a.dec === 'NUEVA REEVALUACION' ? 'Elija el doctor.' : 'Elija el doctor que da el alta.'); $('#falta-doc').focus(); return; }
   if (!a.fecha) { avisar('Falta la fecha de la consulta.'); $('#falta-fec').focus(); return; }
   const d = decisionUi(a.dec), ret = d.pideFecha ? a.ret : '';
   if (d.pideFecha && !ret) { avisar('Falta la fecha de retorno.'); $('#falta-ret').focus(); return; }

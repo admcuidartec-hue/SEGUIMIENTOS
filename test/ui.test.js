@@ -2217,6 +2217,12 @@ test('pacientes: «Decisión del médico…» abre doctor y fecha en la especial
     await pagina.locator('#ficha [data-alta-ok]').click();
     assert.equal(await aviso(pagina), 'Elija el doctor que da el alta.');
     assert.equal(await llamadas(pagina, 'darDeAlta'), n);
+    // Con «Nueva reevaluación» el mensaje no habla de alta.
+    await pagina.evaluate(() => { PA.alta.dec = 'NUEVA REEVALUACION'; });
+    await pagina.locator('#ficha [data-alta-ok]').click();
+    assert.equal(await aviso(pagina), 'Elija el doctor.');
+    assert.equal(await llamadas(pagina, 'darDeAlta'), n);
+    await pagina.evaluate(() => { PA.alta.dec = 'ALTA'; });
     // Error del servidor: el formulario sigue abierto.
     await pagina.locator('#falta-doc').selectOption('Dr. Juvenal Hanampa');
     await pagina.evaluate(() => { DEMO._fallar.darDeAlta = 'Sin conexión con el servidor.'; });
@@ -2294,9 +2300,10 @@ test('pacientes: la línea de estado dice «Sesión k de n», «Programado el �
       { TIPO: 'HIERRO', ESTADO_REGISTRO: 'PROGRAMADO', FECHA_INICIO: '2026-10-12', HECHAS: 0, SESIONES: 2 },
       { TIPO: 'PROCEDIMIENTO', ESTADO_REGISTRO: 'COMPLETO', HECHAS: 1, SESIONES: 1 },
       { TIPO: 'CONTROL', ESTADO_REGISTRO: 'PROGRAMADO', EXAMENES: 'hemograma', FECHA_RETORNO: '2026-10-24', HECHAS: 0, SESIONES: 0 },
-      { TIPO: 'CONTROL', ESTADO_REGISTRO: 'PROGRAMADO', EXAMENES: '', FECHA_RETORNO: '2026-10-24', HECHAS: 0, SESIONES: 0 }
+      { TIPO: 'CONTROL', ESTADO_REGISTRO: 'PROGRAMADO', EXAMENES: '', FECHA_RETORNO: '2026-10-24', HECHAS: 0, SESIONES: 0 },
+      { TIPO: 'CONTROL', ESTADO_REGISTRO: 'PROGRAMADO', EXAMENES: '', FECHA_RETORNO: '', HECHAS: 0, SESIONES: 0 }
     ].map(lineaEstadoRegistro));
-    assert.deepEqual(lineas, ['Cotizado', 'Programado el 12/10', 'Completo', 'Control el 24/10 · exámenes: hemograma', 'Control el 24/10']);
+    assert.deepEqual(lineas, ['Cotizado', 'Programado el 12/10', 'Completo', 'Control el 24/10 · exámenes: hemograma', 'Control el 24/10', 'Control']);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

@@ -38,6 +38,13 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - **Nunca `npm audit fix --force`**: sube clasp a la v3 y rompe los scripts.
 - Los procedimientos y tratamientos se registran en la pestaña **Registro** (`REGISTROS`, `SESIONES`) y las
   altas médicas en `ALTAS`, por especialidad. `INDICACIONES` es historial congelado.
+- **El Excel de hierro (base `HIERRO_ID`) se dejó de usar en octubre de 2026.** Lo que faltaba se trae una vez con
+  el menú «Importar lo que falta de la base de hierro» (`importarLoQueFalta_`): lee HIERRO EV DIARIO (antes HIERRO),
+  PROCEDIMIENTOS y HIERRO NUEVO, y agrega al final de `INDICACIONES` solo lo que no está (`indicacionesQueFaltan`,
+  por fecha, nombre, tipo y detalle). Repetirlo no duplica. Las que quedan SIN CANDIDATO reciben su DNI a mano en
+  Indicadores → «Procedimientos sin paciente» (`asignarDniIndicacion`, solo DNI que ya estén en SOFDOC o Registro).
+- El buscador de Pacientes (`buscar` → `buscarEnPacientes`) pide todas las palabras en cualquier orden, o parte del
+  DNI, y mira citas, Registro e `INDICACIONES`.
 - Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión.
 - El estado de un registro (cotizado, en curso, completo, anulado) se calcula con `estadoRegistro`; no se guarda.
 - `SEGUIMIENTOS` se escribe por posición: una columna nueva solo se agrega al final (`encabezadoAmpliable`).

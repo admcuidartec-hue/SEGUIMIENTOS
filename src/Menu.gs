@@ -14,6 +14,7 @@ function onOpen() {
     .addItem('Actualizar', 'actualizar')
     .addItem('Verificar', 'verificar')
     .addItem('Activar actualización diaria (7:00)', 'activarDiaria')
+    .addItem('Importar lo que falta de la base de hierro', 'importarLoQueFalta')
     .addSeparator()
     .addItem('Preparar hojas', 'prepararHojas')
     .addToUi();
@@ -344,6 +345,71 @@ function importar_() {
   var detalle = todas.length + ' indicaciones: ' + Object.keys(cuenta).map(function (k) { return cuenta[k] + ' ' + k; }).join(', ');
   bitacora_('MENÚ', 'IMPORTAR', detalle);
   return 'Importadas ' + detalle + '. Ahora use «Actualizar».';
+}
+
+/** El aviso se muestra con el candado ya suelto (ver actualizar). */
+function importarLoQueFalta() {
+  var ui = SpreadsheetApp.getUi(), lock, mensaje;
+  try { lock = bloquear_(); } catch (e) { ui.alert('Otra operación está en curso. Intente en un minuto.'); return; }
+  try {
+    mensaje = importarLoQueFalta_();
+  } finally {
+    lock.releaseLock();
+  }
+  ui.alert(mensaje);
+}
+
+/**
+ * Trae de la base de hierro lo que todavía no está en INDICACIONES y lo agrega
+ * al final, sin tocar las filas que ya hay. Lee la pestaña de hierro (hoy
+ * «HIERRO EV DIARIO»; antes «HIERRO»), PROCEDIMIENTOS y HIERRO NUEVO, que ya
+ * trae DNI. Se puede repetir: lo ya importado no se duplica.
+ */
+function importarLoQueFalta_() {
+  var citas = leerCitas_();
+  if (!citas.length) return 'Primero use «Actualizar» para cargar las citas: sin ellas no se puede emparejar.';
+  var porNombre = {};
+  SpreadsheetApp.openById(CONFIG.HIERRO_ID).getSheets().forEach(function (s) { porNombre[normTexto(s.getName())] = s; });
+  var pestanas = [porNombre['HIERRO EV DIARIO'] || porNombre.HIERRO, porNombre.PROCEDIMIENTOS, porNombre['HIERRO NUEVO']]
+    .filter(Boolean);
+  if (!pestanas.length) return 'La base de hierro no tiene las pestañas HIERRO EV DIARIO, PROCEDIMIENTOS ni HIERRO NUEVO.';
+  var candidatas = [];
+  pestanas.forEach(function (sh) {
+    var v = sh.getDataRange().getValues().map(function (f) {
+      return f.map(function (x) { return x instanceof Date ? fechaHoraTexto_(x) : x; });
+    });
+    candidatas = candidatas.concat(indicacionesDesdeHierro(sh.getName(), v[0], v.slice(1)));
+  });
+  var existentes = leerObjetos_('INDICACIONES');
+  var nuevas = indicacionesQueFaltan(existentes, candidatas);
+  if (!nuevas.length) return 'No falta nada: todo lo de la base de hierro ya está en INDICACIONES.';
+  nuevas.forEach(function (i) { i.ID = ''; });
+  aplicarEmparejamientos(nuevas, construirIndiceNombres(citas));
+  completarIds(existentes.concat(nuevas));
+
+  var sh = hoja_('INDICACIONES'), cab = encabezado_(sh), desde = sh.getLastRow() + 1;
+  cab.forEach(function (c, j) {
+    var r = sh.getRange(desde, j + 1, nuevas.length, 1);
+    if (COLUMNAS_FECHA[c]) r.setNumberFormat('yyyy-mm-dd');
+    else if (!COLUMNAS_NUMERICAS[c]) r.setNumberFormat('@');
+  });
+  sh.getRange(desde, 1, nuevas.length, cab.length).setValues(nuevas.map(function (o) {
+    return cab.map(function (c) { return celdaParaHoja_(o[c], c); });
+  }));
+  SpreadsheetApp.flush();
+
+  var n = { unidas: 0, porConfirmar: 0, sin: 0 };
+  nuevas.forEach(function (i) {
+    var e = normTexto(i.EMPAREJAMIENTO);
+    if (e === 'POR CONFIRMAR') n.porConfirmar++;
+    else if (e === 'SIN CANDIDATO') n.sin++;
+    else n.unidas++;
+  });
+  var detalle = nuevas.length + ' indicaciones: ' + n.unidas + ' unidas a un paciente, ' + n.porConfirmar + ' por confirmar y ' +
+    n.sin + ' sin paciente';
+  bitacora_('MENÚ', 'IMPORTAR', detalle);
+  return 'Se agregaron ' + detalle + '. Las que quedaron sin paciente están en la app, en Indicadores → «Procedimientos sin ' +
+    'paciente»: ahí se les escribe el DNI. Ahora use «Actualizar».';
 }
 
 /** Revisión de salud. No escribe nada. */

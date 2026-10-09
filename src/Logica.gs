@@ -370,13 +370,15 @@ var COLUMNAS_INDICACIONES = ['ID', 'FECHA', 'TIPO', 'DETALLE', 'CANTIDAD', 'MEDI
   'TELEFONO', 'ESTADO', 'OBSERVACIONES', 'DNI', 'EMPAREJAMIENTO', 'ORIGEN'];
 
 /**
- * Filas de la pestaña HIERRO o PROCEDIMIENTOS -> indicaciones.
+ * Filas de una pestaña de la base de hierro -> indicaciones. Las que empiezan
+ * por «HIERRO» (HIERRO, HIERRO EV DIARIO, HIERRO NUEVO) son hierro; las demás,
+ * procedimientos. HIERRO NUEVO trae además DNI, médico y tipo de hierro.
  * `filas` son las filas debajo del encabezado, vacías incluidas, para que
  * ORIGEN apunte a la fila real de la hoja (encabezado en la fila 1).
  */
 function indicacionesDesdeHierro(pestana, encabezado, filas, desde) {
   var idx = indiceDeEncabezado(encabezado);
-  var tipo = normTexto(pestana) === 'HIERRO' ? 'HIERRO' : 'PROCEDIMIENTO';
+  var tipo = normTexto(pestana).indexOf('HIERRO') === 0 ? 'HIERRO' : 'PROCEDIMIENTO';
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   var out = [], n = desde || 1;
   (filas || []).forEach(function (f, i) {
@@ -388,15 +390,16 @@ function indicacionesDesdeHierro(pestana, encabezado, filas, desde) {
       TIPO: tipo,
       DETALLE: tipo === 'HIERRO' ? 'HIERRO' : textoLimpio_(celda(f, 'TIPO DE EXAMENES')),
       CANTIDAD: tipo === 'HIERRO' ? celda(f, 'CANTIDAD') : '',
-      MEDICO_SOLICITANTE: '',
+      MEDICO_SOLICITANTE: textoLimpio_(celda(f, 'MEDICO SOLICITANTE')),
       ASESORA: normTexto(celda(f, 'ASESOR')),
       NOMBRE: nombre,
       TELEFONO: normTelefono(celda(f, 'TELEFONO')),
       ESTADO: normalizarEstadoIndicacion(celda(f, '¿ACEPTARON? ¿COTIZACION?')),
-      OBSERVACIONES: textoLimpio_(celda(f, 'OBSERVACIONES')),
-      DNI: '',
+      OBSERVACIONES: [celda(f, 'TIPO DE HIERRO'), celda(f, 'OBSERVACIONES') || celda(f, 'OBSERVACION')]
+        .map(textoLimpio_).filter(Boolean).join(' · '),
+      DNI: normDni(celda(f, 'DNI')),
       EMPAREJAMIENTO: '',
-      ORIGEN: pestana + '!' + (i + 2)
+      ORIGEN: textoLimpio_(pestana) + '!' + (i + 2)
     });
   });
   return out;
@@ -425,6 +428,76 @@ function aplicarEmparejamientos(indicaciones, indice) {
     ind.EMPAREJAMIENTO = r.estado;
   });
   return cambios;
+}
+
+function claveIndicacion_(i) {
+  return [fechaIso(i.FECHA), normTexto(i.NOMBRE), normTexto(i.TIPO), normTexto(i.DETALLE)].join('|');
+}
+
+/**
+ * Las candidatas que todavía no están en INDICACIONES. Se cuentan como un
+ * multiconjunto: dos filas iguales en la base son dos cotizaciones, y si ya
+ * había una solo falta la otra. Así importar dos veces no duplica nada.
+ */
+function indicacionesQueFaltan(existentes, candidatas) {
+  var hay = {};
+  (existentes || []).forEach(function (i) { var k = claveIndicacion_(i); hay[k] = (hay[k] || 0) + 1; });
+  return (candidatas || []).filter(function (i) {
+    var k = claveIndicacion_(i);
+    if (hay[k]) { hay[k]--; return false; }
+    return true;
+  });
+}
+
+/**
+ * Fila (base 0) de una indicación SIN CANDIDATO a la que se le puede poner
+ * DNI a mano. `conocidos` = { dni: 1 } de los pacientes en SOFDOC o Registro:
+ * así un DNI mal escrito no crea un paciente que no existe.
+ */
+function buscarFilaParaAsignar(encabezado, filas, id, dni, conocidos) {
+  var idx = indiceDeEncabezado(encabezado);
+  id = textoLimpio_(id);
+  for (var i = 0; i < filas.length; i++) {
+    if (textoLimpio_(filas[i][idx.ID]) !== id) continue;
+    var estado = normTexto(filas[i][idx.EMPAREJAMIENTO]);
+    if (normDni(filas[i][idx.DNI]) || (estado && estado !== 'SIN CANDIDATO')) {
+      return { fila: -1, error: 'La indicación ' + id + ' ya tiene paciente.' };
+    }
+    if (!(conocidos || {})[normDni(dni)]) {
+      return { fila: -1, error: 'El DNI ' + dni + ' no está en SOFDOC ni en Registro. Revise que esté bien escrito.' };
+    }
+    return { fila: i, error: '' };
+  }
+  return { fila: -1, error: 'No encontré la indicación ' + id + '.' };
+}
+
+/**
+ * Buscador de la pestaña Pacientes. Encuentra al paciente si su nombre tiene
+ * todas las palabras escritas, en cualquier orden, o si su DNI contiene lo
+ * escrito. Mira las citas (la más reciente primero), luego Registro y luego
+ * el historial de indicaciones: quien vino solo por hierro también aparece.
+ */
+function buscarEnPacientes(texto, f) {
+  var q = normTexto(texto);
+  if (q.replace(/\s/g, '').length < 3) return [];
+  var palabras = q.split(' '), dni = normDni(texto), conDigitos = /\d/.test(dni);
+  var vistos = {}, out = [];
+  function ver(d, nombre) {
+    d = normDni(d);
+    if (!d || vistos[d] || out.length >= 20) return;
+    var n = normTexto(nombre);
+    if ((conDigitos && d.indexOf(dni) >= 0) || palabras.every(function (w) { return n.indexOf(w) >= 0; })) {
+      vistos[d] = 1;
+      out.push({ DNI: d, NOMBRE: textoLimpio_(nombre) });
+    }
+  }
+  var citas = (f && f.citas) || [], registros = (f && f.registros) || [];
+  for (var i = citas.length - 1; i >= 0; i--) ver(citas[i].DNI, citas[i].NOMBRE);
+  for (var j = registros.length - 1; j >= 0; j--) {
+    if (normTexto(registros[j].ANULADO) !== 'SI') ver(registros[j].DNI, registros[j].NOMBRE);
+  }
+  ((f && f.indicaciones) || []).forEach(function (x) { ver(x.DNI, x.NOMBRE); });
+  return out;
 }
 
 /** Da un ID 'IND-nnnn' a las indicaciones anotadas a mano sin ID. Devuelve cuántas cambió. */

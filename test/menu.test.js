@@ -179,7 +179,8 @@ function hojaFalsa(valores) {
         getValues: () => Array.from({ length: h }, (_, i) => Array.from({ length: w }, (_, j) => celda(r + i, c + j))),
         setValues: vals => { vals.forEach((f, i) => f.forEach((x, j) => poner(r + i, c + j, x))); return rango; },
         setValue: x => { poner(r, c, x); return rango; },
-        setFontWeight: () => rango
+        setFontWeight: () => rango,
+        setNumberFormat: () => rango
       };
       return rango;
     }
@@ -217,4 +218,78 @@ test('ampliarHojas_ no agrega REFERENCIA si el encabezado de SEGUIMIENTOS no es 
   ctx.ss_ = () => ({ getSheetByName: n => (n === 'SEGUIMIENTOS' ? seg : null) });
   assert.match(ctx.ampliarHojas_()[0], /^✗ SEGUIMIENTOS: el encabezado no coincide/);
   assert.deepEqual(seg.v[0], ['ID', 'FECHA', 'DNI']);
+});
+
+/* ---- Importar lo que falta de la base de hierro (una sola vez, sin duplicar) ---- */
+const hojaOrigen = (nombre, valores) => ({ getName: () => nombre, getDataRange: () => ({ getValues: () => valores }) });
+const COLS_IND = ['ID', 'FECHA', 'TIPO', 'DETALLE', 'CANTIDAD', 'MEDICO_SOLICITANTE', 'ASESORA', 'NOMBRE', 'TELEFONO', 'ESTADO',
+  'OBSERVACIONES', 'DNI', 'EMPAREJAMIENTO', 'ORIGEN'];
+
+function importacion(pestanas) {
+  const { ctx } = contexto();
+  ctx.MEMO.mismaZona = true;
+  const ind = hojaFalsa([COLS_IND,
+    ['IND-0007', '2026-04-18', 'HIERRO', 'HIERRO', 2, '', 'LORENA', 'ROSA QUISPE', '945000111', 'ACEPTÓ', '', '40111222', 'AUTOMÁTICO', 'HIERRO!2']]);
+  const bita = [];
+  ctx.ss_ = () => ({ getSheetByName: n => (n === 'INDICACIONES' ? ind : null) });
+  ctx.leerCitas_ = () => [
+    { DNI: '40111222', NOMBRE: 'ROSA QUISPE', FECHA: '2026-04-01', ESTADO: 'REALIZADO', ESPECIALIDAD: 'HEMATOLOGÍA' },
+    { DNI: '40333444', NOMBRE: 'CARMEN TORRES DIAZ', FECHA: '2026-04-01', ESTADO: 'REALIZADO', ESPECIALIDAD: 'HEMATOLOGÍA' }];
+  ctx.bitacora_ = (u, a, d) => bita.push([u, a, d]);
+  ctx.SpreadsheetApp = { openById: () => ({ getSheets: () => pestanas }), flush: () => {} };
+  return { ctx, ind, bita };
+}
+const PESTANAS = () => [
+  hojaOrigen('HIERRO EV DIARIO', [['FECHA', '', 'ASESOR ', 'NOMBRE ', 'TELÉFONO ', 'CANTIDAD', '¿ACEPTARON? ¿COTIZACIÓN?', 'OBSERVACIONES '],
+    ['2026-04-18', 'abril', 'LORENA', 'ROSA QUISPE', 945000111, 2, 'ACEPTARON', ''],
+    ['2026-05-01', 'mayo', 'MAGALY', 'PAOLA NADIE CONOCIDA', 956000222, 1, 'COTIZARON', '']]),
+  hojaOrigen('PROCEDIMIENTOS', [['FECHA', 'ASESOR ', 'NOMBRE ', 'TELÉFONO ', 'TIPO DE EXÁMENES', '¿ACEPTARON? ¿COTIZACIÓN?', 'OBSERVACIONES '],
+    ['2026-05-02', 'LORENA', 'CARMEN TORRES', 947000333, 'AMO + BIOPSIA', 'COTIZARON', '']]),
+  hojaOrigen('HIERRO NUEVO ', [['FECHA', 'ASESOR ', 'NOMBRE ', 'DNI', 'TELÉFONO ', 'CANTIDAD', '¿ACEPTARON? ¿COTIZACIÓN?', 'TIPO DE HIERRO ', 'MÉDICO SOLICITANTE', 'OBSERVACIÓN'],
+    ['2026-09-30', 'RACHEL', 'ANA LUZ PRUEBA', 41222333, '992 000 111', 1, 'COTIZARON', 'FERINJECT', 'ELI CABANILLAS', '']]),
+  hojaOrigen('AGOSTO', [['', 'MENSAJES DE PACIENTES CHP']])
+];
+
+test('importarLoQueFalta_: agrega al final solo lo que falta, con IDs siguientes, y la segunda vez nada', () => {
+  const { ctx, ind, bita } = importacion(PESTANAS());
+  const m = ctx.importarLoQueFalta_();
+  assert.match(m, /Se agregaron 3 indicaciones: 2 unidas a un paciente, 0 por confirmar y 1 sin paciente/);
+  assert.equal(ind.v.length, 5, 'el encabezado, la que ya estaba y 3 nuevas');
+  assert.deepEqual(ind.v[1].slice(0, 2), ['IND-0007', '2026-04-18'], 'la que ya estaba no se toca');
+  const fila = r => Object.fromEntries(COLS_IND.map((c, j) => [c, r[j]]));
+  const nuevas = ind.v.slice(2).map(fila);
+  assert.deepEqual(nuevas.map(n => [n.ID, n.NOMBRE, n.DNI, n.EMPAREJAMIENTO, n.TELEFONO]), [
+    ['IND-0008', 'PAOLA NADIE CONOCIDA', '', 'SIN CANDIDATO', '956000222'],
+    ['IND-0009', 'CARMEN TORRES', '40333444', 'AUTOMÁTICO', '947000333'],
+    ['IND-0010', 'ANA LUZ PRUEBA', '41222333', 'CONFIRMADO', '992000111']]);
+  assert.equal(nuevas[2].MEDICO_SOLICITANTE, 'ELI CABANILLAS');
+  assert.equal(typeof nuevas[0].FECHA.getFullYear, 'function', 'la fecha se guarda como fecha, no como texto');
+  assert.deepEqual(bita.map(b => b[1]), ['IMPORTAR']);
+  assert.match(ctx.importarLoQueFalta_(), /No falta nada/);
+  assert.equal(ind.v.length, 5, 'importar dos veces no duplica');
+});
+
+test('importarLoQueFalta_: sirve con la pestaña antigua «HIERRO» y avisa si no hay citas', () => {
+  const { ctx, ind } = importacion([hojaOrigen('HIERRO', [['FECHA', '', 'ASESOR ', 'NOMBRE ', 'TELÉFONO ', 'CANTIDAD', '¿ACEPTARON? ¿COTIZACIÓN?'],
+    ['2026-06-01', 'junio', 'MAGALY', 'ROSA QUISPE', 945000111, 1, 'COTIZARON']])]);
+  assert.match(ctx.importarLoQueFalta_(), /Se agregaron 1 indicaciones/);
+  assert.equal(ind.v.length, 3);
+  ctx.leerCitas_ = () => [];
+  assert.match(ctx.importarLoQueFalta_(), /Primero use «Actualizar»/);
+});
+
+test('importarLoQueFalta muestra su aviso con el candado ya suelto', () => {
+  const { ctx, estado } = contexto();
+  ctx.importarLoQueFalta_ = () => 'No falta nada.';
+  ctx.importarLoQueFalta();
+  assert.deepEqual(estado.avisos.map(a => [a.m, a.conCandado]), [['No falta nada.', false]]);
+});
+
+test('el menú del Sheets ofrece «Importar lo que falta de la base de hierro»', () => {
+  const { ctx } = contexto();
+  const items = [];
+  const menu = { addItem: (t, f) => { items.push([t, f]); return menu; }, addSeparator: () => menu, addToUi: () => {} };
+  ctx.SpreadsheetApp = { getUi: () => ({ createMenu: () => menu }) };
+  ctx.onOpen();
+  assert.deepEqual(items.find(i => i[1] === 'importarLoQueFalta'), ['Importar lo que falta de la base de hierro', 'importarLoQueFalta']);
 });

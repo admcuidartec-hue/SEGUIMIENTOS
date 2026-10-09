@@ -2321,7 +2321,34 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     await pestana(pagina, 'sinpac');
     const sin = await filasDe(pagina, '.tabla');
     assert.equal(sin.length, 3);
-    assert.deepEqual(sin[0], ['04/05/2026', 'Hierro', 'Paola Rivera', '956 789 012', 'IND-0120']);
+    assert.deepEqual(sin[0].slice(0, 5), ['04/05/2026', 'Hierro', 'Paola Rivera', '956 789 012', 'IND-0120']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('indicadores: «Procedimientos sin paciente» guarda el DNI escrito, quita la fila y avisa; vacío o desconocido, no', async () => {
+  const { navegador, pagina, errores } = await abrirIndicadores();
+  try {
+    await pestana(pagina, 'sinpac');
+    const fila = id => pagina.locator(`#ipanel tr:has([data-asignar="${id}"])`);
+    // Vacío: avisa y no llama al servidor.
+    await fila('IND-0131').locator('button[data-asignar]').click();
+    assert.match(await aviso(pagina), /Escriba el DNI/);
+    assert.equal(await pagina.evaluate(() => DEMO._llamadas.asignarDniIndicacion || 0), 0);
+    // Desconocido: el servidor lo rechaza; la fila sigue, con lo escrito y el botón activo.
+    await fila('IND-0131').locator('input').fill('49999999');
+    await fila('IND-0131').locator('input').press('Enter');
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.match(await aviso(pagina), /no está en SOFDOC ni en Registro/);
+    assert.equal(await fila('IND-0131').locator('input').inputValue(), '49999999');
+    assert.equal(await fila('IND-0131').locator('button[data-asignar]').isDisabled(), false);
+    // Conocido: se guarda, la fila desaparece y se avisa.
+    await fila('IND-0120').locator('input').fill('40 111 222');
+    await fila('IND-0120').locator('button[data-asignar]').click();
+    await pagina.waitForFunction(() => !document.querySelector('#ipanel [data-asignar="IND-0120"]'));
+    assert.deepEqual(await ultimo(pagina, 'asignarDniIndicacion'), { usuario: 'MAGALY', id: 'IND-0120', dni: '40 111 222' });
+    assert.match(await aviso(pagina), /DNI 40111222/);
+    assert.equal(await pagina.locator('#ipanel button[data-asignar]').count(), 2, 'quedan las otras dos filas');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

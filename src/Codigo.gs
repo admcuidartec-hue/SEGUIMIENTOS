@@ -363,20 +363,41 @@ function nombreSinConsultas_(d, k) {
   return i ? String(i.NOMBRE).trim() : '';
 }
 
+/** Todas las palabras en cualquier orden, o parte del DNI; también quien solo está en Registro o en el historial. */
 function buscar(texto) {
-  var q = normTexto(texto);
-  if (q.length < 3) return [];
-  var qDni = normDni(texto), porDni = /\d/.test(qDni);
-  var d = datos_(), vistos = {}, out = [];
-  for (var i = d.citas.length - 1; i >= 0 && out.length < 20; i--) {
-    var c = d.citas[i];
-    if (vistos[c.DNI]) continue;
-    if ((porDni && c.DNI.indexOf(qDni) === 0) || normTexto(c.NOMBRE).indexOf(q) >= 0) {
-      vistos[c.DNI] = 1;
-      out.push({ DNI: c.DNI, NOMBRE: c.NOMBRE });
-    }
+  if (normTexto(texto).replace(/\s/g, '').length < 3) return [];
+  var d = datos_();
+  return limpiarParaEnvio(buscarEnPacientes(texto, { citas: d.citas, registros: d.registros, indicaciones: d.indicaciones }));
+}
+
+/**
+ * Pone a mano el DNI de una indicación SIN CANDIDATO (Indicadores → «Procedimientos
+ * sin paciente»). Así su teléfono y su cotización pasan al paciente. Solo se acepta
+ * un DNI que ya esté en SOFDOC o en Registro.
+ */
+function asignarDniIndicacion(p) {
+  var d = datos_();
+  if (!p || d.catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {
+    throw new Error('Elija quién es usted en el selector de arriba.');
   }
-  return limpiarParaEnvio(out);
+  var dni = normDni(p.dni);
+  if (!dni) throw new Error('Escriba el DNI del paciente.');
+  var conocidos = {};
+  (d.citas || []).forEach(function (c) { if (c.DNI) conocidos[c.DNI] = 1; });
+  (d.registros || []).forEach(function (r) { if (r.DNI && !anulado_(r)) conocidos[normDni(r.DNI)] = 1; });
+  var lock = bloquear_();
+  try {
+    var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();
+    var cab = datos[0].map(function (c) { return String(c).trim(); });
+    var r = buscarFilaParaAsignar(datos[0], datos.slice(1), p.id, dni, conocidos);
+    if (r.error) throw new Error(r.error);
+    sh.getRange(r.fila + 2, cab.indexOf('DNI') + 1).setNumberFormat('@').setValue(dni);
+    sh.getRange(r.fila + 2, cab.indexOf('EMPAREJAMIENTO') + 1).setValue('CONFIRMADO');
+    bitacora_(String(p.usuario).trim(), 'EMPAREJAMIENTO', textoLimpio_(p.id) + ' → ' + dni + ' (a mano)');
+    return { ok: true, dni: dni };
+  } finally {
+    soltar_(lock);
+  }
 }
 
 /** Envoltorios de la app anterior: «Hecho» es un «no contestó»; «Descartar» cierra con el motivo elegido. */

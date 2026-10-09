@@ -154,3 +154,31 @@ test('guardarRegistro: procedimientos[] y un tratamiento en el mismo envío escr
     doctor: 'Dra. Karen Matos', procedimientos: [], tratamiento: 'HIERRO SACARATO', sesiones: 3, marca: 'FERINJECT', confirmado: true }), /no lleva marca/);
   assert.equal(s2.escrito.REGISTROS.length, 1);
 });
+
+/* ---- Buscador y DNI a mano para las indicaciones sin paciente ---- */
+test('buscar: todas las palabras en cualquier orden, y también quien solo está en Registro', () => {
+  const { ctx } = servidor({ citas: [cita({ fecha: '2026-09-01', nombre: 'ROSA ELENA QUISPE HUAMAN' })], indicaciones: [] });
+  assert.deepEqual(plano(ctx.buscar('rosa quispe')), [{ DNI: '40111222', NOMBRE: 'ROSA ELENA QUISPE HUAMAN' }]);
+  const { ctx: c2 } = servidor({ citas: [], indicaciones: [], registros: [Object.assign({}, REG4, { DNI: '41555666', NOMBRE: 'PEDRO PRUEBA' })] });
+  assert.deepEqual(plano(c2.buscar('5556')), [{ DNI: '41555666', NOMBRE: 'PEDRO PRUEBA' }]);
+});
+
+function hojaIndicaciones() {
+  const v = [['ID', 'FECHA', 'NOMBRE', 'TELEFONO', 'DNI', 'EMPAREJAMIENTO'],
+    ['IND-0120', '2026-05-04', 'PAOLA PRUEBA', '956000111', '', 'SIN CANDIDATO']];
+  return { v, getDataRange: () => ({ getValues: () => v.map(f => f.slice()) }),
+    getRange: (r, c) => { const g = { setNumberFormat: () => g, setValue: x => { v[r - 1][c - 1] = x; return g; } }; return g; } };
+}
+
+test('asignarDniIndicacion: escribe el DNI con el candado y lo deja CONFIRMADO; un DNI desconocido no se acepta', () => {
+  const { ctx, escrito, lock } = servidor({ indicaciones: [] });
+  const sh = hojaIndicaciones();
+  ctx.hoja_ = () => { assert.equal(lock.tomado, 1, 'se lee la hoja con el candado tomado'); return sh; };
+  assert.throws(() => ctx.asignarDniIndicacion({ usuario: '', id: 'IND-0120', dni: '40111222' }), /Elija quién es usted/);
+  assert.throws(() => ctx.asignarDniIndicacion({ usuario: 'MAGALY', id: 'IND-0120', dni: '49999999' }), /no está en SOFDOC ni en Registro/);
+  assert.equal(lock.tomado, 0, 'suelta el candado aunque falle');
+  assert.deepEqual(plano(ctx.asignarDniIndicacion({ usuario: 'MAGALY', id: 'IND-0120', dni: '40 111 222' })), { ok: true, dni: '40111222' });
+  assert.deepEqual(sh.v[1].slice(4), ['40111222', 'CONFIRMADO']);
+  assert.deepEqual(escrito.BITACORA, [['MAGALY', 'EMPAREJAMIENTO', 'IND-0120 → 40111222 (a mano)']]);
+  assert.throws(() => ctx.asignarDniIndicacion({ usuario: 'MAGALY', id: 'IND-0120', dni: '40111222' }), /ya tiene paciente/);
+});

@@ -528,6 +528,9 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .apilada{display:flex;height:12px;border-radius:3px;overflow:hidden;gap:1px;transform-origin:left center;background:var(--line)}
 /* Tablas de Indicadores */
 .tabla{width:100%;min-width:640px;border-collapse:collapse;font-size:13.5px}
+.asignar{display:flex;gap:6px;align-items:center}
+.asignar .btn{height:34px;padding:0 12px;font-size:13px}
+.asignar input{width:118px;height:34px;padding:0 10px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:13.5px}
 .tabla th{text-align:left;font-weight:600;font-size:12px;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
 .tabla td{padding:10px;border-bottom:1px solid var(--line)}
 .tabla tbody tr:hover td{background:var(--surface)}
@@ -3277,7 +3280,9 @@ const ACUMULADAS = { llegan: 1, campanas: 1, procs: 1 };
 const IND = {
   listo: false, pidiendo: false, error: '', quieto: false,
   tab: 'resumen', mes: '', esp: '', sub: 'tipo', verCamp: false, soloMes: false,
-  medico: null      // null = proponer el del usuario médico (D2) al pintar; luego, lo que elija
+  medico: null,     // null = proponer el del usuario médico (D2) al pintar; luego, lo que elija
+  dniEscrito: {},   // «Procedimientos sin paciente»: lo escrito en cada fila, para que un repintado no lo borre
+  asignando: ''     // el ID de la fila que se está guardando: no se manda otra
 };
 
 /** Los meses de getResumen, de más antiguo a más reciente (los del Resumen del mes y sus barras). */
@@ -3514,10 +3519,35 @@ function htmlMotivos(k) {
 
 function htmlSinPaciente(k) {
   const filas = (k.sinCandidato || []).map(i => `<tr><td class="mono">${esc(dmy(String(i.FECHA || '').slice(0, 10)))}</td><td>${esc(frase(i.TIPO))}</td>`
-    + `<td class="n">${esc(nombreBonito(i.NOMBRE))}</td><td class="mono">${i.TELEFONO ? esc(telBonito(i.TELEFONO)) : '<span class="valor cero">Sin teléfono</span>'}</td><td class="mono suave">${esc(i.ID)}</td></tr>`);
+    + `<td class="n">${esc(nombreBonito(i.NOMBRE))}</td><td class="mono">${i.TELEFONO ? esc(telBonito(i.TELEFONO)) : '<span class="valor cero">Sin teléfono</span>'}</td><td class="mono suave">${esc(i.ID)}</td>`
+    + `<td><span class="asignar"><input inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="DNI" aria-label="DNI de ${esc(nombreBonito(i.NOMBRE))}" data-dni-de="${esc(i.ID)}" value="${esc(IND.dniEscrito[i.ID] || '')}">`
+    + `<button type="button" class="btn btn-s" data-asignar="${esc(i.ID)}"${IND.asignando === i.ID ? ' disabled' : ''}>Guardar</button></span></td></tr>`);
   return `<section class="sec-i">${cabSeccion('Procedimientos sin paciente')}
-    <p class="intro">No se encontró a nadie con ese nombre en SOFDOC. Revíselos a mano en la pestaña INDICACIONES. Es la lista completa: los filtros no la cambian.</p>
-    ${tablaInd('sinpac', 'chica', [['Fecha'], ['Tipo'], ['Nombre'], ['Teléfono'], ['Registro']], filas)}</section>`;
+    <p class="intro">No se encontró a nadie con ese nombre en SOFDOC. Escriba el DNI del paciente y pulse «Guardar»: la cotización y su teléfono pasan a su ficha y a su tarjeta. Es la lista completa: los filtros no la cambian.</p>
+    ${tablaInd('sinpac', 'chica', [['Fecha'], ['Tipo'], ['Nombre'], ['Teléfono'], ['Registro'], ['DNI del paciente']], filas)}</section>`;
+}
+
+/** Pone a mano el DNI de una indicación sin paciente; lo escrito se conserva si el servidor lo rechaza. */
+async function asignarDni(id) {
+  if (IND.asignando || !exigirUsuario()) return;
+  const dni = String(IND.dniEscrito[id] || '').trim();
+  if (!dni) { avisar('Escriba el DNI del paciente.'); const c = $(`#ipanel [data-dni-de="${id}"]`); if (c) c.focus(); return; }
+  IND.asignando = id;
+  pintarPanelInd(false);
+  try {
+    const r = await llamar('asignarDniIndicacion', { usuario: S.usuario, id, dni });
+    delete IND.dniEscrito[id];
+    avisar(`DNI ${(r && r.dni) || dni} guardado: la cotización y el teléfono ya están con el paciente.`);
+    IND.asignando = '';
+    invalidarIndicadores();
+    if (S.fase === 'listo') cargarTablero(null, true);
+    cargarIndicadores();
+  } catch (e) {
+    IND.asignando = '';
+    avisar('No se guardó: ' + e.message);
+    pintarPanelInd(false);
+    const c = $(`#ipanel [data-dni-de="${id}"]`); if (c) c.focus();
+  }
 }
 
 /* ---- Eventos ---- */
@@ -3562,6 +3592,12 @@ function iniciarIndicadores() {
     else if (t.id === 'vercamp') { IND.verCamp = !IND.verCamp; pintarPanelInd(anim); if (!anim) enfocarInd('#vercamp'); }
     else if (t.matches('[data-solomes]')) { IND.soloMes = !IND.soloMes; pintarPanelInd(anim); if (!anim) enfocarInd('[data-solomes]'); }
     else if (t.matches('[data-reintentar]')) { IND.error = ''; cargarIndicadores(); }
+    else if (t.matches('[data-asignar]')) asignarDni(t.dataset.asignar);
+  });
+  $('#ipanel').addEventListener('input', e => { const c = e.target.closest('[data-dni-de]'); if (c) IND.dniEscrito[c.dataset.dniDe] = c.value; });
+  $('#ipanel').addEventListener('keydown', e => {
+    const c = e.target.closest('[data-dni-de]');
+    if (c && e.key === 'Enter') { e.preventDefault(); asignarDni(c.dataset.dniDe); }
   });
   $('#v-indicadores .cargando').hidden = true;
   $('#ind-cuerpo').hidden = false;
@@ -3974,6 +4010,12 @@ const DEMO = (() => {
     { ID: 'IND-0006', FECHA: '2026-08-25', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 1, MEDICO_SOLICITANTE: HANAMPA, ASESORA: 'RACHEL',
       NOMBRE: 'CARMEN SOFÍA TORRES DÍAZ', TELEFONO: '912345678', ESTADO: 'COTIZÓ', OBSERVACIONES: '', DNI: '40333444', EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: '' }
   ];
+  // Indicadores → «Procedimientos sin paciente»: se van al ponerles DNI (asignarDniIndicacion).
+  let sinCandidato = [
+    { ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' },
+    { ID: 'IND-0131', FECHA: '2026-08-19', TIPO: 'PROCEDIMIENTO', NOMBRE: 'LUIS ALBERTO GÓMEZ', TELEFONO: '944123456' },
+    { ID: 'IND-0140', FECHA: '2026-09-28', TIPO: 'HIERRO', NOMBRE: 'MARÍA', TELEFONO: '' }
+  ];
   let porConfirmar = [{ ID: 'IND-0003', FECHA: '2026-07-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', NOMBRE: 'JORGE MENDOZA', TELEFONO: '945112233',
     candidatos: [{ dni: '40222333', nombre: 'JORGE LUIS MENDOZA PAREDES' }, { dni: '40999888', nombre: 'JORGE MENDOZA SALAS' }] }];
   const antiguas = [
@@ -4263,15 +4305,18 @@ const DEMO = (() => {
       };
     },
 
+    // Como buscarEnPacientes: todas las palabras en cualquier orden, o parte del DNI; también quien solo está en Registro.
     buscar: q => {
-      const n = norm(q), d = dniDe(q).replace(/\s/g, '');
-      if (n.length < 3) return [];
+      const n = norm(q), d = dniDe(q).replace(/\s/g, ''), palabras = n.split(/\s+/).filter(Boolean);
+      if (n.replace(/\s/g, '').length < 3) return [];
       const out = [], vistos = {};
-      for (let i = citas.length - 1; i >= 0 && out.length < 20; i--) {
-        const c = citas[i];
-        if (vistos[c.DNI]) continue;
-        if ((/\d/.test(d) && c.DNI.indexOf(d) === 0) || norm(c.NOMBRE).includes(n)) { vistos[c.DNI] = 1; out.push({ DNI: c.DNI, NOMBRE: c.NOMBRE }); }
-      }
+      const ver = (dni, nombre) => {
+        if (!dni || vistos[dni] || out.length >= 20) return;
+        if ((/\d/.test(d) && dni.includes(d)) || palabras.every(w => norm(nombre).includes(w))) { vistos[dni] = 1; out.push({ DNI: dni, NOMBRE: nombre }); }
+      };
+      for (let i = citas.length - 1; i >= 0; i--) ver(citas[i].DNI, citas[i].NOMBRE);
+      for (let i = registros.length - 1; i >= 0; i--) if (registros[i].ANULADO !== 'SÍ') ver(registros[i].DNI, registros[i].NOMBRE);
+      indicaciones.forEach(x => ver(x.DNI, x.NOMBRE));
       return out;
     },
 
@@ -4449,6 +4494,26 @@ const DEMO = (() => {
       return { ok: true };
     },
 
+    // Como el servidor: solo SIN CANDIDATO y un DNI que ya esté en SOFDOC o en Registro.
+    asignarDniIndicacion: x => {
+      exigir(x);
+      const dni = dniDe(x.dni).replace(/\s/g, '');
+      if (!dni) throw new Error('Escriba el DNI del paciente.');
+      const i = sinCandidato.find(y => y.ID === x.id);
+      if (!i) throw new Error('La indicación ' + x.id + ' ya tiene paciente.');
+      if (!citas.some(c => c.DNI === dni) && !registros.some(r => r.DNI === dni && r.ANULADO !== 'SÍ')) {
+        throw new Error('El DNI ' + x.dni + ' no está en SOFDOC ni en Registro. Revise que esté bien escrito.');
+      }
+      sinCandidato = sinCandidato.filter(y => y !== i);
+      indicaciones.push({ ID: i.ID, FECHA: i.FECHA, TIPO: i.TIPO, DETALLE: i.TIPO, CANTIDAD: 1, MEDICO_SOLICITANTE: '', ASESORA: '', NOMBRE: i.NOMBRE,
+        TELEFONO: i.TELEFONO, ESTADO: 'COTIZÓ', OBSERVACIONES: '', DNI: dni, EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: '' });
+      tarjetas.concat(series).filter(t => t.DNI === dni && !t.TELEFONOS && i.TELEFONO).forEach(t => {
+        t.TELEFONOS = i.TELEFONO;
+        if ('SIN_CONTACTO' in t) t.SIN_CONTACTO = false;
+      });
+      return { ok: true, dni };
+    },
+
     // Indicadores (Tarea 10). Formas de calcularKpi y resumenPorMes; cifras inventadas, de marzo a setiembre.
     getKpi: () => ({
       cohortes: [
@@ -4500,11 +4565,7 @@ const DEMO = (() => {
         cam('2026-09', KAREN, 'INSTAGRAM', 'ANM-002', 2, 2, 0), cam('2026-09', HANAMPA, 'REFERIDO', 'CIT-001', 2, 1, 1),
         cam('2026-09', ELI, 'FACEBOOK ADS', 'HEM-003', 1, 0, 0)
       ],
-      sinCandidato: [
-        { ID: 'IND-0120', FECHA: '2026-05-04', TIPO: 'HIERRO', NOMBRE: 'PAOLA RIVERA', TELEFONO: '956789012' },
-        { ID: 'IND-0131', FECHA: '2026-08-19', TIPO: 'PROCEDIMIENTO', NOMBRE: 'LUIS ALBERTO GÓMEZ', TELEFONO: '944123456' },
-        { ID: 'IND-0140', FECHA: '2026-09-28', TIPO: 'HIERRO', NOMBRE: 'MARÍA', TELEFONO: '' }
-      ],
+      sinCandidato: sinCandidato.map(x => Object.assign({}, x)),
       meta: reglas.metaRetorno
     }),
 

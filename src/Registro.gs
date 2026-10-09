@@ -157,6 +157,8 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
     var col = EDITABLES[k];
     if (!col) return no('No se puede cambiar ' + k + '.');
     var v = cambios[k], nuevo;
+    // Un valor igual al actual no cuenta: se descarta antes de validar nada (el formulario manda todos los campos).
+    if (iguales_(col, v, r, catalogos)) continue;
     if (col === 'FECHA') { nuevo = fechaIso(v); if (!nuevo) return no('Falta la fecha.'); if (nuevo > hoy) return no('La fecha no puede ser futura.'); }
     else if (col === 'DOCTOR') {
       var doc = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(v); })[0];
@@ -191,7 +193,29 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
     out[col] = nuevo;
     antes[col] = r[col] == null ? '' : r[col];
   }
+  // Si cambia el tratamiento y no se envía la marca, la marca actual debe seguir valiendo para el tratamiento nuevo.
+  if (out.DETALLE !== undefined && !('MARCA' in out)) {
+    var marcasN = (catalogos.marcas || {})[normTexto(out.DETALLE)] || [], actual = textoLimpio_(r.MARCA);
+    if (marcasN.length && !enLista_(marcasN, actual)) return no('Elija la marca de ' + out.DETALLE + ': ' + marcasN.join(' o ') + '.');
+    if (!marcasN.length && actual) { out.MARCA = ''; antes.MARCA = r.MARCA; }
+  }
   return { error: '', cambios: out, antes: antes };
+}
+
+/** ¿El valor pedido, normalizado, es el que el registro ya tiene? */
+function iguales_(col, v, r, catalogos) {
+  var actual = r[col] == null ? '' : r[col], nuevo;
+  if (col === 'FECHA' || col === 'FECHA_INICIO' || col === 'FECHA_RETORNO') { nuevo = fechaIso(v) || ''; actual = fechaIso(actual) || ''; }
+  else if (col === 'DOCTOR') {
+    var doc = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(v); })[0];
+    nuevo = doc ? doc.doctor : '\u0000';
+  }
+  else if (col === 'NOMBRE') nuevo = textoLimpio_(v).toUpperCase();
+  else if (col === 'SESIONES') nuevo = Number(v);
+  else nuevo = textoLimpio_(v);
+  if (col === 'DETALLE') nuevo = enLista_((normTexto(r.TIPO) === 'HIERRO' ? catalogos.tratamientos : catalogos.procedimientos), v) || '\u0000';
+  if (col === 'MARCA') nuevo = enLista_(((catalogos.marcas || {})[normTexto(r.DETALLE)] || []), v) || (textoLimpio_(v) === '' ? '' : '\u0000');
+  return String(nuevo) === String(actual);
 }
 
 /* ---------- Sesiones y estado de un registro ---------- */

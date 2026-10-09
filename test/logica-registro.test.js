@@ -451,3 +451,22 @@ test('validarEdicionRegistro: lo editable, el DNI fijo, sesiones no menos que la
   assert.match(v({ nombre: 'otra' }, REGH({ ANULADO: 'SÍ' })).error, /anulado/);
   assert.deepEqual(v({ sesiones: '3' }).cambios, {}, 'igual al actual no es un cambio');
 });
+
+test('validarEdicionRegistro: un valor igual al actual no se valida (el formulario manda todos los campos)', () => {
+  const ses = [SES(1, '2026-10-02')];
+  const v = (r, c) => plano(L.validarEdicionRegistro(r, c, ses, CAT3, '2026-10-09'));
+  const trat = REGH({ FECHA_INICIO: '2026-10-02' });
+  assert.deepEqual(v(trat, { fechaInicio: '2026-10-02', fecha: '2026-10-01', contacto: '912000111' }),
+    { error: '', cambios: { CONTACTO: '912000111' }, antes: { CONTACTO: '987654321' } });
+  const ctl = REGH({ TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: 'HEMOGRAMA', FECHA_RETORNO: '2026-10-05' });
+  assert.deepEqual(v(ctl, { fechaRetorno: '2026-10-05', examenes: 'HEMOGRAMA', contacto: '912000111' }).cambios, { CONTACTO: '912000111' });
+  assert.match(v(ctl, { fechaRetorno: '2026-10-06' }).error, /después de hoy/);
+});
+
+test('validarEdicionRegistro: al cambiar el tratamiento sin enviar la marca, la marca se revalida', () => {
+  const cat = Object.assign({}, CAT3, { tratamientos: ['HIERRO SACARATO', 'HIERRO CARBOXIMALTOSA'], marcas: { 'HIERRO CARBOXIMALTOSA': ['FERINJECT', 'MONOFER'] } });
+  const v = (r, c) => plano(L.validarEdicionRegistro(r, c, [], cat, '2026-10-09'));
+  assert.match(v(REGH(), { detalle: 'HIERRO CARBOXIMALTOSA' }).error, /Elija la marca/);
+  assert.deepEqual(v(REGH({ DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'FERINJECT' }), { detalle: 'HIERRO SACARATO' }).cambios, { DETALLE: 'HIERRO SACARATO', MARCA: '' });
+  assert.deepEqual(v(REGH(), { detalle: 'HIERRO CARBOXIMALTOSA', marca: 'monofer' }).cambios, { DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'MONOFER' });
+});

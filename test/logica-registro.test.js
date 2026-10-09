@@ -427,3 +427,15 @@ test('decisionesDeAlta: ventanas de 6 meses y 1 año, nueva reevaluación, y una
   r = plano(L.decisionesDeAlta([a('ALTA 6 MESES', '2027-04-05')], citas.concat([cita({ fecha: '2026-12-01' })]), R, '2027-03-10'));
   assert.deepEqual([!!r.vigentes[k], !!r.retornos[k]], [false, false], 'volvió a consulta: la decisión ya se cumplió');
 });
+
+test('decisionesDeAlta: 1 AÑO usa su ventana; sin fecha de retorno se trata como alta simple (sin NaN)', () => {
+  const R = reglas(L), citas = [cita({ fecha: '2026-10-01' })];
+  const a = (dec, ret) => ({ ID: 'ALT-1', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dra. X', DECISION: dec, FECHA_RETORNO: ret, ANULADO: '' });
+  const k = '40111222|HEMATOLOGIA';
+  let r = plano(L.decisionesDeAlta([a('ALTA 1 AÑO', '2027-10-05')], citas, R, '2027-09-10'));
+  assert.deepEqual([!!r.vigentes[k], r.retornos[k]], [false, { fecha: '2027-10-05', tipo: '1 AÑO' }]);
+  r = plano(L.decisionesDeAlta([a('ALTA 1 AÑO', '2027-10-05')], citas, R, '2027-08-01'));
+  assert.ok(r.vigentes[k] && !r.retornos[k]);
+  r = plano(L.decisionesDeAlta([a('ALTA 6 MESES', '')], citas, R, '2027-03-10'));
+  assert.ok(r.vigentes[k] && !r.retornos[k], 'sin fecha: alta simple');
+});

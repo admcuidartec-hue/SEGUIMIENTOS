@@ -196,3 +196,11 @@ test('darDeAlta: guarda la decisión y su fecha de retorno', () => {
     decision: 'NUEVA REEVALUACION', fechaRetorno: '2026-11-20' });
   assert.deepEqual(escrito.ALTAS.map(a => [a.DECISION, a.FECHA_RETORNO]), [['NUEVA REEVALUACION', '2026-11-20']]);
 });
+
+test('darDeAlta: tras una «nueva reevaluación» se puede dar otra alta (la relectura dentro del candado usa la decisión)', () => {
+  const previa = { ID: 'ALT-000001', FECHA_HORA: '2026-10-05 10:00', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA',
+    DOCTOR: 'Dra. Karen Matos', REGISTRADO_POR: 'ANA', ANULADO: '', DECISION: 'NUEVA REEVALUACION', FECHA_RETORNO: '2026-11-20' };
+  const { ctx, escrito } = servidor({}, { ALTAS: [previa] });
+  ctx.darDeAlta({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05' });
+  assert.deepEqual(escrito.ALTAS.map(a => a.DECISION), ['ALTA']);
+});

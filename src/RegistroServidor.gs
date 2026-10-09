@@ -109,7 +109,7 @@ function darDeAlta(p) {
     exigirColumnas_('ALTAS', COLUMNAS_ALTAS);
     var a = v.alta, altas = leerAltas_();
     // Otra asesora pudo dar la misma alta mientras tanto: se revisa otra vez con la hoja releída dentro del candado.
-    if (altasVigentes(altas, d.seguimientos, d.citas)[claveSerie(a.DNI, a.ESPECIALIDAD)]) {
+    if (altasVigentes(altas, d.seguimientos, d.citas, d.reglas, d.hoy)[claveSerie(a.DNI, a.ESPECIALIDAD)]) {
       throw new Error('Ese paciente ya tiene un alta vigente en ' + a.ESPECIALIDAD + '.');
     }
     a.ID = siguienteId(altas.map(function (x) { return x.ID; }), 'ALT');

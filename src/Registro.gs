@@ -356,6 +356,8 @@ function decisionesDeAlta(altas, citas, reglas, hoy) {
   });
   Object.keys(ultimas).forEach(function (k) {
     var a = ultimas[k], dec = decisionDe_(a);
+    // Una alta a 6 meses o 1 año sin fecha de retorno (hoja editada a mano) se trata como alta simple.
+    if (dec.meses && !a.FECHA_RETORNO) dec = DECISIONES.ALTA;
     if (dec.nombre === 'ALTA') { out.vigentes[k] = a; return; }
     if (dec.tipo === 'REEVALUACION') { out.retornos[k] = { fecha: a.FECHA_RETORNO, tipo: 'REEVALUACION' }; return; }
     if (hoy < sumarDias(a.FECHA_RETORNO, -reglas.avisoAltaControl)) out.vigentes[k] = a;

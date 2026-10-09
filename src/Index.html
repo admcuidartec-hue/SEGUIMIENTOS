@@ -708,6 +708,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
             <div class="seg" id="seg" role="group" aria-label="Tipo de seguimiento (cuántos por contactar)"><span class="pastilla" aria-hidden="true"></span></div>
             <span class="relleno"></span>
             <label class="sel-chip"><i class="ph ph-stethoscope"></i><select id="fmed" aria-label="Médico"></select><i class="ph ph-caret-down"></i></label>
+            <label class="sel-chip"><i class="ph ph-calendar-blank"></i><select id="fmes" aria-label="Mes"></select><i class="ph ph-caret-down"></i></label>
             <label class="sel-chip"><i class="ph ph-heartbeat"></i><select id="fesp" aria-label="Especialidad"></select><i class="ph ph-caret-down"></i></label>
             <button type="button" class="pill" id="fsin" aria-pressed="false"><i class="ph ph-phone-slash"></i>Solo sin teléfono</button>
           </div>
@@ -830,7 +831,7 @@ const S = {
   cerrados: [],     // getTablero().cerrados
   fase: 'cargando', // 'cargando' | 'listo' | 'error'
   tipo: '',         // '' | 'REEVALUACION' | 'HIERRO' | 'PROCEDIMIENTO' (seg.tipo, como la app anterior)
-  medico: '', medicoPropuesto: '', esp: '', sinTel: false, q: '',
+  medico: '', medicoPropuesto: '', mes: '', esp: '', sinTel: false, q: '',
   lim: { rec: 6, mes: 4, ant: 3 },
   colMovil: 1,
   sinRecargar: new Set(), // CLAVE de tarjetas con una sesión marcada cuya tarjeta aún no trae el tablero recargado
@@ -1136,6 +1137,15 @@ function tarjetaHtml(p) {
     + `<div class="t1"><b>${esc(nombreDe(p))}</b><span class="tag t-${p.t}">${esc(tag)}</span></div><div class="t2">${esc(sub)}</div>${prog}${etq}<div class="t3">${pie}</div></article>`;
 }
 
+/** Opciones del filtro de mes: los meses que traen las tarjetas, del más reciente al más antiguo. Un mes recordado que ya no existe se ignora. */
+function opcionesMes() {
+  const meses = [...new Set(S.pacientes.map(p => p.raw.MES).filter(Boolean))].sort().reverse();
+  if (S.mes && !meses.includes(S.mes)) S.mes = '';
+  const sel = $('#fmes'), html = '<option value="">Todos los meses</option>' + meses.map(m => `<option value="${esc(m)}">${esc(nombreMes(m))}</option>`).join('');
+  if (sel.innerHTML !== html) sel.innerHTML = html;
+  sel.value = S.mes;
+}
+
 /** Filtros de la pantalla. conTipo = false da la base de los números del segmentado. */
 function filtrados(conTipo) {
   const palabras = norm(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '');
@@ -1143,10 +1153,11 @@ function filtrados(conTipo) {
     && (!S.medico || norm(p.med) === norm(S.medico))
     && (!S.esp || norm(p.esp) === norm(S.esp))
     && (!S.sinTel || p.sinContacto)
+    && (!S.mes || p.raw.MES === S.mes)
     && (!palabras.length || (digitos && p.dni.includes(digitos)) || palabras.every(w => norm(p.n).includes(w)))
     && (!conTipo || !S.tipo || p.tipo === S.tipo));
 }
-const hayFiltros = () => !!(S.tipo || S.medico || S.esp || S.sinTel || S.q.trim());
+const hayFiltros = () => !!(S.tipo || S.medico || S.mes || S.esp || S.sinTel || S.q.trim());
 
 /** Al médico se le propone su filtro; puede cambiarlo a «Todos» (D2). Si deja de serlo, se quita lo propuesto. */
 function proponerMedico() {
@@ -1192,6 +1203,7 @@ let tableroIniciado = false;
 function iniciarTablero() {
   const t = LS.get('seg.tipo');
   S.tipo = TIPOS.some(([k]) => k === t) ? t : '';
+  S.mes = LS.get('seg.mes');   // se valida contra los meses que hay cuando llega el tablero (pintarTablero)
   proponerMedico();
   $('#fmed').innerHTML = '<option value="">Todos los médicos</option>'
     + S.boot.medicos.map(m => `<option value="${esc(m.k)}" title="${esc(m.full)}">${esc(m.short)}</option>`).join('');
@@ -1205,6 +1217,7 @@ function iniciarTablero() {
   });
   $('#coltabs').addEventListener('click', e => { const b = e.target.closest('[data-ct]'); if (b) { S.colMovil = Number(b.dataset.ct); pintarTablero(); } });
   $('#fmed').addEventListener('change', e => { S.medico = e.target.value; pintarTablero(); });
+  $('#fmes').addEventListener('change', e => { S.mes = e.target.value; LS.set('seg.mes', S.mes); pintarTablero(); });
   $('#fesp').addEventListener('change', e => { S.esp = e.target.value; pintarTablero(); });
   $('#fsin').addEventListener('click', () => { S.sinTel = !S.sinTel; pintarTablero(); });
   $('#q').addEventListener('input', e => { S.q = e.target.value; pintarTablero(); });
@@ -1215,8 +1228,8 @@ function iniciarTablero() {
     const mas = e.target.closest('[data-mas]');
     if (mas) { S.lim[mas.dataset.mas] += 10; pintarTablero(); return; }
     if (e.target.closest('.js-quitar')) {
-      Object.assign(S, { tipo: '', medico: '', esp: '', sinTel: false, q: '' });
-      LS.set('seg.tipo', '');
+      Object.assign(S, { tipo: '', medico: '', mes: '', esp: '', sinTel: false, q: '' });
+      LS.set('seg.tipo', ''); LS.set('seg.mes', '');
       $('#q').value = '';
       pintarTablero();
     }
@@ -1283,6 +1296,7 @@ async function cargarTablero(pedido, silencioso, intento) {
 function pintarTablero() {
   if (!tableroIniciado) return;
   const cargando = S.fase === 'cargando', listo = S.fase === 'listo';
+  if (listo) opcionesMes();
   const vis = listo ? filtrados(true) : [], base = listo ? filtrados(false) : [];
   const enCol = c => vis.filter(p => p.col === c);
   const nCol = c => listo ? enCol(c).length : '—';
@@ -4375,6 +4389,8 @@ const DEMO = (() => {
 
     getTablero: () => {
       const col = { POR_CONTACTAR: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] };
+      // MES como en armarTablero (Tablero.gs): mesDe(...) = 'yyyy-mm'; reevaluación por su última cita, el resto por la cotización.
+      tarjetas.forEach(t => { t.MES = String(t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.ULTIMA_CITA : t.FECHA_COTIZACION || '').slice(0, 7); });
       tarjetas.forEach(t => { if (col[t.COLUMNA]) col[t.COLUMNA].push(t); });
       col.POR_CONTACTAR.sort(ordenPorContactar);
       col.AGENDADO.sort(asc);

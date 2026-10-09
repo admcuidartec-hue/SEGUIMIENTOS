@@ -3160,3 +3160,37 @@ test('tablero: «N citas esta semana» cuenta también la cita sin AGENDA con fe
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('tablero: el filtro de mes muestra solo los pacientes de ese mes y se recuerda', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const opciones = await pagina.locator('#fmes option').evaluateAll(o => o.map(x => x.value));
+    assert.equal(opciones[0], '', '«Todos los meses» primero');
+    assert.ok(opciones.length >= 3);
+    assert.deepEqual(opciones.slice(1), opciones.slice(1).sort().reverse(), 'de más reciente a más antiguo');
+    const mes = opciones[1];
+    await pagina.locator('#fmes').selectOption(mes);
+    const meses = await pagina.evaluate(() => filtrados(true).map(p => p.raw.MES));
+    assert.ok(meses.length && meses.every(m => m === mes));
+    assert.equal(await pagina.evaluate(() => localStorage.getItem('seg.mes')), mes);
+    assert.equal(Number(await pagina.locator('#kpis > div').first().locator('dd').textContent()),
+      await pagina.evaluate(() => filtrados(true).filter(p => p.col === 1).length), 'la cifra de Por contactar sigue al filtro');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('tablero: el mes recordado se aplica al abrir y, si ya no existe, se ignora', async () => {
+  const a = await abrirTablero();
+  let mes;
+  try { mes = await a.pagina.locator('#fmes option').evaluateAll(o => o[1].value); } finally { await a.navegador.close(); }
+  const b = await abrirTablero({ guardado: { 'seg.mes': mes } });
+  try {
+    assert.equal(await b.pagina.locator('#fmes').inputValue(), mes);
+    assert.ok(await b.pagina.evaluate(() => hayFiltros()));
+  } finally { await b.navegador.close(); }
+  const c = await abrirTablero({ guardado: { 'seg.mes': '1999-01' } });
+  try {
+    assert.equal(await c.pagina.locator('#fmes').inputValue(), '');
+    assert.equal(await c.pagina.evaluate(() => S.mes), '');
+  } finally { await c.navegador.close(); }
+});

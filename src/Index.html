@@ -428,6 +428,8 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .trat-cab{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
 .trat-cab b{font-size:15px}
 .trat-meta{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+.trat-estado{font-size:13.5px;font-weight:500;color:var(--soft);overflow-wrap:anywhere}
+.trat .edita{margin-top:0}
 .trat .prog{max-width:320px}
 .trat .prog i{height:6px}
 .sesiones{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
@@ -2414,7 +2416,13 @@ function sumarMesesIso(iso, n) {
   const ultimo = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
   return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(Math.min(d, ultimo)).padStart(2, '0');
 }
-const reglaRG = (k, def) => { const n = Number(S.reglas && S.reglas[k]); return Number.isFinite(n) && n > 0 ? n : def; };
+/** Una regla de REGLAS; 0 vale (AVISO_ALTA_CONTROL_DIAS admite 0). Solo si falta o no es un número se usa `def`. */
+const reglaRG = (k, def) => {
+  const v = S.reglas && S.reglas[k], n = Number(v);
+  return v !== '' && v != null && Number.isFinite(n) && n >= 0 ? n : def;
+};
+/** Debajo de los radios: cuándo vuelve a «Por contactar» una decisión con control (6 meses, 1 año). La usan Registro y la ficha. */
+const notaDecision = (d, fecha) => d.meses ? `<p class="nota-dec"><i class="ph ph-calendar-check"></i>Volverá a «Por contactar» el ${esc(dmy(masDias(sumarMesesIso(fecha, d.meses), -reglaRG('avisoAltaControl', 30))))} para agendar su control.</p>` : '';
 
 /** Una vez, tras bootstrap. Los contenedores son fijos: los eventos se conectan aquí y el contenido se repinta. */
 function iniciarRegistro() {
@@ -2533,7 +2541,7 @@ function pintarDecision() {
     if (!$('#aretorno')) box.innerHTML = `<label class="campo">Fecha de retorno<input id="aretorno" type="date" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 730))}"></label>`;
     return;
   }
-  box.innerHTML = d.meses ? `<p class="nota-dec"><i class="ph ph-calendar-check"></i>Volverá a «Por contactar» el ${esc(dmy(masDias(sumarMesesIso(fecha, d.meses), -reglaRG('avisoAltaControl', 30))))} para agendar su control.</p>` : '';
+  box.innerHTML = notaDecision(d, fecha);
 }
 
 /** Deja el formulario vacío, salvo la fecha: se suelen registrar varios pacientes del mismo día seguidos. */
@@ -2828,7 +2836,7 @@ function pintarRegistrados(nuevos) {
     return `<li class="${clase}" data-reg="${esc(x.ID)}"><span class="hora">${esc(hoy ? x.HORA : dm(x.FECHA))}</span>
       <div class="det"><b class="tx">${esc(x.NOMBRE)}<span class="mono"> · DNI ${esc(x.DNI)}</span></b><span class="tx texto">${esc(x.TEXTO)}</span>
         <span class="quien">${esc(x.ID)} · ${anulado ? 'anulado' + (x.MOTIVO_ANULACION ? ': ' + esc(x.MOTIVO_ANULACION) : '') : 'registró ' + esc(nombreBonito(x.ASESORA))}${x.EDITADO && !anulado ? ' · editado' : ''}</span>
-        ${editando ? formEdicion(x) : ''}
+        ${editando ? formEdicion(x, { borrador: RG.borrador, guardando: RG.guardandoEdicion }) : ''}
         <div class="anula">${abierto ? `<input class="ctl" autocomplete="off" placeholder="Motivo (obligatorio)" aria-label="Motivo de la anulación" value="${esc(RG.motivo)}">`
           + `<button type="button" class="btn btn-p" data-confirmar-anular${RG.motivo.trim() && !RG.anulandoEnVuelo ? '' : ' disabled'}>Anular</button><button type="button" class="btn btn-s" data-cancelar-anular>Cancelar</button>` : ''}</div></div>
       ${acciones}</li>`;
@@ -2852,10 +2860,13 @@ function camposEdicion(x) {
   return c;
 }
 const valorOriginal = (x, k) => x[COL_EDICION[k]] == null ? '' : String(x[COL_EDICION[k]]);
-const valorEdicion = (x, k) => k in RG.borrador ? RG.borrador[k] : valorOriginal(x, k);
-/** El formulario en línea. Lo reutiliza la ficha del paciente (Tarea 11) con la misma fila de getRegistros. */
-function formEdicion(x) {
-  const v = k => valorEdicion(x, k), hoy = S.hoy, hierro = x.TIPO === 'HIERRO';
+const valorEdicion = (x, k, borrador) => k in borrador ? borrador[k] : valorOriginal(x, k);
+/**
+ * El formulario en línea, con la forma de una fila de getRegistros. ed = { borrador, guardando }: «Registrados» (RG) y la
+ * ficha del paciente (PA) le pasan cada una su propio borrador, así no comparten lo escrito ni el guardado en vuelo.
+ */
+function formEdicion(x, ed) {
+  const v = k => valorEdicion(x, k, ed.borrador), hoy = S.hoy, hierro = x.TIPO === 'HIERRO';
   const campo = (k, rot, ctl, ancho) => `<label class="campo${ancho ? ' ancho' : ''}">${rot}${ctl}</label>`;
   const fecha = (k, rot, min, max) => campo(k, rot, `<input type="date" data-campo="${k}" value="${esc(v(k))}"${min ? ` min="${esc(min)}"` : ''}${max ? ` max="${esc(max)}"` : ''}>`);
   const sel = (k, lista, actual) => `<select data-campo="${k}">${(!lista.includes(actual) ? [actual] : []).concat(lista)
@@ -2871,7 +2882,7 @@ function formEdicion(x) {
     examenes: () => campo('examenes', 'Exámenes indicados', `<textarea data-campo="examenes" rows="2">${esc(v('examenes'))}</textarea>`, true),
     fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), masDias(hoy, 365)) };
   return `<div class="edita">${camposEdicion(x).map(k => html[k]()).join('')}
-    <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${RG.guardandoEdicion ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
+    <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${ed.guardando ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
 }
 function abrirEdicion(id) {
   if (RG.anulandoEnVuelo || RG.guardandoEdicion) return;
@@ -2890,11 +2901,11 @@ function cerrarEdicion(enfocar) {
   if (b) b.focus();
 }
 /** Solo los campos que cambiaron, como se escribieron (el servidor normaliza y descarta lo que resulte igual). */
-function cambiosEdicion(x) {
+function cambiosEdicion(x, borrador) {
   const out = {};
   camposEdicion(x).forEach(k => {
-    if (!(k in RG.borrador)) return;
-    const nuevo = String(RG.borrador[k]).trim(), antes = valorOriginal(x, k).trim();
+    if (!(k in borrador)) return;
+    const nuevo = String(borrador[k]).trim(), antes = valorOriginal(x, k).trim();
     if (k === 'sesiones' ? Number(nuevo) === Number(antes) : nuevo === antes) return;
     out[k] = k === 'sesiones' ? Number(nuevo) : nuevo;
   });
@@ -2903,7 +2914,7 @@ function cambiosEdicion(x) {
 async function guardarEdicion() {
   const id = RG.editando, x = (RG.lista || []).find(y => y.ID === id);
   if (!x || RG.guardandoEdicion) return;
-  const cambios = cambiosEdicion(x);
+  const cambios = cambiosEdicion(x, RG.borrador);
   if (!Object.keys(cambios).length) { avisar('No hay cambios.'); return; }
   if (!exigirUsuario()) return;
   RG.guardandoEdicion = true;
@@ -2999,8 +3010,17 @@ const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más
   'CERRADO': 'Seguimiento cerrado', 'FALLECIDO': 'Fallecido', 'AGENDADO': 'Agendado o por volver a llamar' };
 // Con estos estados ya no se espera que vuelva: sin la línea «Debía volver el …».
 const SIN_ESPERA = { 'ALTA': 1, 'CERRADO': 1, 'FALLECIDO': 1, 'DESCARTADO': 1 };
-const NOMBRE_REG = { COTIZADO: 'Pendiente', 'EN CURSO': 'En curso', COMPLETO: 'Completado', ANULADO: 'Anulado' };
-const TONO_REG = { COTIZADO: 'e-pend', 'EN CURSO': 'e-curso', COMPLETO: 'e-ok', ANULADO: 'e-anulado' };
+const NOMBRE_REG = { COTIZADO: 'Pendiente', PROGRAMADO: 'Programado', 'EN CURSO': 'En curso', COMPLETO: 'Completado', ANULADO: 'Anulado' };
+const TONO_REG = { COTIZADO: 'e-pend', PROGRAMADO: 'e-curso', 'EN CURSO': 'e-curso', COMPLETO: 'e-ok', ANULADO: 'e-anulado' };
+/** La línea de estado de un registro de la ficha (estadoRegistro del servidor). El anulado no tiene: ya lo dice su etiqueta. */
+function lineaEstadoRegistro(x) {
+  const e = String(x.ESTADO_REGISTRO || x.ESTADO || '');
+  if (e === 'ANULADO') return '';
+  if (x.TIPO === 'CONTROL') return 'Control el ' + dm(x.FECHA_RETORNO) + (String(x.EXAMENES || '').trim() ? ' · exámenes: ' + String(x.EXAMENES).trim() : '');
+  if (e === 'PROGRAMADO') return 'Programado el ' + dm(x.FECHA_INICIO);
+  if (e === 'EN CURSO') return `Sesión ${Number(x.HECHAS) || 0} de ${Number(x.SESIONES) || 0}`;
+  return e === 'COMPLETO' ? 'Completo' : e === 'COTIZADO' ? 'Cotizado' : '';
+}
 const isoDe = v => String(v || '').slice(0, 10);
 
 /** Consultas de una especialidad: «Primera cita», «Reevaluación n»; las no realizadas, con su estado. */
@@ -3046,9 +3066,12 @@ function adaptarFicha(r) {
         puedeAlta: s.ESTADO !== 'ALTA' && !conAlta, medico: s.MEDICO_ULTIMO || '' };
     }),
     trats: (r.registros || []).map(x => {
-      const e = String(x.ESTADO || '');
+      const e = String(x.ESTADO_REGISTRO || x.ESTADO || ''), control = x.TIPO === 'CONTROL';
+      // fila: la forma de getRegistros, para el formulario de Editar (formEdicion).
       return { id: String(x.ID || ''), titulo: x.TEXTO || '', f: isoDe(x.FECHA), med: x.DOCTOR || '', quien: nombreBonito(x.ASESORA), n: Number(x.SESIONES) || 0,
-        estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO', abierto: e === 'COTIZADO' || e === 'EN CURSO',
+        estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO',
+        abierto: e === 'COTIZADO' || e === 'EN CURSO' || (e === 'PROGRAMADO' && !control), anulable: e !== 'ANULADO' && e !== 'COMPLETO',
+        linea: lineaEstadoRegistro(x), fila: Object.assign({}, x, { FECHA: isoDe(x.FECHA), FECHA_INICIO: isoDe(x.FECHA_INICIO), FECHA_RETORNO: isoDe(x.FECHA_RETORNO) }),
         motivo: x.MOTIVO_ANULACION || '',
         sesiones: (x.sesiones || []).map(s => ({ id: String(s.ID || ''), numero: Number(s.NUMERO) || 0, f: isoDe(s.FECHA), quien: nombreBonito(s.ASESORA) }))
           .sort((a, b) => a.numero - b.numero) };
@@ -3064,7 +3087,8 @@ const PA = {
   listo: false,
   q: '', res: [], activo: 0, buscando: false,   // buscador
   dni: '', estado: '', msg: '', p: null,        // ficha abierta: estado '' | 'cargando' | 'listo' | 'error'; p = adaptarFicha()
-  alta: null,         // { esp, doctor, fecha, nota, teclado }: «Dar de alta…» abierto
+  alta: null,         // { esp, doctor, fecha, nota, dec, ret, teclado }: «Decisión del médico…» abierto
+  editando: '', borrador: {},   // el registro con el formulario de Editar abierto y lo escrito en él (no es el de «Registrados»)
   fechas: {},         // la fecha elegida para «Lo hizo», por registro
   anulando: null,     // { que, id }: la fila con el motivo abierto
   motivo: '',
@@ -3138,7 +3162,7 @@ function abrirFicha(dni, teclado) {
   $('#pq').value = '';
   cerrarLista();
   if (PA.dni !== dni || PA.estado !== 'listo') {
-    Object.assign(PA, { dni, estado: 'cargando', p: null, alta: null, fechas: {}, anulando: null, motivo: '', sesAnuladas: {} });
+    Object.assign(PA, { dni, estado: 'cargando', p: null, alta: null, fechas: {}, anulando: null, motivo: '', sesAnuladas: {}, editando: '', borrador: {} });
     pintarFicha();
   }
   return cargarFicha(!teclado);
@@ -3159,6 +3183,7 @@ async function cargarFicha(animar) {
   if (n !== cargarFicha.n || PA.dni !== dni) return;
   const nueva = PA.estado !== 'listo';
   PA.p = adaptarFicha(r);
+  if (PA.editando && !PA.p.trats.some(t => t.id === PA.editando && !t.anulado)) { PA.editando = ''; PA.borrador = {}; }
   PA.estado = 'listo';
   pintarFicha();
   const el = $('#ficha .ficha');
@@ -3219,19 +3244,32 @@ function htmlEmparejar(p, i) {
 function htmlEsp(e) {
   const a = PA.alta && PA.alta.esp === e.esp ? PA.alta : null;
   return `<div class="esp" data-esp="${esc(e.esp)}"><div class="esp-cab"><h4>${esc(frase(e.esp))}</h4><span class="tag ${e.tono}">${esc(e.estado)}</span>`
-    + (e.puedeAlta && !a ? `<button type="button" class="enlace" data-dar-alta="${esc(e.esp)}">Dar de alta…</button>` : '') + '</div>'
+    + (e.puedeAlta && !a ? `<button type="button" class="enlace" data-decision="${esc(e.esp)}">Decisión del médico…</button>` : '') + '</div>'
     + `<p class="perfil">${esc(e.perfil)}</p>`
     + (e.pend ? `<p class="esp-pend"><i class="ph-fill ph-warning"></i><span><b>Procedimiento pendiente.</b> ${esc(e.pend)}</span></p>` : '')
-    + (a ? `<div class="alta-form caja${a.teclado ? ' quieta' : ''}"><b>Alta médica de ${esc(frase(e.esp))}</b>`
-      + `<div class="dos"><label class="campo">Doctor que da el alta<select id="falta-doc">${opcionesDoctores()}</select></label>`
-      + `<label class="campo">Fecha del alta<input type="date" id="falta-fec" value="${esc(a.fecha)}"${e.ultima ? ` min="${esc(e.ultima)}"` : ''} max="${esc(S.hoy)}"></label></div>`
+    + (a ? `<div class="alta-form caja${a.teclado ? ' quieta' : ''}"><b>Decisión del médico · ${esc(frase(e.esp))}</b>`
+      + `<div class="dos"><label class="campo">Doctor<select id="falta-doc">${opcionesDoctores()}</select></label>`
+      + `<label class="campo">Fecha de la consulta<input type="date" id="falta-fec" value="${esc(a.fecha)}"${e.ultima ? ` min="${esc(e.ultima)}"` : ''} max="${esc(S.hoy)}"></label></div>`
+      + `<div class="decs" role="radiogroup" aria-label="Decisión del médico">${DECISIONES_UI.map(d => `<label class="dec"><input type="radio" name="fdec" value="${esc(d.v)}"${d.v === a.dec ? ' checked' : ''}><span>${esc(d.rot)}</span></label>`).join('')}</div>`
+      + `<div id="fdecx">${htmlDecisionFicha(a)}</div>`
       + `<label class="campo">Nota (opcional)<input id="falta-nota" autocomplete="off" value="${esc(a.nota)}"></label>`
-      + '<div class="botones"><button type="button" class="btn btn-p" data-alta-ok>Confirmar alta</button><button type="button" class="btn btn-s" data-alta-cancelar>Cancelar</button></div></div>' : '')
+      + '<div class="botones"><button type="button" class="btn btn-p" data-alta-ok>Confirmar</button><button type="button" class="btn btn-s" data-alta-cancelar>Cancelar</button></div></div>' : '')
     + '<ol class="tiempo">' + e.consultas.map(c => `<li><b>${esc(c.titulo)}</b> · <span class="mono">${esc(dmy(c.f))}</span>${c.det ? ' · ' + esc(c.det) : ''}</li>`).join('')
     + (e.esperada ? `<li class="esperada">${e.esperada.pasada ? 'Debía' : 'Debe'} volver el ${esc(dmy(e.esperada.f))}${e.esperada.vence ? ' (plazo máximo ' + esc(dmy(e.esperada.vence)) + ')' : ''}</li>` : '')
     + '</ol></div>';
 }
+/** Bajo los radios de la ficha: la fecha de retorno (nueva reevaluación) o cuándo vuelve a «Por contactar» (6 meses, 1 año). */
+function htmlDecisionFicha(a) {
+  const d = decisionUi(a.dec);
+  if (d.pideFecha) return `<label class="campo">Fecha de retorno<input id="falta-ret" type="date" value="${esc(a.ret)}" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 730))}"></label>`;
+  return notaDecision(d, a.fecha || S.hoy);
+}
+function pintarDecisionFicha() {
+  const box = $('#fdecx');
+  if (box && PA.alta) box.innerHTML = htmlDecisionFicha(PA.alta);
+}
 function htmlTrat(t) {
+  const editando = !t.anulado && PA.editando === t.id;
   const k = t.sesiones.length, ultima = k ? t.sesiones[k - 1].f : t.f;
   let ses = '';
   if (!t.anulado) {
@@ -3251,10 +3289,13 @@ function htmlTrat(t) {
   }
   return `<div class="trat" data-reg="${esc(t.id)}"><div class="trat-cab"><b>${esc(t.titulo)}</b> <span class="tag ${t.tono}">${esc(t.estado)}</span></div>`
     + `<span class="trat-meta">${esc(t.id)} · ${esc(dmy(t.f))} · ${esc(t.med)} · registró ${esc(t.quien)}${t.anulado ? ' · anulado' + (t.motivo ? ': ' + esc(t.motivo) : '') : ''}</span>`
+    + (t.linea ? `<span class="trat-estado">${esc(t.linea)}</span>` : '')
     + (t.n > 1 && !t.anulado ? '<div class="prog" aria-hidden="true">' + Array.from({ length: t.n }, (_, i) => `<i class="${i < k ? 'si' : ''}"></i>`).join('') + '</div>' : '')
     + (ses ? `<ol class="sesiones">${ses}</ol>` : '')
-    + (t.abierto ? '<div class="trat-acc">' + (anulandoAqui('registro', t.id) ? '' : `<button type="button" class="enlace" data-anular-reg="${esc(t.id)}">Anular registro</button>`)
-      + motivoAqui('registro', t.id) + '</div>' : '')
+    + (editando ? formEdicion(t.fila, { borrador: PA.borrador, guardando: PA.enVuelo === 'editarRegistro' }) : '')
+    + (!t.anulado && !editando ? '<div class="trat-acc">' + `<button type="button" class="enlace" data-editar-ficha="${esc(t.id)}">Editar</button>`
+      + (t.anulable && !anulandoAqui('registro', t.id) ? `<button type="button" class="enlace" data-anular-reg="${esc(t.id)}">Anular registro</button>` : '')
+      + (t.anulable ? motivoAqui('registro', t.id) : '') + '</div>' : '')
     + '</div>';
 }
 function htmlAlta(a) {
@@ -3298,7 +3339,8 @@ function abrirAlta(esp, teclado) {
   const e = PA.p && PA.p.especialidades.find(x => x.esp === esp);
   if (!e || PA.enVuelo) return;
   const doc = ((S.boot && S.boot.doctores) || []).find(d => d.sofdoc && norm(d.sofdoc) === norm(e.medico));
-  Object.assign(PA, { alta: { esp, doctor: doc ? doc.doctor : '', fecha: S.hoy, nota: '', teclado }, anulando: null, motivo: '' });
+  Object.assign(PA, { alta: { esp, doctor: doc ? doc.doctor : '', fecha: S.hoy, nota: '', dec: 'ALTA', ret: '', teclado }, anulando: null, motivo: '',
+    editando: '', borrador: {} });
   pintarFicha();
   $('#falta-doc').focus();
 }
@@ -3307,16 +3349,47 @@ function cerrarAlta() {
   const esp = PA.alta.esp;
   PA.alta = null;
   pintarFicha();
-  const b = $$('#ficha [data-dar-alta]').find(x => x.dataset.darAlta === esp);
+  const b = $$('#ficha [data-decision]').find(x => x.dataset.decision === esp);
   if (b) b.focus();
 }
 function confirmarAlta(b) {
   const a = PA.alta;
   if (!a || PA.enVuelo) return;
   if (!a.doctor) { avisar('Elija el doctor que da el alta.'); $('#falta-doc').focus(); return; }
-  if (!a.fecha) { avisar('Falta la fecha del alta.'); $('#falta-fec').focus(); return; }
-  escribirFicha({ boton: b, fn: 'darDeAlta', datos: { dni: PA.dni, especialidad: a.esp, doctor: a.doctor, fecha: a.fecha, nota: a.nota.trim() },
-    aviso: r => 'Alta médica registrada: ' + frase(a.esp) + (r.alta && r.alta.ID ? ' · ' + r.alta.ID : ''), luego: () => { PA.alta = null; } });
+  if (!a.fecha) { avisar('Falta la fecha de la consulta.'); $('#falta-fec').focus(); return; }
+  const d = decisionUi(a.dec), ret = d.pideFecha ? a.ret : '';
+  if (d.pideFecha && !ret) { avisar('Falta la fecha de retorno.'); $('#falta-ret').focus(); return; }
+  // Como la pestaña Registro: darDeAlta con la decisión (ALTA por omisión) y la fecha de retorno de una nueva reevaluación.
+  escribirFicha({ boton: b, fn: 'darDeAlta', datos: { dni: PA.dni, especialidad: a.esp, doctor: a.doctor, fecha: a.fecha, nota: a.nota.trim(), decision: d.v, fechaRetorno: ret },
+    aviso: r => d.texto + ' registrada: ' + frase(a.esp) + (ret ? ' · retorno ' + dmy(ret) : '') + (r.alta && r.alta.ID ? ' · ' + r.alta.ID : ''),
+    luego: () => { PA.alta = null; } });
+}
+/* ---- Editar un registro desde la ficha: el mismo formulario que «Registrados» (formEdicion), con el borrador de PA ---- */
+const tratEl = id => $$('#ficha .trat[data-reg]').find(x => x.dataset.reg === id);
+function abrirEdicionFicha(id) {
+  if (PA.enVuelo || !PA.p || !PA.p.trats.some(t => t.id === id && !t.anulado)) return;
+  Object.assign(PA, { editando: id, borrador: {}, alta: null, anulando: null, motivo: '' });
+  pintarFicha();
+  const el = tratEl(id), c = el && el.querySelector('[data-campo]');
+  if (c) c.focus();
+}
+function cerrarEdicionFicha(enfocar) {
+  if (PA.enVuelo === 'editarRegistro' || !PA.editando) return;
+  const id = PA.editando;
+  PA.editando = '';
+  PA.borrador = {};
+  pintarFicha();
+  const el = enfocar && tratEl(id), b = el && el.querySelector('[data-editar-ficha]');
+  if (b) b.focus();
+}
+function guardarEdicionFicha(b) {
+  const t = PA.p && PA.p.trats.find(x => x.id === PA.editando);
+  if (!t || PA.enVuelo) return;
+  const cambios = cambiosEdicion(t.fila, PA.borrador);
+  if (!Object.keys(cambios).length) { avisar('No hay cambios.'); return; }
+  escribirFicha({ boton: b || $('#ficha [data-guardar-edicion]'), fn: 'editarRegistro', datos: { id: t.id, cambios },
+    aviso: r => r.ok === false && r.sinCambios ? 'No hay cambios.' : 'Registro editado: ' + ((r.registro && r.registro.TEXTO) || t.titulo) + ' · ' + t.id,
+    luego: () => { PA.editando = ''; PA.borrador = {}; } });
 }
 function loHizo(b) {
   const t = PA.p && PA.p.trats.find(x => x.id === b.dataset.lohizo);
@@ -3331,7 +3404,7 @@ function loHizo(b) {
 /* ---- Anular (registro, sesión, alta o seguimiento): motivo en la misma fila, como en el panel ---- */
 function abrirAnulacion(que, id) {
   if (PA.enVuelo) return;
-  Object.assign(PA, { anulando: { que, id }, motivo: '', alta: null });
+  Object.assign(PA, { anulando: { que, id }, motivo: '', alta: null, editando: '', borrador: {} });
   pintarFicha();
   $('#fmotivo').focus();
 }
@@ -3374,7 +3447,10 @@ function clicFicha(e) {
   if (t.hasAttribute('data-reficha')) { PA.estado = 'cargando'; pintarFicha(); cargarFicha(); }
   else if (d.copiar) { copiar(d.copiar); t.classList.add('ok'); t.innerHTML = '<i class="ph ph-check"></i>Copiado'; }
   else if (d.emparejar) emparejar(t);
-  else if (d.darAlta) abrirAlta(d.darAlta, e.detail === 0);
+  else if (d.decision) abrirAlta(d.decision, e.detail === 0);
+  else if (d.editarFicha) abrirEdicionFicha(d.editarFicha);
+  else if (t.hasAttribute('data-guardar-edicion')) guardarEdicionFicha(t);
+  else if (t.hasAttribute('data-cancelar-edicion')) cerrarEdicionFicha(true);
   else if (t.hasAttribute('data-alta-ok')) confirmarAlta(t);
   else if (t.hasAttribute('data-alta-cancelar')) cerrarAlta();
   else if (d.lohizo) loHizo(t);
@@ -3389,14 +3465,30 @@ function entradaFicha(e) {
   const el = e.target;
   if (el.id === 'fmotivo') PA.motivo = el.value;
   else if (PA.alta && el.id === 'falta-doc') PA.alta.doctor = el.value;
-  else if (PA.alta && el.id === 'falta-fec') PA.alta.fecha = el.value;
+  else if (PA.alta && el.id === 'falta-fec') { PA.alta.fecha = el.value; if (!decisionUi(PA.alta.dec).pideFecha) pintarDecisionFicha(); }
   else if (PA.alta && el.id === 'falta-nota') PA.alta.nota = el.value;
+  else if (PA.alta && el.id === 'falta-ret') PA.alta.ret = el.value;
+  else if (PA.alta && el.name === 'fdec') { PA.alta.dec = el.value; pintarDecisionFicha(); }
+  else if (PA.editando && el.dataset.campo) {
+    PA.borrador[el.dataset.campo] = el.value;
+    if (el.dataset.campo === 'detalle' && e.type === 'change') {
+      // Otro tratamiento: la marca se vuelve a elegir (la única, si tiene una sola), como en «Registrados».
+      const m = marcasDe(el.value);
+      PA.borrador.marca = m.length === 1 ? m[0] : '';
+      pintarFicha();
+      const c = $('#ficha [data-campo="detalle"]');
+      if (c) c.focus();
+    }
+  }
   else if (el.dataset.fechaSes) PA.fechas[el.dataset.fechaSes] = el.value;
 }
 function teclaFicha(e) {
   if (e.target.id === 'fmotivo') {
     if (e.key === 'Enter') { e.preventDefault(); confirmarAnulacionFicha($('#ficha [data-confirmar-anular]')); }
     else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancelarAnulacionFicha(); }
+  } else if (e.target.matches('#ficha [data-campo]')) {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); guardarEdicionFicha(); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarEdicionFicha(true); }
   } else if (e.key === 'Escape' && PA.alta && e.target.closest('.alta-form')) { e.preventDefault(); e.stopPropagation(); cerrarAlta(); }
 }
 
@@ -4681,11 +4773,16 @@ const DEMO = (() => {
         indicaciones: indicaciones.filter(i => i.DNI === k),
         porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === k)),
         seguimientos: seguimientos.filter(s => s.DNI === k),
+        // Como getPaciente + estadoRegistro: el control y el que tiene fecha de inicio sin sesiones están PROGRAMADOS;
+        // además, lo que necesita el formulario de Editar (filaRegistrada).
         registros: registros.filter(r => r.DNI === k).map(r => {
-          const ss = sesionesDe(r.ID);
-          const estado = r.ANULADO ? 'ANULADO' : ss.length >= r.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO' : 'COTIZADO';
-          return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: r.SESIONES,
-            ESTADO: estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION, sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
+          const ss = sesionesDe(r.ID), f = filaRegistrada(r), control = r.TIPO === 'CONTROL';
+          const estado = r.ANULADO ? 'ANULADO' : control ? 'PROGRAMADO' : ss.length >= f.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO'
+            : r.FECHA_INICIO ? 'PROGRAMADO' : 'COTIZADO';
+          return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: f.SESIONES, HECHAS: ss.length,
+            ESTADO: estado, ESTADO_REGISTRO: estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION, NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
+            FECHA_INICIO: f.FECHA_INICIO, EXAMENES: f.EXAMENES, FECHA_RETORNO: f.FECHA_RETORNO,
+            sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
         }),
         altas: altas.filter(a => a.DNI === k).map(a => ({ ID: a.ID, FECHA: a.FECHA, ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR,
           REGISTRADO_POR: a.REGISTRADO_POR, ANULADO: !!a.ANULADO, MOTIVO_ANULACION: a.MOTIVO_ANULACION, VIGENTE: vigente(k, a.ESPECIALIDAD) === a })),
@@ -4819,6 +4916,7 @@ const DEMO = (() => {
         const v = cambios[k], t = String(v == null ? '' : v).trim(), actual = r[col] == null ? '' : String(r[col]);
         // iguales_: el valor normalizado que ya tiene no cuenta.
         const igual = col === 'DOCTOR' ? !!doctorDe(t) && doctorDe(t).doctor === actual : col === 'NOMBRE' ? t.toUpperCase() === actual
+          : col === 'CONTACTO' ? contactoEnvio(t) === contactoEnvio(actual)
           : col === 'SESIONES' ? Number(t) === Number(actual) : col === 'DETALLE' ? (lista().find(y => mismo(y, t)) || '\u0000') === actual
           : col === 'MARCA' ? ((marcas[norm(r.DETALLE)] || []).find(y => mismo(y, t)) || (t ? '\u0000' : '')) === actual
           : /^FECHA/.test(col) ? t.slice(0, 10) === actual.slice(0, 10) : t === actual;
@@ -4827,7 +4925,7 @@ const DEMO = (() => {
         if (col === 'FECHA') { nuevo = t.slice(0, 10); if (!nuevo) throw new Error('Falta la fecha.'); if (nuevo > hoy) throw new Error('La fecha no puede ser futura.'); }
         else if (col === 'DOCTOR') { const d = doctorDe(t); if (!d) throw new Error('Elija el doctor de la lista.'); nuevo = d.doctor; }
         else if (col === 'NOMBRE') { nuevo = t.toUpperCase(); if (!nuevo) throw new Error('Falta el nombre del paciente.'); }
-        else if (col === 'CONTACTO') { nuevo = t; if (!nuevo) throw new Error('Falta el teléfono o usuario.'); }
+        else if (col === 'CONTACTO') { nuevo = contactoEnvio(t); if (!nuevo) throw new Error('Falta el teléfono o usuario.'); }
         else if (col === 'DETALLE') {
           if (control) throw new Error('Un control no tiene procedimiento ni tratamiento.');
           nuevo = lista().find(y => mismo(y, t));

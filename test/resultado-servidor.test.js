@@ -213,6 +213,14 @@ function servidorResultado(opciones) {
     MARCA: 'FERINJECT', SESIONES: 1, ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '' }] : [];
   const indicaciones = o.conCotizacionHistorial ? [{ ID: 'IND-0001', FECHA: '2026-09-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 2, ESTADO: 'COTIZÓ',
     DNI: '40222333', NOMBRE: 'JORGE PRUEBA', TELEFONO: '945000111', EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: 'HIERRO!2' }] : [];
+  if (o.conRegistroProgramadoYControl) {
+    const comun = { FECHA_HORA: '2026-10-05 09:00', FECHA: '2026-10-05', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ROSA PRUEBA',
+      DNI: '40111222', CONTACTO: '987654321', ANULADO: '', MOTIVO_ANULACION: '', EDITADO: '' };
+    base.push(Object.assign({ ID: 'REG-000010', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'FERINJECT', SESIONES: 2,
+      FECHA_INICIO: '2026-10-12', EXAMENES: '', FECHA_RETORNO: '' }, comun),
+    Object.assign({ ID: 'REG-000011', TIPO: 'CONTROL', DETALLE: 'CONTROL', MARCA: '', SESIONES: 0,
+      FECHA_INICIO: '', EXAMENES: 'hemograma', FECHA_RETORNO: '2026-10-24' }, comun));
+  }
   const registros = () => base.concat(escrito.REGISTROS);
   ctx.datos_ = () => ctx.derivar_({ hoy: '2026-10-09', catalogos: CAT, reglas: reglas(L), citas: [], indicaciones: indicaciones.slice(),
     contactos: [], registros: registros(), sesiones: [], altas: [], seguimientosTodos: escrito.SEGUIMIENTOS.slice(), seguimientos: escrito.SEGUIMIENTOS.slice() });
@@ -262,4 +270,14 @@ test('«Aceptó» del historial: si otra asesora ya lo aceptó entretanto, se re
   assert.throws(() => ctx.registrarResultado({ usuario: 'RACHEL', dni: '40222333', especialidad: 'HIERRO', referencia: '',
     resultado: 'ACEPTÓ', fecha: '2026-10-13', sesiones: 1 }), /no está en la lista/);
   assert.deepEqual([escrito.REGISTROS.length, escrito.SEGUIMIENTOS.length, lock.tomado], [1, 1, 0]);
+});
+
+test('getPaciente: cada registro trae su estado, la fecha de inicio y, si es control, los exámenes y el retorno', () => {
+  const { ctx } = servidorResultado({ conRegistroProgramadoYControl: true });
+  const p = plano(ctx.getPaciente('40111222'));
+  assert.deepEqual(p.registros.map(r => [r.ID, r.ESTADO_REGISTRO, r.FECHA_INICIO, r.EXAMENES, r.FECHA_RETORNO]),
+    [['REG-000010', 'PROGRAMADO', '2026-10-12', '', ''], ['REG-000011', 'PROGRAMADO', '', 'hemograma', '2026-10-24']]);
+  // Lo que necesita el formulario de Editar en la ficha (la misma forma que una fila de getRegistros).
+  assert.deepEqual(p.registros.map(r => [r.TIPO, r.HECHAS, r.SESIONES, r.NOMBRE, r.CONTACTO, r.DETALLE, r.MARCA]),
+    [['HIERRO', 0, 2, 'ROSA PRUEBA', '987654321', 'HIERRO CARBOXIMALTOSA', 'FERINJECT'], ['CONTROL', 0, 0, 'ROSA PRUEBA', '987654321', 'CONTROL', '']]);
 });

@@ -41,9 +41,9 @@ test('validarRegistro: procedimiento y tratamiento en un formulario son dos fila
   const r = plano(L.validarRegistro(base({ procedimiento: 'sangria', tratamiento: 'Hierro Carboximaltosa', sesiones: '3', marca: 'ferinject' }), CAT, HOY));
   assert.equal(r.error, '');
   assert.deepEqual(r.filas, [
-    { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987 654 321',
+    { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987654321',
       MARCA: '', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', SESIONES: 1 },
-    { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987 654 321',
+    { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987654321',
       MARCA: 'FERINJECT', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', SESIONES: 3 }]);
 });
 
@@ -449,7 +449,7 @@ test('decisionesDeAlta: 1 AÑO usa su ventana; sin fecha de retorno se trata com
 test('validarEdicionRegistro: lo editable, el DNI fijo, sesiones no menos que las hechas, anulado no', () => {
   const r = REGH({ SESIONES: '3' }), ses = [SES(1, '2026-10-02'), SES(2, '2026-10-05')];
   const v = (c, x) => plano(L.validarEdicionRegistro(x || r, c, ses, CAT3, '2026-10-09'));
-  assert.deepEqual(v({ sesiones: 4, contacto: '912 000 111' }), { error: '', cambios: { SESIONES: 4, CONTACTO: '912 000 111' }, antes: { SESIONES: '3', CONTACTO: '987654321' } });
+  assert.deepEqual(v({ sesiones: 4, contacto: '912 000 111' }), { error: '', cambios: { SESIONES: 4, CONTACTO: '912000111' }, antes: { SESIONES: '3', CONTACTO: '987654321' } });
   assert.match(v({ dni: '40999888' }).error, /anule el registro/);
   assert.match(v({ sesiones: 1 }).error, /Ya hizo 2 sesiones/);
   assert.match(v({ doctor: 'Dr. Nadie' }).error, /doctor de la lista/);
@@ -467,6 +467,18 @@ test('validarEdicionRegistro: un valor igual al actual no se valida (el formular
   const ctl = REGH({ TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: 'HEMOGRAMA', FECHA_RETORNO: '2026-10-05' });
   assert.deepEqual(v(ctl, { fechaRetorno: '2026-10-05', examenes: 'HEMOGRAMA', contacto: '912000111' }).cambios, { CONTACTO: '912000111' });
   assert.match(v(ctl, { fechaRetorno: '2026-10-06' }).error, /después de hoy/);
+});
+
+test('contacto: un teléfono se guarda sin espacios ni signos, al registrar y al editar; un usuario queda tal cual', () => {
+  assert.equal(L.contactoNormal_(' 987 654-321 '), '987654321');
+  assert.equal(L.contactoNormal_('+51 (987) 654.321'), '+51987654321');
+  assert.equal(L.contactoNormal_('  @rosa.q  '), '@rosa.q');
+  assert.equal(L.validarRegistro(base({ contacto: '987 654 321', procedimiento: 'AMO' }), CAT, HOY).filas[0].CONTACTO, '987654321');
+  const v = c => plano(L.validarEdicionRegistro(REGH(), c, [], CAT3, '2026-10-09'));
+  assert.deepEqual(v({ contacto: '987 654 321' }).cambios, {}, 'el mismo número con espacios no es un cambio');
+  assert.deepEqual(v({ contacto: '912 000-111' }).cambios, { CONTACTO: '912000111' });
+  assert.deepEqual(v({ contacto: '@rosa.q' }).cambios, { CONTACTO: '@rosa.q' });
+  assert.match(v({ contacto: '  ' }).error, /teléfono o usuario/);
 });
 
 test('validarEdicionRegistro: al cambiar el tratamiento sin enviar la marca, la marca se revalida', () => {

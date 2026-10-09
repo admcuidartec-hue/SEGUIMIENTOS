@@ -43,6 +43,12 @@ function fechaDma_(iso) {
   return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : String(iso || '');
 }
 
+/** Un teléfono se guarda sin espacios ni signos ('987 654-321' -> '987654321'); un usuario (@…) tal cual. Como contactoEnvio de Index.html. */
+function contactoNormal_(v) {
+  var t = textoLimpio_(v);
+  return /^\+?[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t;
+}
+
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres alfanuméricos. */
 function documentoValido(dni) {
   var d = normTexto(dni).replace(/[\s.\-]/g, '');
@@ -77,7 +83,7 @@ function validarRegistro(p, catalogos, hoy) {
   if (!documentoValido(p.dni)) return no('El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).');
   var nombre = textoLimpio_(p.nombre).toUpperCase();
   if (!nombre) return no('Falta el nombre del paciente.');
-  var contacto = textoLimpio_(p.contacto);
+  var contacto = contactoNormal_(p.contacto);
   if (!contacto) return no('Falta el teléfono o usuario.');
   var fecha = fechaIso(p.fecha);
   if (!fecha) return no('Falta la fecha.');
@@ -165,7 +171,7 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
       if (!doc) return no('Elija el doctor de la lista.');
       nuevo = doc.doctor;
     } else if (col === 'NOMBRE') { nuevo = textoLimpio_(v).toUpperCase(); if (!nuevo) return no('Falta el nombre del paciente.'); }
-    else if (col === 'CONTACTO') { nuevo = textoLimpio_(v); if (!nuevo) return no('Falta el teléfono o usuario.'); }
+    else if (col === 'CONTACTO') { nuevo = contactoNormal_(v); if (!nuevo) return no('Falta el teléfono o usuario.'); }
     else if (col === 'DETALLE') {
       if (control) return no('Un control no tiene procedimiento ni tratamiento.');
       nuevo = enLista_(normTexto(r.TIPO) === 'HIERRO' ? catalogos.tratamientos : catalogos.procedimientos, v);
@@ -211,6 +217,7 @@ function iguales_(col, v, r, catalogos) {
     nuevo = doc ? doc.doctor : '\u0000';
   }
   else if (col === 'NOMBRE') nuevo = textoLimpio_(v).toUpperCase();
+  else if (col === 'CONTACTO') { nuevo = contactoNormal_(v); actual = contactoNormal_(actual); }
   else if (col === 'SESIONES') nuevo = Number(v);
   else nuevo = textoLimpio_(v);
   if (col === 'DETALLE') nuevo = enLista_((normTexto(r.TIPO) === 'HIERRO' ? catalogos.tratamientos : catalogos.procedimientos), v) || '\u0000';

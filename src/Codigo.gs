@@ -350,8 +350,11 @@ function getPaciente(dni) {
     seguimientos: d.seguimientosTodos.filter(function (s) { return s.DNI === k; }),
     registros: d.registros.filter(function (r) { return r.DNI === k; }).map(function (r) {
       var e = estadoRegistro(r, d.sesiones);
-      return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
-        SESIONES: e.total, ESTADO: e.estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '',
+      // ESTADO_REGISTRO y las fechas pintan la línea de estado; NOMBRE…FECHA_RETORNO, el formulario de Editar (como filaRegistrada_).
+      return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: normTexto(r.TIPO), TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
+        SESIONES: e.total, HECHAS: e.hechas, ESTADO: e.estado, ESTADO_REGISTRO: e.estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '',
+        NOMBRE: r.NOMBRE || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
+        FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '',
         sesiones: sesionesDe_(r.ID, d.sesiones).map(function (s) {
           return { ID: s.ID, NUMERO: Number(s.NUMERO), FECHA: fechaIso(s.FECHA), ASESORA: s.ASESORA };
         }) };

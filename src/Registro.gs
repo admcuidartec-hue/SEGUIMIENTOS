@@ -162,6 +162,7 @@ function validarSesion(r, sesiones, fecha, hoy) {
   if (!r) return 'No encontré ese registro. Recargue la página.';
   var e = estadoRegistro(r, sesiones);
   if (e.estado === 'ANULADO') return 'Ese registro está anulado.';
+  if (normTexto(r.TIPO) === 'CONTROL') return 'Un control no tiene sesiones.';
   if (e.estado === 'COMPLETO') return 'Ese tratamiento ya tiene todas sus sesiones.';
   var f = fechaIso(fecha);
   if (!f) return 'Falta la fecha de la sesión.';
@@ -199,27 +200,39 @@ function pendientesRegistro(d) {
   return (d.registros || []).map(function (r) {
     var e = estadoRegistro(r, d.sesiones);
     if (e.estado === 'ANULADO') return null;
-    var enCurso = e.estado === 'EN CURSO';
-    var desde = enCurso ? e.ultima : fechaIso(r.FECHA);
-    var dias = Math.max(0, diasEntre(desde, hoy));
+    var dni = normDni(r.DNI), control = normTexto(r.TIPO) === 'CONTROL';
+    var realizadas = porDni[dni] || [], ultima = realizadas[realizadas.length - 1];
+    var enCurso = e.estado === 'EN CURSO', programado = e.estado === 'PROGRAMADO';
+    var reevaluar = e.estado === 'COMPLETO' && e.ultima ? sumarDias(e.ultima, reglas.postTratamiento) : '';
+    var desde = control ? fechaIso(r.FECHA) : enCurso ? e.ultima : programado ? e.inicio : reevaluar || fechaIso(r.FECHA);
     var lista = (segs[r.ID] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= desde; }).sort(porFechaHora_);
     var c = leerCiclo(lista, reglas, hoy);
-    var dni = normDni(r.DNI), tel = normTelefono(r.CONTACTO), usuario = tel.length === 9 ? '' : textoLimpio_(r.CONTACTO);
-    var sc = sinContacto_(dni, marcas, d.telefonos, usuario), cierre = c.cierre, estado = 'PENDIENTE';
-    var espera = enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion;
+    var tel = normTelefono(r.CONTACTO), usuario = tel.length === 9 ? '' : textoLimpio_(r.CONTACTO);
+    var sc = sinContacto_(dni, marcas, d.telefonos, usuario), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '';
+    var agenda = c.agenda;
+    var dias = Math.max(0, diasEntre(desde, hoy)), espera = enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion;
+    // La consulta realizada que cierra el control (desde la fecha del registro) o la reevaluación (después de la última sesión).
+    var vuelta = control ? realizadas.filter(function (x) { return x.FECHA >= fechaIso(r.FECHA); })[0]
+      : e.estado === 'COMPLETO' ? realizadas.filter(function (x) { return x.FECHA > e.ultima; })[0] : null;
     if (muertos[dni]) estado = 'FALLECIDO';
-    else if (e.estado === 'COMPLETO') estado = 'COMPLETADO';
     else if (cierre) estado = 'CERRADO';
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
-    else if (c.agenda) estado = 'AGENDADO';
+    else if (vuelta) { estado = 'COMPLETADO'; volvio = vuelta.FECHA; }
+    else if (agenda) estado = 'AGENDADO';
+    else if (control) {
+      if (hoy <= sumarDias(e.inicio, reglas.graciaAgenda)) { estado = 'AGENDADO'; agenda = { tipo: 'CONTROL', fecha: e.inicio, intento: 0 }; }
+      else { motivo = 'CONTROL VENCIDO'; dias = Math.max(0, diasEntre(e.inicio, hoy)); }
+    } else if (programado) {
+      if (hoy <= sumarDias(e.inicio, reglas.graciaAgenda)) { estado = 'AGENDADO'; agenda = { tipo: 'SESION', fecha: e.inicio, intento: 0 }; }
+      else motivo = 'NO VINO';
+    } else if (e.estado === 'COMPLETO') estado = hoy < reevaluar ? 'COMPLETADO' : 'POR REEVALUAR';
     else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
-    var realizadas = porDni[dni] || [], ultima = realizadas[realizadas.length - 1];
     return {
       ID_REGISTRO: r.ID,
       DNI: dni,
       ESPECIALIDAD: r.TIPO,
-      TIPO_SEGUIMIENTO: r.TIPO,
+      TIPO_SEGUIMIENTO: control ? 'CONTROL' : r.TIPO,
       NOMBRE: ultima ? ultima.NOMBRE : r.NOMBRE,
       TELEFONOS: ((d.telefonos || {})[dni] || []).join(' / '),
       USUARIO: usuario,
@@ -241,9 +254,14 @@ function pendientesRegistro(d) {
       ATRASO: enCurso && estado === 'PENDIENTE' ? dias - reglas.diasEntreSesiones : 0,
       CIERRE: cierre ? cierre.motivo : '',
       FECHA_CIERRE: cierre ? cierre.fecha : '',
-      AGENDA: c.agenda ? c.agenda.tipo : '',
-      FECHA_AGENDA: c.agenda ? c.agenda.fecha : '',
-      INTENTO: c.agenda ? c.agenda.intento : 0
+      AGENDA: agenda ? agenda.tipo : '',
+      FECHA_AGENDA: agenda ? agenda.fecha : '',
+      INTENTO: agenda ? agenda.intento : 0,
+      MOTIVO_PENDIENTE: motivo,
+      FECHA_REEVALUAR: reevaluar,
+      VOLVIO: volvio,
+      EXAMENES: textoLimpio_(r.EXAMENES),
+      FECHA_INICIO: e.inicio
     };
   }).filter(Boolean);
 }

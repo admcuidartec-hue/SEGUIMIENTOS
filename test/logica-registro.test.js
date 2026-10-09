@@ -112,6 +112,11 @@ test('validarSesion: ni completo, ni anulado, ni antes del registro o de la sesi
   assert.match(v(reg(), [], ''), /Falta la fecha/);
 });
 
+test('validarSesion: un control no tiene sesiones', () => {
+  const c = reg({ TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: '0', FECHA_RETORNO: '2026-10-16' });
+  assert.equal(L.validarSesion(c, [], '2026-10-04', HOY), 'Un control no tiene sesiones.');
+});
+
 test('validarAnulacionSesion: solo la última sesión válida de su registro', () => {
   const s = [ses(1, '2026-09-25'), ses(2, '2026-10-01')];
   assert.equal(L.validarAnulacionSesion('SES-000002', s).error, '');
@@ -342,4 +347,56 @@ test('estadoRegistro: COTIZADO, PROGRAMADO, EN CURSO y COMPLETO; los antiguos si
 test('textoRegistro de un control', () => {
   assert.equal(L.textoRegistro({ TIPO: 'CONTROL', DETALLE: 'CONTROL', EXAMENES: 'hemograma' }), 'Control + laboratorio · hemograma');
   assert.equal(L.textoRegistro({ TIPO: 'CONTROL', DETALLE: 'CONTROL', EXAMENES: '' }), 'Control + laboratorio');
+});
+
+function dReg(registros, sesiones, citas, hoy, segs) {
+  return { registros, sesiones: sesiones || [], citas: citas || [], seguimientos: segs || [], reglas: reglas(L), hoy,
+    telefonos: { 40111222: ['987654321'] }, catalogos: CAT3 };
+}
+const REGH = o => Object.assign({ ID: 'REG-000010', FECHA: '2026-10-01', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ROSA PRUEBA',
+  DNI: '40111222', CONTACTO: '987654321', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', MARCA: '', SESIONES: '2', ANULADO: '', FECHA_INICIO: '' }, o);
+const SES = (n, f) => ({ ID: 'SES-00000' + n, ID_REGISTRO: 'REG-000010', NUMERO: String(n), FECHA: f, ANULADO: '' });
+const filaH = d => plano(L.pendientesRegistro(d))[0];
+
+test('pendientesRegistro: programado → Agendado «Sesión»; pasada la gracia sin sesión → Por contactar «No vino»', () => {
+  const r = REGH({ FECHA_INICIO: '2026-10-12' });
+  const a = filaH(dReg([r], [], [], '2026-10-10'));
+  assert.deepEqual([a.ESTADO, a.AGENDA, a.FECHA_AGENDA], ['AGENDADO', 'SESION', '2026-10-12']);
+  assert.equal(filaH(dReg([r], [], [], '2026-10-14')).ESTADO, 'AGENDADO', 'dentro de la gracia de 2 días');
+  const f = filaH(dReg([r], [], [], '2026-10-15'));
+  assert.deepEqual([f.ESTADO, f.MOTIVO_PENDIENTE], ['PENDIENTE', 'NO VINO']);
+});
+
+test('pendientesRegistro: completo → Completado con fecha para reevaluar; a los 30 días → POR REEVALUAR; si volvió → Completado', () => {
+  const r = REGH({ FECHA_INICIO: '2026-10-02' }), ses = [SES(1, '2026-10-02'), SES(2, '2026-10-09')];
+  const antes = filaH(dReg([r], ses, [], '2026-10-20'));
+  assert.deepEqual([antes.ESTADO, antes.FECHA_REEVALUAR], ['COMPLETADO', '2026-11-08']);
+  assert.equal(filaH(dReg([r], ses, [], '2026-11-08')).ESTADO, 'POR REEVALUAR');
+  const volvio = filaH(dReg([r], ses, [cita({ fecha: '2026-11-05' })], '2026-11-20'));
+  assert.deepEqual([volvio.ESTADO, volvio.VOLVIO], ['COMPLETADO', '2026-11-05']);
+});
+
+test('pendientesRegistro: «Agendó cita» sobre POR REEVALUAR lo deja en Agendado', () => {
+  const r = REGH({ FECHA_INICIO: '2026-10-02' }), ses = [SES(1, '2026-10-02'), SES(2, '2026-10-09')];
+  const sg = { ID: 'SEG-1', FECHA_HORA: '2026-11-09 10:00', DNI: '40111222', ESPECIALIDAD: 'HIERRO', RESPONSABLE: 'MAGALY', ACCION: 'HECHO',
+    REFERENCIA: 'REG-000010', RESULTADO: 'AGENDÓ CITA', FECHA_PROXIMA: '2026-11-15', ANULADO: '' };
+  const f = filaH(dReg([r], ses, [], '2026-11-10', [sg]));
+  assert.deepEqual([f.ESTADO, f.AGENDA, f.FECHA_AGENDA], ['AGENDADO', 'CITA', '2026-11-15']);
+});
+
+test('pendientesRegistro: control + laboratorio → Agendado; vencido → Por contactar; con consulta → Completado', () => {
+  const c = REGH({ TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: '0', EXAMENES: 'hemograma', FECHA_RETORNO: '2026-10-16' });
+  const a = filaH(dReg([c], [], [], '2026-10-10'));
+  assert.deepEqual([a.ESTADO, a.AGENDA, a.FECHA_AGENDA, a.TIPO_SEGUIMIENTO], ['AGENDADO', 'CONTROL', '2026-10-16', 'CONTROL']);
+  const v = filaH(dReg([c], [], [], '2026-10-19'));
+  assert.deepEqual([v.ESTADO, v.MOTIVO_PENDIENTE], ['PENDIENTE', 'CONTROL VENCIDO']);
+  const ok = filaH(dReg([c], [], [cita({ fecha: '2026-10-15' })], '2026-10-19'));
+  assert.deepEqual([ok.ESTADO, ok.VOLVIO], ['COMPLETADO', '2026-10-15']);
+});
+
+test('pendientesRegistro: un registro antiguo sin fecha de inicio sigue como hasta hoy', () => {
+  const r = REGH();
+  assert.equal(filaH(dReg([r], [], [], '2026-10-05')).ESTADO, 'EN ESPERA');
+  assert.equal(filaH(dReg([r], [], [], '2026-10-09')).ESTADO, 'PENDIENTE');
+  assert.equal(filaH(dReg([r], [SES(1, '2026-10-03')], [], '2026-10-05')).ESTADO, 'EN TRATAMIENTO');
 });

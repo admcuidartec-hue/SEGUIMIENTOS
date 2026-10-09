@@ -151,6 +151,25 @@ function marcarAnulado_(nombre, id, motivo) {
   throw new Error('No encontré ' + id + '.');
 }
 
+/** Escribe solo las celdas pedidas de la fila con ese ID. Nada más de la fila cambia. */
+function actualizarCeldas_(nombre, id, cambios) {
+  var sh = hoja_(nombre), v = sh.getDataRange().getValues();
+  var cab = v[0].map(function (c) { return String(c).trim(); }), cId = cab.indexOf('ID'), cA = cab.indexOf('ANULADO');
+  for (var i = 1; i < v.length; i++) {
+    if (String(v[i][cId]).trim() !== id) continue;
+    if (cA >= 0 && normTexto(v[i][cA]) === 'SI') throw new Error(id + ' está anulado.');
+    Object.keys(cambios).forEach(function (c) {
+      var j = cab.indexOf(c);
+      if (j < 0) throw new Error('Falta preparar las hojas: a ' + nombre + ' le falta la columna ' + c + '.');
+      var r = sh.getRange(i + 1, j + 1);
+      if (!COLUMNAS_FECHA[c] && !COLUMNAS_FECHA_HORA[c] && !COLUMNAS_NUMERICAS[c]) r.setNumberFormat('@');
+      r.setValue(celdaParaHoja_(cambios[c], c));
+    });
+    return;
+  }
+  throw new Error('No encontré ' + id + '.');
+}
+
 function getRegistrosHoy() {
   var d = datos_(), nombres = {};
   d.citas.forEach(function (c) { nombres[c.DNI] = c.NOMBRE; });

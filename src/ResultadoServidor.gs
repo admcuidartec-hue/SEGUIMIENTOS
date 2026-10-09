@@ -52,6 +52,8 @@ function registrarResultado_(p, opciones) {
     var frescos = leerSeguimientos_().filter(function (x) { return !anulado_(x); });
     // Se vuelve a validar con lo releído: otra asesora pudo cerrar o dar de baja al paciente.
     d.seguimientos = frescos;
+    // «Aceptó» crea o programa un registro: otra asesora pudo hacerlo entretanto, y su registro cierra la cotización.
+    if (v.fila.RESULTADO === 'ACEPTÓ') d.registros = leerRegistros_();
     derivar_(d);
     v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(d) });
     if (v.error) throw new Error(v.error);
@@ -62,22 +64,44 @@ function registrarResultado_(p, opciones) {
       var marca = { DNI: v.fila.DNI, RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: v.fila.TELEFONO, FECHA_HORA: fechaHoraTexto_(ahora) };
       quedan = (telefonosPorDni(d.indicacionesTodas, d.contactos, frescos.concat([marca]))[v.fila.DNI] || []).length > 0 || !!t.USUARIO;
     }
+    var registro = null;
+    if (v.fila.RESULTADO === 'ACEPTÓ') {
+      exigirColumnas_('REGISTROS', COLUMNAS_REGISTROS);
+      if (t.ID_REGISTRO) {
+        actualizarCeldas_('REGISTROS', t.ID_REGISTRO, { FECHA_INICIO: v.fila.FECHA_PROXIMA });
+      } else {
+        var ids = d.registros.map(function (x) { return x.ID; });
+        var hierro = normTexto(t.ESPECIALIDAD) === 'HIERRO';
+        registro = { ID: siguienteId(ids, 'REG'), FECHA_HORA: fechaHoraTexto_(ahora), FECHA: d.hoy, ASESORA: v.fila.RESPONSABLE, DOCTOR: '',
+          NOMBRE: textoLimpio_(t.NOMBRE).toUpperCase(), DNI: v.fila.DNI, CONTACTO: String(t.TELEFONOS || '').split(' / ')[0] || '',
+          TIPO: hierro ? 'HIERRO' : 'PROCEDIMIENTO', DETALLE: hierro ? 'HIERRO CARBOXIMALTOSA' : textoLimpio_(t.DETALLE).replace(/ ×\d+$/, ''),
+          MARCA: hierro ? 'FERINJECT' : '', SESIONES: Number(p.sesiones) || 1, ANULADO: '', MOTIVO_ANULACION: '',
+          FECHA_INICIO: v.fila.FECHA_PROXIMA, EXAMENES: '', FECHA_RETORNO: '', EDITADO: '' };
+        anexarObjeto_('REGISTROS', COLUMNAS_REGISTROS, registro);
+        bitacora_(registro.ASESORA, 'REGISTRO', registro.ID + ' · ' + registro.DNI + ' · aceptó la cotización del historial');
+        v.fila.NOTA = unirNota_('Registro ' + registro.ID, v.fila.NOTA);
+      }
+    }
     s = copia_(v.fila, { ID: 'SEG-' + ahora.getTime() + '-' + Math.floor(Math.random() * 1000), FECHA_HORA: fechaHoraTexto_(ahora),
       ACCION: accionPara(v.fila.RESULTADO, quedan) });
     anexarObjeto_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS, s);
     bitacora_(s.RESPONSABLE, 'RESULTADO', s.DNI + ' · ' + s.ESPECIALIDAD + ' · ' + s.RESULTADO + (s.REFERENCIA ? ' · ' + s.REFERENCIA : ''));
     d.seguimientos = frescos.concat([s]);
+    if (registro) d.registros = (d.registros || []).concat([registro]);
+    else if (v.fila.RESULTADO === 'ACEPTÓ') d.registros = (d.registros || []).map(function (x) {
+      return x.ID === t.ID_REGISTRO ? copia_(x, { FECHA_INICIO: v.fila.FECHA_PROXIMA }) : x;
+    });
   } finally {
     soltar_(lock);
   }
   // Fuera del candado: la tarjeta recalculada en memoria, para que la app confirme el movimiento.
   d.seguimientosTodos = d.seguimientosTodos.concat([s]);
   derivar_(d);
-  var clave = claveTarjeta(t), tab = armarTablero(d), nueva = null;
+  var clave = registro ? registro.ID : claveTarjeta(t), tab = armarTablero(d), nueva = null;
   Object.keys(tab.columnas).forEach(function (c) {
     tab.columnas[c].forEach(function (x) { if (x.CLAVE === clave && !nueva) nueva = x; });
   });
-  return limpiarParaEnvio({ ok: true, seguimiento: s, tarjeta: nueva });
+  return limpiarParaEnvio({ ok: true, seguimiento: s, registro: registro, tarjeta: nueva });
 }
 
 function anularResultado(p) {

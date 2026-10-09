@@ -200,3 +200,66 @@ test('getPaciente: un registro anulado no da el nombre; si todos lo están, lo d
   ctx.datos_ = () => { const d = base(); d.indicaciones = d.indicaciones.concat([{ DNI: '45000222', NOMBRE: 'LUIS ALBERTO NUEVO', FECHA: '2026-07-01', TIPO: 'HIERRO', ESTADO: 'COTIZÓ' }]); return d; };
   assert.equal(plano(ctx.getPaciente('45000222')).nombre, 'LUIS ALBERTO NUEVO');
 });
+
+/** Arnés de «Aceptó»: un registro cotizado o una cotización del historial; la segunda llamada ve lo escrito por la primera. */
+function servidorResultado(opciones) {
+  const o = opciones || {};
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
+  const escrito = { SEGUIMIENTOS: [], REGISTROS: [], BITACORA: [] };
+  const lock = { tomado: 0, flush: 0 };
+  const L = cargar();
+  const base = o.conRegistroCotizado ? [{ ID: 'REG-000010', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10-01', ASESORA: 'MAGALY',
+    DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ROSA PRUEBA', DNI: '40111222', CONTACTO: '987654321', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA',
+    MARCA: 'FERINJECT', SESIONES: 1, ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '' }] : [];
+  const indicaciones = o.conCotizacionHistorial ? [{ ID: 'IND-0001', FECHA: '2026-09-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 2, ESTADO: 'COTIZÓ',
+    DNI: '40222333', NOMBRE: 'JORGE PRUEBA', TELEFONO: '945000111', EMPAREJAMIENTO: 'CONFIRMADO', ORIGEN: 'HIERRO!2' }] : [];
+  const registros = () => base.concat(escrito.REGISTROS);
+  ctx.datos_ = () => ctx.derivar_({ hoy: '2026-10-09', catalogos: CAT, reglas: reglas(L), citas: [], indicaciones: indicaciones.slice(),
+    contactos: [], registros: registros(), sesiones: [], altas: [], seguimientosTodos: escrito.SEGUIMIENTOS.slice(), seguimientos: escrito.SEGUIMIENTOS.slice() });
+  ctx.leerOpcional_ = n => (n === 'REGISTROS' ? registros() : []);
+  ctx.leerRegistros_ = registros;
+  ctx.exigirColumnas_ = () => {};
+  ctx.exigirHojaPreparada_ = () => {};
+  ctx.hoja_ = () => ({});
+  ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
+  ctx.SpreadsheetApp = { flush: () => { lock.flush++; } };
+  ctx.leerSeguimientos_ = () => escrito.SEGUIMIENTOS.slice();
+  ctx.anexarObjeto_ = (n, cols, x) => { assert.equal(lock.tomado, 1, 'se escribe con el candado tomado'); escrito[n].push(plano(x)); };
+  ctx.bitacora_ = (u, a, d) => escrito.BITACORA.push([u, a, d]);
+  ctx.fechaHoraTexto_ = () => '2026-10-09 10:30';
+  ctx.actualizarCeldas_ = () => { throw new Error('actualizarCeldas_ sin doble en esta prueba'); };
+  return { ctx, escrito, lock };
+}
+
+test('«Aceptó» sobre un registro escribe su fecha de inicio con el candado tomado', () => {
+  const { ctx, escrito, lock } = servidorResultado({ conRegistroCotizado: true });
+  const celdas = [];
+  ctx.actualizarCeldas_ = (h, id, c) => { assert.equal(lock.tomado, 1); celdas.push([h, id, plano(c)]); };
+  const r = plano(ctx.registrarResultado({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010',
+    resultado: 'ACEPTÓ', fecha: '2026-10-12' }));
+  assert.deepEqual(celdas, [['REGISTROS', 'REG-000010', { FECHA_INICIO: '2026-10-12' }]]);
+  assert.equal(escrito.SEGUIMIENTOS[0].RESULTADO, 'ACEPTÓ');
+  assert.equal(r.tarjeta.COLUMNA, 'AGENDADO');
+});
+
+test('«Aceptó» sobre una cotización del historial crea el registro con sus sesiones, una sola vez', () => {
+  const { ctx, escrito } = servidorResultado({ conCotizacionHistorial: true });
+  const r = plano(ctx.registrarResultado({ usuario: 'MAGALY', dni: '40222333', especialidad: 'HIERRO', referencia: '',
+    resultado: 'ACEPTÓ', fecha: '2026-10-12', sesiones: 2 }));
+  assert.deepEqual(escrito.REGISTROS.map(x => [x.TIPO, x.DNI, x.SESIONES, x.FECHA_INICIO]), [['HIERRO', '40222333', 2, '2026-10-12']]);
+  assert.match(escrito.SEGUIMIENTOS[0].NOTA, /Registro REG-\d{6}/);
+  assert.equal(r.registro.ID, escrito.REGISTROS[0].ID);
+  assert.throws(() => ctx.registrarResultado({ usuario: 'MAGALY', dni: '40222333', especialidad: 'HIERRO', referencia: '',
+    resultado: 'ACEPTÓ', fecha: '2026-10-12', sesiones: 2 }), /no está en la lista/, 'la segunda vez la cotización ya no está abierta');
+});
+
+test('«Aceptó» del historial: si otra asesora ya lo aceptó entretanto, se relee REGISTROS dentro del candado y no se duplica', () => {
+  const { ctx, escrito, lock } = servidorResultado({ conCotizacionHistorial: true });
+  // La segunda asesora valida con datos de antes: sin el registro que la primera acaba de crear.
+  const fresco = ctx.datos_;
+  ctx.datos_ = () => { const d = fresco(); d.registros = []; return ctx.derivar_(d); };
+  ctx.registrarResultado({ usuario: 'MAGALY', dni: '40222333', especialidad: 'HIERRO', referencia: '', resultado: 'ACEPTÓ', fecha: '2026-10-12', sesiones: 2 });
+  assert.throws(() => ctx.registrarResultado({ usuario: 'RACHEL', dni: '40222333', especialidad: 'HIERRO', referencia: '',
+    resultado: 'ACEPTÓ', fecha: '2026-10-13', sesiones: 1 }), /no está en la lista/);
+  assert.deepEqual([escrito.REGISTROS.length, escrito.SEGUIMIENTOS.length, lock.tomado], [1, 1, 0]);
+});

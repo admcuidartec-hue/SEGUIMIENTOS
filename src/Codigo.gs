@@ -262,9 +262,10 @@ function datos_() {
 function derivar_(d) {
   // Historial (INDICACIONES) + Registro: lo que cuenta en cifras, teléfonos y pendientes.
   d.indicacionesTodas = d.indicaciones.concat(indicacionesDeRegistros(d.registros, d.sesiones, d.catalogos, d.reglas, d.hoy));
-  d.vigentes = altasVigentes(d.altas, d.seguimientos, d.citas);
+  d.vigentes = altasVigentes(d.altas, d.seguimientos, d.citas, d.reglas, d.hoy);
+  d.retornos = decisionesDeAlta(d.altas, d.citas, d.reglas, d.hoy).retornos;
   d.telefonos = telefonosPorDni(d.indicacionesTodas, d.contactos, d.seguimientos);
-  d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes);
+  d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos);
   d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos)
     .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
       reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos }));

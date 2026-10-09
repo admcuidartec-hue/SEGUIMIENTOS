@@ -179,7 +179,7 @@ function getRegistrosHoy() {
     return { ID: r.ID, HORA: hora(r), ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegistro(r), ANULADO: anulado_(r), MOTIVO_ANULACION: r.MOTIVO_ANULACION || '' };
   }).concat(d.altas.filter(hoy).map(function (a) {
     return { ID: a.ID, HORA: hora(a), ASESORA: a.REGISTRADO_POR, NOMBRE: nombres[a.DNI] || '', DNI: a.DNI,
-      TEXTO: 'Alta médica · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR, ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '' };
+      TEXTO: decisionDe_(a).texto + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR + (fechaIso(a.FECHA_RETORNO) ? ' · retorno ' + fechaDma_(fechaIso(a.FECHA_RETORNO)) : ''), ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '' };
   }));
   lista.sort(function (a, b) { return a.HORA < b.HORA ? 1 : a.HORA > b.HORA ? -1 : (a.ID < b.ID ? 1 : -1); });
   return limpiarParaEnvio(lista);

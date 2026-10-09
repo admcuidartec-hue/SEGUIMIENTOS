@@ -144,3 +144,11 @@ test('reglas: plazos de la Etapa 2 y sus valores por omisión', () => {
   const r = L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], [['DIAS_POST_TRATAMIENTO', 45], ['DIAS_CONTROL_LAB', 10], ['AVISO_ALTA_CONTROL_DIAS', 20]]);
   assert.deepEqual([r.postTratamiento, r.controlLab, r.avisoAltaControl], [45, 10, 20]);
 });
+
+test('estadoDeSerie: el retorno indicado por el médico manda sobre el plazo de REGLAS', () => {
+  const R = reglas(L), s = L.armarSeries([cita({ fecha: '2026-10-01' })])['40111222|HEMATOLOGIA'];
+  const e = L.estadoDeSerie(s, [], R, '2026-11-10', null, { retorno: { fecha: '2026-11-20', tipo: 'REEVALUACION' } });
+  assert.deepEqual([e.estado, e.esperada, e.vence], ['AL DÍA', '2026-11-20', '2026-12-05']);
+  const c = L.estadoDeSerie(s, [], R, '2027-03-10', null, { retorno: { fecha: '2027-04-05', tipo: '6 MESES' } });
+  assert.deepEqual([c.esperada, c.estado], ['2027-03-06', 'POR VENCER'], 'el control de alta se espera 30 días antes');
+});

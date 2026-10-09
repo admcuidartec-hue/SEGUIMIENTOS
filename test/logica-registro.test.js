@@ -202,7 +202,7 @@ test('validarAlta: consultas en esa especialidad, doctor del catálogo, fecha v�
   const p = o => Object.assign({ usuario: 'magaly', dni: '40111222', especialidad: 'hematologia', doctor: 'Dr. Elí Cabanillas', fecha: '2026-09-10', nota: ' ok ' }, o);
   const v = (o, vig) => plano(L.validarAlta(p(o), CAT, citas, vig || {}, HOY));
   assert.deepEqual(v({}).alta, { FECHA: '2026-09-10', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dr. Elí Cabanillas',
-    REGISTRADO_POR: 'MAGALY', NOTA: 'ok', ANULADO: '', MOTIVO_ANULACION: '' });
+    REGISTRADO_POR: 'MAGALY', NOTA: 'ok', ANULADO: '', MOTIVO_ANULACION: '', DECISION: 'ALTA', FECHA_RETORNO: '' });
   assert.match(v({ usuario: '' }).error, /Elija quién es usted/);
   assert.match(v({ especialidad: 'REUMATOLOGÍA' }).error, /no tiene consultas realizadas en REUMATOLOGÍA/);
   assert.match(v({ doctor: '' }).error, /doctor que da el alta/);
@@ -399,4 +399,31 @@ test('pendientesRegistro: un registro antiguo sin fecha de inicio sigue como has
   assert.equal(filaH(dReg([r], [], [], '2026-10-05')).ESTADO, 'EN ESPERA');
   assert.equal(filaH(dReg([r], [], [], '2026-10-09')).ESTADO, 'PENDIENTE');
   assert.equal(filaH(dReg([r], [SES(1, '2026-10-03')], [], '2026-10-05')).ESTADO, 'EN TRATAMIENTO');
+});
+
+test('validarAlta: cuatro decisiones; la nueva reevaluación pide fecha de retorno futura', () => {
+  const citas = [cita({ fecha: '2026-10-01' })];
+  const p = o => Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05' }, o);
+  const ok = d => plano(L.validarAlta(p(d), CAT3, citas, {}, '2026-10-09'));
+  assert.deepEqual([ok({}).alta.DECISION, ok({}).alta.FECHA_RETORNO], ['ALTA', '']);
+  assert.deepEqual([ok({ decision: 'ALTA 6 MESES' }).alta.DECISION, ok({ decision: 'ALTA 6 MESES' }).alta.FECHA_RETORNO], ['ALTA 6 MESES', '2027-04-05']);
+  assert.equal(ok({ decision: 'alta 1 año' }).alta.FECHA_RETORNO, '2027-10-05');
+  assert.equal(ok({ decision: 'NUEVA REEVALUACION', fechaRetorno: '2026-11-20' }).alta.FECHA_RETORNO, '2026-11-20');
+  assert.match(L.validarAlta(p({ decision: 'NUEVA REEVALUACION' }), CAT3, citas, {}, '2026-10-09').error, /fecha de retorno/);
+  assert.match(L.validarAlta(p({ decision: 'NUEVA REEVALUACION', fechaRetorno: '2026-10-09' }), CAT3, citas, {}, '2026-10-09').error, /después de hoy/);
+  assert.match(L.validarAlta(p({ decision: 'OTRA' }), CAT3, citas, {}, '2026-10-09').error, /Elija la decisión/);
+});
+
+test('decisionesDeAlta: ventanas de 6 meses y 1 año, nueva reevaluación, y una consulta posterior las anula', () => {
+  const R = reglas(L), citas = [cita({ fecha: '2026-10-01' })];
+  const a = (dec, ret) => ({ ID: 'ALT-1', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dra. X', DECISION: dec, FECHA_RETORNO: ret, ANULADO: '' });
+  const k = '40111222|HEMATOLOGIA';
+  let r = plano(L.decisionesDeAlta([a('ALTA 6 MESES', '2027-04-05')], citas, R, '2027-02-01'));
+  assert.ok(r.vigentes[k] && !r.retornos[k], 'antes de la ventana: alta vigente');
+  r = plano(L.decisionesDeAlta([a('ALTA 6 MESES', '2027-04-05')], citas, R, '2027-03-10'));
+  assert.deepEqual([!!r.vigentes[k], r.retornos[k]], [false, { fecha: '2027-04-05', tipo: '6 MESES' }]);
+  r = plano(L.decisionesDeAlta([a('NUEVA REEVALUACION', '2026-11-20')], citas, R, '2026-10-09'));
+  assert.deepEqual([!!r.vigentes[k], r.retornos[k]], [false, { fecha: '2026-11-20', tipo: 'REEVALUACION' }]);
+  r = plano(L.decisionesDeAlta([a('ALTA 6 MESES', '2027-04-05')], citas.concat([cita({ fecha: '2026-12-01' })]), R, '2027-03-10'));
+  assert.deepEqual([!!r.vigentes[k], !!r.retornos[k]], [false, false], 'volvió a consulta: la decisión ya se cumplió');
 });

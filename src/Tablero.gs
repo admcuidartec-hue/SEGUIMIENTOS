@@ -61,7 +61,11 @@ function columnaDe(t) {
 function etiquetaDe(t, reglas, hoy) {
   var sesion = 'Sesión ' + (Number(t.HECHAS) + 1) + ' de ' + t.SESIONES;
   if (t.COLUMNA === 'POR_CONTACTAR') {
-    if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') return 'Debía volver el ' + dm_(t.PROXIMA_ESPERADA) + ' · hace ' + plural_(diasEntre(t.PROXIMA_ESPERADA, hoy), 'día', 'días');
+    if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') {
+      if (t.RETORNO_TIPO === '6 MESES' || t.RETORNO_TIPO === '1 AÑO') return 'Control de alta a ' + (t.RETORNO_TIPO === '6 MESES' ? '6 meses' : '1 año') + ' · el ' + dm_(t.FECHA_RETORNO);
+      if (t.RETORNO_TIPO === 'REEVALUACION') return 'Debía volver el ' + dm_(t.FECHA_RETORNO) + ' (lo indicó el médico)';
+      return 'Debía volver el ' + dm_(t.PROXIMA_ESPERADA) + ' · hace ' + plural_(diasEntre(t.PROXIMA_ESPERADA, hoy), 'día', 'días');
+    }
     if (t.ESTADO === 'POR REEVALUAR') return 'Por reevaluar · terminó el ' + dm_(t.ULTIMA_SESION);
     if (t.MOTIVO_PENDIENTE === 'NO VINO') return 'No vino a su sesión ' + (Number(t.HECHAS) + 1) + ' (' + dm_(t.FECHA_INICIO) + ')';
     if (t.MOTIVO_PENDIENTE === 'CONTROL VENCIDO') return 'Debía volver con resultados el ' + dm_(t.FECHA_INICIO);

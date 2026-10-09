@@ -298,10 +298,17 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
   if (futura) out.proximaAgendada = futura.FECHA;
   if (!ultima) { out.estado = 'SIN ATENCIÓN'; return out; }
 
-  out.esperada = sumarDias(ultima, plazo.esperado);
-  out.vence = sumarDias(ultima, plazo.vence);
-  out.atraso = Math.max(0, diasEntre(out.vence, hoy));
   extra = extra || {};
+  var ret = extra.retorno;
+  if (ret && ret.fecha) {
+    // El médico indicó cuándo volver: esa fecha manda sobre el plazo de REGLAS.
+    out.esperada = ret.tipo === 'REEVALUACION' ? ret.fecha : sumarDias(ret.fecha, -reglas.avisoAltaControl);
+    out.vence = sumarDias(out.esperada, plazo.vence - plazo.esperado);
+  } else {
+    out.esperada = sumarDias(ultima, plazo.esperado);
+    out.vence = sumarDias(ultima, plazo.vence);
+  }
+  out.atraso = Math.max(0, diasEntre(out.vence, hoy));
   out.cierre = ''; out.fechaCierre = ''; out.agenda = null;
   if (extra.fallecido) { out.estado = 'FALLECIDO'; return out; }
   // El alta va primero: el doctor cerró el seguimiento (diseño de Registro, §5bis).
@@ -660,7 +667,7 @@ function segsPorSerie(seguimientos) {
   return out;
 }
 
-function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas) {
+function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas, retornos) {
   var series = armarSeries(citas);
   var tel = telefonosPorDni(indicaciones, contactos, seguimientos), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
   var marcas = marcasTelefono(seguimientos), muertos = fallecidos(seguimientos);
@@ -669,7 +676,7 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
     var s = series[k];
     if (!s.realizadas.length) return;
     var e = estadoDeSerie(s, segs[k], reglas, hoy, (altas || {})[k],
-      { fallecido: !!muertos[s.dni], sinContacto: sinContacto_(s.dni, marcas, tel, '') });
+      { fallecido: !!muertos[s.dni], sinContacto: sinContacto_(s.dni, marcas, tel, ''), retorno: (retornos || {})[k] });
     out.push({
       DNI: s.dni,
       ESPECIALIDAD: s.especialidad,
@@ -691,7 +698,9 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
       FECHA_CIERRE: e.fechaCierre || '',
       AGENDA: e.agenda ? e.agenda.tipo : '',
       FECHA_AGENDA: e.agenda ? e.agenda.fecha : '',
-      INTENTO: e.agenda ? e.agenda.intento : 0
+      INTENTO: e.agenda ? e.agenda.intento : 0,
+      RETORNO_TIPO: ((retornos || {})[k] || {}).tipo || '',
+      FECHA_RETORNO: ((retornos || {})[k] || {}).fecha || ''
     });
   });
   return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });

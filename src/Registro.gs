@@ -268,6 +268,21 @@ function pendientesRegistro(d) {
 
 /* ---------- Alta médica (por especialidad) ---------- */
 
+var DECISIONES = {
+  'ALTA': { nombre: 'ALTA', texto: 'Alta médica', meses: 0 },
+  'ALTA 6 MESES': { nombre: 'ALTA 6 MESES', texto: 'Alta con reevaluación a 6 meses', meses: 6, tipo: '6 MESES' },
+  'ALTA 1 ANO': { nombre: 'ALTA 1 AÑO', texto: 'Alta con reevaluación a 1 año', meses: 12, tipo: '1 AÑO' },
+  'NUEVA REEVALUACION': { nombre: 'NUEVA REEVALUACION', texto: 'Nueva reevaluación', meses: 0, pideFecha: true, tipo: 'REEVALUACION' }
+};
+function decisionDe_(a) { return DECISIONES[normTexto(a && a.DECISION) || 'ALTA'] || DECISIONES.ALTA; }
+/** 'yyyy-mm-dd' + n meses; el día 31 de un mes corto pasa al último día de ese mes. */
+function sumarMeses_(iso, n) {
+  var y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1 + n, d = Number(iso.slice(8, 10));
+  y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+  var ultimo = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+  return y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + Math.min(d, ultimo)).slice(-2);
+}
+
 function validarAlta(p, catalogos, citas, vigentes, hoy) {
   function no(m) { return { error: m, alta: null }; }
   if (!p) return no('Faltan los datos del alta.');
@@ -285,21 +300,37 @@ function validarAlta(p, catalogos, citas, vigentes, hoy) {
   if (fecha > hoy) return no('La fecha no puede ser futura.');
   // Antes de la última consulta el alta quedaría cerrada al instante (hay una consulta posterior).
   if (fecha < ultima) return no('El alta no puede ser anterior a la última consulta (' + fechaDma_(ultima) + ').');
+  var dec = DECISIONES[normTexto(p.decision) || 'ALTA'];
+  if (!dec) return no('Elija la decisión del médico.');
+  var retorno = '';
+  if (dec.meses) retorno = sumarMeses_(fecha, dec.meses);
+  if (dec.pideFecha) {
+    retorno = fechaIso(p.fechaRetorno);
+    if (!retorno) return no('Falta la fecha de retorno.');
+    if (retorno <= hoy) return no('La fecha de retorno debe ser después de hoy.');
+    if (retorno > sumarDias(hoy, 730)) return no('La fecha de retorno va hasta dos años desde hoy.');
+  }
   if ((vigentes || {})[k]) return no('Ese paciente ya tiene un alta vigente en ' + serie.especialidad + '.');
   return { error: '', alta: { FECHA: fecha, DNI: dni, ESPECIALIDAD: serie.especialidad, DOCTOR: doctor.doctor, REGISTRADO_POR: quien,
-    NOTA: textoLimpio_(p.nota), ANULADO: '', MOTIVO_ANULACION: '' } };
+    NOTA: textoLimpio_(p.nota), ANULADO: '', MOTIVO_ANULACION: '', DECISION: dec.nombre, FECHA_RETORNO: retorno } };
 }
 
 /**
  * Altas vigentes por serie (DNI + especialidad): sin anular y sin ninguna consulta realizada después.
  * Los descartes antiguos con motivo «ALTA MÉDICA» cuentan como altas con la fecha del seguimiento.
  */
-function altasVigentes(altas, seguimientos, citas) {
+function altasVigentes(altas, seguimientos, citas, reglas, hoy) {
   var series = armarSeries(citas), out = {}, candidatas = [];
-  (altas || []).forEach(function (a) {
-    if (anulado_(a)) return;
-    candidatas.push({ ID: a.ID, FECHA: fechaIso(a.FECHA), DNI: normDni(a.DNI), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR || '', REGISTRADO_POR: a.REGISTRADO_POR || '' });
-  });
+  if (reglas && hoy) {
+    // Con las reglas y la fecha de hoy, la decisión del médico decide si el alta sigue vigente.
+    var dec = decisionesDeAlta(altas, citas, reglas, hoy).vigentes;
+    Object.keys(dec).forEach(function (k) { candidatas.push(dec[k]); });
+  } else {
+    (altas || []).forEach(function (a) {
+      if (anulado_(a)) return;
+      candidatas.push({ ID: a.ID, FECHA: fechaIso(a.FECHA), DNI: normDni(a.DNI), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR || '', REGISTRADO_POR: a.REGISTRADO_POR || '' });
+    });
+  }
   (seguimientos || []).forEach(function (s) {
     if (normTexto(s.ACCION) !== 'DESCARTADO' || normTexto(s.MOTIVO) !== 'ALTA MEDICA' || TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)]) return;
     candidatas.push({ ID: s.ID, FECHA: fechaIso(s.FECHA_HORA), DNI: normDni(s.DNI), ESPECIALIDAD: s.ESPECIALIDAD, DOCTOR: '', REGISTRADO_POR: s.RESPONSABLE || '' });
@@ -309,6 +340,26 @@ function altasVigentes(altas, seguimientos, citas) {
     if (!serie || !a.FECHA) return;
     if (serie.realizadas.some(function (c) { return c.FECHA > a.FECHA; })) return;
     if (!out[k] || a.FECHA > out[k].FECHA) out[k] = a;
+  });
+  return out;
+}
+
+/** Qué decidió el médico, por serie: lo que sigue de alta y lo que debe volver (con su fecha). */
+function decisionesDeAlta(altas, citas, reglas, hoy) {
+  var series = armarSeries(citas), ultimas = {}, out = { vigentes: {}, retornos: {} };
+  (altas || []).forEach(function (a) {
+    if (anulado_(a)) return;
+    var k = claveSerie(normDni(a.DNI), a.ESPECIALIDAD), f = fechaIso(a.FECHA), serie = series[k];
+    if (!serie || !f || serie.realizadas.some(function (c) { return c.FECHA > f; })) return;
+    if (!ultimas[k] || f > ultimas[k].FECHA) ultimas[k] = { ID: a.ID, FECHA: f, DNI: normDni(a.DNI), ESPECIALIDAD: a.ESPECIALIDAD,
+      DOCTOR: a.DOCTOR || '', REGISTRADO_POR: a.REGISTRADO_POR || '', DECISION: decisionDe_(a).nombre, FECHA_RETORNO: fechaIso(a.FECHA_RETORNO) };
+  });
+  Object.keys(ultimas).forEach(function (k) {
+    var a = ultimas[k], dec = decisionDe_(a);
+    if (dec.nombre === 'ALTA') { out.vigentes[k] = a; return; }
+    if (dec.tipo === 'REEVALUACION') { out.retornos[k] = { fecha: a.FECHA_RETORNO, tipo: 'REEVALUACION' }; return; }
+    if (hoy < sumarDias(a.FECHA_RETORNO, -reglas.avisoAltaControl)) out.vigentes[k] = a;
+    else out.retornos[k] = { fecha: a.FECHA_RETORNO, tipo: dec.tipo };
   });
   return out;
 }

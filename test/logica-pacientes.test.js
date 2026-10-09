@@ -18,7 +18,7 @@ test('armarPacientes: teléfonos y pendientes vienen de las indicaciones emparej
   ];
   const p = plano(L.armarPacientes(citas, inds, [], reglas(L), '2026-10-01'));
   const rosa = p.find(x => x.DNI === '40111222');
-  assert.deepEqual(Object.keys(rosa), plano(L.COLUMNAS_PACIENTES));
+  assert.deepEqual(Object.keys(rosa), plano(L.COLUMNAS_PACIENTES).concat(['RETORNO_TIPO', 'FECHA_RETORNO']), 'además de la hoja, lleva el retorno indicado por el médico');
   assert.equal(rosa.TELEFONOS, '987654321 / 912345678');
   assert.equal(rosa.PENDIENTE, 'Hierro (Ferinject) ×2: cotizó y no lo hizo; AMO + BIOPSIA: cotizó y no lo hizo; Hierro (Ferinject): cotizó y no lo hizo');
   assert.equal(rosa.ESTADO, 'VENCIDO');

@@ -189,3 +189,10 @@ test('exigirColumnas_: sin las columnas nuevas de REGISTROS no se escribe', () =
   ctx.hoja_ = () => ({ getRange: () => ({ getValues: () => [['ID', 'FECHA_HORA', 'FECHA']] }), getLastColumn: () => 3 });
   assert.throws(() => ctx.exigirColumnas_('REGISTROS', ctx.COLUMNAS_REGISTROS), /Falta preparar las hojas/);
 });
+
+test('darDeAlta: guarda la decisión y su fecha de retorno', () => {
+  const { ctx, escrito } = servidor();
+  ctx.darDeAlta({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05',
+    decision: 'NUEVA REEVALUACION', fechaRetorno: '2026-11-20' });
+  assert.deepEqual(escrito.ALTAS.map(a => [a.DECISION, a.FECHA_RETORNO]), [['NUEVA REEVALUACION', '2026-11-20']]);
+});

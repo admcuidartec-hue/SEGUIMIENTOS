@@ -1,5 +1,7 @@
 # Se regeneran con los scripts
-.cache-voz/
+# La caché de Gemini se versiona: cuesta cupo diario rehacerla
+.cache-voz/*
+!.cache-voz/gemini-*.wav
 voces/
 tutorial-chp/public/voz/
 tutorial-chp/public/voz-ger/

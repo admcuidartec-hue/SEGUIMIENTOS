@@ -26,7 +26,12 @@ entorno en la nube de Claude Code la clave de Gemini es un **secreto de red**: s
 `generativelanguage.googleapis.com`, encabezado `x-goog-api-key`. El proxy la añade a cada
 petición y no aparece en el entorno, así que se corre con `MOTOR_VOZ=gemini`.
 
-Con Gemini se pide un audio por escena, no por frase, para gastar menos cupo. Cada audio queda
+Con Gemini se pide un audio por escena, no por frase, para gastar menos cupo: el nivel
+gratuito da **10 peticiones por día y por modelo**, y los dos videos suman unas 52 escenas.
+Agrupar varias escenas en una petición y cortar por los silencios se probó y falla (Gemini hace
+pausas igual de largas dentro de una escena que entre escenas), así que no se hace. El modelo
+por omisión es `gemini-3.8-flash-tts`; `ESTILO_VOZ` va vacío porque los modelos 3.x leen la
+indicación de estilo en voz alta. Cada audio queda
 en `.cache-voz/`: si el cupo del día se acaba, el script lo dice y al correrlo de nuevo al día
 siguiente sigue desde donde quedó. Si Google renombra el modelo, se cambia con `MODELO_GEMINI`.
 

@@ -17,8 +17,8 @@ CACHE = os.path.join(D, '.cache-voz')
 GEMINI = os.environ.get('GEMINI_API_KEY', '')
 GOOGLE = os.environ.get('GOOGLE_TTS_API_KEY', '')
 VOZ_GEMINI = os.environ.get('VOZ_GEMINI', 'Kore')
-MODELO_GEMINI = os.environ.get('MODELO_GEMINI', 'gemini-2.5-flash-preview-tts')
-ESTILO = os.environ.get('ESTILO_VOZ', 'Lee en español latinoamericano, con voz cálida, clara y pausada, como una instructora')
+MODELO_GEMINI = os.environ.get('MODELO_GEMINI', 'gemini-3.8-flash-tts')
+ESTILO = os.environ.get('ESTILO_VOZ', '')  # los modelos 3.x leen en voz alta la indicación de estilo
 VOZ_GOOGLE = os.environ.get('VOZ_GOOGLE', 'es-US-Chirp3-HD-Aoede')
 
 
@@ -47,7 +47,7 @@ def _post(url, cuerpo, cabeceras):
 
 def _gemini(texto, ruta):
     url = f'https://generativelanguage.googleapis.com/v1beta/models/{MODELO_GEMINI}:generateContent'
-    cuerpo = {'contents': [{'parts': [{'text': f'{ESTILO}: {texto}'}]}],
+    cuerpo = {'contents': [{'parts': [{'text': f'{ESTILO}: {texto}' if ESTILO else texto}]}],
               'generationConfig': {'responseModalities': ['AUDIO'],
                                    'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': VOZ_GEMINI}}}}}
     for intento in range(6):
@@ -66,10 +66,13 @@ def _gemini(texto, ruta):
                 raise SystemExit(f'El modelo {MODELO_GEMINI} no existe. Defina MODELO_GEMINI con uno vigente.\n{msg[:400]}')
             raise SystemExit(f'Gemini respondió {e.code}:\n{msg[:600]}')
     parte = r['candidates'][0]['content']['parts'][0]['inlineData']
+    datos = base64.b64decode(parte['data'])
+    if datos[:4] == b'RIFF':  # algunos modelos devuelven el WAV completo
+        open(ruta, 'wb').write(datos); return
     m = re.search(r'rate=(\d+)', parte.get('mimeType', ''))
-    with wave.open(ruta, 'wb') as w:  # llega PCM de 16 bits, mono, sin cabecera
+    with wave.open(ruta, 'wb') as w:  # si no, PCM de 16 bits, mono, sin cabecera
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(int(m.group(1)) if m else 24000)
-        w.writeframes(base64.b64decode(parte['data']))
+        w.writeframes(datos)
 
 
 def _google(texto, ruta, velocidad):

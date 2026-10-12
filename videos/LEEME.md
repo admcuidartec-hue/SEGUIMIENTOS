@@ -21,7 +21,10 @@ Las capturas de `tutorial-chp/public/cap/` y `ger/` salen del modo demo de `src/
 | `GOOGLE_TTS_API_KEY` | Google Cloud Text-to-Speech | Requiere facturación. Voz `VOZ_GOOGLE` (por omisión `es-US-Chirp3-HD-Aoede`). |
 | ninguna | Kokoro, local | Voz provisional. |
 
-Las claves van en la configuración del entorno, **nunca en el código ni en el chat**.
+Las claves van en la configuración del entorno, **nunca en el código ni en el chat**. En el
+entorno en la nube de Claude Code la clave de Gemini es un **secreto de red**: sitio permitido
+`generativelanguage.googleapis.com`, encabezado `x-goog-api-key`. El proxy la añade a cada
+petición y no aparece en el entorno, así que se corre con `MOTOR_VOZ=gemini`.
 
 Con Gemini se pide un audio por escena, no por frase, para gastar menos cupo. Cada audio queda
 en `.cache-voz/`: si el cupo del día se acaba, el script lo dice y al correrlo de nuevo al día
@@ -37,8 +40,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # Solo si se usa Kokoro: descargar el modelo a voces/
 mkdir -p voces && curl -L https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2 | tar -xj -C voces
 
-.venv/bin/python video-tutorial.py     # voz, música y src/Tutorial.tsx
-.venv/bin/python video-gerencia.py     # voz, música y src/Gerencia.tsx
+MOTOR_VOZ=gemini .venv/bin/python video-tutorial.py   # voz, música y src/Tutorial.tsx
+MOTOR_VOZ=gemini .venv/bin/python video-gerencia.py   # voz, música y src/Gerencia.tsx
 
 cd tutorial-chp
 npx remotion render TutorialSeguimientos ../salida/instructivo.mp4 --crf=26 --audio-bitrate=128k

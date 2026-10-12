@@ -1,6 +1,9 @@
 """Voz de los videos. Elige el motor según las claves del entorno:
 
   GEMINI_API_KEY      → Gemini (Google AI Studio, nivel gratuito). Voz: VOZ_GEMINI (Kore por omisión).
+  MOTOR_VOZ=gemini    → Gemini sin clave en el entorno: la pone el proxy del entorno en la nube
+                        (secreto de red con el encabezado x-goog-api-key para
+                        generativelanguage.googleapis.com).
   GOOGLE_TTS_API_KEY  → Google Cloud Text-to-Speech, voces Chirp 3 HD. Voz: VOZ_GOOGLE.
   ninguna             → Kokoro, local (voz provisional).
 
@@ -24,6 +27,9 @@ class CupoAgotado(Exception):
 
 
 def motor():
+    elegido = os.environ.get('MOTOR_VOZ', '').lower()
+    if elegido in ('gemini', 'google', 'kokoro'):
+        return elegido
     return 'gemini' if GEMINI else 'google' if GOOGLE else 'kokoro'
 
 
@@ -46,7 +52,7 @@ def _gemini(texto, ruta):
                                    'speechConfig': {'voiceConfig': {'prebuiltVoiceConfig': {'voiceName': VOZ_GEMINI}}}}}
     for intento in range(6):
         try:
-            r = _post(url, cuerpo, {'x-goog-api-key': GEMINI})
+            r = _post(url, cuerpo, {'x-goog-api-key': GEMINI} if GEMINI else {})
             break
         except urllib.error.HTTPError as e:
             msg = e.read().decode(errors='replace')
@@ -69,7 +75,7 @@ def _gemini(texto, ruta):
 def _google(texto, ruta, velocidad):
     cuerpo = {'input': {'text': texto}, 'voice': {'languageCode': VOZ_GOOGLE[:5], 'name': VOZ_GOOGLE},
               'audioConfig': {'audioEncoding': 'LINEAR16', 'sampleRateHertz': 24000, 'speakingRate': velocidad}}
-    r = _post('https://texttospeech.googleapis.com/v1/text:synthesize', cuerpo, {'x-goog-api-key': GOOGLE})
+    r = _post('https://texttospeech.googleapis.com/v1/text:synthesize', cuerpo, {'x-goog-api-key': GOOGLE} if GOOGLE else {})
     open(ruta, 'wb').write(base64.b64decode(r['audioContent']))  # LINEAR16 llega con cabecera WAV
 
 

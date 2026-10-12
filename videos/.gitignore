@@ -1,0 +1,10 @@
+# Se regeneran con los scripts
+.cache-voz/
+voces/
+tutorial-chp/public/voz/
+tutorial-chp/public/voz-ger/
+tutorial-chp/out/
+salida/
+__pycache__/
+cdn/
+.venv/

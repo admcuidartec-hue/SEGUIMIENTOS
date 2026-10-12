@@ -1,0 +1,52 @@
+# Videos de la plataforma
+
+Proyecto que arma los dos videos de Seguimientos CHP con [Remotion](https://www.remotion.dev):
+
+| Video | Composición | Guion | Script |
+|---|---|---|---|
+| Instructivo general | `TutorialSeguimientos` | `narrar.py` | `video-tutorial.py` |
+| Presentación a gerencia | `PresentacionGerencia` | `narrar-ger.py` | `video-gerencia.py` |
+
+Las capturas de `tutorial-chp/public/cap/` y `ger/` salen del modo demo de `src/Index.html`:
+**pacientes inventados, ningún dato real**. Se rehacen con `video-caps.js`, `ger-caps.js` y
+`ger-caps2.js` solo si cambia la interfaz.
+
+## La voz
+
+`voz.py` elige el motor según la clave que encuentre en el entorno:
+
+| Clave | Motor | Notas |
+|---|---|---|
+| `GEMINI_API_KEY` | Gemini (Google AI Studio) | Nivel gratuito, sin tarjeta. Voz `VOZ_GEMINI` (por omisión `Kore`). |
+| `GOOGLE_TTS_API_KEY` | Google Cloud Text-to-Speech | Requiere facturación. Voz `VOZ_GOOGLE` (por omisión `es-US-Chirp3-HD-Aoede`). |
+| ninguna | Kokoro, local | Voz provisional. |
+
+Las claves van en la configuración del entorno, **nunca en el código ni en el chat**.
+
+Con Gemini se pide un audio por escena, no por frase, para gastar menos cupo. Cada audio queda
+en `.cache-voz/`: si el cupo del día se acaba, el script lo dice y al correrlo de nuevo al día
+siguiente sigue desde donde quedó. Si Google renombra el modelo, se cambia con `MODELO_GEMINI`.
+
+## Generar y renderizar
+
+```bash
+cd videos
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+(cd tutorial-chp && npm ci)
+
+# Solo si se usa Kokoro: descargar el modelo a voces/
+mkdir -p voces && curl -L https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/kokoro-multi-lang-v1_0.tar.bz2 | tar -xj -C voces
+
+.venv/bin/python video-tutorial.py     # voz, música y src/Tutorial.tsx
+.venv/bin/python video-gerencia.py     # voz, música y src/Gerencia.tsx
+
+cd tutorial-chp
+npx remotion render TutorialSeguimientos ../salida/instructivo.mp4 --crf=26 --audio-bitrate=128k
+npx remotion render PresentacionGerencia ../salida/gerencia.mp4 --crf=26 --audio-bitrate=128k
+```
+
+En el entorno en la nube de Claude Code se añade
+`--browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`.
+
+`rutas.js` sirve las librerías de la página desde copias locales (`cdn/`, no versionada) para
+tomar capturas sin salida a internet.

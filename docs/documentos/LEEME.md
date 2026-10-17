@@ -13,6 +13,6 @@ Ningún documento contiene datos reales de pacientes: las capturas usan el modo 
 | `Informe_Proceso_Comercial_CHP.docx` | Informe detallado del proyecto comercial (CRM de Leads + Seguimientos), para tesis | 13/10/2026 |
 
 | `videos/Video-Instructivo-Seguimientos-CHP.mp4` | Video instructivo para asesoras, voz de Gemini (Kore), 4 min 45 s | 14/10/2026 |
-| `videos/Video-Presentacion-Gerencia-CHP.mp4` | Presentación a gerencia, voz provisional Kokoro (se reemplaza cuando esté la de Gemini), 5 min 24 s | 13/10/2026 |
+| `videos/Video-Presentacion-Gerencia-CHP.mp4` | Presentación a gerencia, voz Gemini (Kore), 5 min 59 s | 17/10/2026 |
 
 Los videos se generan desde `videos/` en la raíz; ver `videos/LEEME.md`.

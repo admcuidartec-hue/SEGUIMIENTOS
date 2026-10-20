@@ -69,7 +69,7 @@ a{color:var(--accent)}a:hover{color:var(--accent-hover)}
 .topmovil{display:none;position:sticky;top:0;z-index:20;align-items:center;gap:10px;padding:8px 14px;background:var(--side);border-bottom:1px solid var(--line)}
 .topmovil .js-usuario{margin-left:auto;min-width:0;max-width:150px}
 .topmovil .js-tema{width:44px;flex:0 0 44px;padding:0;display:grid;place-items:center;font-size:18px}
-.navmovil{display:none;position:fixed;left:0;right:0;bottom:0;z-index:30;grid-template-columns:repeat(4,1fr);height:64px;background:var(--side);border-top:1px solid var(--line);view-transition-name:menu-movil}
+.navmovil{display:none;position:fixed;left:0;right:0;bottom:0;z-index:30;grid-template-columns:repeat(5,1fr);height:64px;background:var(--side);border-top:1px solid var(--line);view-transition-name:menu-movil}
 .navmovil button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-width:0;padding:0;border:0;background:transparent;font-size:11.5px;font-weight:500;color:var(--muted)}
 .navmovil button i{font-size:21px}
 .navmovil button[aria-current="page"]{color:var(--accent)}
@@ -604,6 +604,36 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .sec-i{max-width:1120px;display:flex;flex-direction:column;gap:12px}
 .sec-i .desplazable,.bloque-i .desplazable{max-width:100%}
 
+/* Enfermería (spec 2026-10-20-enfermeria) */
+.enf-grupo{margin-top:26px;display:flex;flex-direction:column;gap:10px;max-width:980px}
+.enf-grupo>h2,.enf-grupo>summary{display:flex;align-items:baseline;gap:10px;margin:0;font-size:15px;font-weight:600}
+.enf-grupo>summary{cursor:pointer;min-height:44px;align-items:center}
+.enf-grupo h2 .n,.enf-grupo summary .n{font-family:var(--mono);font-size:12px;font-weight:500;color:var(--soft);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:1px 9px}
+.enf-grupo.g-vencido>h2{color:var(--accent)}
+.enf-lista{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.enf{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:6px;box-shadow:var(--shadow)}
+.enf.vencido{border-left:3px solid var(--accent)}
+.enf-cab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.enf-cab b{font-size:15px;font-weight:600}
+.enf-l{font-size:13px;color:var(--soft)}
+.enf-cuando{font-size:13px;font-weight:600;color:var(--info)}
+.enf.vencido .enf-cuando{color:var(--accent)}
+.enf-reac{margin:0;font-size:13px;color:var(--warn);display:flex;gap:6px;align-items:baseline}
+.enf-nc{font-size:12.5px;color:var(--muted)}
+.enf-pie{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin-top:4px}
+.enf-tel{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:13.5px}
+.enf-tel .btn{font-family:'Geist',sans-serif}
+.enf-acc{display:flex;gap:8px;flex-wrap:wrap}
+.enf-panel{margin-top:6px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface-2);display:flex;flex-direction:column;gap:10px}
+.enf-panel h3{margin:0;font-size:13.5px;font-weight:600}
+.enf-vacio{color:var(--soft)}
+.reac-aplic{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px dashed var(--line-2);border-radius:var(--r-s)}
+.ra-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}
+.trat-enf{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--soft)}
+.trat-enf li.anulado{text-decoration:line-through;color:var(--muted)}
+.trat-enf b{color:var(--ink);font-weight:600}
+.t-enf{font-size:13px;color:var(--soft)}
+
 /* Resumen imprimible (README §6.5; MAPEO §4): oculto en pantalla; al imprimir es lo único que se ve. Solo tokens: al imprimir
    se fuerza la paleta clara quitando data-modo (ver beforeprint), así que sale igual aunque la app esté en oscuro. */
 #imprimible{display:none}
@@ -726,6 +756,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
       <button type="button" data-sec="registro"><i class="ph ph-note-pencil"></i>Registro</button>
       <button type="button" data-sec="pacientes"><i class="ph ph-users-three"></i>Pacientes</button>
       <button type="button" data-sec="indicadores"><i class="ph ph-chart-line-up"></i>Indicadores</button>
+      <button type="button" data-sec="enfermeria"><i class="ph ph-first-aid-kit"></i>Enfermería</button>
     </nav>
     <div class="pie">
       <label>¿Quién es usted?<select class="ctl js-usuario" id="usuario"></select></label>
@@ -808,6 +839,12 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
           <div class="ipanel" id="ipanel" role="tabpanel"></div>
         </div>
       </section>
+      <section class="vista" id="v-enfermeria" hidden>
+        <div class="cab"><div><h1>Enfermería</h1>
+          <p class="sub" id="enf-sub">Tras cada sesión de hierro: al día siguiente, a los 3 y a los 5 días. En orden de llamada.</p></div></div>
+        <p class="cargando" role="status">Cargando…</p>
+        <div id="enf-cuerpo" hidden></div>
+      </section>
     </main>
   </div>
 </div>
@@ -816,6 +853,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
   <button type="button" data-sec="registro"><i class="ph ph-note-pencil"></i>Registro</button>
   <button type="button" data-sec="pacientes"><i class="ph ph-users-three"></i>Pacientes</button>
   <button type="button" data-sec="indicadores"><i class="ph ph-chart-line-up"></i>Indicadores</button>
+  <button type="button" data-sec="enfermeria"><i class="ph ph-first-aid-kit"></i>Enfermería</button>
 </nav>
 <section id="imprimible" aria-label="Resumen del mes para imprimir"></section>
 <div class="velo" id="velo"></div>
@@ -935,6 +973,7 @@ function adaptarBoot(b) {
     procedimientos: b.procedimientos || [],
     tratamientos: b.tratamientos || [],
     marcas: b.marcas || {},
+    reacciones: b.reacciones || [],   // Enfermería: CATALOGOS.REACCIONES
     reglas: b.reglas || {}
   };
 }
@@ -998,7 +1037,7 @@ function exigirUsuario() {
 }
 
 /* Cada pantalla puede definir mostrar(); se llama al entrar en ella. Las llenan las tareas siguientes. */
-const VISTAS = { tablero: {}, registro: {}, pacientes: {}, indicadores: {} };
+const VISTAS = { tablero: {}, registro: {}, pacientes: {}, indicadores: {}, enfermeria: {} };
 /** sinAnim: al arrancar o con el teclado (lo que se dispara con el teclado no se anima; README §7). */
 function ir(sec, sinAnim) {
   if (!VISTAS[sec]) sec = 'tablero';
@@ -1900,6 +1939,7 @@ function sesionesHtml(p) {
   const agendada = sesionAgendada(p);
   return `<label class="campo">Fecha de la sesión<input type="date" id="pfs" value="${esc(f)}"${r.min ? ` min="${esc(r.min)}"` : ''} max="${esc(r.max)}"></label>`
     + (ultima ? '' : `<label class="campo">Próxima sesión (opcional)<input type="date" id="pfp" value="${esc(P.proximaF)}" min="${esc(rp.min)}" max="${esc(rp.max)}"></label>`)
+    + (p.t === 'hier' && p.idRegistro ? htmlReac('panel:' + p.id) : '')
     + `<div class="acc"><button type="button" data-marcar-sesion><i class="ph ph-check-square i-ok"></i><span>Marcar sesión ${k} hecha</span><span class="kbd">1</span></button>`
     + (agendada ? '<button type="button" data-acc="cambiar"><i class="ph ph-calendar-blank i-info"></i><span>Cambiar fecha</span><span class="kbd">2</span></button>' : '')
     + `<button type="button" data-anular-ultima${ult && !P.anularUltima && !sesionSinRecargar(p) ? '' : ' disabled'}><i class="ph ph-arrow-counter-clockwise"></i><span>Anular la última</span></button></div>`
@@ -1927,6 +1967,11 @@ function marcarSesionPanel(teclado) {
   const r = rangoSesion(p), f = P.sesionF || r.f, m = validarFecha('lohizo', f, r);
   if (m) { avisar(m); return; }
   const extra = { fecha: f, teclado: !!teclado }, prox = sesionDe(p).ultima ? '' : String(P.proximaF || '').trim();
+  // Enfermería: la reacción durante la aplicación viaja con la sesión (marcarSesion la guarda en el mismo candado).
+  const reac = p.t === 'hier' ? reaccionDe('panel:' + p.id) : null;
+  if (reac && reac.error) { avisar(reac.error); return; }
+  if (reac) extra.reaccion = reac;
+  delete REAC['panel:' + p.id];
   if (prox) {
     const rp = rangoProxima(f);
     if (prox <= f) { avisar(`La próxima sesión debe ser después de la sesión que marca (${dmy(f)}).`); return; }
@@ -2299,7 +2344,8 @@ async function guardarResultado(clave, resultado, extra) {
   const viaSesion = resultado === 'LO HIZO' && !!p.idRegistro;
   let r;
   try {
-    r = viaSesion ? await llamar('marcarSesion', Object.assign({ usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota }, extra.proxima ? { proxima: extra.proxima } : {}))
+    r = viaSesion ? await llamar('marcarSesion', Object.assign({ usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota }, extra.proxima ? { proxima: extra.proxima } : {},
+      extra.reaccion ? { reaccion: extra.reaccion } : {}))
       : await llamar('registrarResultado', payload);
   } catch (e) {
     S.enVuelo.delete(clave);
@@ -2700,8 +2746,9 @@ function pintarFormRegistro(anim) {
     <fieldset><legend><span class="k">4</span>Tratamiento<small>si aplica</small></legend>
       <div class="chips" id="rtrats">${[''].concat((S.boot && S.boot.tratamientos) || []).map(t => `<button type="button" class="chip" data-trat="${esc(t)}" aria-pressed="${t === RG.trat}">${t ? esc(etiquetaCat(t)) : 'Ninguno'}</button>`).join('')}</div>
       <div id="rses"></div></fieldset>
-    <fieldset><legend><span class="k">5</span>Primera sesión<small>opcional, si ya la agendó</small></legend>
-      <label class="campo">Fecha de la primera sesión<input id="rinicio" type="date" min="${hoy}" max="${esc(masDias(S.hoy, 180))}"></label></fieldset>
+    <fieldset><legend><span class="k">5</span>Primera sesión<small>opcional: si ya la agendó o si ya se aplicó</small></legend>
+      <label class="campo">Fecha de la primera sesión<input id="rinicio" type="date" min="${hoy}" max="${esc(masDias(S.hoy, 180))}"></label>
+      <p class="nota-dec" id="rinicio-n" aria-live="polite" hidden></p></fieldset>
     <div id="rdup"></div>${barra('Registrar')}`;
   else if (RG.modo === 'control') f.innerHTML = paciente + `
     <fieldset><legend><span class="k">3</span>Control + laboratorio</legend>
@@ -2910,14 +2957,32 @@ function faltanRegistro() {
 }
 /** La fecha de retorno de una nueva reevaluación no bloquea el botón: al pulsarlo, el aviso dice que falta. */
 const faltaRetorno = () => esDecision() && decisionUi(RG.dec).pideFecha && !($('#aretorno') && $('#aretorno').value);
+/**
+ * Primera sesión (Enfermería, A): desde la fecha del registro; si ya pasó, al guardar se marca la sesión 1 hecha en esa fecha.
+ * Devuelve la fecha pasada ('' si no hay o es de hoy en adelante) y pinta la nota bajo el campo.
+ */
+function primeraSesionHecha() {
+  const c = $('#rinicio'), n = $('#rinicio-n');
+  if (!c || !n) return '';
+  const fec = ($('#rfec') && $('#rfec').value) || S.hoy, v = c.value;
+  c.min = fec < S.hoy ? fec : S.hoy;
+  const pasada = v && v < S.hoy && v >= fec ? v : '';
+  n.hidden = !v;
+  n.innerHTML = !v ? '' : pasada ? `<i class="ph ph-check-circle"></i>La sesión 1 se marcará como hecha el ${esc(dm(pasada))}.`
+    : v < fec ? '<i class="ph ph-warning-circle"></i>La primera sesión no puede ser anterior a la fecha del registro.'
+    : `<i class="ph ph-calendar-check"></i>Quedará programada para el ${esc(dm(v))}.`;
+  return pasada;
+}
 function validarRegistro() {
   const b = $('#rgo');
   if (!b) return;
   const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0), d = decisionUi(RG.dec);
+  const hecha = RG.modo === 'indicacion' ? primeraSesionHecha() : '';
+  const conSesion = hecha ? (n === 1 ? ` con la sesión 1 hecha el ${dm(hecha)}` : `, cada uno con la sesión 1 hecha el ${dm(hecha)}`) : '';
   b.disabled = f.length > 0 || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
   $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.`
-    : RG.modo === 'indicacion' ? (n === 1 ? 'Se creará 1 registro.' : `Se crearán ${n} registros.`)
+    : RG.modo === 'indicacion' ? (n === 1 ? `Se creará 1 registro${conSesion}.` : `Se crearán ${n} registros${conSesion}.`)
     : RG.modo === 'control' ? 'Volverá con sus resultados en la fecha de retorno.'
     : d.pideFecha ? (faltaRetorno() ? 'Elija la fecha de retorno.' : 'Lo esperamos en la fecha de retorno.')
     : d.meses ? 'Cierra el seguimiento hasta su control.' : 'Cierra el seguimiento de esa especialidad.';
@@ -2952,7 +3017,9 @@ async function registrar(forzar, teclado) {
       const r = await llamar('guardarRegistro', datos);
       if (!r.ok && r.duplicado) { pintarDuplicado(r.duplicado); return; }
       const regs = r.registros || [];
-      avisar(`Registro guardado: ${regs.map(x => x.TEXTO).join(' + ')} · ${nombreBonito(regs.length ? regs[0].NOMBRE : datos.nombre)} · ${regs.map(x => x.ID).join(', ')}`);
+      const ses = (r.sesiones || [])[0];
+      avisar(`Registro guardado: ${regs.map(x => x.TEXTO).join(' + ')} · ${nombreBonito(regs.length ? regs[0].NOMBRE : datos.nombre)} · ${regs.map(x => x.ID).join(', ')}`
+        + (ses ? ` · sesión 1 hecha el ${dm(String(ses.FECHA).slice(0, 10))}` : ''));
       trasEscribirRegistro(regs.map(x => x.ID), teclado);
     } else {
       const nombre = RG.pac && RG.pac.nombre, esp = RG.aEsp, d = decisionUi(RG.dec), ret = d.pideFecha ? $('#aretorno').value : '';
@@ -3267,7 +3334,13 @@ function adaptarFicha(r) {
         linea: lineaEstadoRegistro(x), fila: Object.assign({}, x, { FECHA: isoDe(x.FECHA), FECHA_INICIO: isoDe(x.FECHA_INICIO), FECHA_RETORNO: isoDe(x.FECHA_RETORNO) }),
         motivo: x.MOTIVO_ANULACION || '',
         sesiones: (x.sesiones || []).map(s => ({ id: String(s.ID || ''), numero: Number(s.NUMERO) || 0, f: isoDe(s.FECHA), quien: nombreBonito(s.ASESORA) }))
-          .sort((a, b) => a.numero - b.numero) };
+          .sort((a, b) => a.numero - b.numero),
+        hierro: norm(x.TIPO) === 'HIERRO',
+        // Enfermería: contactos y reacciones de este tratamiento, en orden (sesión y día).
+        enf: (r.enfermeria || []).filter(f => f.ID_REGISTRO === x.ID).map(f => ({ sesion: Number(f.NUMERO_SESION) || 0, dia: Number(f.DIA) || 0,
+          contestado: norm(f.RESULTADO) === 'CONTACTADO', tipo: norm(f.REACCION_TIPO), reaccion: String(f.REACCION || ''), nota: String(f.NOTA || ''),
+          cuando: dm(String(f.FECHA_HORA || '').slice(0, 10)), quien: nombreBonito(f.ENFERMERA), anulado: f.ANULADO === true || norm(f.ANULADO) === 'SI',
+          motivo: String(f.MOTIVO_ANULACION || '') })).sort((a, b) => a.sesion - b.sesion || a.dia - b.dia) };
     }),
     altas,
     previos: (r.indicaciones || []).map(i => ({ f: isoDe(i.FECHA), tipo: frase(i.TIPO), det: etiquetaCat(i.DETALLE) + (Number(i.CANTIDAD) > 1 ? ' ×' + Number(i.CANTIDAD) : ''),
@@ -3475,7 +3548,8 @@ function htmlTrat(t) {
         const f = t.id in PA.fechas ? PA.fechas[t.id] : S.hoy;
         ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span><span class="lohizo">`
           + `<input type="date" class="ctl mono" data-fecha-ses="${esc(t.id)}" value="${esc(f)}" min="${esc(ultima)}" max="${esc(S.hoy)}" aria-label="Fecha de la sesión ${i + 1}">`
-          + `<button type="button" class="btn btn-p" data-lohizo="${esc(t.id)}">Lo hizo</button></span></li>`;
+          + `<button type="button" class="btn btn-p" data-lohizo="${esc(t.id)}">Lo hizo</button></span>`
+          + (t.hierro ? htmlReac('ficha:' + t.id) : '') + '</li>';
       } else ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span></li>`;
     }
     ses += (PA.sesAnuladas[t.id] || []).map(a => `<li class="ses anulada"><i class="ph ph-x-circle"></i><span class="tx">Sesión ${esc(a.numero)} · <span class="mono">${esc(dmy(a.f))}</span> · ${esc(a.quien)}</span> · anulada: ${esc(a.motivo)}</li>`).join('');
@@ -3485,6 +3559,9 @@ function htmlTrat(t) {
     + (t.linea ? `<span class="trat-estado">${esc(t.linea)}</span>` : '')
     + (t.n > 1 && !t.anulado ? '<div class="prog" aria-hidden="true">' + Array.from({ length: t.n }, (_, i) => `<i class="${i < k ? 'si' : ''}"></i>`).join('') + '</div>' : '')
     + (ses ? `<ol class="sesiones">${ses}</ol>` : '')
+    + (t.enf && t.enf.length ? '<div class="trat-enf-t"><b>Enfermería</b><ul class="trat-enf">' + t.enf.map(f => `<li class="${f.anulado ? 'anulado' : ''}"><b>Sesión ${f.sesion} · ${esc(diaTexto(f.dia))}</b>`
+      + ` · ${esc(f.contestado ? (f.tipo && f.tipo !== 'NINGUNA' ? (TIPO_REAC[f.tipo] || f.tipo).toLowerCase() + ': ' + f.reaccion : 'sin reacción') : 'no contestó')}`
+      + `${f.nota ? ' · ' + esc(f.nota) : ''} · <span class="mono">${esc(f.cuando)}</span> · ${esc(f.quien)}${f.anulado && f.motivo ? ' · anulado: ' + esc(f.motivo) : ''}</li>`).join('') + '</ul></div>' : '')
     + (editando ? formEdicion(t.fila, { borrador: PA.borrador, guardando: PA.enVuelo === 'editarRegistro' }) : '')
     + (!t.anulado && !editando ? '<div class="trat-acc">' + `<button type="button" class="enlace" data-editar-ficha="${esc(t.id)}">Editar</button>`
       + (t.anulable && !anulandoAqui('registro', t.id) ? `<button type="button" class="enlace" data-anular-reg="${esc(t.id)}">Anular registro</button>` : '')
@@ -3589,9 +3666,11 @@ function loHizo(b) {
   if (!t || PA.enVuelo) return;
   const f = t.id in PA.fechas ? PA.fechas[t.id] : S.hoy;
   if (!f) { avisar('Falta la fecha de la sesión.'); return; }
-  escribirFicha({ boton: b, fn: 'marcarSesion', datos: { id: t.id, fecha: f, nota: '' },
+  const reac = t.hierro ? reaccionDe('ficha:' + t.id) : null;
+  if (reac && reac.error) { avisar(reac.error); return; }
+  escribirFicha({ boton: b, fn: 'marcarSesion', datos: Object.assign({ id: t.id, fecha: f, nota: '' }, reac ? { reaccion: reac } : {}),
     aviso: r => r.completo ? 'Tratamiento completado: ' + t.id + '.' : `Sesión ${(r.sesion && Number(r.sesion.NUMERO)) || t.sesiones.length + 1} de ${t.n} registrada: ${t.id}.`,
-    luego: () => { delete PA.fechas[t.id]; } });
+    luego: () => { delete PA.fechas[t.id]; delete REAC['ficha:' + t.id]; } });
 }
 
 /* ---- Anular (registro, sesión, alta o seguimiento): motivo en la misma fila, como en el panel ---- */
@@ -3745,7 +3824,8 @@ const porCantidad = i => (a, b) => b[1][i] - a[1][i] || (a[0] < b[0] ? -1 : a[0]
 
 /* ---- Resumen del mes (getResumen): un paciente que no volvió cuenta en el mes de su última consulta ---- */
 const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
-  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
+  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS',
+  'REAC_PAC', 'REAC_INM', 'REAC_MED', 'ENF_DEBIDOS', 'ENF_A_TIEMPO'];   // Enfermería (cifrasEnfermeria)
 function sumarMes(filas, mes) {
   const o = {};
   CAMPOS_RESUMEN.forEach(c => { o[c] = 0; });
@@ -4041,11 +4121,17 @@ function datosTrats(filas, mes, metaT) {
   const m = sumarMes(filas, mes), ma = sumarMes(filas, mesAnterior(mes));
   return TRATS.map(def => {
     const c = cumplimiento(m, def.k), a = cumplimiento(ma, def.k);
-    return { def, c, metaT, meta: textoMeta(metaT, c.p, 0, 'Meta de cumplimiento') || { clase: '' }, comp: comparativo(c, a, mesAnterior(mes)) };
+    // Enfermería, solo en la tarjeta de hierro: pacientes con reacción y contactos hechos a tiempo.
+    const enf = def.k === 'hierro' ? { pac: m.REAC_PAC, inm: m.REAC_INM, med: m.REAC_MED, deb: m.ENF_DEBIDOS, at: m.ENF_A_TIEMPO } : null;
+    return { def, c, metaT, enf, meta: textoMeta(metaT, c.p, 0, 'Meta de cumplimiento') || { clase: '' }, comp: comparativo(c, a, mesAnterior(mes)) };
   });
 }
+/** Las dos frases de Enfermería de la tarjeta de hierro. */
+const textosEnf = e => !e ? [] : [
+  `Reacciones: ${plural(e.pac, 'paciente', 'pacientes')} (inmediatas ${e.inm}, mediatas ${e.med}).`,
+  e.deb ? `Contactos de enfermería a tiempo: ${pc(e.at, e.deb)} % (${e.at} de ${e.deb}).` : 'Contactos de enfermería a tiempo: todavía ninguno tocaba.'];
 /** Una tarjeta unificada: cifra, barra apilada, reparto, meta y comparativo. */
-function htmlTratU({ def, c, meta, metaT, comp }) {
+function htmlTratU({ def, c, meta, metaT, comp, enf }) {
   const pp = n => c.base ? ` · ${pc(n, c.base)} %` : '';
   const barra = c.ind ? `<div class="apilada t-barra" data-barra aria-hidden="true">${c.si ? `<i class="si" style="flex:${c.si}"></i>` : ''}${c.no ? `<i class="no" style="flex:${c.no}"></i>` : ''}${c.curso ? `<i class="curso" style="flex:${c.curso}"></i>` : ''}</div>` : '';
   return `<article class="trat-u" data-trat="${def.k}"><header><h3>${def.t}</h3><span>${c.ind} ${def.ind}</span></header>`
@@ -4053,7 +4139,8 @@ function htmlTratU({ def, c, meta, metaT, comp }) {
     + `<ul class="t-ley"><li><i class="si"></i>${def.si} <b>${c.si}</b>${pp(c.si)}</li><li><i class="no"></i>${def.no} <b>${c.no}</b>${pp(c.no)}</li>`
     + (c.curso ? `<li><i class="curso"></i>En curso <b>${c.curso}</b> · aún no cuentan</li>` : '') + '</ul>'
     + (metaT ? `<p class="r-meta ${meta.clase}"><span>Meta de cumplimiento: ${metaT} %${c.p === null ? '' : c.p >= metaT ? ' · cumplida' : ` · a ${metaT - c.p} ${metaT - c.p === 1 ? 'punto' : 'puntos'}`}</span></p>` : '')
-    + `<p class="t-comp ${comp.clase}">${esc(comp.texto)}</p></article>`;
+    + `<p class="t-comp ${comp.clase}">${esc(comp.texto)}</p>`
+    + textosEnf(enf).map(t => `<p class="t-enf">${esc(t)}</p>`).join('') + '</article>';
 }
 /** Mes a mes: seis meses (los últimos, o los que terminan en el elegido si es anterior), con su % que VOLVIÓ (null sin base). */
 function columnasMeses(filas, elegido) {
@@ -4306,13 +4393,13 @@ function htmlImpPagina1(R, f) {
   const barras = cols.map(({ mes, v, curso }) => `<div data-imp-mes="${esc(mes)}" class="${curso ? 'curso' : ''}${v === null ? ' sin' : ''}">`
     + (v === null ? '<b>sin cifra</b>' : `<span style="height:${v}%"><b>${v}%</b></span>`) + '</div>').join('');
   const ejes = cols.map(({ mes }) => `<span${mes === f.mes ? ' class="sel"' : ''}>${esc(mesSolo(mes))}</span>`).join('');
-  const trats = datosTrats(filas, f.mes, metaT).map(({ def, c, metaT: mT, comp }) => {
+  const trats = datosTrats(filas, f.mes, metaT).map(({ def, c, metaT: mT, comp, enf }) => {
     const pp = n => c.base ? ` (${pc(n, c.base)} %)` : '';
     const barra = c.ind ? `<span class="apilada t-barra">${c.si ? `<i class="si" style="flex:${c.si}"></i>` : ''}${c.no ? `<i class="no" style="flex:${c.no}"></i>` : ''}${c.curso ? `<i class="curso" style="flex:${c.curso}"></i>` : ''}</span>` : '';
     return `<div class="imp-trat" data-trat="${def.k}"><p class="imp-trat-cab"><b>${c.p === null ? '—' : c.p + ' %'}</b><span><b>${esc(def.t)}</b> · cumplimiento · ${c.ind} ${def.ind}</span></p>${barra}`
       + `<p>${esc(`${def.si}: ${c.si}${pp(c.si)} · ${def.no}: ${c.no}${pp(c.no)}${c.curso ? ` · en curso: ${c.curso}` : ''}`)}</p>`
       + (mT ? `<p class="imp-meta ${c.p === null ? '' : c.p >= mT ? 'ok' : 'mal'}">${esc(`Meta de cumplimiento: ${mT} %${c.p === null ? '' : c.p >= mT ? ' · cumplida' : ` · a ${mT - c.p} puntos`}`)}</p>` : '')
-      + `<p class="imp-suave">${esc(comp.texto)}</p></div>`;
+      + `<p class="imp-suave">${esc(comp.texto)}</p>` + textosEnf(enf).map(t => `<p class="imp-suave">${esc(t)}</p>`).join('') + '</div>';
   }).join('');
   const recup = `<p class="imp-rec"><b class="buena">${pct(m.RECUPERADOS, m.SEGUIMIENTOS)}</b> <span>volvieron tras el seguimiento (${m.RECUPERADOS} de ${m.SEGUIMIENTOS}).</span></p>`;
   return `<section class="pag" id="imp-p1">
@@ -4412,6 +4499,185 @@ window.addEventListener('beforeprint', () => {
 });
 window.addEventListener('afterprint', () => { document.documentElement.classList.remove('imp-listo'); aplicarModo(); });
 
+/* ============ ENFERMERÍA (spec 2026-10-20-enfermeria-design.md) ============ */
+/*
+ * Los contactos tras cada sesión de hierro (getEnfermeria), en orden de llamada: vencidos, hoy y próximos 7 días.
+ * «Ya me contacté» abre el panel en la misma fila (¿reacción? no, inmediata o mediata y cuáles); «No contestó» guarda directo.
+ * Lo guardado se puede deshacer desde el aviso (anularContactoEnfermeria).
+ */
+const EN = { lista: null, pidiendo: false, error: '', abierto: '', tipo: '', sel: [], nota: '', enVuelo: '', proximos: false, gen: 0 };
+const GRUPOS_ENF = [['VENCIDO', 'Vencidos', 'el más antiguo primero'], ['HOY', 'Hoy', ''], ['PROXIMO', 'Próximos 7 días', '']];
+const TIPO_REAC = { NINGUNA: 'Sin reacción', INMEDIATA: 'Inmediata', MEDIATA: 'Mediata' };
+const reaccionesCat = () => (S.boot && S.boot.reacciones && S.boot.reacciones.length ? S.boot.reacciones : []);
+const esOtra = r => norm(r) === 'OTRA';
+const diaTexto = d => Number(d) === 0 ? 'En la aplicación' : 'Día ' + d;
+
+function iniciarEnfermeria() {
+  VISTAS.enfermeria.mostrar = () => cargarEnfermeria();
+  $('#v-enfermeria .cargando').hidden = true;
+  $('#enf-cuerpo').hidden = false;
+  $('#enf-cuerpo').addEventListener('click', clicEnfermeria);
+  $('#enf-cuerpo').addEventListener('input', e => { if (e.target.id === 'enf-nota') EN.nota = e.target.value; });
+  $('#enf-cuerpo').addEventListener('toggle', e => { if (e.target.matches('details.enf-grupo')) EN.proximos = e.target.open; }, true);
+  if (S.seccion === 'enfermeria') cargarEnfermeria();
+}
+/** Pide la lista (solo vale la última respuesta) y pinta. silencioso: sin «Cargando…». */
+async function cargarEnfermeria(silencioso) {
+  const n = EN.gen = EN.gen + 1;
+  if (!silencioso || !EN.lista) { EN.pidiendo = true; pintarEnfermeria(); }
+  try {
+    const r = await llamar('getEnfermeria');
+    if (n !== EN.gen) return;
+    EN.lista = r.contactos || []; EN.error = '';
+  } catch (e) {
+    if (n !== EN.gen) return;
+    EN.error = e.message;
+  }
+  EN.pidiendo = false;
+  pintarEnfermeria();
+}
+function htmlContactoEnf(c) {
+  const vencido = c.GRUPO === 'VENCIDO', hace = vencido ? Math.max(1, diasEntre(c.FECHA, S.hoy)) : 0, abierto = EN.abierto === c.CLAVE;
+  const tel = String(c.TELEFONOS || '').split(' / ').filter(Boolean)[0] || '';
+  const reacs = (c.REACCIONES || []).map(r => `<p class="enf-reac"><i class="ph ph-warning"></i><span>${esc(diaTexto(r.DIA))}: ${esc((TIPO_REAC[r.TIPO] || frase(r.TIPO)).toLowerCase())} · ${esc(r.REACCION)}</span></p>`).join('');
+  const marca = [c.TRATAMIENTO, c.MARCA].filter(Boolean).join(' · ');
+  return `<li class="enf${vencido ? ' vencido' : ''}" data-enf="${esc(c.CLAVE)}">`
+    + `<div class="enf-cab"><b>${esc(nombreBonito(c.NOMBRE) || 'DNI ' + c.DNI)}</b><span class="tag t-hier">${esc(marca || 'Hierro')}</span></div>`
+    + `<div class="enf-l">Sesión ${c.NUMERO_SESION} de ${c.SESIONES} · aplicada el ${esc(dm(c.FECHA_SESION))} · DNI ${esc(c.DNI)}</div>`
+    + `<div class="enf-cuando">${esc(diaTexto(c.DIA))} · ${c.GRUPO === 'HOY' ? 'toca hoy' : (vencido ? 'tocaba el ' : 'toca el ') + esc(dm(c.FECHA))}${vencido ? ' · hace ' + plural(hace, 'día', 'días') : ''}</div>`
+    + reacs + (c.NO_CONTESTO ? `<span class="enf-nc">No contestó ${c.NO_CONTESTO === 1 ? '1 vez' : c.NO_CONTESTO + ' veces'}</span>` : '')
+    + '<div class="enf-pie">' + (tel ? `<span class="enf-tel"><i class="ph ph-phone"></i>${esc(telBonito(tel))}<button type="button" class="btn btn-s" data-enf-copiar="${esc(tel)}"><i class="ph ph-copy"></i>Copiar</button></span>`
+      : c.USUARIO ? `<span class="enf-tel"><i class="ph ph-at"></i>${esc(c.USUARIO)}</span>` : '<span class="enf-tel sin"><i class="ph ph-phone-slash"></i>Sin teléfono</span>')
+    + `<span class="enf-acc"><button type="button" class="btn btn-p" data-enf-ya="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''} aria-expanded="${abierto}"><i class="ph ph-check"></i>Ya me contacté</button>`
+    + `<button type="button" class="btn btn-s" data-enf-nc="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''}><i class="ph ph-phone-x"></i>No contestó</button></span></div>`
+    + (abierto ? htmlPanelEnf(c) : '') + '</li>';
+}
+/** «Ya me contacté»: ¿tuvo reacción? (No / Inmediata / Mediata), cuáles (chips), nota (obligatoria con «Otra») y Guardar. */
+function htmlPanelEnf(c) {
+  const con = EN.tipo === 'INMEDIATA' || EN.tipo === 'MEDIATA', otra = EN.sel.some(esOtra);
+  return `<div class="enf-panel" role="group" aria-label="Contacto con ${esc(nombreBonito(c.NOMBRE))}"><h3>¿Tuvo reacción?</h3>`
+    + `<div class="chips" role="radiogroup" aria-label="¿Tuvo reacción?">${[['NINGUNA', 'No'], ['INMEDIATA', 'Inmediata'], ['MEDIATA', 'Mediata']].map(([k, l]) =>
+      `<button type="button" class="pill" role="radio" data-enf-tipo="${k}" aria-checked="${EN.tipo === k}" aria-pressed="${EN.tipo === k}">${l}</button>`).join('')}</div>`
+    + (con ? `<h3>¿Cuál?</h3><div class="chips" aria-label="Reacciones">${reaccionesCat().map(r =>
+      `<button type="button" class="chip" data-enf-reac="${esc(r)}" aria-pressed="${EN.sel.includes(r)}">${esc(r)}</button>`).join('')}</div>` : '')
+    + `<label class="campo">Nota ${otra ? '(obligatoria: escriba cuál fue la reacción)' : '(opcional)'}<textarea id="enf-nota" rows="2">${esc(EN.nota)}</textarea></label>`
+    + `<div class="botones"><button type="button" class="btn btn-p" data-enf-guardar="${esc(c.CLAVE)}"${EN.enVuelo ? ' disabled' : ''}>Guardar</button>`
+    + '<button type="button" class="btn btn-s" data-enf-cancelar>Cancelar</button></div></div>';
+}
+function pintarEnfermeria() {
+  const C = $('#enf-cuerpo');
+  if (!C || C.hidden) return;
+  const a = document.activeElement, foco = a && a.closest && a.closest('#enf-cuerpo') ? (a.id ? '#' + a.id : [...a.attributes].filter(x => x.name.startsWith('data-enf')).map(x => `[${x.name}="${CSS.escape(x.value)}"]`)[0] || '') : '';
+  if (EN.error && !EN.lista) { C.innerHTML = `<p class="vacio">No se pudo cargar la lista: ${esc(EN.error)} <button type="button" class="pill" data-enf-reintentar><i class="ph ph-arrow-clockwise"></i>Reintentar</button></p>`; return; }
+  if (!EN.lista) { C.innerHTML = '<p class="vacio" role="status">Cargando los contactos…</p>'; return; }
+  const n = g => EN.lista.filter(c => c.GRUPO === g).length;
+  $('#enf-sub').textContent = `${plural(n('VENCIDO') + n('HOY'), 'contacto', 'contactos')} por hacer hoy · tras cada sesión de hierro: al día siguiente, a los 3 y a los 5 días.`;
+  if (!EN.lista.length) { C.innerHTML = '<p class="vacio enf-vacio"><i class="ph ph-check-circle"></i>No hay contactos pendientes. Aparecen solos al marcar cada sesión de hierro.</p>'; return; }
+  C.innerHTML = GRUPOS_ENF.map(([g, t, r]) => {
+    const L = EN.lista.filter(c => c.GRUPO === g);
+    const cab = `${t}${r ? ` <span class="enf-l">${r}</span>` : ''}<span class="n">${L.length}</span>`;
+    const lista = L.length ? `<ul class="enf-lista">${L.map(htmlContactoEnf).join('')}</ul>` : `<p class="enf-l">${g === 'HOY' ? 'Nada para hoy.' : g === 'VENCIDO' ? 'Ninguno vencido.' : 'Nada en los próximos 7 días.'}</p>`;
+    return g === 'PROXIMO' ? `<details class="enf-grupo" data-grupo-enf="${g}"${EN.proximos || L.some(c => c.CLAVE === EN.abierto) ? ' open' : ''}><summary>${cab}</summary>${lista}</details>`
+      : `<section class="enf-grupo g-${g.toLowerCase()}" data-grupo-enf="${g}"><h2>${cab}</h2>${lista}</section>`;
+  }).join('');
+  if (foco) { const el = C.querySelector(foco); if (el) el.focus({ preventScroll: true }); }
+}
+function clicEnfermeria(e) {
+  const b = e.target.closest('button'); if (!b) return;
+  const d = b.dataset;
+  if ('enfReintentar' in d) { cargarEnfermeria(); return; }
+  if (d.enfCopiar) { copiar(d.enfCopiar); return; }
+  if (d.enfYa) {
+    if (EN.abierto === d.enfYa) { EN.abierto = ''; pintarEnfermeria(); return; }
+    Object.assign(EN, { abierto: d.enfYa, tipo: '', sel: [], nota: '' });
+    pintarEnfermeria();
+    const p = $(`#enf-cuerpo [data-enf="${CSS.escape(d.enfYa)}"] [data-enf-tipo]`); if (p) p.focus({ preventScroll: true });
+    return;
+  }
+  if ('enfCancelar' in d) { const k = EN.abierto; EN.abierto = ''; pintarEnfermeria(); const y = k && $(`#enf-cuerpo [data-enf-ya="${CSS.escape(k)}"]`); if (y) y.focus(); return; }
+  if (d.enfTipo) { EN.tipo = d.enfTipo; if (d.enfTipo === 'NINGUNA') EN.sel = []; pintarEnfermeria(); return; }
+  if (d.enfReac) { EN.sel = EN.sel.includes(d.enfReac) ? EN.sel.filter(x => x !== d.enfReac) : EN.sel.concat(d.enfReac); pintarEnfermeria(); return; }
+  if (d.enfGuardar) {
+    if (!EN.tipo) { avisar('Elija si tuvo reacción: no, inmediata o mediata.'); return; }
+    if (EN.tipo !== 'NINGUNA' && !EN.sel.length) { avisar('Elija al menos una reacción.'); return; }
+    if (EN.sel.some(esOtra) && !EN.nota.trim()) { avisar('Escriba cuál fue la reacción en la nota («Otra»).'); return; }
+    guardarContactoEnf(d.enfGuardar, { resultado: 'CONTACTADO', reaccionTipo: EN.tipo, reacciones: EN.tipo === 'NINGUNA' ? [] : EN.sel.slice(), nota: EN.nota.trim() });
+    return;
+  }
+  if (d.enfNc) guardarContactoEnf(d.enfNc, { resultado: 'NO CONTESTO', nota: '' });
+}
+/**
+ * Guarda un contacto. Se ve en el acto: «contactado» saca la fila (ese día queda cumplido); «no contestó» suma una vez y la deja.
+ * Al llegar la respuesta manda su lista; si falla, todo vuelve y se avisa. El aviso trae «Deshacer» (anula la fila ENF-…).
+ */
+async function guardarContactoEnf(clave, datos) {
+  if (!exigirUsuario() || EN.enVuelo) return;
+  const c = (EN.lista || []).find(x => x.CLAVE === clave); if (!c) return;
+  const antes = EN.lista.slice(), quien = S.usuario, nombre = nombreBonito(c.NOMBRE);
+  EN.enVuelo = clave;
+  if (datos.resultado === 'CONTACTADO') { EN.lista = EN.lista.filter(x => x !== c); EN.abierto = ''; }
+  else EN.lista = EN.lista.map(x => x === c ? Object.assign({}, x, { NO_CONTESTO: x.NO_CONTESTO + 1 }) : x);
+  pintarEnfermeria();
+  EN.gen++;   // una lista pedida antes ya no vale
+  try {
+    const r = await llamar('registrarContactoEnfermeria', Object.assign({ usuario: quien, clave }, datos));
+    EN.lista = r.contactos || EN.lista;
+    EN.enVuelo = '';
+    invalidarIndicadores();
+    pintarEnfermeria();
+    const id = r.fila && r.fila.ID;
+    const que = datos.resultado === 'CONTACTADO' ? (datos.reaccionTipo === 'NINGUNA' ? 'contactado, sin reacción' : `contactado, reacción ${TIPO_REAC[datos.reaccionTipo].toLowerCase()}: ${datos.reacciones.join(', ')}`) : 'no contestó';
+    avisar(`Guardado: ${nombre} · ${diaTexto(c.DIA).toLowerCase()} · ${que}.`, id ? { texto: 'Deshacer', fn: () => deshacerEnf(id, quien, nombre) } : null);
+    if (datos.resultado === 'CONTACTADO') { const sig = $('#enf-cuerpo [data-enf-ya]'); if (sig) sig.focus({ preventScroll: true }); }
+  } catch (e) {
+    EN.lista = antes; EN.enVuelo = '';
+    if (datos.resultado === 'CONTACTADO') EN.abierto = clave;
+    pintarEnfermeria();
+    avisar('No se guardó: ' + e.message);
+  }
+}
+async function deshacerEnf(id, quien, nombre) {
+  try {
+    await llamar('anularContactoEnfermeria', { usuario: quien, id, motivo: 'Deshecho al momento' });
+    invalidarIndicadores();
+    avisar('Deshecho: ' + nombre + '.');
+  } catch (e) { avisar('No se deshizo: ' + e.message); }
+  await cargarEnfermeria(true);
+}
+
+/* ---- «¿Reacción durante la aplicación?» al marcar una sesión de hierro (panel del tablero y ficha) ---- */
+const REAC = {};   // ctx ('panel:CLAVE' o 'ficha:REG-…') -> { hubo, sel, nota }
+const estadoReac = ctx => REAC[ctx] = REAC[ctx] || { hubo: false, sel: [], nota: '' };
+function htmlReac(ctx) {
+  const e = estadoReac(ctx), otra = e.sel.some(esOtra);
+  return `<div class="reac-aplic" data-reac-ctx="${esc(ctx)}"><div class="ra-cab"><span>¿Reacción durante la aplicación?</span>`
+    + `<span class="chips"><button type="button" class="pill" data-ra="no" aria-pressed="${!e.hubo}">No</button><button type="button" class="pill" data-ra="si" aria-pressed="${e.hubo}">Sí</button></span></div>`
+    + (e.hubo ? `<div class="chips" aria-label="Reacciones durante la aplicación">${reaccionesCat().map(r => `<button type="button" class="chip" data-ra-reac="${esc(r)}" aria-pressed="${e.sel.includes(r)}">${esc(r)}</button>`).join('')}</div>`
+      + `<label class="campo">Nota ${otra ? '(obligatoria con «Otra»)' : '(opcional)'}<input data-ra-nota autocomplete="off" value="${esc(e.nota)}"></label>` : '')
+    + '</div>';
+}
+/** Lo que se envía a marcarSesion: null (sin reacción), { error } o { hubo, reacciones, nota }. */
+function reaccionDe(ctx) {
+  const e = REAC[ctx];
+  if (!e || !e.hubo) return null;
+  if (!e.sel.length) return { error: 'Elija al menos una reacción.' };
+  if (e.sel.some(esOtra) && !e.nota.trim()) return { error: 'Escriba cuál fue la reacción en la nota («Otra»).' };
+  return { hubo: true, reacciones: e.sel.slice(), nota: e.nota.trim() };
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('.reac-aplic [data-ra], .reac-aplic [data-ra-reac]'); if (!b) return;
+  const box = b.closest('.reac-aplic'), ctx = box.dataset.reacCtx, st = estadoReac(ctx);
+  if (b.dataset.ra) st.hubo = b.dataset.ra === 'si';
+  else st.sel = st.sel.includes(b.dataset.raReac) ? st.sel.filter(x => x !== b.dataset.raReac) : st.sel.concat(b.dataset.raReac);
+  const sel = b.dataset.ra ? `[data-ra="${b.dataset.ra}"]` : `[data-ra-reac="${CSS.escape(b.dataset.raReac)}"]`;
+  box.outerHTML = htmlReac(ctx);
+  const nuevo = $(`.reac-aplic[data-reac-ctx="${CSS.escape(ctx)}"] ${sel}`); if (nuevo) nuevo.focus({ preventScroll: true });
+});
+document.addEventListener('input', e => {
+  if (!e.target.matches || !e.target.matches('.reac-aplic [data-ra-nota]')) return;
+  estadoReac(e.target.closest('.reac-aplic').dataset.reacCtx).nota = e.target.value;
+});
+
 /* ============ Arranque ============ */
 async function iniciar() {
   S.modo = LS.get('seg.modo') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro');
@@ -4447,6 +4713,7 @@ async function iniciar() {
   iniciarRegistro();
   iniciarPacientes();
   iniciarIndicadores();
+  iniciarEnfermeria();
   cargarTablero(pedidoTablero);
   // D2: el médico entra directo a Indicadores, con su filtro propuesto (puede cambiarlo a «Todos»).
   if (yo() && yo().rol === 'Médico') ir('indicadores', true);
@@ -4467,7 +4734,7 @@ async function iniciar() {
    ========================================================================== */
 const DEMO = (() => {
   const hoy = '2026-10-01';
-  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS'];
+  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS', 'ENFERMERA PRUEBA'];   // nombres inventados
   const reglas = { espera: 15, maxSeguimientos: 3, graciaAgenda: 2, diasEntreSesiones: 7, esperaCotizacion: 7, metaRetorno: 60, metaTratamiento: 95, metaDiaria: 15,
     postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
   const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
@@ -4616,6 +4883,58 @@ const DEMO = (() => {
   { ID: 'ALT-000002', FECHA_HORA: '2026-09-18 16:40', FECHA: '2026-09-18', DNI: '41666777', ESPECIALIDAD: 'HEMATOLOGÍA',
     DOCTOR: 'Dr. Elí Cabanillas', REGISTRADO_POR: 'MAGALY', NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' });
   const regPorId = id => registros.find(r => r.ID === id);
+
+  /* ---- Enfermería (Enfermeria.gs): contactos a los días 1, 3 y 5 de cada sesión de hierro y la hoja ENFERMERIA ---- */
+  const REACCIONES = ['Náuseas', 'Vómitos', 'Cefalea', 'Mareo', 'Dolor en la zona de punción', 'Flebitis', 'Enrojecimiento o picazón',
+    'Erupción en la piel', 'Hipotensión', 'Palpitaciones', 'Fiebre', 'Dolor muscular o articular', 'Sabor metálico', 'Otra'];
+  const DIAS_ENF = [1, 3, 5], CORTE_ENF = 10;
+  const enfermeria = [];
+  const idEnf = () => siguiente(enfermeria, 'ENF');
+  const ENFR = (FECHA_HORA, ID_SESION, ID_REGISTRO, NUMERO_SESION, DNI, DIA, RESULTADO, REACCION_TIPO, REACCION, NOTA) =>
+    enfermeria.push({ ID: idEnf(), FECHA_HORA, ID_REGISTRO, ID_SESION, NUMERO_SESION, DNI, DIA, RESULTADO, REACCION_TIPO: REACCION_TIPO || '',
+      REACCION: REACCION || '', NOTA: NOTA || '', ENFERMERA: 'ENFERMERA PRUEBA', ANULADO: '', MOTIVO_ANULACION: '' });
+  // Carlos (REG-000005): tras la sesión 1, cefalea al día siguiente; el día 3 bien; el día 5 no contestó. En la sesión 2, náuseas al aplicarla.
+  ENFR('2026-09-23 10:15', 'SES-000003', 'REG-000005', 1, '41333444', 1, 'CONTACTADO', 'MEDIATA', 'Cefalea', 'Leve, cedió con paracetamol');
+  ENFR('2026-09-25 09:40', 'SES-000003', 'REG-000005', 1, '41333444', 3, 'CONTACTADO', 'NINGUNA');
+  ENFR('2026-09-27 11:05', 'SES-000003', 'REG-000005', 1, '41333444', 5, 'NO CONTESTO', '');
+  ENFR('2026-09-29 12:00', 'SES-000004', 'REG-000005', 2, '41333444', 0, 'CONTACTADO', 'INMEDIATA', 'Náuseas');
+  const vivaEnf = f => !f.ANULADO;
+  /** Como reaccionesDeCatalogo_: las elegidas, tal como están en el catálogo. */
+  const reaccionesDe = elegidas => {
+    const pedidas = (Array.isArray(elegidas) ? elegidas : []).map(x => String(x).trim()).filter(Boolean);
+    if (!pedidas.length) throw new Error('Elija al menos una reacción.');
+    return [...new Set(pedidas.map(p => { const r = REACCIONES.find(y => mismo(y, p)); if (!r) throw new Error('La reacción «' + p + '» no está en el catálogo.'); return r; }))];
+  };
+  /** reaccionAplicacion: null sin reacción; si no, la fila DIA 0 (INMEDIATA) sin la sesión. */
+  const reaccionDemo = reac => {
+    if (!reac || !reac.hubo) return null;
+    const lista = reaccionesDe(reac.reacciones), nota = String(reac.nota || '').trim();
+    if (lista.some(r => mismo(r, 'Otra')) && !nota) throw new Error('Escriba cuál fue la reacción en la nota («Otra»).');
+    return { DIA: 0, RESULTADO: 'CONTACTADO', REACCION_TIPO: 'INMEDIATA', REACCION: lista.join(' · '), NOTA: nota };
+  };
+  /** contactosEnfermeria: pendientes, en orden de llamada (vencidos, hoy, próximos 7 días). */
+  function contactosDemo() {
+    const desde = mas(hoy, -CORTE_ENF), hasta = mas(hoy, 7), out = [];
+    sesiones.filter(x => !x.ANULADO).forEach(x => {
+      const r = regPorId(x.ID_REGISTRO);
+      if (!r || r.ANULADO || r.TIPO !== 'HIERRO' || muertos[r.DNI]) return;
+      const filas = enfermeria.filter(f => vivaEnf(f) && f.ID_SESION === x.ID);
+      const reacciones = filas.filter(f => f.RESULTADO === 'CONTACTADO' && f.REACCION_TIPO && f.REACCION_TIPO !== 'NINGUNA')
+        .sort((a, b) => a.DIA - b.DIA).map(f => ({ DIA: f.DIA, TIPO: f.REACCION_TIPO, REACCION: f.REACCION }));
+      const tel = r.CONTACTO.replace(/\D/g, '');
+      DIAS_ENF.forEach(dia => {
+        const fecha = mas(x.FECHA, dia);
+        if (fecha < desde || fecha > hasta) return;
+        const delDia = filas.filter(f => f.DIA === dia);
+        if (delDia.some(f => f.RESULTADO === 'CONTACTADO')) return;
+        out.push({ CLAVE: x.ID + '|' + dia, ID_REGISTRO: r.ID, ID_SESION: x.ID, NUMERO_SESION: Number(x.NUMERO), DNI: r.DNI, NOMBRE: r.NOMBRE,
+          TELEFONOS: tel.length === 9 ? tel : '', USUARIO: tel.length === 9 ? '' : r.CONTACTO, TRATAMIENTO: frase(r.DETALLE), MARCA: frase(r.MARCA),
+          SESIONES: Number(r.SESIONES), FECHA_SESION: x.FECHA, DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
+          NO_CONTESTO: delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length, REACCIONES: reacciones });
+      });
+    });
+    return out.sort((a, b) => a.FECHA < b.FECHA ? -1 : a.FECHA > b.FECHA ? 1 : a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : a.CLAVE < b.CLAVE ? -1 : 1);
+  }
   /* ---- «Registrados» y la decisión del médico, como RegistroServidor.gs y Registro.gs ---- */
   const dmyDemo = iso => iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '';
   const DECISIONES = { 'ALTA': { nombre: 'ALTA', texto: 'Alta médica', meses: 0 },
@@ -5015,8 +5334,46 @@ const DEMO = (() => {
       hoy, usuarios, motivos, resultados: ORDEN_RESULTADOS,
       especialidades: [...new Set(series.map(x => x.ESPECIALIDAD).concat(antiguas.map(x => x.ESPECIALIDAD_CONSULTA)))].sort(),
       medicos: [...new Set(series.concat(antiguas).map(x => x.MEDICO_ULTIMO))].sort(),
-      doctores, procedimientos, tratamientos, marcas, reglas: Object.assign({}, reglas)
+      doctores, procedimientos, tratamientos, marcas, reacciones: REACCIONES.slice(),
+      reglas: Object.assign({ diasEnfermeria: DIAS_ENF.slice(), corteEnfermeria: CORTE_ENF }, reglas)
     }),
+
+    getEnfermeria: () => ({ hoy, contactos: contactosDemo(), reacciones: REACCIONES.slice(), dias: DIAS_ENF.slice() }),
+
+    // Como registrarContactoEnfermeria (EnfermeriaServidor.gs) y validarContactoEnfermeria (Enfermeria.gs).
+    registrarContactoEnfermeria: x => {
+      const quien = exigir(x);
+      const c = contactosDemo().find(y => y.CLAVE === String(x.clave || '').trim());
+      if (!c) throw new Error('Ese contacto ya no está en la lista. Recargue la página.');
+      const resultado = ['CONTACTADO', 'NO CONTESTO'].find(r => mismo(r, x.resultado));
+      if (!resultado) throw new Error('Elija si contestó o no.');
+      const nota = String(x.nota || '').trim();
+      let tipo = '', reaccion = '';
+      if (resultado === 'CONTACTADO') {
+        tipo = ['NINGUNA', 'INMEDIATA', 'MEDIATA'].find(r => mismo(r, x.reaccionTipo));
+        if (!tipo) throw new Error('Elija si tuvo reacción: no, inmediata o mediata.');
+        if (tipo !== 'NINGUNA') {
+          const lista = reaccionesDe(x.reacciones);
+          if (lista.some(r => mismo(r, 'Otra')) && !nota) throw new Error('Escriba cuál fue la reacción en la nota («Otra»).');
+          reaccion = lista.join(' · ');
+        }
+      }
+      const f = { ID: idEnf(), FECHA_HORA: ahora(), ID_REGISTRO: c.ID_REGISTRO, ID_SESION: c.ID_SESION, NUMERO_SESION: c.NUMERO_SESION, DNI: c.DNI,
+        DIA: c.DIA, RESULTADO: resultado, REACCION_TIPO: tipo, REACCION: reaccion, NOTA: nota, ENFERMERA: quien, ANULADO: '', MOTIVO_ANULACION: '' };
+      enfermeria.push(f);
+      return { ok: true, fila: f, contactos: contactosDemo() };
+    },
+
+    anularContactoEnfermeria: x => {
+      exigir(x, true);
+      const id = String(x.id || '').trim();
+      if (id.indexOf('ENF-') !== 0) throw new Error('Aquí solo se anulan contactos de Enfermería (ENF-…).');
+      const f = enfermeria.find(y => y.ID === id);
+      if (!f) throw new Error('No encontré ' + id + '.');
+      if (f.ANULADO) throw new Error(id + ' ya estaba anulado.');
+      f.ANULADO = 'SÍ'; f.MOTIVO_ANULACION = String(x.motivo).trim();
+      return { ok: true };
+    },
 
     getTablero: () => {
       const col = { POR_CONTACTAR: [], CONTACTADO: [], PAGO_REALIZADO: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] };
@@ -5074,6 +5431,7 @@ const DEMO = (() => {
         indicaciones: indicaciones.filter(i => i.DNI === k),
         porConfirmar: porConfirmar.filter(i => i.candidatos.some(c => c.dni === k)),
         seguimientos: seguimientos.filter(s => s.DNI === k),
+        enfermeria: enfermeria.filter(f => f.DNI === k).map(f => Object.assign({}, f, { ANULADO: !!f.ANULADO })),
         // Como getPaciente + estadoRegistro: el control y el que tiene fecha de inicio sin sesiones están PROGRAMADOS;
         // además, lo que necesita el formulario de Editar (filaRegistrada).
         registros: registros.filter(r => r.DNI === k).map(r => {
@@ -5143,7 +5501,9 @@ const DEMO = (() => {
       }
       const inicio = String(x.fechaInicio || '').trim().slice(0, 10);
       if (!filas.length && inicio && !/^\d{4}-\d{2}-\d{2}$/.test(inicio)) throw new Error('La fecha de la primera sesión no es válida.');
-      if (!filas.length && inicio && inicio < hoy) throw new Error('La fecha de la primera sesión no puede ser pasada.');
+      // Enfermería, A: pasada (desde la fecha del registro), la sesión 1 se marca hecha al guardar.
+      if (!filas.length && inicio && inicio < fecha) throw new Error('La primera sesión no puede ser anterior a la fecha del registro (' + dmyDemo(fecha) + ').');
+      const hecha = !filas.length && inicio && inicio < hoy ? inicio : '';
       if (!filas.length && inicio && inicio > mas(hoy, 180)) throw new Error('La fecha de la primera sesión va hasta 180 días desde hoy.');
       base.FECHA_INICIO = inicio;
       const procs = filas.length ? [] : (Array.isArray(x.procedimientos) ? x.procedimientos : []).concat(x.procedimiento ? [x.procedimiento] : []).map(p => String(p).trim()).filter(Boolean);
@@ -5171,18 +5531,27 @@ const DEMO = (() => {
           if (dup) return { ok: false, duplicado: { ID: dup.ID, FECHA: dup.FECHA, TEXTO: textoRegistro(dup) } };
         }
       }
-      const cuando = ahora();
+      const cuando = ahora(), hechas = [];
       filas.forEach(f => {
         f.ID = siguiente(registros, 'REG');
         f.FECHA_HORA = cuando;
         registros.push(f);
+        if (hecha) {
+          const sx = SES(siguiente(sesiones, 'SES'), f.ID, 1, hecha, quien);
+          sx.FECHA_HORA = cuando; sx.NOTA = 'Registrada con el tratamiento';
+          sesiones.push(sx); hechas.push(sx);
+          const t = ubicar(reg(f), '');
+          tarjetas.push(t); trasSesion(t, f);
+          f.TEXTO = textoRegistro(f);
+          return;
+        }
         // Control: Agendado «Control con resultados el …»; con fecha de inicio: Agendado «Sesión 1 el …» (pendientesRegistro).
         if (f.TIPO === 'CONTROL') tarjetas.push(ubicar(reg(f, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'PROGRAMADO', AGENDA: 'CONTROL', FECHA_AGENDA: f.FECHA_RETORNO }), 'AGENDADO'));
         else if (f.FECHA_INICIO) tarjetas.push(ubicar(reg(f, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'PROGRAMADO', AGENDA: 'SESION', FECHA_AGENDA: f.FECHA_INICIO }), 'AGENDADO'));
         else { const t = reg(f); tarjetas.push(ubicar(t, t.ESTADO === 'PENDIENTE' ? 'POR_CONTACTAR' : '')); }
         f.TEXTO = textoRegistro(f);
       });
-      return { ok: true, registros: filas };
+      return { ok: true, registros: filas, sesiones: hechas };
     },
 
     // Como getRegistros (RegistroServidor.gs): 'HOY' o un mes 'yyyy-mm' según FECHA_HORA; lo más reciente (FECHA + HORA) primero.
@@ -5302,6 +5671,8 @@ const DEMO = (() => {
         if (prox < hoy) throw new Error('La próxima sesión no puede ser anterior a hoy.');
         if (prox > mas(f, 180)) throw new Error('La próxima sesión va hasta 180 días después de la sesión.');
       }
+      // «¿Reacción durante la aplicación?» (reaccionAplicacion): se valida antes de escribir nada.
+      const reac = r.TIPO === 'HIERRO' ? reaccionDemo(x.reaccion) : null;
       const cuando = ahora();
       const s = { ID: siguiente(sesiones, 'SES'), FECHA_HORA: cuando, ID_REGISTRO: r.ID, NUMERO: validas.length + 1, FECHA: f, ASESORA: quien,
         NOTA: String(x.nota || '').trim(), ANULADO: '', MOTIVO_ANULACION: '' };
@@ -5312,6 +5683,12 @@ const DEMO = (() => {
       if (!t) tarjetas.push(t = ubicar(reg(r), ''));
       trasSesion(t, r);
       const out = { ok: true, sesion: s, completo: s.NUMERO >= r.SESIONES };
+      if (reac) {
+        const fe = Object.assign({ ID: idEnf(), FECHA_HORA: cuando, ID_REGISTRO: r.ID, ID_SESION: s.ID, NUMERO_SESION: s.NUMERO, DNI: r.DNI,
+          ENFERMERA: quien, ANULADO: '', MOTIVO_ANULACION: '' }, reac);
+        enfermeria.push(fe);
+        out.reaccion = fe;
+      }
       if (prox && demo._fallarAgenda) out.agendaError = 'No se pudo agendar la próxima sesión: ' + demo._fallarAgenda;
       else if (prox) {
         // La misma fila que «Agendó cita» sobre un registro en curso, ligada a esta sesión (filaProximaSesion).
@@ -5504,9 +5881,12 @@ const DEMO = (() => {
 
     // Una fila por mes y médico, como resumenPorMes. Setiembre está en curso (NUEVOS_CURSO y CONTROL_CURSO).
     getResumen: () => {
-      const r = (MES, MEDICO, v) => ({ MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], NUEVOS_ALTA: v[12] || 0, CONTROL: v[3],
-        CONTROL_NO: v[4], CONTROL_CURSO: v[5], CONTROL_ALTA: v[13] || 0, HIERRO: v[6], HIERRO_NO: v[7], HIERRO_COMPLETO: v[14] || 0,
-        PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11] });
+      // Enfermería (cifrasEnfermeria): [pacientes con reacción, con inmediata, con mediata, contactos que ya tocaban, a tiempo].
+      const ENF = { ['2026-09|' + ELI]: [2, 1, 2, 12, 9], ['2026-09|' + KAREN]: [1, 0, 1, 6, 5], ['2026-08|' + ELI]: [1, 1, 0, 9, 5] };
+      const r = (MES, MEDICO, v) => { const e = ENF[MES + '|' + MEDICO] || [0, 0, 0, 0, 0];
+        return { MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], NUEVOS_ALTA: v[12] || 0, CONTROL: v[3],
+          CONTROL_NO: v[4], CONTROL_CURSO: v[5], CONTROL_ALTA: v[13] || 0, HIERRO: v[6], HIERRO_NO: v[7], HIERRO_COMPLETO: v[14] || 0,
+          PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11], REAC_PAC: e[0], REAC_INM: e[1], REAC_MED: e[2], ENF_DEBIDOS: e[3], ENF_A_TIEMPO: e[4] }; };
       return { hoy, meta: reglas.metaRetorno, metaTratamiento: reglas.metaTratamiento, medicos: [ELI, HANAMPA, KAREN], filas: [
         r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4, 0, 0, 5]),
         r('2026-09', HANAMPA, [6, 0, 5, 4, 1, 2, 0, 0, 0, 0, 2, 1]),

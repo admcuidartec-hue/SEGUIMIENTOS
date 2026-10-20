@@ -18,6 +18,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 | `src/Codigo.gs` | Lee y escribe el Sheets; funciones que llama la app |
 | `src/Registro.gs` | Lógica pura de la pestaña Registro: registros, sesiones y altas |
 | `src/RegistroServidor.gs` | Funciones de la pestaña Registro que escriben `REGISTROS`, `SESIONES` y `ALTAS` |
+| `src/Enfermeria.gs` | Lógica pura de Enfermería: contactos tras cada sesión de hierro, reacciones y sus cifras |
+| `src/EnfermeriaServidor.gs` | Funciones de Enfermería que leen y escriben `ENFERMERIA` |
 | `src/Menu.gs` | Menú `Seguimientos` del Sheets |
 | `src/Index.html` | La app. El bloque `DEMO` del final permite abrirla en el navegador sin desplegar: **no lo elimine** |
 
@@ -27,7 +29,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - No cambie los nombres `doGet`, `bootstrap`, `getBandeja`, `getPaciente`, `buscar`,
   `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`, `guardarRegistro`,
   `marcarSesion`, `anularRegistro`, `anularSesion`, `darDeAlta`, `anularAlta`, `getRegistrosHoy`,
-  `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`.
+  `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`, `getEnfermeria`,
+  `registrarContactoEnfermeria`, `anularContactoEnfermeria`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.
@@ -74,7 +77,7 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visual) y la especificación en
 `docs/superpowers/specs/2026-10-06-rediseno-frontend-design.md`. Todo vive en `src/Index.html`.
 
-- **Menú lateral** (en el celular, barra superior y barra inferior): Tablero, Registro, Pacientes e Indicadores,
+- **Menú lateral** (en el celular, barra superior y barra inferior): Tablero, Registro, Pacientes, Indicadores y Enfermería,
   más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y `seg.tipo`.
 - **Tablero:** el embudo de seis fases en franjas (ver «Etapa 3») y el panel «¿Qué pasó?» de cada
   tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`. Se puede arrastrar una tarjeta a otra columna: abre el
@@ -179,6 +182,33 @@ Especificación: `docs/superpowers/specs/2026-10-20-embudo-seis-fases-design.md`
   y mirar el Resumen del mes y el resumen impreso → `npm run actualizar` en la misma sesión. La v12 ignora las filas
   `ACCION = PAGO` (no las cuenta ni las muestra), así que lo probado no cambia nada para el equipo. Avisar a las asesoras:
   ↑ ↓ ahora cambian de fase, ← → recorren la fase, y el 4 es «Pagó».
+
+## Enfermería (20/10/2026)
+
+Pedido de Liset (Enfermería). Especificación: `docs/superpowers/specs/2026-10-20-enfermeria-design.md`.
+
+- **Primera sesión ya aplicada** (Registro → Indicación, campo 5): una fecha pasada, desde la `FECHA` del registro, crea el
+  registro **y marca la sesión 1 hecha** en esa fecha en el mismo candado (`validarRegistro` → `sesionHecha`; la sesión la
+  registra quien registra). Hoy o futura, como siempre: programada. Antes de la fecha del registro, se rechaza.
+- **Contactos tras cada sesión de hierro**: sesión + 1, + 3 y + 5 días (`REGLAS.ENFERMERIA_DIAS` = «1,3,5»). Se **calculan**
+  (`contactosEnfermeria`); en la hoja **`ENFERMERIA`** solo queda lo registrado (`CONTACTADO` o `NO CONTESTO`, con
+  `REACCION_TIPO` `NINGUNA` / `INMEDIATA` / `MEDIATA` y `REACCION` del catálogo `CATALOGOS.REACCIONES`). Un contacto
+  `CONTACTADO` queda cumplido; un `NO CONTESTO` lo deja en la lista. No se muestran los de registros o sesiones anulados,
+  los de un fallecido ni los que tocaban hace más de `ENFERMERIA_CORTE_DIAS` (10).
+- **Pantalla «Enfermería»** (menú y barra del celular): vencidos (el más antiguo primero), hoy y próximos 7 días (plegable).
+  «Ya me contacté» abre en la misma fila: ¿reacción? No / Inmediata / Mediata, cuáles (chips) y nota (obligatoria con «Otra»).
+  «No contestó» guarda directo. Todo con «Deshacer» (`anularContactoEnfermeria`, solo `ENF-…`).
+- **Al marcar una sesión de hierro** (tablero y ficha): «¿Reacción durante la aplicación?» opcional; `marcarSesion({ reaccion })`
+  la guarda en el mismo candado como fila `ENFERMERIA` con `DIA = 0` e `INMEDIATA`.
+- **Ficha**: bajo cada tratamiento de hierro, su historial de Enfermería. **Indicadores**: la tarjeta de hierro suma
+  «Reacciones: n pacientes (inmediatas x, mediatas y)» y «Contactos de enfermería a tiempo: p %» (campos `REAC_*` y `ENF_*`
+  al final de `CAMPOS_RESUMEN`, por mes de la sesión).
+- La enfermera elige su nombre en «¿Quién es usted?»: hay que **agregarlo a `CATALOGOS.USUARIOS`** (no se escribe en el código).
+- **Publicar**: `npm run subir` → «Preparar hojas» (crea `ENFERMERIA`, agrega `REACCIONES` a `CATALOGOS` y
+  `ENFERMERIA_DIAS` y `ENFERMERIA_CORTE_DIAS` a `REGLAS`) → «Verificar» (debe listar `ENFERMERIA`) → agregar a la enfermera en
+  `USUARIOS` → en el `@HEAD`, con el paciente de prueba: registrar un hierro con la primera sesión de ayer, ver sus contactos,
+  un «Ya me contacté» con reacción y su «Deshacer» → `npm run actualizar`. Sin «Preparar hojas», registrar un contacto o una
+  reacción se niega a escribir (`ENFERMERIA` se escribe por posición).
 
 ## Publicar
 

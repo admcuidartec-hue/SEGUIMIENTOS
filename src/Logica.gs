@@ -194,7 +194,7 @@ function reglasDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
   var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60,
     esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15,
-    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30, metaTratamiento: 95 };
+    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30, metaTratamiento: 95, diasEnfermeria: [1, 3, 5], corteEnfermeria: 10 };
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   (filas || []).forEach(function (f) {
     var esp = normTexto(celda(f, 'ESPECIALIDAD'));
@@ -214,6 +214,11 @@ function reglasDesdeFilas(encabezado, filas) {
     if (par === 'DIAS_CONTROL_LAB') r.controlLab = entero_(val, 15, 1);
     if (par === 'AVISO_ALTA_CONTROL_DIAS') r.avisoAltaControl = entero_(val, 30);
     if (par === 'META_CUMPLIMIENTO_TRATAMIENTO_PCT') r.metaTratamiento = Math.min(100, entero_(val, 95));
+    if (par === 'ENFERMERIA_DIAS') {
+      var dias = String(val === undefined || val === null ? '' : val).split(/[^\d]+/).map(Number).filter(function (n) { return n >= 1 && n <= 60; });
+      if (dias.length) r.diasEnfermeria = dias.filter(function (n, i) { return dias.indexOf(n) === i; }).sort(function (a, b) { return a - b; });
+    }
+    if (par === 'ENFERMERIA_CORTE_DIAS') r.corteEnfermeria = entero_(val, 10);
   });
   Object.keys(r.plazos).forEach(function (k) {
     if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;
@@ -231,7 +236,7 @@ function plazoDe(reglas, especialidad) {
  */
 function catalogosDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
-  var out = { usuarios: [], motivos: [], alias: {}, doctores: [], procedimientos: [], tratamientos: [], marcas: {} };
+  var out = { usuarios: [], motivos: [], alias: {}, doctores: [], procedimientos: [], tratamientos: [], marcas: {}, reacciones: [] };
   function celda(f, k) { return idx[k] === undefined ? '' : textoLimpio_(f[idx[k]]); }
   (filas || []).forEach(function (f) {
     var u = celda(f, 'USUARIOS'), m = celda(f, 'MOTIVOS_DESCARTE');
@@ -242,14 +247,21 @@ function catalogosDesdeFilas(encabezado, filas) {
     if (celda(f, 'DOCTOR')) out.doctores.push({ doctor: celda(f, 'DOCTOR'), sofdoc: celda(f, 'DOCTOR_SOFDOC') });
     if (celda(f, 'PROCEDIMIENTOS')) out.procedimientos.push(celda(f, 'PROCEDIMIENTOS'));
     if (celda(f, 'TRATAMIENTOS')) out.tratamientos.push(celda(f, 'TRATAMIENTOS'));
+    if (celda(f, 'REACCIONES')) out.reacciones.push(celda(f, 'REACCIONES'));
     var par = celda(f, 'MARCAS').split('|');
     if (par.length === 2 && textoLimpio_(par[0]) && textoLimpio_(par[1])) {
       var t = normTexto(par[0]);
       (out.marcas[t] = out.marcas[t] || []).push(textoLimpio_(par[1]));
     }
   });
+  // Sin la columna REACCIONES (antes de «Preparar hojas»), la lista inicial de Enfermería.
+  if (!out.reacciones.length) out.reacciones = REACCIONES_INICIALES.slice();
   return out;
 }
+
+/** Reacciones que registra Enfermería; «Preparar hojas» las siembra en CATALOGOS.REACCIONES. */
+var REACCIONES_INICIALES = ['Náuseas', 'Vómitos', 'Cefalea', 'Mareo', 'Dolor en la zona de punción', 'Flebitis', 'Enrojecimiento o picazón',
+  'Erupción en la piel', 'Hipotensión', 'Palpitaciones', 'Fiebre', 'Dolor muscular o articular', 'Sabor metálico', 'Otra'];
 
 /* ==========================================================================
    SERIES Y ESTADO
@@ -1090,7 +1102,9 @@ function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy, contactos, 
    ========================================================================== */
 
 var CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
-  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS'];
+  'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS',
+  // Enfermería (se suman en getResumen con resumenConEnfermeria): pacientes con reacción y contactos a tiempo.
+  'REAC_PAC', 'REAC_INM', 'REAC_MED', 'ENF_DEBIDOS', 'ENF_A_TIEMPO'];
 
 function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
   var acc = {};

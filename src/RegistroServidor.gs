@@ -38,7 +38,9 @@ function guardarRegistro(p) {
   try {
     exigirColumnas_('REGISTROS', COLUMNAS_REGISTROS);
     var ids = leerOpcional_('REGISTROS').map(function (r) { return r.ID; });
-    var ahora = fechaHoraTexto_(new Date());
+    var ahora = fechaHoraTexto_(new Date()), hechas = [];
+    // Primera sesión ya aplicada (fecha pasada): se marca la sesión 1 de cada registro en este mismo candado.
+    var sesiones = v.sesionHecha ? leerSesiones_() : [];
     v.filas.forEach(function (f) {
       f.ID = siguienteId(ids, 'REG');
       ids.push(f.ID);
@@ -46,8 +48,18 @@ function guardarRegistro(p) {
       anexarObjeto_('REGISTROS', COLUMNAS_REGISTROS, f);
       bitacora_(f.ASESORA, 'REGISTRO', f.ID + ' · ' + f.DNI + ' · ' + textoRegistro(f));
       f.TEXTO = textoRegistro(f);
+      if (v.sesionHecha) {
+        var error = validarSesion(f, sesiones, v.sesionHecha, d.hoy);
+        if (error) throw new Error(error);
+        var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }), 'SES'), FECHA_HORA: ahora, ID_REGISTRO: f.ID, NUMERO: 1,
+          FECHA: v.sesionHecha, ASESORA: f.ASESORA, NOTA: 'Registrada con el tratamiento', ANULADO: '', MOTIVO_ANULACION: '' };
+        anexarObjeto_('SESIONES', COLUMNAS_SESIONES, s);
+        bitacora_(f.ASESORA, 'SESIÓN', f.ID + ' · sesión 1 de ' + (Number(f.SESIONES) || 1) + ' (registrada con el tratamiento)');
+        sesiones.push(s);
+        hechas.push(s);
+      }
     });
-    return limpiarParaEnvio({ ok: true, registros: v.filas });
+    return limpiarParaEnvio({ ok: true, registros: v.filas, sesiones: hechas });
   } finally {
     soltar_(lock);
   }
@@ -69,6 +81,10 @@ function marcarSesion(p) {
     var error = validarSesion(r, sesiones, p.fecha, d.hoy);
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
+    // «¿Reacción durante la aplicación?»: se valida antes de escribir nada, para no dejar la sesión a medias.
+    var reac = normTexto(r.TIPO) === 'HIERRO' ? reaccionAplicacion(p.reaccion, d.catalogos) : { error: '', fila: null };
+    if (reac.error) throw new Error(reac.error);
+    if (reac.fila) exigirColumnas_('ENFERMERIA', COLUMNAS_ENFERMERIA);
     if (proxima) {
       error = validarProximaSesion(e, p.fecha, proxima, d.hoy);
       if (error) throw new Error(error);
@@ -81,6 +97,13 @@ function marcarSesion(p) {
     anexarObjeto_('SESIONES', COLUMNAS_SESIONES, s);
     bitacora_(asesora, 'SESIÓN', r.ID + ' · sesión ' + s.NUMERO + ' de ' + e.total);
     var out = { ok: true, sesion: s, completo: s.NUMERO >= e.total };
+    if (reac.fila) {
+      var fe = copia_(reac.fila, { ID: siguienteId(leerEnfermeria_().map(function (x) { return x.ID; }), 'ENF'), FECHA_HORA: cuando,
+        ID_REGISTRO: r.ID, ID_SESION: s.ID, NUMERO_SESION: s.NUMERO, DNI: normDni(r.DNI), ENFERMERA: asesora, ANULADO: '', MOTIVO_ANULACION: '' });
+      anexarObjeto_('ENFERMERIA', COLUMNAS_ENFERMERIA, fe);
+      bitacora_(asesora, 'ENFERMERÍA', fe.ID + ' · ' + fe.DNI + ' · sesión ' + s.NUMERO + ' · reacción en la aplicación: ' + fe.REACCION);
+      out.reaccion = fe;
+    }
     if (proxima) {
       // Misma FECHA_HORA que la sesión: pendientesRegistro cuenta los seguimientos desde que se registró la última sesión.
       var g = copia_(filaProximaSesion(r, s, proxima, asesora), { ID: 'SEG-' + ahora.getTime() + '-' + Math.floor(Math.random() * 1000),

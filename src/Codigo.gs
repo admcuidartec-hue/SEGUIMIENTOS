@@ -253,7 +253,8 @@ function datos_() {
     contactos: leerContactos_(),
     registros: leerRegistros_(),
     sesiones: leerSesiones_(),
-    altas: leerAltas_()
+    altas: leerAltas_(),
+    enfermeria: leerEnfermeria_()
   });
   return MEMO.datos;
 }
@@ -304,9 +305,11 @@ function bootstrap() {
     procedimientos: d.catalogos.procedimientos,
     tratamientos: d.catalogos.tratamientos,
     marcas: d.catalogos.marcas,
+    reacciones: d.catalogos.reacciones,
     reglas: { espera: d.reglas.espera, maxSeguimientos: d.reglas.maxSeguimientos, graciaAgenda: d.reglas.graciaAgenda,
       diasEntreSesiones: d.reglas.diasEntreSesiones, esperaCotizacion: d.reglas.esperaCotizacion,
       metaRetorno: d.reglas.metaRetorno, metaTratamiento: d.reglas.metaTratamiento, metaDiaria: d.reglas.metaDiaria,
+      diasEnfermeria: d.reglas.diasEnfermeria, corteEnfermeria: d.reglas.corteEnfermeria,
       postTratamiento: d.reglas.postTratamiento, controlLab: d.reglas.controlLab, avisoAltaControl: d.reglas.avisoAltaControl }
   });
 }
@@ -363,6 +366,12 @@ function getPaciente(dni) {
       var v = d.vigentes[claveSerie(k, a.ESPECIALIDAD)];
       return { ID: a.ID, FECHA: fechaIso(a.FECHA), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR, REGISTRADO_POR: a.REGISTRADO_POR,
         ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', VIGENTE: !!(v && v.ID === a.ID) };
+    }),
+    // Enfermería: contactos y reacciones de sus tratamientos (también las anuladas, que la ficha muestra tachadas).
+    enfermeria: (d.enfermeria || []).filter(function (f) { return f.DNI === k; }).map(function (f) {
+      return { ID: f.ID, FECHA_HORA: String(f.FECHA_HORA || ''), ID_REGISTRO: f.ID_REGISTRO, ID_SESION: f.ID_SESION, NUMERO_SESION: Number(f.NUMERO_SESION) || 0,
+        DIA: Number(f.DIA) || 0, RESULTADO: normTexto(f.RESULTADO), REACCION_TIPO: normTexto(f.REACCION_TIPO), REACCION: textoLimpio_(f.REACCION),
+        NOTA: textoLimpio_(f.NOTA), ENFERMERA: textoLimpio_(f.ENFERMERA), ANULADO: anulado_(f), MOTIVO_ANULACION: textoLimpio_(f.MOTIVO_ANULACION) };
     }),
     fallecido: fallecidos(d.seguimientos)[k] || null,
     telefonos: d.telefonos[k] || [],
@@ -468,7 +477,8 @@ function getKpi() {
 /** Pantalla «Resumen»: filas por mes y médico; la app suma según el filtro elegido. */
 function getResumen() {
   var d = datos_();
-  var filas = resumenPorMes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.vigentes);
+  var filas = resumenConEnfermeria(resumenPorMes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.vigentes),
+    cifrasEnfermeria({ registros: d.registros, sesiones: d.sesiones, enfermeria: d.enfermeria || [], hoy: d.hoy, reglas: d.reglas, catalogos: d.catalogos }));
   var medicos = {};
   filas.forEach(function (f) { if (f.MEDICO !== 'SIN MÉDICO') medicos[f.MEDICO] = 1; });
   return limpiarParaEnvio({ hoy: d.hoy, filas: filas, medicos: Object.keys(medicos).sort(), meta: d.reglas.metaRetorno,

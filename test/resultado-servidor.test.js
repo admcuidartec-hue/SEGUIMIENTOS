@@ -8,7 +8,7 @@ const CAT = { usuarios: ['MAGALY', 'RACHEL'], motivos: [], alias: {}, doctores: 
   procedimientos: [], tratamientos: [], marcas: {} };
 
 function servidor(hoja, extraEnHoja, registros, cabecera) {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
   const escrito = { SEGUIMIENTOS: [], BITACORA: [], anulados: [], llamadas: [] };
   const lock = { tomado: 0, flush: 0 };
   const L = cargar();
@@ -139,7 +139,7 @@ test('«lo hizo» de una sesión que no es la última deja la tarjeta en tratami
 
 test('hojas sin preparar: registrar y anular se niegan, no escriben y sueltan el candado', () => {
   const hoja = [{ ID: 'SEG-2', FECHA_HORA: '2026-10-02 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'NO CONTESTÓ', ACCION: 'HECHO', REFERENCIA: '' }];
-  const cab = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'Menu.gs']).COLUMNAS_SEGUIMIENTOS.slice(0, -2);
+  const cab = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'Menu.gs']).COLUMNAS_SEGUIMIENTOS.slice(0, -2);
   const { ctx, escrito, lock } = servidor(hoja, [], [], cab);
   assert.throws(() => ctx.registrarResultado(p({})), /Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas\./);
   assert.throws(() => ctx.anularResultado({ usuario: 'MAGALY', id: 'SEG-2', motivo: 'x' }), /Falta preparar las hojas/);
@@ -162,10 +162,10 @@ test('un campo motivo del payload nuevo no cambia MOTIVO de un resultado normal'
   assert.equal(escrito.SEGUIMIENTOS[0].MOTIVO, 'NO DESEA CONTINUAR');
 });
 
-test('bootstrap: reglas con las once claves y metaDiaria 15; getPaciente trae telefonos', () => {
+test('bootstrap: reglas con las trece claves y metaDiaria 15; getPaciente trae telefonos', () => {
   const { ctx } = servidor();
   const b = plano(ctx.bootstrap());
-  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl', 'metaTratamiento'].sort());
+  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl', 'metaTratamiento', 'diasEnfermeria', 'corteEnfermeria'].sort());
   assert.equal(b.reglas.metaDiaria, 15);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).telefonos, ['987654321', '912345678']);
 });
@@ -204,7 +204,7 @@ test('getPaciente: un registro anulado no da el nombre; si todos lo están, lo d
 /** Arnés de «Aceptó»: un registro cotizado o una cotización del historial; la segunda llamada ve lo escrito por la primera. */
 function servidorResultado(opciones) {
   const o = opciones || {};
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
   const escrito = { SEGUIMIENTOS: [], REGISTROS: [], BITACORA: [] };
   const lock = { tomado: 0, flush: 0 };
   const L = cargar();

@@ -333,11 +333,11 @@ test('validarRegistro: control + laboratorio con exámenes y fecha de retorno', 
   assert.match(L.validarRegistro(base3({ tipo: 'CONTROL', fechaRetorno: '2026-10-09' }), CAT3, '2026-10-09').error, /después de hoy/);
 });
 
-test('validarRegistro: la fecha de la primera sesión es opcional, de hoy en adelante', () => {
+test('validarRegistro: la fecha de la primera sesión es opcional; pasada, solo desde la fecha del registro (Enfermería, A)', () => {
   const v = L.validarRegistro(base3({ tratamiento: 'HIERRO SACARATO', sesiones: 3, fechaInicio: '2026-10-12' }), CAT3, '2026-10-09');
   assert.equal(plano(v.filas)[0].FECHA_INICIO, '2026-10-12');
   assert.equal(plano(L.validarRegistro(base3({ procedimiento: 'SANGRÍA' }), CAT3, '2026-10-09').filas)[0].FECHA_INICIO, '');
-  assert.match(L.validarRegistro(base3({ procedimiento: 'SANGRÍA', fechaInicio: '2026-10-01' }), CAT3, '2026-10-09').error, /no puede ser pasada/);
+  assert.match(L.validarRegistro(base3({ procedimiento: 'SANGRÍA', fechaInicio: '2026-01-01' }), CAT3, '2026-10-09').error, /anterior a la fecha del registro/);
 });
 
 test('estadoRegistro: COTIZADO, PROGRAMADO, EN CURSO y COMPLETO; los antiguos sin fecha de inicio no cambian', () => {

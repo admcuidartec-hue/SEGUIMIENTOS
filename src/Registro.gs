@@ -76,7 +76,7 @@ function doctorPropuesto(catalogos, medicoSofdoc) {
 }
 
 function validarRegistro(p, catalogos, hoy) {
-  function no(m) { return { error: m, filas: [] }; }
+  function no(m) { return { error: m, filas: [], sesionHecha: '' }; }
   if (!p) return no('Faltan los datos del registro.');
   var asesora = enLista_(catalogos.usuarios, p.usuario);
   if (!asesora) return no('Elija quién es usted en el selector de arriba.');
@@ -97,11 +97,13 @@ function validarRegistro(p, catalogos, hoy) {
     if (!ret) return no('Falta la fecha de retorno a control.');
     if (ret <= hoy) return no('La fecha de retorno debe ser después de hoy.');
     if (ret > sumarDias(hoy, 365)) return no('La fecha de retorno va hasta un año desde hoy.');
-    return { error: '', filas: [copia_(base0, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: textoLimpio_(p.examenes), FECHA_RETORNO: ret })] };
+    return { error: '', filas: [copia_(base0, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: textoLimpio_(p.examenes), FECHA_RETORNO: ret })], sesionHecha: '' };
   }
   var inicio = fechaIso(p.fechaInicio);
   if (textoLimpio_(p.fechaInicio) && !inicio) return no('La fecha de la primera sesión no es válida.');
-  if (inicio && inicio < hoy) return no('La fecha de la primera sesión no puede ser pasada.');
+  // Pasada: la enfermera registra después de aplicar; desde la fecha del registro, la sesión 1 se marca hecha al guardar.
+  if (inicio && inicio < fecha) return no('La primera sesión no puede ser anterior a la fecha del registro (' + fechaDma_(fecha) + ').');
+  var sesionHecha = inicio && inicio < hoy ? inicio : '';
   if (inicio && inicio > sumarDias(hoy, 180)) return no('La fecha de la primera sesión va hasta 180 días desde hoy.');
   base0.FECHA_INICIO = inicio || '';
   var proc = textoLimpio_(p.procedimiento), trat = textoLimpio_(p.tratamiento);
@@ -132,7 +134,7 @@ function validarRegistro(p, catalogos, hoy) {
     }
     filas.push(copia_(base, { TIPO: 'HIERRO', DETALLE: t1, MARCA: marca, SESIONES: n }));
   }
-  return { error: '', filas: filas };
+  return { error: '', filas: filas, sesionHecha: sesionHecha };
 }
 
 /** El registro previo, sin anular, de la misma indicación del mismo DNI a 7 días o menos de la fecha nueva. */

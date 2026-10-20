@@ -208,8 +208,9 @@ test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita A
   assert.equal(cat.v[6][3], '', 'el particular sin nombre SOFDOC');
   assert.equal(cat.v[2][1], '', 'ALTA MÉDICA quitado');
   assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
-    ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30]]);
-  assert.equal(cambios.length, 10, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los siete parámetros');
+    ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30],
+    ['META_CUMPLIMIENTO_TRATAMIENTO_PCT', 95]]);
+  assert.equal(cambios.length, 11, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los ocho parámetros');
   assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
 });
 

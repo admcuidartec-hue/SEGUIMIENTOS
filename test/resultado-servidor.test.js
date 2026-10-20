@@ -48,7 +48,7 @@ test('registrarResultado: escribe la fila, la bitácora, suelta con flush y devu
   assert.deepEqual([s.FECHA_HORA, s.ACCION, s.RESULTADO, s.FECHA_PROXIMA], ['2026-10-06 10:30', 'HECHO', 'LO PENSARÁ', '2026-10-09']);
   assert.deepEqual(escrito.BITACORA, [['MAGALY', 'RESULTADO', '40111222 · HEMATOLOGÍA · LO PENSARÁ']]);
   assert.deepEqual([lock.tomado, lock.flush], [0, 1]);
-  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.ETIQUETA], ['AGENDADO', 'Llamar el vie 09/10']);
+  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.ETIQUETA], ['CONTACTADO', 'Llamar el vie 09/10']);
 });
 
 test('número equivocado: con otro teléfono sigue (TELEFONO); el último cierra (DESCARTADO), releyendo dentro del candado', () => {
@@ -162,10 +162,10 @@ test('un campo motivo del payload nuevo no cambia MOTIVO de un resultado normal'
   assert.equal(escrito.SEGUIMIENTOS[0].MOTIVO, 'NO DESEA CONTINUAR');
 });
 
-test('bootstrap: reglas con las diez claves y metaDiaria 15; getPaciente trae telefonos', () => {
+test('bootstrap: reglas con las once claves y metaDiaria 15; getPaciente trae telefonos', () => {
   const { ctx } = servidor();
   const b = plano(ctx.bootstrap());
-  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl'].sort());
+  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl', 'metaTratamiento'].sort());
   assert.equal(b.reglas.metaDiaria, 15);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).telefonos, ['987654321', '912345678']);
 });
@@ -298,4 +298,17 @@ test('«Aceptó» sobre un registro en curso se rechaza sin candado; «Agendó c
   assert.deepEqual([escrito.SEGUIMIENTOS[0].RESULTADO, escrito.SEGUIMIENTOS[0].REFERENCIA], ['AGENDÓ CITA', 'REG-000010']);
   // Un tratamiento en curso agenda su próxima sesión: la tarjeta lo dice así, «Sesión 2 el …», como al marcar con «Próxima sesión».
   assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.AGENDA, r.tarjeta.FECHA_AGENDA, r.tarjeta.ETIQUETA], ['AGENDADO', 'SESION', '2026-10-12', 'Sesión 2 el lun 12/10']);
+});
+
+test('«Pagó»: escribe ACCION = PAGO y la tarjeta pasa a Pago realizado; también desde Contactado; un segundo pago se rechaza', () => {
+  const { ctx, escrito } = servidor();
+  ctx.registrarResultado(p({ resultado: 'NO CONTESTÓ' }));
+  const r = plano(ctx.registrarResultado(p({ resultado: 'PAGO', fecha: '2026-10-05' })));
+  const s = escrito.SEGUIMIENTOS[1];
+  assert.deepEqual([s.ACCION, s.RESULTADO, s.FECHA_PROXIMA, s.MOTIVO], ['PAGO', 'PAGO', '2026-10-05', '']);
+  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.ETIQUETA, r.tarjeta.FECHA_PAGO], ['PAGO_REALIZADO', 'Pagó el 05/10 · falta agendar', '2026-10-05']);
+  assert.throws(() => ctx.registrarResultado(p({ resultado: 'PAGO', fecha: '2026-10-06' })), /Ya figura el pago del 05\/10/);
+  // Después del pago, «Agendó cita» la lleva a Agendado.
+  const a = plano(ctx.registrarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' })));
+  assert.equal(a.tarjeta.COLUMNA, 'AGENDADO');
 });

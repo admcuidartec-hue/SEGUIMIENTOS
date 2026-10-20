@@ -194,7 +194,7 @@ function reglasDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
   var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60,
     esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15,
-    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
+    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30, metaTratamiento: 95 };
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   (filas || []).forEach(function (f) {
     var esp = normTexto(celda(f, 'ESPECIALIDAD'));
@@ -213,6 +213,7 @@ function reglasDesdeFilas(encabezado, filas) {
     if (par === 'DIAS_POST_TRATAMIENTO') r.postTratamiento = entero_(val, 30);
     if (par === 'DIAS_CONTROL_LAB') r.controlLab = entero_(val, 15, 1);
     if (par === 'AVISO_ALTA_CONTROL_DIAS') r.avisoAltaControl = entero_(val, 30);
+    if (par === 'META_CUMPLIMIENTO_TRATAMIENTO_PCT') r.metaTratamiento = Math.min(100, entero_(val, 95));
   });
   Object.keys(r.plazos).forEach(function (k) {
     if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;
@@ -292,7 +293,7 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
   var r = serie.realizadas;
   var ultima = r.length ? r[r.length - 1].FECHA : '';
   var penultima = r.length > 1 ? r[r.length - 2].FECHA : '';
-  var out = { estado: '', ultima: ultima, esperada: '', vence: '', atraso: 0, intentos: 0, ultimoSeguimiento: '', proximaAgendada: '' };
+  var out = { estado: '', ultima: ultima, esperada: '', vence: '', atraso: 0, intentos: 0, ultimoSeguimiento: '', proximaAgendada: '', pago: '' };
 
   var futura = serie.agendadas.filter(function (c) { return c.FECHA >= hoy; })[0];
   if (futura) out.proximaAgendada = futura.FECHA;
@@ -323,12 +324,15 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
   var posteriores = lista.filter(function (s) { return fechaIso(s.FECHA_HORA) > ultima; });
   var c = leerCiclo(posteriores, reglas, hoy);
   out.intentos = c.intentos;
+  out.pago = c.pago;
 
   if (c.cierre) { out.estado = 'CERRADO'; out.cierre = c.cierre.motivo; out.fechaCierre = c.cierre.fecha; return out; }
   if (extra.sinContacto) { out.estado = 'CERRADO'; out.cierre = 'NÚMERO EQUIVOCADO'; out.fechaCierre = extra.sinContacto; return out; }
   // La cita de SOFDOC gana sobre lo que haya dicho la asesora.
   if (futura) { out.estado = 'AGENDADO'; out.agenda = { tipo: 'CITA', fecha: futura.FECHA, intento: 0 }; return out; }
   if (c.agenda) { out.estado = 'AGENDADO'; out.agenda = c.agenda; return out; }
+  // Pagó y aún no tiene fecha: Pago realizado, sin cerrarse ni envejecer por tiempo (Etapa 3, §2.2).
+  if (c.pago) { out.estado = 'PAGO REALIZADO'; return out; }
 
   var hechoAntesDeVolver = lista.some(function (s) {
     var f = fechaIso(s.FECHA_HORA);
@@ -702,7 +706,8 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
       FECHA_AGENDA: e.agenda ? e.agenda.fecha : '',
       INTENTO: e.agenda ? e.agenda.intento : 0,
       RETORNO_TIPO: ((retornos || {})[k] || {}).tipo || '',
-      FECHA_RETORNO: ((retornos || {})[k] || {}).fecha || ''
+      FECHA_RETORNO: ((retornos || {})[k] || {}).fecha || '',
+      FECHA_PAGO: e.pago || ''
     });
   });
   return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });
@@ -754,6 +759,7 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
     else if (c.loHizo) estado = 'COMPLETADO';
     else if (c.agenda) estado = 'AGENDADO';
+    else if (c.pago) estado = 'PAGO REALIZADO';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
     return {
       DNI: g.dni,
@@ -777,7 +783,8 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
       AGENDA: c.agenda ? c.agenda.tipo : '',
       FECHA_AGENDA: c.agenda ? c.agenda.fecha : '',
       INTENTO: c.agenda ? c.agenda.intento : 0,
-      FECHA_LOHIZO: c.loHizo
+      FECHA_LOHIZO: c.loHizo,
+      FECHA_PAGO: c.pago
     };
   });
 }

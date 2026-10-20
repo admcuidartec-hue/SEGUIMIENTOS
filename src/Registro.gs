@@ -386,6 +386,10 @@ function pendientesRegistro(d) {
     }
     else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
+    // Pagó y aún no tiene fecha: Pago realizado en vez de Por contactar, Contactado o ANTIGUO (Etapa 3, §2.2).
+    if (c.pago && (estado === 'PENDIENTE' || estado === 'ANTIGUO' || estado === 'POR REEVALUAR' || (estado === 'AGENDADO' && agenda && AGENDAS_CONTACTO[agenda.tipo]))) {
+      estado = 'PAGO REALIZADO'; agenda = null; motivo = '';
+    }
     return {
       ID_REGISTRO: r.ID,
       DNI: dni,
@@ -421,7 +425,8 @@ function pendientesRegistro(d) {
       VOLVIO: volvio,
       EXAMENES: textoLimpio_(r.EXAMENES),
       FECHA_INICIO: e.inicio,
-      FECHA_FALTA: falta
+      FECHA_FALTA: falta,
+      FECHA_PAGO: c.pago
     };
   }).filter(Boolean);
 }

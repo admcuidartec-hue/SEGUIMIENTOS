@@ -49,10 +49,11 @@ test('armarTablero: reparte, ordena y cuenta', () => {
       reg({ ID_REGISTRO: 'REG-000003', DNI: '8', ESTADO: 'COMPLETADO', ESTADO_REGISTRO: 'COMPLETO', HECHAS: 3, ULTIMA_SESION: '2026-09-20' })]
   });
   assert.deepEqual(t.columnas.POR_CONTACTAR.map(x => x.CLAVE), ['1|HEMATOLOGÍA']);
-  assert.deepEqual(t.columnas.AGENDADO.map(x => x.DNI), ['4', '3'], 'la fecha más cercana primero');
+  assert.deepEqual(t.columnas.AGENDADO.map(x => x.DNI), ['4'], 'solo fechas reales');
+  assert.deepEqual(t.columnas.CONTACTADO.map(x => x.DNI), ['3'], '«llamar el…» es Contactado');
   assert.deepEqual(t.columnas.EN_TRATAMIENTO.map(x => x.CLAVE), ['REG-000001']);
   assert.deepEqual(t.columnas.COMPLETADO.map(x => [x.CLAVE, x.ETIQUETA]), [['REG-000002', 'Completó el tratamiento']], 'solo lo de este mes');
-  assert.deepEqual(t.cifras, { porContactar: 1, agendados: 2, enTratamiento: 1, completadosMes: 1, cerradosMes: 1, hechosHoy: 0, hechosHoyPor: {} });
+  assert.deepEqual(t.cifras, { porContactar: 1, contactados: 1, pagados: 0, agendados: 1, enTratamiento: 1, completadosMes: 1, cerradosMes: 1, hechosHoy: 0, hechosHoyPor: {} });
   assert.deepEqual(t.cerrados.map(x => [x.DNI, x.CIERRE]), [['5', 'SE ATIENDE EN OTRO LUGAR']]);
 });
 

@@ -1,7 +1,7 @@
 /* ==========================================================================
-   TABLERO DE CUATRO COLUMNAS
+   TABLERO: EL EMBUDO DE SEIS FASES (Etapa 3)
 
-   Por contactar · Agendado · En tratamiento · Completado. Reparte las filas que
+   Por contactar · Contactado · Pago realizado · Agendado · En tratamiento · Completado. Reparte las filas que
    ya calculan armarPacientes, pendientesIndicacion y pendientesRegistro.
    Funciones puras: se prueban en Node.
    ========================================================================== */
@@ -43,17 +43,25 @@ function retornosDelMes(seguimientos, citas, hoy) {
   return out;
 }
 
-/** Columna de una fila con TIPO_SEGUIMIENTO; '' si no va al tablero. */
+/** Las seis fases del embudo, en orden. */
+var COLUMNAS_TABLERO = ['POR_CONTACTAR', 'CONTACTADO', 'PAGO_REALIZADO', 'AGENDADO', 'EN_TRATAMIENTO', 'COMPLETADO'];
+
+/**
+ * Columna de una fila con TIPO_SEGUIMIENTO; '' si no va al tablero. AGENDADO con una agenda que solo dice que se le
+ * escribió (llamar, reintentar, sin respuesta) es Contactado; Agendado queda para las fechas reales.
+ */
 function columnaDe(t) {
   var e = t.ESTADO;
+  if (e === 'PAGO REALIZADO') return 'PAGO_REALIZADO';
+  var agendado = e === 'AGENDADO' ? (AGENDAS_CONTACTO[t.AGENDA] ? 'CONTACTADO' : 'AGENDADO') : '';
   if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') {
     if (e === 'VENCIDO') return 'POR_CONTACTAR';
     // Una cita de SOFDOC sin seguimiento es rutina, no trabajo de la asesora.
-    return e === 'AGENDADO' && Number(t.N_SEGUIMIENTOS) > 0 ? 'AGENDADO' : '';
+    return agendado && Number(t.N_SEGUIMIENTOS) > 0 ? agendado : '';
   }
   if (e === 'POR REEVALUAR') return 'POR_CONTACTAR';
   if (e === 'PENDIENTE') return 'POR_CONTACTAR';
-  if (e === 'AGENDADO') return 'AGENDADO';
+  if (agendado) return agendado;
   if (e === 'EN TRATAMIENTO') return 'EN_TRATAMIENTO';
   return '';
 }
@@ -72,7 +80,8 @@ function etiquetaDe(t, reglas, hoy) {
     if (t.ESTADO_REGISTRO === 'EN CURSO') return sesion + (t.ATRASO > 0 ? ' · atrasada ' + plural_(t.ATRASO, 'día', 'días') : ' · tocaba hoy');
     return 'Cotizó hace ' + plural_(t.DIAS, 'día', 'días');
   }
-  if (t.COLUMNA === 'AGENDADO') {
+  if (t.COLUMNA === 'PAGO_REALIZADO') return 'Pagó el ' + dm_(t.FECHA_PAGO) + ' · falta agendar';
+  if (t.COLUMNA === 'AGENDADO' || t.COLUMNA === 'CONTACTADO') {
     if (t.AGENDA === 'SESION') return 'Sesión ' + (Number(t.HECHAS) + 1) + ' el ' + diaCorto_(t.FECHA_AGENDA);
     if (t.AGENDA === 'CONTROL') return 'Control con resultados el ' + diaCorto_(t.FECHA_AGENDA);
     if (t.AGENDA === 'CITA') return 'Cita el ' + diaCorto_(t.FECHA_AGENDA);
@@ -116,7 +125,8 @@ function armarTablero(d) {
   var reglas = d.reglas, hoy = d.hoy, mes = mesDe(hoy);
   var nombrePorDni = {};
   (d.citas || []).slice().sort(porFecha).forEach(function (c) { if (c.NOMBRE) nombrePorDni[c.DNI] = c.NOMBRE; });
-  var col = { POR_CONTACTAR: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] }, cerrados = [];
+  var col = {}, cerrados = [];
+  COLUMNAS_TABLERO.forEach(function (c) { col[c] = []; });
   var reeval = (d.pacientes || []).map(function (p) { return conTipo_(p, 'REEVALUACION'); });
   var todas = reeval.concat(d.pendientes || []);
 
@@ -126,7 +136,8 @@ function armarTablero(d) {
   });
   todas.forEach(function (t) {
     var c = columnaDe(t);
-    if (c === 'AGENDADO') col.AGENDADO.push(tarjeta_(t, c, reglas, hoy, t.FECHA_AGENDA || t.PROXIMA_AGENDADA));
+    if (c === 'AGENDADO' || c === 'CONTACTADO') col[c].push(tarjeta_(t, c, reglas, hoy, t.FECHA_AGENDA || t.PROXIMA_AGENDADA));
+    if (c === 'PAGO_REALIZADO') col[c].push(tarjeta_(t, c, reglas, hoy, t.FECHA_PAGO));
     if (c === 'EN_TRATAMIENTO') col.EN_TRATAMIENTO.push(tarjeta_(t, c, reglas, hoy, sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones)));
     if (t.ESTADO === 'COMPLETADO') {
       var f = t.VOLVIO || (t.ULTIMA_SESION && t.ESTADO_REGISTRO === 'COMPLETO' ? t.ULTIMA_SESION : t.FECHA_LOHIZO);
@@ -155,15 +166,15 @@ function armarTablero(d) {
     if (mesDe(muertos[dni].fecha) === mes) cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: nombrePorDni[dni] || '', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: muertos[dni].fecha });
   });
 
-  // Una sola tarjeta por necesidad: un registro completo que ya toca reevaluar (en Por contactar o, si ya se agendó,
-  // en Agendado) reemplaza a la reevaluación del mismo paciente y especialidad, esté donde esté.
-  var reemplaza = {};
-  col.POR_CONTACTAR.concat(col.AGENDADO).forEach(function (t) {
+  // Una sola tarjeta por necesidad: un registro completo que ya toca reevaluar (en Por contactar o, si ya se contactó,
+  // pagó o agendó, en esas columnas) reemplaza a la reevaluación del mismo paciente y especialidad, esté donde esté.
+  var reemplaza = {}, ABIERTAS_REEV = ['POR_CONTACTAR', 'CONTACTADO', 'PAGO_REALIZADO', 'AGENDADO'];
+  ABIERTAS_REEV.reduce(function (a, c) { return a.concat(col[c]); }, []).forEach(function (t) {
     if (t.ESTADO === 'POR REEVALUAR' || (t.ID_REGISTRO && t.ESTADO_REGISTRO === 'COMPLETO' && t.FECHA_REEVALUAR && t.FECHA_REEVALUAR <= hoy)) {
       reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD_CONSULTA || 'HEMATOLOGÍA')] = 1;
     }
   });
-  ['POR_CONTACTAR', 'AGENDADO'].forEach(function (c) {
+  ABIERTAS_REEV.forEach(function (c) {
     col[c] = col[c].filter(function (t) {
       return !(t.TIPO_SEGUIMIENTO === 'REEVALUACION' && reemplaza[claveSerie(normDni(t.DNI), t.ESPECIALIDAD)]);
     });
@@ -179,12 +190,14 @@ function armarTablero(d) {
   col.COMPLETADO = deduped;
 
   var asc = function (a, b) { return a.FECHA_CLAVE < b.FECHA_CLAVE ? -1 : a.FECHA_CLAVE > b.FECHA_CLAVE ? 1 : 0; };
+  col.CONTACTADO.sort(asc);
+  col.PAGO_REALIZADO.sort(asc);   // el pago más antiguo primero: lleva más tiempo esperando su fecha
   col.AGENDADO.sort(asc);
   col.EN_TRATAMIENTO.sort(asc);
   col.COMPLETADO.sort(function (a, b) { return -asc(a, b); });
   var hechosHoy = (d.seguimientos || []).filter(function (s) {
     var r = resultadoDe(s);
-    return r && r.grupo === 'SIGUE' && r.fecha === hoy;
+    return r && (r.grupo === 'SIGUE' || r.grupo === 'PAGO') && r.fecha === hoy;
   }).length;
   var marcadas = telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos);
   Object.keys(col).forEach(function (c) {
@@ -198,7 +211,8 @@ function armarTablero(d) {
   return {
     columnas: col,
     cerrados: cerrados,
-    cifras: { porContactar: col.POR_CONTACTAR.length, agendados: col.AGENDADO.length, enTratamiento: col.EN_TRATAMIENTO.length,
+    cifras: { porContactar: col.POR_CONTACTAR.length, contactados: col.CONTACTADO.length, pagados: col.PAGO_REALIZADO.length,
+      agendados: col.AGENDADO.length, enTratamiento: col.EN_TRATAMIENTO.length,
       completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length, hechosHoy: hechosHoy, hechosHoyPor: hechosHoyPor_(d) }
   };
 }

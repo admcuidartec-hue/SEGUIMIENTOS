@@ -12,6 +12,8 @@ var RESULTADOS = {
   'AGENDO CITA':              { nombre: 'AGENDÓ CITA',              grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: false, soloReevaluacion: true },
   'LO HIZO':                  { nombre: 'LO HIZO',                  grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: true },
   'ACEPTO':                   { nombre: 'ACEPTÓ',                   grupo: 'SIGUE',    pide: 'FECHA',    soloIndicacion: true },
+  // «Pagó»: grupo propio. No es un intento sin respuesta ni cuenta como «volvió»; deja la tarjeta en Pago realizado (Etapa 3).
+  'PAGO':                     { nombre: 'PAGO',                     grupo: 'PAGO',     pide: 'FECHA',    soloIndicacion: false },
   'ALTA MEDICA':              { nombre: 'ALTA MÉDICA',              grupo: 'CIERRE',   pide: 'DOCTOR',   soloIndicacion: false },
   'NUMERO EQUIVOCADO':        { nombre: 'NÚMERO EQUIVOCADO',        grupo: 'TELEFONO', pide: 'TELEFONO', soloIndicacion: false },
   'SE ATIENDE EN OTRO LUGAR': { nombre: 'SE ATIENDE EN OTRO LUGAR', grupo: 'CIERRE',   pide: '',         soloIndicacion: false },
@@ -19,7 +21,7 @@ var RESULTADOS = {
   'NO DESEA CONTINUAR':       { nombre: 'NO DESEA CONTINUAR',       grupo: 'CIERRE',   pide: 'MOTIVO',   soloIndicacion: false },
   'NO DESEA REALIZARSE':      { nombre: 'NO DESEA REALIZARSE',      grupo: 'CIERRE',   pide: 'MOTIVO',   soloIndicacion: true }
 };
-var ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
+var ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ', 'PAGO', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
   'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
 
 /**
@@ -36,7 +38,7 @@ function resultadoDe(s) {
   if (r) {
     // Sin teléfono que marcar, un «número equivocado» es un cierre, como antes.
     var grupo = r.grupo === 'TELEFONO' && !base.telefono ? 'CIERRE' : r.grupo;
-    return con({ resultado: r.nombre, grupo: grupo, motivo: grupo === 'SIGUE' ? '' : r.nombre, antiguo: false });
+    return con({ resultado: r.nombre, grupo: grupo, motivo: grupo === 'SIGUE' || grupo === 'PAGO' ? '' : r.nombre, antiguo: false });
   }
   var accion = normTexto(s.ACCION);
   if (accion === 'HECHO') return con({ resultado: 'NO CONTESTÓ', grupo: 'SIGUE', motivo: '', antiguo: true });
@@ -103,17 +105,28 @@ function leerCiclo(lista, reglas, hoy) {
   var filas = (lista || []).map(resultadoDe).filter(Boolean).sort(function (a, b) {
     return a.fechaHora < b.fechaHora ? -1 : a.fechaHora > b.fechaHora ? 1 : 0;
   });
-  var out = { intentos: 0, ultimo: '', cierre: null, agenda: null, loHizo: '' };
+  var out = { intentos: 0, ultimo: '', cierre: null, agenda: null, loHizo: '', pago: '' };
   if (!filas.length) return out;
   out.ultimo = filas[filas.length - 1].fecha;
-  var decisivas = filas.filter(function (r) { return r.grupo !== 'TELEFONO'; });
-  out.intentos = decisivas.filter(function (r) { return r.grupo === 'SIGUE'; }).length;
+  // «Pagó» no decide la agenda: la tarjeta queda en Pago realizado hasta que una fecha real o un cierre la mueva.
+  var pagos = filas.filter(function (r) { return r.grupo === 'PAGO'; }), ultPago = pagos[pagos.length - 1];
+  if (ultPago) out.pago = ultPago.fechaProxima || ultPago.fecha;
+  var decisivas = filas.filter(function (r) { return r.grupo !== 'TELEFONO' && r.grupo !== 'PAGO'; });
+  out.intentos = decisivas.filter(function (r) { return r.grupo === 'SIGUE'; }).length + pagos.length;
   var u = decisivas[decisivas.length - 1];
   if (!u) return out;
   if (u.grupo === 'CIERRE') { out.cierre = { motivo: u.motivo, fecha: u.fecha, quien: u.quien }; return out; }
   if (u.resultado === 'LO HIZO') { out.loHizo = u.fechaProxima || u.fecha; return out; }
   var seguidos = 0;
   for (var i = decisivas.length - 1; i >= 0 && decisivas[i].resultado === 'NO CONTESTÓ'; i--) seguidos++;
+  // Quien pagó no se cierra solo ni vuelve a «Contactado»: solo cuentan una cita (más adelante) o un cierre explícito.
+  if (out.pago) {
+    if (u.resultado === 'AGENDÓ CITA' && u.fechaProxima && filas.indexOf(u) > filas.indexOf(ultPago)) {
+      if (hoy <= sumarDias(u.fechaProxima, reglas.graciaAgenda)) out.agenda = { tipo: 'CITA', fecha: u.fechaProxima, intento: 0 };
+      else out.citaVencida = u.fechaProxima;
+    }
+    return out;
+  }
   if (seguidos >= reglas.maxSeguimientos) {
     var cierra = sumarDias(u.fecha, reglas.espera);
     if (hoy >= cierra) out.cierre = { motivo: 'SIN RESPUESTA', fecha: cierra, quien: '' };
@@ -134,6 +147,9 @@ function leerCiclo(lista, reglas, hoy) {
   }
   return out;
 }
+
+/** Agendas que solo dicen que se le escribió (columna Contactado), no una fecha real. */
+var AGENDAS_CONTACTO = { 'LLAMAR': 1, 'REINTENTAR': 1, 'SIN RESPUESTA': 1 };
 
 /** Lo que la asesora eligió en «¿Qué pasó?», revisado. La tarjeta se busca como en la bandeja. */
 function validarResultado(p, d) {
@@ -160,7 +176,14 @@ function validarResultado(p, d) {
   if (r.soloReevaluacion && esIndicacion && !porReevaluar && !empezado) return no('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
   if (r.nombre === 'ACEPTÓ' && empezado) return no('El tratamiento ya empezó: use «Agendó cita» para la próxima sesión.');
   var hoy = d.hoy, f = fechaIso(p.fecha), nota = textoLimpio_(p.nota);
-  var fila = { DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD, RESPONSABLE: quien, MOTIVO: r.grupo === 'SIGUE' ? '' : r.nombre, NOTA: nota,
+  if (r.nombre === 'PAGO') {
+    // Solo antes de tener fecha: el pago lleva a Pago realizado; después de agendar no cambia la fase (Etapa 3, §3).
+    if (t.COLUMNA === 'PAGO_REALIZADO') return no('Ya figura el pago del ' + fechaCorta_(t.FECHA_PAGO) + '.');
+    if (t.COLUMNA && t.COLUMNA !== 'POR_CONTACTAR' && t.COLUMNA !== 'CONTACTADO') return no('El paciente ya tiene fecha: el pago no cambia su fase.');
+    if (!f) return no('Falta la fecha del pago.');
+    if (f > hoy || f < sumarDias(hoy, -30)) return no('La fecha del pago va de hace 30 días a hoy.');
+  }
+  var fila = { DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD, RESPONSABLE: quien, MOTIVO: r.grupo === 'SIGUE' || r.grupo === 'PAGO' ? '' : r.nombre, NOTA: nota,
     REFERENCIA: ref, RESULTADO: r.nombre, FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
   if (r.nombre === 'LO PENSARÁ') {
     if (!f) return no('Falta la fecha para volver a llamar.');
@@ -172,6 +195,7 @@ function validarResultado(p, d) {
     if (f < hoy || f > sumarDias(hoy, 180)) return no('La fecha de la cita va de hoy a 180 días.');
     fila.FECHA_PROXIMA = f;
   }
+  if (r.nombre === 'PAGO') fila.FECHA_PROXIMA = f;
   if (r.nombre === 'LO HIZO') {
     if (!f) return no('Falta la fecha de la sesión.');
     if (f > hoy) return no('La fecha de la sesión no puede ser futura.');
@@ -212,12 +236,15 @@ function validarResultado(p, d) {
 }
 
 function unirNota_(a, b) { return b ? a + ' · ' + b : a; }
+function fechaCorta_(iso) { iso = fechaIso(iso); return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : ''; }
 
 /** ACCION que se escribe junto al resultado, para que las cifras antiguas sigan igual. */
 function accionPara(resultado, quedanContactos) {
   var r = RESULTADOS[normTexto(resultado)];
   if (!r) return '';
   if (r.grupo === 'SIGUE') return 'HECHO';
+  // Una ACCION propia: kpiRecuperacion y las cifras antiguas solo miran HECHO, y la versión anterior la ignora.
+  if (r.grupo === 'PAGO') return 'PAGO';
   if (r.grupo === 'TELEFONO') return quedanContactos ? 'TELEFONO' : 'DESCARTADO';
   return 'DESCARTADO';
 }

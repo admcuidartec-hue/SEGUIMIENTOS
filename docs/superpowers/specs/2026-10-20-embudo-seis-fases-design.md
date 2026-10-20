@@ -27,7 +27,7 @@
 
 **Los números de `data-col` no siguen el orden de pantalla** *(decidido aquí)*: las cuatro columnas de antes conservan su
 número (1 a 4) para no tocar cada `p.col === 4` del código ni las pruebas que dependen de ellos; las nuevas son 5 y 6.
-El orden en pantalla, el de las flechas del teclado y el de la franja de cifras lo da la lista `COLS` de `Index.html`.
+El orden en pantalla (de arriba hacia abajo) y el de las flechas del teclado lo da la lista `COLS` de `Index.html`.
 
 Las etiquetas de Contactado son las de siempre («Llamar el lun 12/10», «Reintentar el 21/10 · intento 1 de 2»,
 «Sin respuesta · se cierra el 21/10»). La de Pago realizado: **«Pagó el dd/mm · falta agendar»**.
@@ -64,18 +64,27 @@ la respuesta del servidor la confirma o la corrige, y «Deshacer» la devuelve.
 Nunca se guarda sin confirmar. Un arrastre que no corresponde muestra un aviso: «Ya figura el pago» si la tarjeta ya
 está en Pago realizado; «El pago se registra antes de agendar» si está en Agendado o más adelante.
 
-### 2.5 Horizontal en todas las pantallas (requisito del usuario, 20/10/2026)
+### 2.5 Franjas de arriba hacia abajo (requisito del usuario, 20/10/2026)
 
-- **Escritorio**: las seis columnas lado a lado, en orden. Cada columna tiene un ancho mínimo (≈ 228 px); si no caben,
-  **el tablero se desplaza en horizontal dentro de su contenedor** (`overflow-x: auto`), nunca la página.
-- **Celular (≤ 760 px)**: también lado a lado. Un carril horizontal con `scroll-snap` por columna; cada columna mide
-  ~85 % del ancho, para que asome la siguiente, con su encabezado de fase visible. **Se quitan las pestañas de columnas**
-  (`#coltabs`) y ya no se apilan.
-- **Franja de cifras** (`#kpis`) arriba del tablero: una celda por fase, en el orden del embudo, con la cifra, una barra
-  proporcional (la fase con más tarjetas = barra llena) y su línea de detalle. En una fila horizontal; en el celular, desplazable.
-  Pulsar una celda lleva el carril a esa columna.
-- El modo oscuro usa los tokens de siempre: los colores nuevos (`--pago`, `--pago-soft`, `--contacto`) se declaran
-  solo en `:root` y en `html[data-modo="oscuro"]`.
+El usuario primero pidió las seis columnas lado a lado y, el mismo día, lo cambió por **franjas horizontales apiladas**
+(maqueta `Maqueta-Embudo-filas.png`): la tarjeta «baja» a la franja siguiente al avanzar.
+
+- **Una franja por fase**, en el orden del embudo (1 Por contactar arriba … 6 Completado abajo), con una flecha ▼ entre franjas.
+- **Cabecera fija a la izquierda (230 px)**: número de fase, nombre, cifra, una línea de detalle (la que antes iba en la
+  franja de cifras de arriba: «N sin ningún intento», «esperan respuesta», «falta agendar», «N citas esta semana»,
+  «ninguna atrasada», «volvieron, completaron o alta · N cerrados este mes») y una **barra proporcional** tipo embudo
+  (la fase con más tarjetas, llena).
+- **Carril a la derecha**: las tarjetas en fila (≈ 270 px), con desplazamiento horizontal dentro del carril; nunca de la página.
+- **Tope de 12 tarjetas por franja** *(decidido aquí)*; al final, **«Ver los N →»** abre la franja entera en su carril
+  (y «Ver menos» la recoge). Por contactar conserva sus separadores de grupo (Recientes, Hace 1 a 2 meses, Más antiguos)
+  y Agendado los suyos (Esta semana, Más adelante), como un rótulo dentro del carril.
+- **La franja de cifras de arriba (`#kpis`) se quita**: la cabecera de cada franja la reemplaza.
+- **Celular (≤ 760 px)**: la cabecera va encima de su carril; el carril sigue horizontal con `scroll-snap` obligatorio y
+  cada tarjeta mide ~82 % para que asome la siguiente. **Se quitan las pestañas de columnas** (`#coltabs`).
+- **Teclado**: ↑ ↓ (j k) cambian de fase (a la tarjeta de la misma posición, o la última); ← → recorren la fase.
+- **Arrastrar** a otra franja abre el paso con confirmación, como antes (§2.4). Como las franjas no siempre caben en la
+  ventana, **la página se desplaza sola** cuando el puntero se acerca al borde de arriba o de abajo durante un arrastre.
+- Modo oscuro con los tokens de siempre: no hacen falta colores nuevos (el número y la barra usan `--accent`, la franja `--col`, la cabecera `--surface`).
 
 ## 3. «Pagó»
 
@@ -144,8 +153,8 @@ seguimiento» se queda como cifra aparte.
   agenda después del pago, cita vencida), los tres estados, `columnaDe`, `etiquetaDe`, `armarTablero` (cifras),
   `validarResultado` (columnas permitidas, fecha) y `META_CUMPLIMIENTO_TRATAMIENTO_PCT`.
 - `test/resultado-servidor.test.js`: `ACCION = PAGO` al escribir, y Contactado como tarjeta abierta.
-- `test/ui.test.js`: seis columnas en orden y horizontales (escritorio y 390 px, sin scroll de la página), franja de
-  seis cifras, «Pagó» (atajo 4 y arrastre) moviendo la tarjeta y Deshacer, la tarjeta unificada y las metas en positivo.
+- `test/ui.test.js`: seis franjas en orden (escritorio y 390 px, sin scroll horizontal de la página), cabeceras con su
+  cifra y detalle, tope de 12 y «Ver los N →», teclado ↑ ↓ / ← →, «Pagó» (atajo 4 y arrastre) moviendo la tarjeta y Deshacer, la tarjeta unificada y las metas en positivo.
 - El DEMO tiene al menos una tarjeta en cada columna.
 
 ## 7. Publicar

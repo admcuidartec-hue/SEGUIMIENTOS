@@ -8,7 +8,7 @@ const CAT = { usuarios: ['MAGALY', 'RACHEL'], motivos: [], alias: {}, doctores: 
   procedimientos: [], tratamientos: [], marcas: {} };
 
 function servidor(hoja, extraEnHoja, registros, cabecera) {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
   const escrito = { SEGUIMIENTOS: [], BITACORA: [], anulados: [], llamadas: [] };
   const lock = { tomado: 0, flush: 0 };
   const L = cargar();
@@ -48,7 +48,7 @@ test('registrarResultado: escribe la fila, la bitácora, suelta con flush y devu
   assert.deepEqual([s.FECHA_HORA, s.ACCION, s.RESULTADO, s.FECHA_PROXIMA], ['2026-10-06 10:30', 'HECHO', 'LO PENSARÁ', '2026-10-09']);
   assert.deepEqual(escrito.BITACORA, [['MAGALY', 'RESULTADO', '40111222 · HEMATOLOGÍA · LO PENSARÁ']]);
   assert.deepEqual([lock.tomado, lock.flush], [0, 1]);
-  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.ETIQUETA], ['AGENDADO', 'Llamar el vie 09/10']);
+  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.ETIQUETA], ['CONTACTADO', 'Llamar el vie 09/10']);
 });
 
 test('número equivocado: con otro teléfono sigue (TELEFONO); el último cierra (DESCARTADO), releyendo dentro del candado', () => {
@@ -139,7 +139,7 @@ test('«lo hizo» de una sesión que no es la última deja la tarjeta en tratami
 
 test('hojas sin preparar: registrar y anular se niegan, no escriben y sueltan el candado', () => {
   const hoja = [{ ID: 'SEG-2', FECHA_HORA: '2026-10-02 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'NO CONTESTÓ', ACCION: 'HECHO', REFERENCIA: '' }];
-  const cab = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'Menu.gs']).COLUMNAS_SEGUIMIENTOS.slice(0, -2);
+  const cab = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'Menu.gs']).COLUMNAS_SEGUIMIENTOS.slice(0, -2);
   const { ctx, escrito, lock } = servidor(hoja, [], [], cab);
   assert.throws(() => ctx.registrarResultado(p({})), /Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas\./);
   assert.throws(() => ctx.anularResultado({ usuario: 'MAGALY', id: 'SEG-2', motivo: 'x' }), /Falta preparar las hojas/);
@@ -162,10 +162,10 @@ test('un campo motivo del payload nuevo no cambia MOTIVO de un resultado normal'
   assert.equal(escrito.SEGUIMIENTOS[0].MOTIVO, 'NO DESEA CONTINUAR');
 });
 
-test('bootstrap: reglas con las diez claves y metaDiaria 15; getPaciente trae telefonos', () => {
+test('bootstrap: reglas con las trece claves y metaDiaria 15; getPaciente trae telefonos', () => {
   const { ctx } = servidor();
   const b = plano(ctx.bootstrap());
-  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl'].sort());
+  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl', 'metaTratamiento', 'diasEnfermeria', 'corteEnfermeria'].sort());
   assert.equal(b.reglas.metaDiaria, 15);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).telefonos, ['987654321', '912345678']);
 });
@@ -204,7 +204,7 @@ test('getPaciente: un registro anulado no da el nombre; si todos lo están, lo d
 /** Arnés de «Aceptó»: un registro cotizado o una cotización del historial; la segunda llamada ve lo escrito por la primera. */
 function servidorResultado(opciones) {
   const o = opciones || {};
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
   const escrito = { SEGUIMIENTOS: [], REGISTROS: [], BITACORA: [] };
   const lock = { tomado: 0, flush: 0 };
   const L = cargar();
@@ -298,4 +298,17 @@ test('«Aceptó» sobre un registro en curso se rechaza sin candado; «Agendó c
   assert.deepEqual([escrito.SEGUIMIENTOS[0].RESULTADO, escrito.SEGUIMIENTOS[0].REFERENCIA], ['AGENDÓ CITA', 'REG-000010']);
   // Un tratamiento en curso agenda su próxima sesión: la tarjeta lo dice así, «Sesión 2 el …», como al marcar con «Próxima sesión».
   assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.AGENDA, r.tarjeta.FECHA_AGENDA, r.tarjeta.ETIQUETA], ['AGENDADO', 'SESION', '2026-10-12', 'Sesión 2 el lun 12/10']);
+});
+
+test('«Pagó»: escribe ACCION = PAGO y la tarjeta pasa a Pago realizado; también desde Contactado; un segundo pago se rechaza', () => {
+  const { ctx, escrito } = servidor();
+  ctx.registrarResultado(p({ resultado: 'NO CONTESTÓ' }));
+  const r = plano(ctx.registrarResultado(p({ resultado: 'PAGO', fecha: '2026-10-05' })));
+  const s = escrito.SEGUIMIENTOS[1];
+  assert.deepEqual([s.ACCION, s.RESULTADO, s.FECHA_PROXIMA, s.MOTIVO], ['PAGO', 'PAGO', '2026-10-05', '']);
+  assert.deepEqual([r.tarjeta.COLUMNA, r.tarjeta.ETIQUETA, r.tarjeta.FECHA_PAGO], ['PAGO_REALIZADO', 'Pagó el 05/10 · falta agendar', '2026-10-05']);
+  assert.throws(() => ctx.registrarResultado(p({ resultado: 'PAGO', fecha: '2026-10-06' })), /Ya figura el pago del 05\/10/);
+  // Después del pago, «Agendó cita» la lleva a Agendado.
+  const a = plano(ctx.registrarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' })));
+  assert.equal(a.tarjeta.COLUMNA, 'AGENDADO');
 });

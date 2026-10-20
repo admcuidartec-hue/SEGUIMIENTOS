@@ -5,10 +5,10 @@
    la sesión de un registro ya tienen su hoja: se delegan en darDeAlta y marcarSesion.
    ========================================================================== */
 
-/** Solo las tarjetas abiertas aceptan un resultado: uno tardío sobre una serie cerrada la reabriría. */
+/** Solo las tarjetas abiertas (todas menos Completado) aceptan un resultado: uno tardío sobre una serie cerrada la reabriría. */
 function tarjetasAbiertas_(d) {
   var c = armarTablero(d).columnas;
-  return (c.POR_CONTACTAR || []).concat(c.AGENDADO || [], c.EN_TRATAMIENTO || []);
+  return (c.POR_CONTACTAR || []).concat(c.CONTACTADO || [], c.PAGO_REALIZADO || [], c.AGENDADO || [], c.EN_TRATAMIENTO || []);
 }
 
 function registrarResultado(p) { return registrarResultado_(p, null); }

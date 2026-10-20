@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { cargar } = require('./cargar');
 
 test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', () => {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs', 'ResultadoServidor.gs']);
   for (const f of ['doGet', 'bootstrap', 'getBandeja', 'getPaciente', 'buscar', 'marcarSeguimiento',
     'descartar', 'confirmarEmparejamiento', 'getKpi', 'getResumen',
     'guardarRegistro', 'marcarSesion', 'anularRegistro', 'anularSesion', 'darDeAlta', 'anularAlta', 'getRegistrosHoy', 'editarRegistro', 'getRegistros', 'buscarPacienteRegistro',
@@ -16,11 +16,11 @@ test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', ()
 });
 
 test('Menu.gs carga con los otros y expone las funciones del menú', () => {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs', 'ResultadoServidor.gs', 'Menu.gs']);
   for (const f of ['onOpen', 'actualizar', 'verificar', 'prepararHojas', 'importarIndicaciones', 'importarLoQueFalta']) {
     assert.equal(typeof ctx[f], 'function', f);
   }
   const base = ctx.hojasBase_();
-  assert.deepEqual(Object.keys(base), ['CITAS', 'PACIENTES', 'INDICACIONES', 'SEGUIMIENTOS', 'BITACORA', 'CONTACTOS_CRM', 'KPI', 'REGISTROS', 'SESIONES', 'ALTAS']);
+  assert.deepEqual(Object.keys(base), ['CITAS', 'PACIENTES', 'INDICACIONES', 'SEGUIMIENTOS', 'BITACORA', 'CONTACTOS_CRM', 'KPI', 'REGISTROS', 'SESIONES', 'ALTAS', 'ENFERMERIA']);
   for (const f of ['actualizacionDiaria', 'activarDiaria']) assert.equal(typeof ctx[f], 'function', f);
 });

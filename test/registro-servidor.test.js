@@ -11,7 +11,7 @@ const REG4 = { ID: 'REG-000004', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10
   NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987654321', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: '1', ANULADO: '' };
 
 function servidor(extra, hojas) {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs']);
   const escrito = { REGISTROS: [], SESIONES: [], ALTAS: [], SEGUIMIENTOS: [], BITACORA: [], anulados: [] };
   const lock = { tomado: 0 };
   const L = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs']);
@@ -102,7 +102,7 @@ test('buscarPacienteRegistro: datos del paciente conocido y propuesta de doctor'
 });
 
 test('marcarAnulado_ escribe SÍ y el motivo en la fila de ese ID, y no anula dos veces', () => {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs']);
   const v = [['ID', 'ANULADO', 'MOTIVO_ANULACION'], ['REG-000001', '', ''], ['REG-000002', '', '']];
   ctx.hoja_ = () => ({ getDataRange: () => ({ getValues: () => v.map(f => f.slice()) }),
     getRange: (r, c) => ({ setValue: x => { v[r - 1][c - 1] = x; } }) });
@@ -190,7 +190,7 @@ test('asignarDniIndicacion: escribe el DNI con el candado y lo deja CONFIRMADO; 
 });
 
 test('exigirColumnas_: sin las columnas nuevas de REGISTROS no se escribe', () => {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs']);
   ctx.hoja_ = () => ({ getRange: () => ({ getValues: () => [['ID', 'FECHA_HORA', 'FECHA']] }), getLastColumn: () => 3 });
   assert.throws(() => ctx.exigirColumnas_('REGISTROS', ctx.COLUMNAS_REGISTROS), /Falta preparar las hojas/);
 });

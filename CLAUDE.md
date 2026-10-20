@@ -18,6 +18,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 | `src/Codigo.gs` | Lee y escribe el Sheets; funciones que llama la app |
 | `src/Registro.gs` | Lógica pura de la pestaña Registro: registros, sesiones y altas |
 | `src/RegistroServidor.gs` | Funciones de la pestaña Registro que escriben `REGISTROS`, `SESIONES` y `ALTAS` |
+| `src/Enfermeria.gs` | Lógica pura de Enfermería: contactos tras cada sesión de hierro, reacciones y sus cifras |
+| `src/EnfermeriaServidor.gs` | Funciones de Enfermería que leen y escriben `ENFERMERIA` |
 | `src/Menu.gs` | Menú `Seguimientos` del Sheets |
 | `src/Index.html` | La app. El bloque `DEMO` del final permite abrirla en el navegador sin desplegar: **no lo elimine** |
 
@@ -27,7 +29,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - No cambie los nombres `doGet`, `bootstrap`, `getBandeja`, `getPaciente`, `buscar`,
   `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`, `guardarRegistro`,
   `marcarSesion`, `anularRegistro`, `anularSesion`, `darDeAlta`, `anularAlta`, `getRegistrosHoy`,
-  `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`.
+  `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`, `getEnfermeria`,
+  `registrarContactoEnfermeria`, `anularContactoEnfermeria`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.
@@ -74,9 +77,9 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visual) y la especificación en
 `docs/superpowers/specs/2026-10-06-rediseno-frontend-design.md`. Todo vive en `src/Index.html`.
 
-- **Menú lateral** (en el celular, barra superior y barra inferior): Tablero, Registro, Pacientes e Indicadores,
+- **Menú lateral** (en el celular, barra superior y barra inferior): Tablero, Registro, Pacientes, Indicadores y Enfermería,
   más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y `seg.tipo`.
-- **Tablero:** cuatro columnas (Por contactar, Agendado, En tratamiento, Completado) y el panel «¿Qué pasó?» de cada
+- **Tablero:** el embudo de seis fases en franjas (ver «Etapa 3») y el panel «¿Qué pasó?» de cada
   tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`. Se puede arrastrar una tarjeta a otra columna: abre el
   paso con confirmación, nunca guarda solo.
 - **Registro:** indicaciones (procedimientos y tratamientos) y altas médicas, con «Registrados hoy».
@@ -85,13 +88,14 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
   ese botón imprime la pantalla tal como se ve.
 - Lo que se dispara con el teclado no se anima, y con «reducir movimiento» del sistema nada se anima.
 
-**Atajos del tablero.** **H** («hecho») y **D** («descartar») ya no existen: se reemplazan por **1 a 3** y **X** (en la Etapa 1 eran 1 a 4; ver «Etapa 2»).
+**Atajos del tablero.** **H** («hecho») y **D** («descartar») ya no existen: se reemplazan por **1 a 4** y **X** (ver «Etapa 2» y «Etapa 3»).
 
 | Tecla | Qué hace |
 |---|---|
-| ↑ ↓ (o j k) y ← → | Moverse entre tarjetas y columnas |
+| ↑ ↓ (o j k) | Cambiar de fase (la franja de arriba o de abajo) |
+| ← → | Moverse entre las tarjetas de la fase |
 | Enter | Abrir el panel de la tarjeta |
-| 1 a 3 | «¿Qué pasó?»: 1 = No contestó, 2 = Lo pensará, 3 = Agendó cita (reevaluación, Control, Por reevaluar y tratamiento en curso) o Aceptó (hierro y procedimiento por empezar). El 4 ya no hace nada. El 1 guarda sin abrir el panel. En una tarjeta En tratamiento, el 1 es «Marcar sesión k hecha» |
+| 1 a 4 | «¿Qué pasó?»: 1 = No contestó, 2 = Lo pensará, 3 = Agendó cita (reevaluación, Control, Por reevaluar y tratamiento en curso) o Aceptó (hierro y procedimiento por empezar), 4 = **Pagó** (solo en Por contactar y Contactado; abre el paso con la fecha, nunca guarda solo). El 1 guarda sin abrir el panel. En una tarjeta En tratamiento, el 1 es «Marcar sesión k hecha» |
 | X | Cerrar el seguimiento (abre las opciones de cierre; nada se cierra sin confirmar) |
 | C | Copiar el teléfono |
 | / | Ir al buscador |
@@ -141,6 +145,70 @@ En un paso con fecha o motivo, Enter confirma.
 - **Publicar la Etapa 2:** «Preparar hojas» **antes** de usar las pantallas nuevas, y luego «Verificar»: sin las columnas nuevas,
   `guardarRegistro`, `editarRegistro` y `darDeAlta` se niegan a escribir (`REGISTROS` y `ALTAS` se escriben por posición). Después,
   probar en el `@HEAD` solo con un paciente de prueba, y avisar a las asesoras de que el atajo 3 ahora es «Aceptó».
+
+## Etapa 3 (20/10/2026): embudo de seis fases y metas en positivo
+
+Especificación: `docs/superpowers/specs/2026-10-20-embudo-seis-fases-design.md` (acta de reunión, punto 6).
+
+- **Seis fases** (`COLUMNAS_TABLERO` en `Tablero.gs`): Por contactar → **Contactado** → **Pago realizado** → Agendado →
+  En tratamiento → Completado. Contactado = `ESTADO AGENDADO` con `AGENDA` `LLAMAR`, `REINTENTAR` o `SIN RESPUESTA`
+  (`AGENDAS_CONTACTO`); Agendado queda solo para fechas reales (cita, sesión, control, programado). La columna se calcula del
+  estado (`columnaDe`), nunca se guarda; la app mueve la tarjeta en el acto (`previsto`) y la respuesta lo confirma.
+- **Regla general**: la tarjeta está en la fase más avanzada de su ciclo. Quien pagó no vuelve a Contactado con un
+  «No contestó» o «Lo pensará», **no se cierra solo por tiempo** (ni por `MAX_SEGUIMIENTOS` ni por `CORTE_INDICACIONES_DIAS`) y
+  vuelve a Pago realizado si su cita pasa sin realizarse. Una fecha real o una sesión ganan sobre el pago.
+- **«Pagó»** (`RESULTADO = PAGO`, `ACCION = PAGO`, grupo propio `PAGO` en `RESULTADOS`): para todos los tipos, solo sobre
+  tarjetas de Por contactar y Contactado, con la fecha del pago (de hace 30 días a hoy) en `FECHA_PROXIMA`. Cuenta para la meta
+  del día y como intento (`N_SEGUIMIENTOS`); **no** cuenta como «volvió» ni para el cierre automático. Se deshace como los
+  demás. Las tarjetas traen `FECHA_PAGO`; `ESTADO = 'PAGO REALIZADO'`.
+- **`data-col`**: las cuatro columnas de antes conservan su número (1 Por contactar, 2 Agendado, 3 En tratamiento,
+  4 Completado); Contactado es **5** y Pago realizado **6**. El orden de pantalla lo da `COLS` en `Index.html`.
+- **Franjas de arriba hacia abajo**: cada fase es una franja con su cabecera (número, nombre, cifra, detalle y barra
+  proporcional) y un carril horizontal con hasta 12 tarjetas y «Ver los N →». Ya no hay franja de cifras arriba (`#kpis`) ni
+  pestañas de columnas en el celular (`#coltabs`): allí la cabecera va encima del carril, que se desliza con `scroll-snap`.
+  Arrastrar a otra franja abre el paso (a Pago realizado, «Pagó»; a Contactado, el panel con No contestó y Lo pensará
+  señalados); durante el arrastre la página se desplaza sola al acercarse al borde.
+- **Metas en positivo** (`textoMeta`): «Meta de retorno: 60 %», «Meta cumplida: 63 % (meta 60 %)», «Cumplimiento: 54 % · a 6
+  puntos de la meta (60 %)». La cifra grande del Resumen del mes, sus barras y la línea de meta hablan del **% que volvió**;
+  «Qué conviene mirar» lee la tendencia al revés que antes (subir es mejorar).
+- **Tarjeta unificada** (Resumen del mes y resumen impreso): «Tratamiento de hierro» (indicados, completaron, no siguieron,
+  en curso) y «Procedimientos» (realizados, no realizados), con barra apilada, «Meta de cumplimiento» y el comparativo con el
+  mes anterior («▲ 8 puntos mejor que agosto (52 %)»; sin base, «Agosto no tiene datos para comparar.»). Cumplimiento =
+  cumplieron ÷ (cumplieron + no cumplieron): los en curso aún no cuentan.
+- **Parámetro nuevo de `REGLAS`**: `META_CUMPLIMIENTO_TRATAMIENTO_PCT` = 95 (`metaTratamiento`), en `bootstrap().reglas` y en
+  `getResumen().metaTratamiento`. «Preparar hojas» lo agrega si falta.
+- **Publicar la Etapa 3**: `npm run subir` → en el Sheets, «Preparar hojas» (agrega `META_CUMPLIMIENTO_TRATAMIENTO_PCT`) →
+  «Verificar» → en el `@HEAD`, con el **paciente de prueba**: un «Pagó», su «Deshacer», otro «Pagó» seguido de «Agendó cita»,
+  y mirar el Resumen del mes y el resumen impreso → `npm run actualizar` en la misma sesión. La v12 ignora las filas
+  `ACCION = PAGO` (no las cuenta ni las muestra), así que lo probado no cambia nada para el equipo. Avisar a las asesoras:
+  ↑ ↓ ahora cambian de fase, ← → recorren la fase, y el 4 es «Pagó».
+
+## Enfermería (20/10/2026)
+
+Pedido de Liset (Enfermería). Especificación: `docs/superpowers/specs/2026-10-20-enfermeria-design.md`.
+
+- **Primera sesión ya aplicada** (Registro → Indicación, campo 5): una fecha pasada, desde la `FECHA` del registro, crea el
+  registro **y marca la sesión 1 hecha** en esa fecha en el mismo candado (`validarRegistro` → `sesionHecha`; la sesión la
+  registra quien registra). Hoy o futura, como siempre: programada. Antes de la fecha del registro, se rechaza.
+- **Contactos tras cada sesión de hierro**: sesión + 1, + 3 y + 5 días (`REGLAS.ENFERMERIA_DIAS` = «1,3,5»). Se **calculan**
+  (`contactosEnfermeria`); en la hoja **`ENFERMERIA`** solo queda lo registrado (`CONTACTADO` o `NO CONTESTO`, con
+  `REACCION_TIPO` `NINGUNA` / `INMEDIATA` / `MEDIATA` y `REACCION` del catálogo `CATALOGOS.REACCIONES`). Un contacto
+  `CONTACTADO` queda cumplido; un `NO CONTESTO` lo deja en la lista. No se muestran los de registros o sesiones anulados,
+  los de un fallecido ni los que tocaban hace más de `ENFERMERIA_CORTE_DIAS` (10).
+- **Pantalla «Enfermería»** (menú y barra del celular): vencidos (el más antiguo primero), hoy y próximos 7 días (plegable).
+  «Ya me contacté» abre en la misma fila: ¿reacción? No / Inmediata / Mediata, cuáles (chips) y nota (obligatoria con «Otra»).
+  «No contestó» guarda directo. Todo con «Deshacer» (`anularContactoEnfermeria`, solo `ENF-…`).
+- **Al marcar una sesión de hierro** (tablero y ficha): «¿Reacción durante la aplicación?» opcional; `marcarSesion({ reaccion })`
+  la guarda en el mismo candado como fila `ENFERMERIA` con `DIA = 0` e `INMEDIATA`.
+- **Ficha**: bajo cada tratamiento de hierro, su historial de Enfermería. **Indicadores**: la tarjeta de hierro suma
+  «Reacciones: n pacientes (inmediatas x, mediatas y)» y «Contactos de enfermería a tiempo: p %» (campos `REAC_*` y `ENF_*`
+  al final de `CAMPOS_RESUMEN`, por mes de la sesión).
+- La enfermera elige su nombre en «¿Quién es usted?»: hay que **agregarlo a `CATALOGOS.USUARIOS`** (no se escribe en el código).
+- **Publicar**: `npm run subir` → «Preparar hojas» (crea `ENFERMERIA`, agrega `REACCIONES` a `CATALOGOS` y
+  `ENFERMERIA_DIAS` y `ENFERMERIA_CORTE_DIAS` a `REGLAS`) → «Verificar» (debe listar `ENFERMERIA`) → agregar a la enfermera en
+  `USUARIOS` → en el `@HEAD`, con el paciente de prueba: registrar un hierro con la primera sesión de ayer, ver sus contactos,
+  un «Ya me contacté» con reacción y su «Deshacer» → `npm run actualizar`. Sin «Preparar hojas», registrar un contacto o una
+  reacción se niega a escribir (`ENFERMERIA` se escribe por posición).
 
 ## Publicar
 

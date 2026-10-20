@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { cargar, plano } = require('./cargar');
 
 function contexto() {
-  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Codigo.gs', 'RegistroServidor.gs', 'Menu.gs']);
+  const ctx = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'RegistroServidor.gs', 'EnfermeriaServidor.gs', 'Menu.gs']);
   const estado = { tomado: false, avisos: [] };
   ctx.LockService = { getScriptLock: () => ({
     tryLock: () => { estado.tomado = true; return true; },
@@ -203,13 +203,15 @@ test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita A
   const cambios = [...ctx.ampliarHojas_()];
   assert.deepEqual(seg.v[0].slice(8), ['REFERENCIA', 'RESULTADO', 'FECHA_PROXIMA', 'TELEFONO', 'ANULADO', 'MOTIVO_ANULACION']);
   assert.deepEqual(seg.v[1].slice(0, 8), ['S-1', '', '1', 'H', 'M', 'HECHO', '', 'n'], 'no toca las filas');
-  assert.deepEqual(cat.v[0], ['USUARIOS', 'MOTIVOS_DESCARTE', 'DOCTOR', 'DOCTOR_SOFDOC', 'PROCEDIMIENTOS', 'TRATAMIENTOS', 'MARCAS']);
+  assert.deepEqual(cat.v[0], ['USUARIOS', 'MOTIVOS_DESCARTE', 'DOCTOR', 'DOCTOR_SOFDOC', 'PROCEDIMIENTOS', 'TRATAMIENTOS', 'MARCAS', 'REACCIONES']);
+  assert.deepEqual(cat.v.slice(1, 15).map(f => f[7]), plano(ctx.REACCIONES_INICIALES), 'Enfermería: el catálogo de reacciones');
   assert.equal(cat.v[1][2], 'Dr. Elí Cabanillas');
   assert.equal(cat.v[6][3], '', 'el particular sin nombre SOFDOC');
   assert.equal(cat.v[2][1], '', 'ALTA MÉDICA quitado');
   assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
-    ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30]]);
-  assert.equal(cambios.length, 10, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los siete parámetros');
+    ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30],
+    ['META_CUMPLIMIENTO_TRATAMIENTO_PCT', 95], ['ENFERMERIA_DIAS', '1,3,5'], ['ENFERMERIA_CORTE_DIAS', 10]]);
+  assert.equal(cambios.length, 13, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los diez parámetros');
   assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
 });
 

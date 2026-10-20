@@ -31,7 +31,7 @@ test('resultadoDe: anulada o desconocida no cuenta; número equivocado sin telé
 });
 
 test('leerCiclo: sin filas', () => {
-  assert.deepEqual(plano(L.leerCiclo([], R, '2026-10-05')), { intentos: 0, ultimo: '', cierre: null, agenda: null, loHizo: '' });
+  assert.deepEqual(plano(L.leerCiclo([], R, '2026-10-05')), { intentos: 0, ultimo: '', cierre: null, agenda: null, loHizo: '', pago: '' });
 });
 
 test('leerCiclo: un «no contestó» espera la reintentada; pasada la espera ya no hay agenda', () => {

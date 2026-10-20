@@ -7,7 +7,7 @@ const path = require('path');
 const { chromium } = require('playwright');
 
 const ARCHIVO = path.join(__dirname, '..', 'src', 'Index.html');
-const SECCIONES = ['tablero', 'registro', 'pacientes', 'indicadores'];
+const SECCIONES = ['tablero', 'registro', 'pacientes', 'indicadores', 'enfermeria'];
 
 /**
  * Abre la app en modo DEMO y junta los `pageerror`.
@@ -43,7 +43,7 @@ test('carga sin errores: menú con las cuatro secciones, arranca con bootstrap y
   const { navegador, pagina, errores } = await abrir();
   try {
     assert.deepEqual((await pagina.locator('.menu [data-sec]').allTextContents()).map(t => t.trim()),
-      ['Tablero', 'Registro', 'Pacientes', 'Indicadores']);
+      ['Tablero', 'Registro', 'Pacientes', 'Indicadores', 'Enfermería']);
     assert.equal(await pagina.locator('[data-sec][href^="#"]').count(), 0, 'el menú no navega con href="#…"');
     assert.ok(await visible(pagina, '#v-tablero'));
     await pagina.waitForFunction(() => S.fase === 'listo');
@@ -59,7 +59,7 @@ test('carga sin errores: menú con las cuatro secciones, arranca con bootstrap y
 test('el menú cambia de pantalla y marca el ítem con aria-current', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
-    for (const sec of ['registro', 'pacientes', 'indicadores', 'tablero']) {
+    for (const sec of ['registro', 'pacientes', 'indicadores', 'enfermeria', 'tablero']) {
       await pagina.locator(`.menu [data-sec="${sec}"]`).click();
       await pagina.waitForSelector(`#v-${sec}`, { state: 'visible' });
       for (const otra of SECCIONES.filter(s => s !== sec)) assert.equal(await visible(pagina, `#v-${otra}`), false, `${sec}: ${otra} oculta`);
@@ -78,7 +78,8 @@ test('«¿Quién es usted?» arranca vacío, sin usuario por omisión', async ()
     assert.equal(await pagina.locator('.side .js-usuario').inputValue(), '');
     assert.equal(await pagina.locator('.topmovil .js-usuario').inputValue(), '');
     const opciones = await pagina.locator('.side .js-usuario option').evaluateAll(l => l.map(o => [o.value, o.textContent]));
-    assert.deepEqual(opciones, [['', '— Elija —'], ['MAGALY', 'Magaly'], ['ANA', 'Ana'], ['RACHEL', 'Rachel'], ['DR. ELI CABANILLAS', 'Dr. Eli Cabanillas']]);
+    assert.deepEqual(opciones, [['', '— Elija —'], ['MAGALY', 'Magaly'], ['ANA', 'Ana'], ['RACHEL', 'Rachel'], ['DR. ELI CABANILLAS', 'Dr. Eli Cabanillas'],
+      ['ENFERMERA PRUEBA', 'Enfermera Prueba']]);
     assert.equal(await pagina.evaluate(() => exigirUsuario()), false);
     assert.equal(await pagina.locator('#aviso span').textContent(), 'Elija quién es usted.');
     // Los dos selectores se sincronizan y el elegido se recuerda en seg.usuario.
@@ -162,7 +163,7 @@ test('adaptadores: adaptarBoot, nombreBonito, telBonito y medicoCorto', async ()
       medicos: ['Dr. ELÍ FABRIZIO CABANILLAS HUALPA', 'Dra. ALEJANDRA LA TORRE MATUK', 'Dr. JUVENAL HANAMPA ROQUE'].map(medicoCorto)
     }));
     assert.deepEqual(Object.keys(r.boot).sort(),
-      ['doctores', 'especialidades', 'hoy', 'marcas', 'medicos', 'procedimientos', 'reglas', 'tratamientos', 'usuarios']);
+      ['doctores', 'especialidades', 'hoy', 'marcas', 'medicos', 'procedimientos', 'reacciones', 'reglas', 'tratamientos', 'usuarios']);
     assert.deepEqual(r.boot.usuarios[0], { v: 'MAGALY', l: 'Magaly', rol: 'Asesora', med: '' });
     assert.deepEqual(r.boot.usuarios[3], { v: 'DR. ELI CABANILLAS', l: 'Dr. Eli Cabanillas', rol: 'Médico', med: 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA' });
     assert.deepEqual(r.boot.medicos.find(m => m.k === 'Dra. ALEJANDRA LA TORRE MATUK'),
@@ -183,7 +184,7 @@ test('DEMO: formas reales de getTablero, copias y contadores de llamadas', async
     const antes = await pagina.evaluate(() => DEMO._llamadas.getTablero || 0);
     const t = await pagina.evaluate(() => llamar('getTablero'));
     assert.deepEqual(Object.keys(t), ['columnas', 'cerrados', 'cifras']);
-    assert.deepEqual(Object.keys(t.columnas), ['POR_CONTACTAR', 'AGENDADO', 'EN_TRATAMIENTO', 'COMPLETADO']);
+    assert.deepEqual(Object.keys(t.columnas), ['POR_CONTACTAR', 'CONTACTADO', 'PAGO_REALIZADO', 'AGENDADO', 'EN_TRATAMIENTO', 'COMPLETADO']);
     for (const c of Object.keys(t.columnas)) {
       assert.ok(t.columnas[c].length > 0, c);
       for (const x of t.columnas[c]) {
@@ -194,7 +195,11 @@ test('DEMO: formas reales de getTablero, copias y contadores de llamadas', async
         assert.equal(typeof x.SIN_CONTACTO, 'boolean');
       }
     }
-    assert.deepEqual(t.columnas.AGENDADO.map(x => x.AGENDA).sort(), ['CITA', 'LLAMAR', 'REINTENTAR', 'SIN RESPUESTA']);
+    assert.deepEqual(t.columnas.AGENDADO.map(x => x.AGENDA).sort(), ['CITA']);
+    assert.deepEqual(t.columnas.CONTACTADO.map(x => x.AGENDA).sort(), ['LLAMAR', 'REINTENTAR', 'SIN RESPUESTA']);
+    assert.ok(t.columnas.PAGO_REALIZADO.every(x => x.ESTADO === 'PAGO REALIZADO' && x.FECHA_PAGO), 'Pago realizado trae FECHA_PAGO');
+    assert.equal(t.cifras.contactados, t.columnas.CONTACTADO.length);
+    assert.equal(t.cifras.pagados, t.columnas.PAGO_REALIZADO.length);
     assert.ok(t.columnas.POR_CONTACTAR.some(x => x.ATRASO > 0), 'sesión atrasada en Por contactar');
     assert.ok(t.columnas.POR_CONTACTAR.some(x => x.USUARIO), 'paciente con usuario @');
     assert.ok(t.columnas.POR_CONTACTAR.some(x => x.SIN_CONTACTO), 'paciente sin teléfono');
@@ -294,7 +299,9 @@ test('no hay colores escritos a mano fuera de la paleta', () => {
 
 /* ============ Tablero (Tarea 5) ============ */
 
-const COL_N = { POR_CONTACTAR: '1', AGENDADO: '2', EN_TRATAMIENTO: '3', COMPLETADO: '4' };
+// Los números de data-col: los de las cuatro columnas de antes se conservan; Contactado es 5 y Pago realizado 6.
+const COL_N = { POR_CONTACTAR: '1', CONTACTADO: '5', PAGO_REALIZADO: '6', AGENDADO: '2', EN_TRATAMIENTO: '3', COMPLETADO: '4' };
+const FASES = ['POR_CONTACTAR', 'CONTACTADO', 'PAGO_REALIZADO', 'AGENDADO', 'EN_TRATAMIENTO', 'COMPLETADO'];
 const HOY = '2026-10-01';
 const entre = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 86400000);
 /** Días de una tarjeta de Por contactar: reevaluación desde PROXIMA_ESPERADA; hierro y procedimiento, DIAS. */
@@ -306,6 +313,9 @@ async function abrirTablero(opciones = {}) {
   const r = await abrir(Object.assign({}, opciones, { guardado: Object.assign({ 'seg.usuario': 'MAGALY' }, opciones.guardado || {}) }));
   try {
     if (!opciones.sinTarjetas) await r.pagina.waitForSelector('#tablero .tarjeta', { timeout: 10000 });
+    // Las franjas muestran 12 tarjetas y «Ver los N →»: las pruebas las abren todas para encontrar cualquier tarjeta,
+    // salvo la que prueba ese tope (opciones.conTope).
+    if (!opciones.sinTarjetas && !opciones.conTope) await r.pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
   } catch (e) { await r.navegador.close(); throw e; }
   return r;
 }
@@ -315,49 +325,55 @@ const datosDemo = pagina => pagina.evaluate(() => llamar('getTablero'));
 const pintadas = (pagina, n) => pagina.evaluate(n => {
   let grupo = '';
   const out = [];
-  document.querySelectorAll(`#tablero [data-col="${n}"] > *`).forEach(el => {
+  document.querySelectorAll(`#tablero [data-col="${n}"] .carril > *`).forEach(el => {
     if (el.tagName === 'H3') grupo = el.dataset.grupo;
     if (el.dataset.card) out.push({ id: el.dataset.card, texto: el.textContent.replace(/\s+/g, ' ').trim(), grupo });
   });
   return out;
 }, n);
 
-test('tablero: las cuatro columnas tienen las tarjetas del DEMO, cada una con su ETIQUETA literal', async () => {
+test('tablero: seis franjas del embudo, de arriba hacia abajo, con las tarjetas del DEMO y su ETIQUETA literal', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     const d = await datosDemo(pagina);
-    for (const c of Object.keys(COL_N)) {
+    // Orden de pantalla: Por contactar arriba … Completado abajo, numeradas 1 a 6, con una flecha entre franjas.
+    const franjas = await pagina.locator('#tablero > .col').evaluateAll(l => l.map(c => [c.dataset.col, c.querySelector('.f-num').textContent.trim(),
+      c.querySelector('h2').firstChild.textContent.trim()]));
+    assert.deepEqual(franjas, [['1', '1', 'Por contactar'], ['5', '2', 'Contactado'], ['6', '3', 'Pago realizado'], ['2', '4', 'Agendado'],
+      ['3', '5', 'En tratamiento'], ['4', '6', 'Completado']]);
+    assert.equal(await pagina.locator('#tablero > .baja').count(), 5);
+    for (const c of FASES) {
       const claves = d.columnas[c].map(t => t.CLAVE);
       const vistas = await pintadas(pagina, COL_N[c]);
-      assert.ok(vistas.length > 0, c);
+      assert.ok(vistas.length > 0, `el DEMO tiene al menos una tarjeta en ${c}`);
       for (const v of vistas) {
         assert.ok(claves.includes(v.id), `${v.id} pintada en ${c} y el servidor la pone en otra`);
         const t = d.columnas[c].find(x => x.CLAVE === v.id);
         assert.ok(v.texto.includes(t.ETIQUETA), `${v.id}: «${t.ETIQUETA}» en «${v.texto}»`);
       }
       if (c !== 'POR_CONTACTAR') assert.deepEqual(vistas.map(v => v.id).sort(), claves.slice().sort(), `${c}: todas`);
+      // La cifra de la cabecera es la de la franja.
+      assert.equal(await pagina.locator(`#tablero [data-col="${COL_N[c]}"] h2 .n`).textContent(), String(claves.length));
     }
-    const lucia = (await pintadas(pagina, '2')).find(v => v.id === '40999000|HEMATOLOGÍA');
+    // Contactado: llamar, reintentar y sin respuesta (las que antes estaban en Agendado).
+    assert.deepEqual(d.columnas.CONTACTADO.map(t => t.AGENDA).sort(), ['LLAMAR', 'REINTENTAR', 'SIN RESPUESTA']);
+    assert.deepEqual(d.columnas.AGENDADO.map(t => t.AGENDA), ['CITA'], 'Agendado: solo fechas reales');
+    const lucia = (await pintadas(pagina, '5')).find(v => v.id === '40999000|HEMATOLOGÍA');
     assert.ok(lucia.texto.includes('Reintentar el 02/10 · intento 2 de 3'), lucia.texto);
+    const norma = (await pintadas(pagina, '6'))[0];
+    assert.equal(norma.id, '43777888|HEMATOLOGÍA');
+    assert.ok(norma.texto.includes('Pagó el 30/09 · falta agendar'), norma.texto);
     // Rojo solo con ATRASO > 0 o SIN RESPUESTA.
     const mal = await pagina.evaluate(() => [...document.querySelectorAll('#tablero [data-card] .etq.mal, #tablero [data-card] .chip-fecha.mal')].map(e => e.closest('[data-card]').dataset.card).sort());
     const enRojo = Object.values(d.columnas).flat().filter(t => Number(t.ATRASO) > 0 || t.AGENDA === 'SIN RESPUESTA').map(t => t.CLAVE).sort();
     assert.deepEqual(enRojo, ['REG-000001', 'REG-000004'], 'el DEMO tiene una atrasada y una sin respuesta');
     assert.deepEqual(mal, enRojo);
-    // Agendado: «Esta semana» (FECHA_CLAVE ≤ hoy + 6) y «Más adelante», con el chip según AGENDA.
-    const ag = await pintadas(pagina, '2');
-    const grupo = Object.fromEntries(ag.map(v => [v.id, v.grupo]));
-    assert.equal(grupo['40999000|HEMATOLOGÍA'], 'semana');
-    assert.equal(grupo['40777888|HEMATOLOGÍA'], 'semana');
-    assert.equal(grupo['40888999|HIERRO'], 'despues');
-    assert.equal(grupo['REG-000004'], 'despues');
+    // Contactado y Agendado llevan la fecha en un chip (= ETIQUETA), no en una línea aparte.
     const chip = id => pagina.evaluate(id => [...document.querySelectorAll('[data-card]')].find(e => e.dataset.card === id).querySelector('.chip-fecha').textContent.trim(), id);
-    for (const t of d.columnas.AGENDADO) assert.equal(await chip(t.CLAVE), t.ETIQUETA, `chip de ${t.CLAVE} = ETIQUETA`);
+    for (const t of d.columnas.AGENDADO.concat(d.columnas.CONTACTADO)) assert.equal(await chip(t.CLAVE), t.ETIQUETA, `chip de ${t.CLAVE} = ETIQUETA`);
     assert.equal(await chip('40777888|HEMATOLOGÍA'), 'Cita el lun 05/10');
-    assert.equal(await chip('40999000|HEMATOLOGÍA'), 'Reintentar el 02/10 · intento 2 de 3');
-    assert.equal(await pagina.locator('#tablero [data-col="2"] [data-card] .etq').count(), 0, 'en Agendado la fecha no se repite');
-    assert.equal(await pagina.evaluate(() => [...document.querySelectorAll('[data-card]')].find(e => e.dataset.card === 'REG-000004').querySelector('.chip-fecha').classList.contains('mal')), true);
-    assert.deepEqual(await pagina.locator('#tablero [data-col="2"] h3').evaluateAll(l => l.map(h => h.dataset.grupo)), ['semana', 'despues']);
+    assert.equal(await pagina.locator('#tablero [data-col="2"] [data-card] .etq, #tablero [data-col="5"] [data-card] .etq').count(), 0, 'la fecha no se repite');
+    assert.deepEqual(await pagina.locator('#tablero [data-col="2"] h3').evaluateAll(l => l.map(h => h.dataset.grupo)), ['semana']);
     // La clave es texto y el adaptador conserva la forma de la referencia.
     const p = await pagina.evaluate(() => S.pacientes.find(x => x.id === '40444555|HEMATOLOGÍA'));
     assert.equal(p.col, 1);
@@ -369,52 +385,64 @@ test('tablero: las cuatro columnas tienen las tarjetas del DEMO, cada una con su
   } finally { await navegador.close(); }
 });
 
-test('tablero: Por contactar en tres grupos, en el orden del servidor, con «Ver 10 más de N»', async () => {
-  const { navegador, pagina, errores } = await abrirTablero();
+test('tablero: cada franja muestra hasta 12 tarjetas en su carril horizontal; «Ver los N →» la abre entera', async () => {
+  const { navegador, pagina, errores } = await abrirTablero({ conTope: true });
   try {
     const d = await datosDemo(pagina);
     const pc = d.columnas.POR_CONTACTAR;
     const por = { rec: [], mes: [], ant: [] };
     pc.forEach(t => por[grupoDe(diasDe(t))].push(t.CLAVE));   // ya vienen en el orden del servidor
-    assert.ok(por.rec.length > 16, 'el DEMO tiene suficientes recientes para «Ver 10 más»');
-    assert.deepEqual(await pagina.locator('#tablero [data-col="1"] h3').evaluateAll(l => l.map(h => h.dataset.grupo)), ['rec', 'mes', 'ant']);
-    assert.match(await pagina.locator('#tablero [data-col="1"] h3[data-grupo="rec"]').textContent(), /Recientes/);
-    assert.match(await pagina.locator('#tablero [data-col="1"] h3[data-grupo="mes"]').textContent(), /Hace 1 a 2 meses/);
-    assert.match(await pagina.locator('#tablero [data-col="1"] h3[data-grupo="ant"]').textContent(), /Más antiguos/);
+    assert.ok(pc.length > 12, 'el DEMO tiene más de 12 por contactar');
     let vistas = await pintadas(pagina, '1');
-    const de = g => vistas.filter(v => v.grupo === g).map(v => v.id);
-    assert.deepEqual(de('rec'), por.rec.slice(0, 6), 'recientes: 6, en el orden del servidor');
-    assert.deepEqual(de('mes'), por.mes.slice(0, 4));
-    assert.deepEqual(de('ant'), por.ant.slice(0, 3));
-    const resto = por.rec.length - 6;
-    assert.equal((await pagina.locator('[data-mas="rec"]').textContent()).trim(), `Ver 10 más de ${resto}`);
-    assert.equal(await pagina.locator('[data-mas="mes"]').count(), por.mes.length > 4 ? 1 : 0);
-    await pagina.locator('[data-mas="rec"]').click();
+    // Las primeras 12 del servidor, pintadas por grupo (Recientes, Hace 1 a 2 meses, Más antiguos) y en su orden dentro de cada uno.
+    const doce = pc.slice(0, 12);
+    assert.deepEqual(vistas.map(v => v.id), ['rec', 'mes', 'ant'].flatMap(g => doce.filter(t => grupoDe(diasDe(t)) === g).map(t => t.CLAVE)));
+    // Separadores de grupo dentro del carril, con el total del grupo.
+    const grupos = await pagina.locator('#tablero [data-col="1"] .carril > h3').evaluateAll(l => l.map(h => h.dataset.grupo));
+    assert.deepEqual(grupos, [...new Set(vistas.map(v => v.grupo))]);
+    assert.match(await pagina.locator('#tablero [data-col="1"] h3[data-grupo="rec"]').textContent(), new RegExp(`Recientes.*${por.rec.length}`));
+    // Las tarjetas van en fila: misma altura de arriba, cada vez más a la derecha; el carril se desplaza, la página no.
+    const caja = await pagina.locator('#tablero [data-col="1"] .tarjeta').evaluateAll(l => l.slice(0, 3).map(e => { const r = e.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.left), Math.round(r.width)]; }));
+    assert.ok(Math.abs(caja[0][0] - caja[1][0]) <= 3, 'en la misma fila');
+    assert.ok(caja[1][1] > caja[0][1] && caja[2][1] > caja[1][1]);
+    assert.ok(Math.abs(caja[0][2] - 270) <= 1, 'tarjetas de ~270 px');
+    assert.ok(await pagina.evaluate(() => { const c = document.querySelector('#tablero [data-col="1"] .carril'); return c.scrollWidth > c.clientWidth && getComputedStyle(c).overflowX === 'auto'; }));
+    assert.ok(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'sin scroll horizontal de la página');
+    // La cabecera de la franja: número, nombre, cifra, detalle y barra proporcional (la mayor, llena).
+    const barra = n => pagina.locator(`#tablero [data-col="${n}"] .f-barra i`).evaluate(i => i.style.width);
+    assert.equal(await barra('1'), '100%');
+    assert.ok(parseInt(await barra('6'), 10) < 100);
+    const mas = pagina.locator('#tablero [data-mas="1"]');
+    assert.equal((await mas.textContent()).trim(), `Ver los ${pc.length}`);
+    assert.equal(await pagina.locator('#tablero [data-mas]').count(), 1, 'solo la franja con más de 12');
+    await mas.click();
     vistas = await pintadas(pagina, '1');
-    assert.deepEqual(de('rec'), por.rec.slice(0, 16));
-    assert.equal((await pagina.locator('[data-mas="rec"]').textContent()).trim(), `Ver ${por.rec.length - 16} más de ${por.rec.length - 16}`);
+    assert.deepEqual(vistas.map(v => v.id).sort(), pc.map(t => t.CLAVE).sort(), 'abierta: todas');
+    assert.equal((await pagina.locator('#tablero [data-mas="1"]').textContent()).trim(), 'Ver menos');
+    assert.equal(await pagina.locator('#tablero [data-mas="1"]').getAttribute('aria-expanded'), 'true');
+    await pagina.locator('#tablero [data-mas="1"]').click();
+    assert.equal((await pintadas(pagina, '1')).length, 12);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
 
-test('tablero: las cifras coinciden con el DEMO y «N cerrados este mes» abre la lista', async () => {
+test('tablero: el detalle de cada fase coincide con el DEMO y «N cerrados este mes» abre la lista', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     const d = await datosDemo(pagina);
-    const celdas = await pagina.locator('#kpis > div').evaluateAll(l => l.map(c => ({
-      dt: c.querySelector('dt').textContent.trim(), dd: c.querySelector('dd').textContent.trim(),
-      span: c.querySelector('span').textContent.replace(/\s+/g, ' ').trim(), mal: c.querySelector('span').classList.contains('mal') })));
+    assert.equal(await pagina.locator('#kpis').count(), 0, 'la franja de cifras de arriba ya no existe: cada fase lleva la suya');
+    const sub = n => pagina.locator(`#tablero [data-col="${n}"] .f-sub`).textContent().then(t => t.replace(/\s+/g, ' ').trim());
     const pc = d.columnas.POR_CONTACTAR;
     const sinIntento = pc.filter(t => Number(t.N_SEGUIMIENTOS) === 0).length;
-    const atrasadas = pc.filter(t => Number(t.ATRASO) > 0).length;
-    assert.deepEqual(celdas.map(c => c.dt), ['Por contactar', 'Agendados', 'En tratamiento', 'Completados en el mes']);
-    assert.deepEqual(celdas.map(c => c.dd), [d.cifras.porContactar, d.cifras.agendados, d.cifras.enTratamiento, d.cifras.completadosMes].map(String));
-    assert.equal(celdas[0].span, `${sinIntento} sin ningún intento`);
-    assert.equal(celdas[1].span, '1 cita esta semana');
-    assert.equal(atrasadas, 1);
-    assert.equal(celdas[2].span, '1 sesión atrasada');
-    assert.equal(celdas[2].mal, true);
-    assert.match(celdas[3].span, new RegExp(`${d.cerrados.length} cerrados este mes`));
+    assert.equal(pc.filter(t => Number(t.ATRASO) > 0).length, 1);
+    assert.equal(await sub('1'), `${sinIntento} sin ningún intento · 1 sesión atrasada`);
+    assert.equal(await sub('5'), 'esperan respuesta · 1 por cerrarse');
+    assert.equal(await sub('6'), 'falta agendar');
+    assert.equal(await sub('2'), '1 cita esta semana');
+    assert.equal(await sub('3'), 'ninguna atrasada');
+    assert.match(await sub('4'), new RegExp(`volvieron, completaron o alta · ${d.cerrados.length} cerrados este mes`));
+    assert.deepEqual([d.cifras.porContactar, d.cifras.contactados, d.cifras.pagados, d.cifras.agendados, d.cifras.enTratamiento, d.cifras.completadosMes],
+      FASES.map(c => d.columnas[c].length));
     assert.equal(await visible(pagina, '#cerrados'), false);
     await pagina.locator('#ver-cerrados').click();
     assert.ok(await visible(pagina, '#cerrados'));
@@ -436,7 +464,7 @@ test('tablero: el filtro por tipo cambia los números y se recuerda; «Solo sin 
     const n = tipo => pc.filter(t => !tipo || t.TIPO_SEGUIMIENTO === tipo).length;
     const seg = () => pagina.locator('#seg button').evaluateAll(l => l.map(b => b.textContent.replace(/\s+/g, ' ').trim()));
     assert.deepEqual(await seg(), [`Todos ${n('')}`, `Reevaluaciones ${n('REEVALUACION')}`, `Hierro ${n('HIERRO')}`, `Procedimientos ${n('PROCEDIMIENTO')}`]);
-    const cifra = () => pagina.locator('#kpis > div:first-child dd').textContent();
+    const cifra = () => pagina.locator('#tablero [data-col="1"] h2 .n').textContent();
     assert.equal(await cifra(), String(n('')));
     // Chromium sobre file://: a veces el PRIMER documento de un contexto nuevo tiene un localStorage que nunca se
     // guarda (otra página del mismo contexto lee null, y tras reload() también). Se vio en ~1 de 7 corridas y nunca
@@ -511,26 +539,30 @@ test('tablero: la meta del día sale de hechosHoyPor y cambia con el usuario sin
   } finally { await navegador.close(); }
 });
 
-test('tablero: teclado (↓ j k →, Enter abre el panel, Esc lo cierra, C copia, / busca)', async () => {
+test('tablero: teclado (← → en la fase, ↑ ↓ j k de fase, Enter abre el panel, Esc lo cierra, C copia, / busca)', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     const sel = () => pagina.evaluate(() => [seleccion.id, [...document.querySelectorAll('.tarjeta.sel')].map(e => e.dataset.card)]);
-    const c1 = (await pintadas(pagina, '1')).map(v => v.id), c2 = (await pintadas(pagina, '2')).map(v => v.id);
+    const c1 = (await pintadas(pagina, '1')).map(v => v.id), c2 = (await pintadas(pagina, '5')).map(v => v.id);
     await pagina.keyboard.press('ArrowDown');
-    assert.deepEqual(await sel(), [c1[0], [c1[0]]]);
-    await pagina.keyboard.press('ArrowDown');
-    assert.deepEqual(await sel(), [c1[1], [c1[1]]]);
-    await pagina.keyboard.press('j');
-    assert.deepEqual(await sel(), [c1[2], [c1[2]]]);
-    await pagina.keyboard.press('k');
+    assert.deepEqual(await sel(), [c1[0], [c1[0]]], 'la primera flecha elige la primera tarjeta');
+    await pagina.keyboard.press('ArrowRight');
     assert.deepEqual(await sel(), [c1[1], [c1[1]]]);
     await pagina.keyboard.press('ArrowRight');
-    assert.deepEqual(await sel(), [c2[1], [c2[1]]], '→ pasa a la tarjeta más cercana de la columna siguiente');
+    assert.deepEqual(await sel(), [c1[2], [c1[2]]]);
+    await pagina.keyboard.press('ArrowLeft');
+    assert.deepEqual(await sel(), [c1[1], [c1[1]]]);
+    await pagina.keyboard.press('ArrowDown');
+    assert.deepEqual(await sel(), [c2[1], [c2[1]]], '↓ baja a la fase siguiente (Contactado), a la tarjeta de la misma posición');
+    await pagina.keyboard.press('k');
+    assert.deepEqual(await sel(), [c1[1], [c1[1]]], 'k sube de fase');
+    await pagina.keyboard.press('j');
+    assert.deepEqual(await sel(), [c2[1], [c2[1]]], 'j baja de fase');
     assert.equal(await pagina.evaluate(() => document.activeElement.dataset.card), c2[1]);
     // C copia el primer teléfono de la tarjeta (sin espacios).
     await pagina.keyboard.press('c');
     const d = await datosDemo(pagina);
-    const tel = d.columnas.AGENDADO.find(t => t.CLAVE === c2[1]).TELEFONOS.split(' / ')[0];
+    const tel = d.columnas.CONTACTADO.find(t => t.CLAVE === c2[1]).TELEFONOS.split(' / ')[0];
     await pagina.waitForFunction(tel => document.querySelector('#aviso span').textContent.includes(tel), tel);
     assert.match(await pagina.locator('#aviso span').textContent(), /^(Copiado: |No se pudo copiar\. El número es )\d{9}$/);
     // Enter abre el panel, sin animación, con el nombre; Esc lo cierra y vuelve a la tarjeta.
@@ -576,33 +608,41 @@ test('tablero: error con «Reintentar», carga con esqueletos y columnas vacías
     // Cargando: esqueletos y cifras con «—».
     await pagina.waitForSelector('#tablero .skel', { state: 'visible' });
     assert.equal(await pagina.locator('.error').count(), 0);
-    assert.deepEqual(await pagina.locator('#kpis dd').allTextContents(), ['—', '—', '—', '—']);
+    assert.deepEqual(await pagina.locator('#tablero h2 .n').allTextContents(), ['—', '—', '—', '—', '—', '—']);
     await pagina.waitForSelector('#tablero .tarjeta');
     assert.equal(await pagina.evaluate(() => DEMO._llamadas.getTablero), antes + 1);
     // Columnas vacías: el texto de cada columna, sin «Quitar filtros».
     await pagina.evaluate(() => {
-      DEMO.getTablero = () => ({ columnas: { POR_CONTACTAR: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] }, cerrados: [],
-        cifras: { porContactar: 0, agendados: 0, enTratamiento: 0, completadosMes: 0, cerradosMes: 0, hechosHoy: 0, hechosHoyPor: {} } });
+      DEMO.getTablero = () => ({ columnas: { POR_CONTACTAR: [], CONTACTADO: [], PAGO_REALIZADO: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] }, cerrados: [],
+        cifras: { porContactar: 0, contactados: 0, pagados: 0, agendados: 0, enTratamiento: 0, completadosMes: 0, cerradosMes: 0, hechosHoy: 0, hechosHoyPor: {} } });
       return cargarTablero();
     });
     assert.deepEqual(await pagina.locator('#tablero .vacio').allTextContents().then(l => l.map(t => t.trim())),
-      ['No hay pacientes por contactar.', 'Sin citas ni llamadas agendadas.', 'Nadie en tratamiento.', 'Todavía no hay cierres este mes.']);
+      ['No hay pacientes por contactar.', 'Nadie esperando respuesta.', 'Ningún pago esperando su fecha.', 'Sin citas ni sesiones agendadas.',
+        'Nadie en tratamiento.', 'Todavía no hay cierres este mes.']);
     assert.equal(await pagina.locator('#tablero .js-quitar').count(), 0);
     assert.equal(await pagina.locator('#metadia').textContent().then(t => t.replace(/\s+/g, ' ').trim()), 'Hoy: 0 de 15 seguimientos');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
 
-test('tablero en celular: una columna a la vez, con pestañas, sin scroll horizontal', async () => {
+test('tablero en celular: las seis franjas una debajo de otra, cabecera arriba y carril deslizable, sin scroll horizontal', async () => {
   const { navegador, pagina, errores } = await abrirTablero({ viewport: { width: 390, height: 844 } });
   try {
-    assert.ok(await visible(pagina, '#coltabs'));
-    const visibles = () => pagina.locator('#tablero .col').evaluateAll(l => l.filter(c => c.offsetParent).map(c => c.dataset.col));
-    assert.deepEqual(await visibles(), ['1']);
-    await pagina.locator('#coltabs [data-ct="2"]').click();
-    assert.deepEqual(await visibles(), ['2']);
-    assert.equal(await pagina.locator('#coltabs [data-ct="2"]').getAttribute('aria-selected'), 'true');
-    assert.ok(await pagina.evaluate(() => document.documentElement.scrollWidth <= 390));
+    assert.equal(await pagina.locator('#coltabs').count(), 0, 'ya no hay pestañas de columnas');
+    const franjas = await pagina.locator('#tablero > .col').evaluateAll(l => l.map(c => [c.dataset.col, !!c.offsetParent]));
+    assert.deepEqual(franjas, [['1', true], ['5', true], ['6', true], ['2', true], ['3', true], ['4', true]], 'todas visibles, en el orden del embudo');
+    const m = await pagina.evaluate(() => {
+      const col = document.querySelector('#tablero [data-col="1"]'), cab = col.querySelector('.f-cab').getBoundingClientRect();
+      const carril = col.querySelector('.carril'), r = carril.getBoundingClientRect(), t = carril.querySelector('.tarjeta').getBoundingClientRect();
+      return { cabArriba: cab.bottom <= r.top + 1, snap: getComputedStyle(carril).scrollSnapType, desliza: carril.scrollWidth > carril.clientWidth,
+        ancho: t.width / r.width, pagina: document.documentElement.scrollWidth };
+    });
+    assert.ok(m.cabArriba, 'la cabecera va encima de su carril');
+    assert.match(m.snap, /x mandatory/);
+    assert.ok(m.desliza);
+    assert.ok(m.ancho > .7 && m.ancho < .9, 'cada tarjeta ocupa ~82 % para que asome la siguiente');
+    assert.ok(m.pagina <= 390, 'sin scroll horizontal de la página');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -625,7 +665,7 @@ const llamadas = (pagina, fn) => pagina.evaluate(fn => DEMO._llamadas[fn] || 0, 
 const ultimo = (pagina, fn) => pagina.evaluate(fn => DEMO._ultimo[fn][0], fn);
 const aviso = pagina => pagina.locator('#aviso span').textContent();
 async function abrirPanelDe(pagina, id) {
-  await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+  await pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
   await pagina.locator(`#tablero [data-card="${id}"]`).click();
   await pagina.waitForFunction(id => seleccion.panel === id && document.getElementById('panel').classList.contains('abierto'), id);
 }
@@ -646,12 +686,12 @@ test('panel: hierro y procedimiento ofrecen «Aceptó» y «No desea realizarse�
   try {
     await abrirPanelDe(pagina, 'REG-000021');
     const botones = await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc));
-    assert.deepEqual(botones, ['nocontesto', 'pensara', 'acepto']);
+    assert.deepEqual(botones, ['nocontesto', 'pensara', 'acepto', 'pago'], '4 = «Pagó» en Por contactar');
     const cierres = await pagina.locator('#panel .acc.cierra [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc));
     assert.ok(cierres.includes('nodesea') && !cierres.includes('otro') && !cierres.includes('alta'));
     await pagina.keyboard.press('Escape');
     await abrirPanelDe(pagina, '40444555|HEMATOLOGÍA');
-    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo', 'pago']);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -741,14 +781,14 @@ test('panel: En tratamiento «Anular la última» pide motivo y anula ULTIMA_SES
 test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
-    // «Lo pensará» con fecha: Agendado, «Llamar …». El payload es el de MAPEO §1.3.
+    // «Lo pensará» con fecha: Contactado, «Llamar …». El payload es el de MAPEO §1.3.
     await abrirPanelDe(pagina, LUIS);
     await pagina.locator('#panel [data-acc="pensara"]').click();
     assert.equal(await pagina.locator('#panel #pf').inputValue(), '2026-10-02', 'propone mañana');
     assert.equal(await pagina.locator('#panel #pf').getAttribute('min'), '2026-10-02');
     assert.equal(await pagina.locator('#panel #pf').getAttribute('max'), '2026-12-30');
     await confirmarPaso(pagina, '2026-10-08');
-    await esperarCol(pagina, LUIS, '2');
+    await esperarCol(pagina, LUIS, '5');
     await esperarEstable(pagina);
     assert.match(await textoTarjeta(pagina, LUIS), /Llamar el jue 08\/10/);
     assert.deepEqual(await ultimo(pagina, 'registrarResultado'), { usuario: 'MAGALY', dni: '40444555', especialidad: 'HEMATOLOGÍA', referencia: '',
@@ -762,11 +802,11 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
     await esperarCol(pagina, CARMEN, '2');
     await esperarEstable(pagina);
     assert.match(await textoTarjeta(pagina, CARMEN), /Cita el mar 06\/10/);
-    // 1 sin abrir el panel: Agendado, «Reintentar …».
+    // 1 sin abrir el panel: Contactado, «Reintentar …».
     const antes = await llamadas(pagina, 'registrarResultado');
     await pagina.locator(`#tablero [data-card="${PEDRO}"]`).focus();
     await pagina.keyboard.press('1');
-    await esperarCol(pagina, PEDRO, '2');
+    await esperarCol(pagina, PEDRO, '5');
     await esperarEstable(pagina);
     assert.equal(await pagina.evaluate(() => seleccion.panel), '', '1 no abre el panel');
     assert.equal(await llamadas(pagina, 'registrarResultado'), antes + 1);
@@ -790,7 +830,7 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
     assert.match(await textoTarjeta(pagina, SOFIA), /Completó el tratamiento/);
     // Lo pintado coincide con lo que el DEMO (el servidor) tiene ahora.
     const d = await datosDemo(pagina);
-    for (const [id, c] of [[LUIS, 'AGENDADO'], [CARMEN, 'AGENDADO'], [PEDRO, 'AGENDADO'], [SOFIA, 'COMPLETADO']]) {
+    for (const [id, c] of [[LUIS, 'CONTACTADO'], [CARMEN, 'AGENDADO'], [PEDRO, 'CONTACTADO'], [SOFIA, 'COMPLETADO']]) {
       const t = d.columnas[c].find(x => x.CLAVE === id);
       assert.ok(t, `${id} en ${c} en el DEMO`);
       assert.ok((await textoTarjeta(pagina, id)).includes(t.ETIQUETA), `${id}: ${t.ETIQUETA}`);
@@ -812,7 +852,7 @@ test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corres
     let tab = await llamadas(pagina, 'getTablero');
     await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
     await pagina.keyboard.press('1');
-    await esperarCol(pagina, LUIS, '2');
+    await esperarCol(pagina, LUIS, '5');
     await esperarEstable(pagina);
     assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 7 de 15/);
     await deshacer();
@@ -855,10 +895,10 @@ test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corres
 test('panel: una recarga silenciosa pedida antes de un guardado no devuelve la tarjeta a su columna vieja (I1)', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
-    await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+    await pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
     await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
     await pagina.keyboard.press('1');
-    await esperarCol(pagina, LUIS, '2');
+    await esperarCol(pagina, LUIS, '5');
     await esperarEstable(pagina);
     // getTablero lee la hoja al pedirlo y responde 600 ms después, como un servidor que leyó antes del guardado.
     await pagina.evaluate(() => { DEMO._demora.getTablero = 600; DEMO._alPedir.getTablero = true; });
@@ -869,14 +909,14 @@ test('panel: una recarga silenciosa pedida antes de un guardado no devuelve la t
     // Durante la recarga, 1 sobre otra tarjeta: el guardado responde antes que la recarga.
     await pagina.locator(`#tablero [data-card="${CARMEN}"]`).focus();
     await pagina.keyboard.press('1');
-    await esperarCol(pagina, CARMEN, '2');
+    await esperarCol(pagina, CARMEN, '5');
     await esperarEstable(pagina);
     await pagina.waitForTimeout(800);   // llegó la foto vieja
-    assert.equal(await colPintada(pagina, CARMEN), '2', 'la foto de antes del guardado no se aplica');
+    assert.equal(await colPintada(pagina, CARMEN), '5', 'la foto de antes del guardado no se aplica');
     await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 2);
     await esperarCol(pagina, LUIS, '1');   // la recarga repetida sí trae lo deshecho
     await pagina.waitForTimeout(800);
-    assert.equal(await colPintada(pagina, CARMEN), '2', 'tras asentarse todo, Agendado');
+    assert.equal(await colPintada(pagina, CARMEN), '5', 'tras asentarse todo, Contactado');
     assert.equal(await colPintada(pagina, LUIS), '1');
     assert.equal(await llamadas(pagina, 'getTablero'), tab + 2, 'una sola recarga repetida, sin bucle');
     // Un guardado todavía en vuelo cuando llega la recarga: se descarta y se repide al terminar el guardado.
@@ -884,15 +924,15 @@ test('panel: una recarga silenciosa pedida antes de un guardado no devuelve la t
     await pagina.evaluate(() => { DEMO._demora.registrarResultado = 1500; cargarTablero(null, true); });
     await pagina.locator(`#tablero [data-card="${otra}"]`).focus();
     await pagina.keyboard.press('1');
-    await esperarCol(pagina, otra, '2');
+    await esperarCol(pagina, otra, '5');
     await pagina.waitForTimeout(900);   // la recarga ya llegó; el guardado sigue en vuelo
     assert.equal(await pagina.evaluate(() => S.enVuelo.size), 1);
-    assert.equal(await colPintada(pagina, otra), '2', 'con un guardado en vuelo la recarga no se aplica');
+    assert.equal(await colPintada(pagina, otra), '5', 'con un guardado en vuelo la recarga no se aplica');
     assert.equal(await llamadas(pagina, 'getTablero'), tab + 3);
     await esperarEstable(pagina);
     await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 4);
     await pagina.waitForTimeout(800);
-    assert.equal(await colPintada(pagina, otra), '2');
+    assert.equal(await colPintada(pagina, otra), '5');
     assert.equal(await llamadas(pagina, 'getTablero'), tab + 4);
     assert.equal(await pagina.evaluate(() => S.recargaPendiente), false);
     assert.deepEqual(errores, []);
@@ -902,10 +942,10 @@ test('panel: una recarga silenciosa pedida antes de un guardado no devuelve la t
 test('panel: un 1 pulsado mientras Deshacer anula no queda deshecho por la recarga que sale después (I1, guardado antes de pedirla)', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
-    await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+    await pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
     await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
     await pagina.keyboard.press('1');
-    await esperarCol(pagina, LUIS, '2');
+    await esperarCol(pagina, LUIS, '5');
     await esperarEstable(pagina);
     // La anulación termina antes que el guardado; la recarga se pide con el guardado en vuelo, lee la hoja antes
     // de que el guardado escriba y responde después de él.
@@ -918,16 +958,16 @@ test('panel: un 1 pulsado mientras Deshacer anula no queda deshecho por la recar
     await pagina.locator('#aviso button').click();   // Deshacer
     await pagina.locator(`#tablero [data-card="${CARMEN}"]`).focus();
     await pagina.keyboard.press('1');                // durante la anulación
-    await esperarCol(pagina, CARMEN, '2');
+    await esperarCol(pagina, CARMEN, '5');
     await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 1);
     assert.equal(await pagina.evaluate(() => S.enVuelo.size), 1, 'la recarga se pidió con el guardado en vuelo');
     await esperarEstable(pagina);                    // el guardado responde antes que la recarga
     await pagina.waitForTimeout(700);                // llegó la foto de antes del guardado
-    assert.equal(await colPintada(pagina, CARMEN), '2', 'la foto de antes del guardado no se aplicó');
+    assert.equal(await colPintada(pagina, CARMEN), '5', 'la foto de antes del guardado no se aplicó');
     await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 2);   // se descartó y se repidió
     await esperarCol(pagina, LUIS, '1');
     await pagina.waitForTimeout(800);
-    assert.equal(await colPintada(pagina, CARMEN), '2', 'tras asentarse todo, Agendado');
+    assert.equal(await colPintada(pagina, CARMEN), '5', 'tras asentarse todo, Contactado');
     assert.equal(await colPintada(pagina, LUIS), '1');
     assert.equal(await llamadas(pagina, 'getTablero'), tab + 2);
     assert.deepEqual(errores, []);
@@ -937,10 +977,10 @@ test('panel: un 1 pulsado mientras Deshacer anula no queda deshecho por la recar
 test('panel: en el tope de recargas descartadas queda una pendiente y el siguiente guardado la pide (I1, tope)', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
-    await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+    await pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
     await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
     await pagina.keyboard.press('1');
-    await esperarCol(pagina, LUIS, '2');
+    await esperarCol(pagina, LUIS, '5');
     await esperarEstable(pagina);
     // Cada getTablero cuenta como si saliera un guardado mientras viaja: las 4 respuestas (intento 0 a 3) se descartan.
     await pagina.evaluate(() => { window.__tab = DEMO.getTablero; DEMO.getTablero = (...a) => { S.escrituras++; return window.__tab(...a); }; });
@@ -951,7 +991,7 @@ test('panel: en el tope de recargas descartadas queda una pendiente y el siguien
     await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 4);
     await pagina.waitForTimeout(300);
     assert.equal(await llamadas(pagina, 'getTablero'), tab + 4, 'tope: sin bucle');
-    assert.equal(await colPintada(pagina, LUIS), '2', 'ninguna respuesta descartada se aplicó');
+    assert.equal(await colPintada(pagina, LUIS), '5', 'ninguna respuesta descartada se aplicó');
     assert.equal(await pagina.evaluate(() => S.recargaPendiente), true, 'en el tope queda pendiente');
     // El siguiente guardado, al terminar, pide un tablero nuevo que sí se aplica.
     await pagina.evaluate(() => { DEMO.getTablero = window.__tab; });
@@ -960,7 +1000,7 @@ test('panel: en el tope de recargas descartadas queda una pendiente y el siguien
     await esperarEstable(pagina);
     await pagina.waitForFunction(n => DEMO._llamadas.getTablero === n, tab + 5);
     await esperarCol(pagina, LUIS, '1');
-    assert.equal(await colPintada(pagina, CARMEN), '2');
+    assert.equal(await colPintada(pagina, CARMEN), '5');
     assert.equal(await pagina.evaluate(() => S.recargaPendiente), false);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -969,14 +1009,14 @@ test('panel: en el tope de recargas descartadas queda una pendiente y el siguien
 test('panel: si el servidor falla, todo vuelve, «No se guardó: …» y sin «Deshacer»', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
-    const cifras = () => pagina.locator('#kpis dd').allTextContents();
+    const cifras = () => pagina.locator('#tablero h2 .n').allTextContents();
     const antes = await cifras();
     await pagina.evaluate(() => { DEMO._fallar.registrarResultado = 'Sin conexión con el servidor.'; DEMO._demora.registrarResultado = 400; });
     await abrirPanelDe(pagina, LUIS);
     await pagina.locator('#panel [data-acc="pensara"]').click();
     await confirmarPaso(pagina, '2026-10-08');
     // Mientras tanto, se ve movida y la meta sumada.
-    await esperarCol(pagina, LUIS, '2');
+    await esperarCol(pagina, LUIS, '5');
     assert.notDeepEqual(await cifras(), antes);
     assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 7 de 15/);
     await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
@@ -1023,7 +1063,7 @@ test('panel: los cierres confirman en el panel; «Falleció» saca todas las tar
     await esperarCol(pagina, CARMEN, '');   // salen tras desvanecerse (180 ms)
     await esperarCol(pagina, CARMEN_H, '');
     assert.equal((await ultimo(pagina, 'registrarResultado')).resultado, 'FALLECIÓ');
-    assert.match(await pagina.locator('#kpis').textContent(), /3 cerrados este mes/);
+    assert.match(await pagina.locator('#tablero [data-col="4"] .f-sub').textContent(), /3 cerrados este mes/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -1238,7 +1278,7 @@ test('panel: atajos (1 guarda sin panel, X abre el cierre sin guardar, Esc cierr
     await esperarEstable(pagina);
     assert.equal(await llamadas(pagina, 'registrarResultado'), n + 1);
     assert.equal(await pagina.evaluate(() => seleccion.panel), '');
-    assert.equal(await colPintada(pagina, c1[0]), '2');
+    assert.equal(await colPintada(pagina, c1[0]), '5', '«No contestó» la baja a Contactado');
     assert.equal(await pagina.evaluate(() => seleccion.id), c1[1], 'la selección pasa a la siguiente');
     assert.equal(await pagina.evaluate(() => document.activeElement.dataset.card), c1[1]);
     // X abre el panel con el grupo de cierre resaltado, sin guardar.
@@ -1261,6 +1301,10 @@ test('panel: atajos (1 guarda sin panel, X abre el cierre sin guardar, Esc cierr
     // La segunda de Por contactar en el DEMO es el hierro de Ana María (REG-000003): su 3 es «Aceptó tratamiento».
     assert.equal(c1[1], 'REG-000003');
     assert.equal((await pagina.locator('#panel .paso h4').textContent()).trim(), 'Aceptó tratamiento');
+    await pagina.keyboard.press('Escape');
+    await pagina.keyboard.press('4');   // 4 = «Pagó»: abre su paso, no guarda
+    assert.equal((await pagina.locator('#panel .paso h4').textContent()).trim(), 'Pagó');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), n);
     await pagina.keyboard.press('Escape');
     await pagina.keyboard.press('Escape');
     assert.equal(await pagina.evaluate(() => seleccion.panel), '');
@@ -1318,11 +1362,11 @@ test('panel: si «Falleció» falla, vuelven todas las tarjetas del DNI y la cue
     await pagina.locator('#panel [data-confirmar]').click();
     await esperarCol(pagina, CARMEN, '');
     await esperarCol(pagina, CARMEN_H, '');
-    assert.match(await pagina.locator('#kpis').textContent(), /3 cerrados este mes/);
+    assert.match(await pagina.locator('#tablero [data-col="4"] .f-sub').textContent(), /3 cerrados este mes/);
     await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
     await esperarCol(pagina, CARMEN, '1');
     await esperarCol(pagina, CARMEN_H, '1');
-    assert.match(await pagina.locator('#kpis').textContent(), /2 cerrados este mes/);
+    assert.match(await pagina.locator('#tablero [data-col="4"] .f-sub').textContent(), /2 cerrados este mes/);
     assert.equal(await pagina.evaluate(() => S.cerrados.length), 2);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -1372,19 +1416,31 @@ test('panel: hierro y procedimiento no ofrecen «Alta médica» ni «Agendó cit
   } finally { await navegador.close(); }
 });
 
-/** Arrastra con el ratón una tarjeta hasta el centro de una columna. soltar:false deja el botón pulsado. */
+/**
+ * Arrastra con el ratón una tarjeta hasta el centro de una franja. Las franjas van una debajo de otra y no siempre caben
+ * las dos en la ventana: una vez arrancado el arrastre se desplaza la página hasta la franja de destino, como hace la app
+ * sola cuando el puntero llega al borde. soltar:false deja el botón pulsado.
+ */
 async function arrastrar(pagina, id, col, opciones = {}) {
-  const o = await pagina.evaluate(([id, col]) => {
+  const o = await pagina.evaluate(id => {
     const el = [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id);
-    el.scrollIntoView({ block: 'center' });   // el ratón de Playwright no desplaza la página
-    const t = el.getBoundingClientRect(), c = document.querySelector(`#tablero [data-col="${col}"]`).getBoundingClientRect();
-    return { x: t.left + t.width / 2, y: t.top + 20, cx: c.left + c.width / 2, cy: Math.min(Math.max(c.top + 40, 60), innerHeight - 60) };
-  }, [id, col]);
+    el.scrollIntoView({ block: 'center', inline: 'nearest' });   // el ratón de Playwright no desplaza la página
+    const t = el.getBoundingClientRect();
+    return { x: t.left + t.width / 2, y: t.top + 20 };
+  }, id);
   await pagina.mouse.move(o.x, o.y);
   await pagina.mouse.down();
   await pagina.mouse.move(o.x + 3, o.y + 2);   // menos de 6 px: aún no arranca
   if (opciones.alMedio) await opciones.alMedio();
-  await pagina.mouse.move(o.cx, o.cy, { steps: 8 });
+  await pagina.mouse.move(o.x + 12, o.y + 10);   // arranca
+  const c = await pagina.evaluate(col => {
+    const f = document.querySelector(`#tablero [data-col="${col}"]`);
+    const r0 = f.getBoundingClientRect();
+    if (r0.top < 0 || r0.bottom > innerHeight) scrollBy(0, r0.top - innerHeight / 2 + r0.height / 2);
+    const r = f.getBoundingClientRect();
+    return { cx: r.left + r.width * .6, cy: r.top + r.height / 2 };
+  }, col);
+  await pagina.mouse.move(c.cx, c.cy, { steps: 8 });
   if (opciones.sinSoltar) return;
   await pagina.mouse.up();
 }
@@ -1452,7 +1508,7 @@ test('arrastrar: una columna no válida devuelve la copia y avisa; Completado no
 test('arrastrar: a 390 px no hay arrastre', async () => {
   const { navegador, pagina, errores } = await abrirTablero({ viewport: { width: 390, height: 844 } });
   try {
-    const o = await pagina.evaluate(() => { const r = document.querySelector('#tablero .col.movil [data-card]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 20 }; });
+    const o = await pagina.evaluate(() => { const r = document.querySelector('#tablero [data-card]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 20 }; });
     await pagina.mouse.move(o.x, o.y); await pagina.mouse.down();
     await pagina.mouse.move(o.x + 60, o.y + 80, { steps: 6 });
     assert.equal(await pagina.locator('.tarjeta.fantasma').count(), 0);
@@ -2582,34 +2638,45 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     assert.equal(await pagina.locator('#imes').textContent(), 'setiembre 2026');
     assert.equal(await pagina.locator('#msig').isDisabled(), true, 'es el último mes');
 
-    // 1. Resumen del mes (setiembre, todos los médicos: 9 de 35).
-    assert.equal(await grande(pagina), '26%');
+    // 1. Resumen del mes (setiembre, todos los médicos: volvieron 26 de 35), en positivo (Etapa 3).
+    assert.equal(await grande(pagina), '74%');
     let t = await textoPanel(pagina);
-    assert.match(t, /de los pacientes de setiembre no volvieron a su reevaluación\./);
-    assert.match(t, /9 de 35 pacientes/);
-    assert.match(t, /Nuevos 3 de 17/);
-    assert.match(t, /En control 6 de 18/);
+    assert.match(t, /de los pacientes de setiembre volvieron a su reevaluación\./);
+    assert.match(t, /26 de 35 pacientes volvieron · 9 no/);
+    assert.match(t, /Nuevos 14 de 17/);
+    assert.match(t, /En control 12 de 18/);
     assert.match(t, /A 65 pacientes de este mes aún no les toca volver: no cuentan todavía\./);
-    assert.match(await pagina.locator('#ipanel .r-meta').textContent(), /Dentro de la meta: que vuelva el 60 %/);
-    assert.equal(await pagina.locator('#ipanel .r-meta.ok').count(), 1);
+    assert.match(await pagina.locator('#ipanel .res-izq .r-meta').textContent(), /^Meta cumplida: 74 % \(meta 60 %\)\. El mes sigue en curso\.$/);
+    assert.equal(await pagina.locator('#ipanel .res-izq .r-meta.ok').count(), 1);
+    assert.doesNotMatch(t, /como máximo|Fuera de la meta|no más de/, 'ninguna meta como tope');
+    // Las dos tarjetas unificadas: cumplimiento, reparto, meta en positivo y el comparativo con agosto.
+    const trat = k => pagina.locator(`#ipanel .trat-u[data-trat="${k}"]`).innerText().then(x => x.replace(/\s+/g, ' ').trim());
+    assert.equal(await trat('hierro'), 'Tratamiento de hierro 20 indicados 50 % cumplimiento Completaron 8 · 50 % No siguieron 8 · 50 % '
+      + 'En curso 4 · aún no cuentan Meta de cumplimiento: 95 % · a 45 puntos ▲ 15 puntos mejor que agosto (35 %). '
+      + 'Reacciones: 3 pacientes (inmediatas 1, mediatas 3). Contactos de enfermería a tiempo: 78 % (14 de 18).');
+    assert.equal(await trat('proc'), 'Procedimientos 5 cotizados 40 % cumplimiento Realizados 2 · 40 % No realizados 3 · 60 % '
+      + 'Meta de cumplimiento: 95 % · a 55 puntos ▲ 26 puntos mejor que agosto (14 %).');
+    assert.deepEqual(await pagina.locator('#ipanel .trat-u[data-trat="hierro"] .t-barra i').evaluateAll(l => l.map(i => [i.className, i.style.flexGrow])),
+      [['si', '8'], ['no', '8'], ['curso', '4']]);
+    assert.equal(await pagina.locator('#ipanel .trat-u .t-comp.mejor').count(), 2);
     assert.deepEqual(await pagina.locator('#ipanel .sec > div').evaluateAll(l => l.map(d => d.textContent.replace(/\s+/g, ' ').trim())), [
-      '40% no siguieron el tratamiento de hierro 8 de 20',
-      '0% completaron el tratamiento de hierro 0 de 12',
-      '60% no siguieron otros procedimientos 3 de 5',
       '39% volvieron tras el seguimiento 7 de 18']);
-    // Seis barras (abril a setiembre), la de setiembre rayada (en curso) y marcada; la línea de meta en el 40 %.
+    // Seis barras (abril a setiembre) con el % que VOLVIÓ, la de setiembre rayada (en curso) y marcada; la línea en la meta, 60 %.
     assert.deepEqual(await pagina.locator('#ipanel .barras [data-mes]').evaluateAll(l => l.map(b => b.dataset.mes)),
       ['2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09']);
     assert.equal(await pagina.locator('#ipanel .barras [data-mes="2026-09"]').getAttribute('aria-pressed'), 'true');
     assert.deepEqual(await pagina.locator('#ipanel .barras .curso').evaluateAll(l => l.map(b => b.dataset.mes)), ['2026-09']);
     assert.equal(await pagina.locator('#ipanel .barras .linea').count(), 1);
-    assert.match(await pagina.locator('#ipanel .mm-ley').textContent(), /Meta: no más de 40 %/);
+    assert.match(await pagina.locator('#ipanel .barras .linea').getAttribute('style'), /\* 0\.6\)/);
+    assert.equal(await pagina.locator('#ipanel .barras [data-mes="2026-09"] b').textContent(), '74%');
+    assert.match(await pagina.locator('#ipanel .mm-cab h2').textContent(), /% que volvió/);
+    assert.match(await pagina.locator('#ipanel .mm-ley').textContent(), /Meta: 60 %/);
 
     // 2. ¿Hasta dónde llegan? 100 cuadritos, el relato y la tabla con su total.
     await pestana(pagina, 'llegan');
     assert.equal(await pagina.locator('#ipanel .waffle i').count(), 100);
     assert.match(await pagina.locator('#ipanel .relato p').first().textContent(), /^De cada 100 pacientes nuevos, \d+ no vuelven nunca después de su primera consulta\.$/);
-    assert.match(await textoPanel(pagina), /La meta es que vuelva el 60 %; hoy vuelve el \d+ %\./);
+    assert.match(await textoPanel(pagina), /Meta de retorno: 60 %\. Hoy vuelve el \d+ %\./);
     const llegan = await filasDe(pagina, '.tabla');
     assert.deepEqual(llegan.map(f => f[0]), ['marzo 2026', 'abril 2026', 'mayo 2026', 'junio 2026', 'julio 2026', 'agosto 2026', 'Total']);
     assert.equal(llegan.at(-1)[1], '310');
@@ -2694,19 +2761,21 @@ test('indicadores: «Procedimientos sin paciente» guarda el DNI escrito, quita 
 test('indicadores: el mes cambia la cifra grande con ‹ › y con un clic en la barra', async () => {
   const { navegador, pagina, errores } = await abrirIndicadores();
   try {
-    assert.equal(await grande(pagina), '26%');
+    assert.equal(await grande(pagina), '74%');
     await pagina.locator('#mant').click();
     assert.equal(await pagina.locator('#imes').textContent(), 'agosto 2026');
-    assert.equal(await grande(pagina), '47%');
-    assert.match(await textoPanel(pagina), /67 de 142 pacientes/);
-    assert.equal(await pagina.locator('#ipanel .r-meta.mal').count(), 1);
-    assert.match(await pagina.locator('#ipanel .r-meta').textContent(), /Fuera de la meta por 7 puntos: la meta es que no vuelva como máximo el 40 %\./);
+    assert.equal(await grande(pagina), '53%');
+    assert.match(await textoPanel(pagina), /75 de 142 pacientes volvieron · 67 no/);
+    assert.equal(await pagina.locator('#ipanel .res-izq .r-meta.mal').count(), 1);
+    assert.equal((await pagina.locator('#ipanel .res-izq .r-meta').textContent()).trim(), 'Cumplimiento: 53 % · a 7 puntos de la meta (60 %).');
+    // En agosto, el comparativo mira julio (50 %): agosto quedó 15 puntos por debajo.
+    assert.equal(await pagina.locator('#ipanel .trat-u[data-trat="hierro"] .t-comp.peor').textContent(), '▼ 15 puntos peor que julio (50 %).');
     assert.equal(await pagina.locator('#ipanel .barras [data-mes="2026-08"]').getAttribute('aria-pressed'), 'true');
     assert.equal(await pagina.locator('#msig').isDisabled(), false);
     // Un clic en la barra de abril.
     await pagina.locator('#ipanel .barras [data-mes="2026-04"]').click();
     assert.equal(await pagina.locator('#imes').textContent(), 'abril 2026');
-    assert.notEqual(await grande(pagina), '47%');
+    assert.notEqual(await grande(pagina), '53%');
     // Marzo solo está en getKpi (primera consulta): se alcanza con ‹ y el resumen lo dice en una frase.
     await pagina.locator('#mant').click();
     assert.equal(await pagina.locator('#imes').textContent(), 'marzo 2026');
@@ -2715,7 +2784,7 @@ test('indicadores: el mes cambia la cifra grande con ‹ › y con un clic en la
     await pagina.locator('#msig').click();
     assert.equal(await pagina.locator('#imes').textContent(), 'abril 2026');
     await pagina.locator('#ipanel .barras [data-mes="2026-09"]').click();
-    assert.equal(await grande(pagina), '26%');
+    assert.equal(await grande(pagina), '74%');
     // El mes manda en Recuperación.
     await pagina.locator('#mant').click();
     await pestana(pagina, 'recup');
@@ -2732,8 +2801,8 @@ test('indicadores: el filtro de médico cambia las cifras; especialidad solo don
     assert.equal(await pagina.locator('#imed').inputValue(), '', 'una asesora ve a todos los médicos');
     assert.equal(await pagina.locator('#iesp-c').isVisible(), false, 'el Resumen del mes no tiene especialidad');
     await pagina.locator('#imed').selectOption(ELI);
-    assert.equal(await grande(pagina), '25%');
-    assert.match(await textoPanel(pagina), /de sus pacientes de setiembre no volvieron/);
+    assert.equal(await grande(pagina), '75%');
+    assert.match(await textoPanel(pagina), /de sus pacientes de setiembre volvieron/);
     await pestana(pagina, 'campanas');
     assert.deepEqual((await filasDe(pagina, '[data-tabla="canal"]'))[0], ['FACEBOOK ADS', '30', '38 % (11/29)', '1']);
     assert.equal(await pagina.locator('#iesp-c').isVisible(), false, 'campañas no tiene especialidad');
@@ -2759,9 +2828,9 @@ test('indicadores: un médico entra directo a Indicadores con su filtro propuest
     assert.equal(await pagina.locator('.menu [aria-current="page"]').getAttribute('data-sec'), 'indicadores');
     assert.equal(await pagina.locator('#imed').inputValue(), 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
     assert.equal(await pagina.locator('#imed').isDisabled(), false);
-    assert.equal(await grande(pagina), '25%');
+    assert.equal(await grande(pagina), '75%');
     await pagina.locator('#imed').selectOption('');
-    assert.equal(await grande(pagina), '26%');
+    assert.equal(await grande(pagina), '74%');
     // Cambiar de pestaña o de mes no le vuelve a imponer el filtro.
     await pestana(pagina, 'llegan');
     await pestana(pagina, 'resumen');
@@ -2854,7 +2923,7 @@ test('indicadores: getKpi y getResumen se piden al entrar, se guardan y se vuelv
     await pagina.locator('.menu [data-sec="indicadores"]').click();
     await pagina.waitForFunction(() => DEMO._llamadas.getKpi === 2 && DEMO._llamadas.getResumen === 2);
     await pagina.waitForSelector('#ipanel[data-tab] section');
-    assert.equal(await grande(pagina), '26%');
+    assert.equal(await grande(pagina), '74%');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -2882,7 +2951,7 @@ test('indicadores: si el servidor falla, «No se pudieron calcular los indicador
     await pagina.evaluate(() => { delete DEMO._fallar.getKpi; });
     await pagina.locator('#ipanel [data-reintentar]').click();
     await pagina.waitForSelector('#ipanel[data-tab] section');
-    assert.equal(await grande(pagina), '26%');
+    assert.equal(await grande(pagina), '74%');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -2917,7 +2986,7 @@ test('imprimible: se arma con los datos del DEMO, llama a window.print y su cifr
     assert.equal(await pagina.locator('#imprimible').isVisible(), false, 'oculto en pantalla');
     await espiarPrint(pagina);
     const pantalla = await grande(pagina);
-    assert.equal(pantalla, '26%');
+    assert.equal(pantalla, '74%');
     await imprimir(pagina);
     assert.equal(await pagina.evaluate(() => window.__print), 1);
     assert.equal(await pagina.locator('#imprimible .pag').count(), 2);
@@ -2927,17 +2996,22 @@ test('imprimible: se arma con los datos del DEMO, llama a window.print y su cifr
     const p1 = await pagina.locator('#imp-p1').textContent().then(t => t.replace(/\s+/g, ' '));
     assert.match(p1, /todos los médicos/);
     assert.match(p1, /setiembre 2026/);
-    assert.match(p1, /de los pacientes de setiembre no volvieron a su reevaluación\./);
-    assert.match(p1, /Son 9 de 35 pacientes/);
-    assert.deepEqual(await pagina.locator('#imp-p1 .imp-sec p').evaluateAll(l => l.map(p => p.textContent.replace(/\s+/g, ' ').trim())), [
-      '40% no siguieron el tratamiento de hierro (8 de 20).',
-      '0% completaron el tratamiento de hierro (0 de 12).',
-      '60% no siguieron otros procedimientos (3 de 5).',
-      '39% volvieron tras el seguimiento (7 de 18).']);
+    assert.match(p1, /de los pacientes de setiembre volvieron a su reevaluación\./);
+    assert.match(p1, /Son 26 de 35 pacientes; 9 no volvieron\./);
+    assert.match(p1, /Meta cumplida: 74 % \(meta 60 %\)\./);
+    assert.doesNotMatch(p1, /como máximo|Fuera de la meta/);
+    // La tarjeta unificada, igual que en la pantalla.
+    const imp = await pagina.locator('#imp-p1 .imp-trat').evaluateAll(l => l.map(p => p.textContent.replace(/\s+/g, ' ').trim()));
+    assert.equal(imp.length, 2);
+    assert.match(imp[0], /^50 %\s*Tratamiento de hierro · cumplimiento · 20 indicados\s*Completaron: 8 \(50 %\) · No siguieron: 8 \(50 %\) · en curso: 4\s*Meta de cumplimiento: 95 % · a 45 puntos\s*▲ 15 puntos mejor que agosto \(35 %\)\.\s*Reacciones: 3 pacientes \(inmediatas 1, mediatas 3\)\.\s*Contactos de enfermería a tiempo: 78 % \(14 de 18\)\.$/);
+    assert.match(imp[1], /^40 %\s*Procedimientos · cumplimiento · 5 cotizados\s*Realizados: 2 \(40 %\) · No realizados: 3 \(60 %\)\s*Meta de cumplimiento: 95 % · a 55 puntos\s*▲ 26 puntos mejor que agosto \(14 %\)\.$/);
+    assert.match(await pagina.locator('#imp-p1 .imp-rec').textContent(), /39% volvieron tras el seguimiento \(7 de 18\)\./);
+    assert.match(p1, /Mes a mes · % que volvió a su reevaluación/);
+    assert.match(await pagina.locator('#imp-p1 .imp-barras .linea').getAttribute('style'), /bottom:60%/);
     assert.equal(await pagina.locator('#imp-p1 .imp-barras [data-imp-mes]').count(), 6);
     assert.equal(await pagina.locator('#imp-p1 .imp-barras .curso').count(), 1);
     assert.equal(await pagina.locator('#imp-p1 .imp-conviene li').count(), 2);
-    assert.match(await pagina.locator('#imp-p1 .imp-conviene li').first().textContent(), /^Mejoró: de 50 % a 26 % en 6 meses\.$/);
+    assert.match(await pagina.locator('#imp-p1 .imp-conviene li').first().textContent(), /^Mejoró: de 50 % a 74 % en 6 meses\.$/);
     assert.match(await pagina.locator('#imp-p1 .imp-conviene li').nth(1).textContent(), /^Lo que más se pierde: 60 % no siguieron otros procedimientos \(3 de 5\)\.$/);
     const hoyDemo = await pagina.evaluate(() => DEMO.bootstrap().hoy);
     assert.equal(hoyDemo, '2026-10-01');
@@ -2956,7 +3030,7 @@ test('imprimible: se arma con los datos del DEMO, llama a window.print y su cifr
     await pestana(pagina, 'resumen');
     await pagina.locator('#imed').selectOption('Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
     const filtrada = await grande(pagina);
-    assert.equal(filtrada, '25%');
+    assert.equal(filtrada, '75%');
     await imprimir(pagina);
     assert.equal(await pagina.evaluate(() => window.__print), 2);
     assert.equal((await pagina.locator('#imprimible .imp-grande').textContent()).trim(), filtrada);
@@ -2975,7 +3049,7 @@ test('imprimible: si getResumen y getKpi no están en el caché, el botón los p
     const despues = await pagina.evaluate(() => ({ r: DEMO._llamadas.getResumen, k: DEMO._llamadas.getKpi }));
     assert.equal(despues.r, antes.r + 1);
     assert.equal(despues.k, antes.k + 1);
-    assert.equal((await pagina.locator('#imprimible .imp-grande').textContent()).trim(), '26%');
+    assert.equal((await pagina.locator('#imprimible .imp-grande').textContent()).trim(), '74%');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -2997,10 +3071,11 @@ test('queConvieneMirar: tendencia (mejoró, empeoró, se mantiene) y la cifra se
         sinNada: queConvieneMirar(mes([null]), [[0, 0, false, 'a', ''], [0, 0, true, 'b', ''], [0, 0, false, 'c', ''], [0, 0, true, 'd', '']], 60)
       };
     });
-    assert.deepEqual(frases.baja, ['Mejoró: de 61 % a 25 % en 6 meses.', 'Lo que más se pierde: 60 % no siguieron otros procedimientos (3 de 5).']);
-    assert.equal(frases.sube[0], 'Empeoró: de 30 % a 36 % en 3 meses.');
+    // p es el % que volvió: bajar es empeorar.
+    assert.deepEqual(frases.baja, ['Empeoró: de 61 % a 25 % en 6 meses.', 'Lo que más se pierde: 60 % no siguieron otros procedimientos (3 de 5).']);
+    assert.equal(frases.sube[0], 'Mejoró: de 30 % a 36 % en 3 meses.');
     assert.equal(frases.igual[0], 'Se mantiene alrededor de 43 %.');
-    assert.equal(frases.justo5[0], 'Empeoró: de 40 % a 45 % en 2 meses.');
+    assert.equal(frases.justo5[0], 'Mejoró: de 40 % a 45 % en 2 meses.');
     assert.equal(frases.justo4[0], 'Se mantiene alrededor de 44 %.');
     assert.equal(frases.peorHierro[1], 'Lo que más se pierde: 42 % no siguieron el tratamiento de hierro (5 de 12).');
     assert.equal(frases.sinNada.length, 2);
@@ -3154,7 +3229,7 @@ test('teclado completo: Tab hasta el tablero, flechas, Enter, 2, la fecha, Enter
     assert.equal(await pagina.locator('#pf').inputValue(), '2026-10-08');
     const antes = await llamadas(pagina, 'registrarResultado');
     await pagina.keyboard.press('Enter');
-    await esperarCol(pagina, id, '2');
+    await esperarCol(pagina, id, '5');   // Lo pensará: Contactado
     await esperarEstable(pagina);
     assert.equal(await llamadas(pagina, 'registrarResultado'), antes + 1, 'Enter en la fecha guarda una vez');
     assert.equal((await ultimo(pagina, 'registrarResultado')).fecha, '2026-10-08');
@@ -3174,10 +3249,10 @@ test('menú: el ítem activo lleva el icono relleno', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
     const iconos = () => pagina.locator('.side .menu [data-sec] i').evaluateAll(l => l.map(i => i.classList.contains('ph-fill')));
-    assert.deepEqual(await iconos(), [true, false, false, false]);
+    assert.deepEqual(await iconos(), [true, false, false, false, false]);
     await pagina.locator('.side [data-sec="registro"]').click();
     await pagina.waitForSelector('#v-registro', { state: 'visible' });
-    assert.deepEqual(await iconos(), [false, true, false, false]);
+    assert.deepEqual(await iconos(), [false, true, false, false, false]);
     assert.equal(await pagina.locator('.navmovil [data-sec="registro"] i').evaluate(i => i.classList.contains('ph-fill')), true);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -3375,7 +3450,7 @@ test('saludo: «doctora» para una médica; la hora es la de Lima aunque el nave
 test('tablero: «N citas esta semana» cuenta también la cita sin AGENDA con fecha (PROXIMA_AGENDADA), como el chip', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
-    const citas = () => pagina.locator('#kpis > div').nth(1).locator('span').textContent();
+    const citas = () => pagina.locator('#tablero [data-col="2"] .f-sub').textContent();
     const antes = Number((await citas()).match(/^(\d+)/)[1]);
     await pagina.evaluate(() => {
       const base = S.tablero.columnas.AGENDADO.find(t => t.AGENDA === 'CITA');
@@ -3403,7 +3478,7 @@ test('tablero: el filtro de mes muestra solo los pacientes de ese mes y se recue
     const meses = await pagina.evaluate(() => filtrados(true).map(p => p.raw.MES));
     assert.ok(meses.length && meses.every(m => m === mes));
     assert.equal(await pagina.evaluate(() => localStorage.getItem('seg.mes')), mes);
-    assert.equal(Number(await pagina.locator('#kpis > div').first().locator('dd').textContent()),
+    assert.equal(Number(await pagina.locator('#tablero [data-col="1"] h2 .n').textContent()),
       await pagina.evaluate(() => filtrados(true).filter(p => p.col === 1).length), 'la cifra de Por contactar sigue al filtro');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -3431,7 +3506,7 @@ test('panel: un tratamiento en curso ofrece «Agendó cita» (próxima sesión) 
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     await abrirPanelDe(pagina, ROSA);   // Rosa: hierro en curso, sesión 2 de 3 atrasada, en Por contactar
-    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo', 'pago']);
     const cierres = await pagina.locator('#panel .acc.cierra [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc));
     assert.ok(cierres.includes('otro') && !cierres.includes('nodesea'), 'en curso: «No desea continuar»');
     await pagina.locator('#panel [data-acc="agendo"]').click();
@@ -3464,13 +3539,13 @@ test('tablero: ningún mes del filtro sale de una fecha vacía («undefin»)', a
 test('tablero: «Por reevaluar» de un hierro terminado reemplaza la reevaluación vencida del mismo paciente', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
-    await pagina.evaluate(() => { S.lim = { rec: 99, mes: 99, ant: 99 }; pintarTablero(); });
+    await pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
     assert.equal(await colPintada(pagina, 'REG-000022'), '1');
     assert.match(await textoTarjeta(pagina, 'REG-000022'), /Por reevaluar · terminó el 12\/08/);
     assert.equal(await colPintada(pagina, '43666777|HEMATOLOGÍA'), '', 'la reevaluación vencida no se muestra');
     await abrirPanelDe(pagina, 'REG-000022');
     assert.equal(await pagina.locator('#panel .alerta').textContent(), 'Por reevaluar · terminó el 12/08', 'el panel no dice «sesión 2 de 1 pendiente»');
-    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo', 'pago']);
     await pagina.locator('#panel [data-acc="agendo"]').click();
     await confirmarPaso(pagina, masDiasIso(HOY_DEMO, 7));
     await esperarEstable(pagina);
@@ -3480,7 +3555,7 @@ test('tablero: «Por reevaluar» de un hierro terminado reemplaza la reevaluaci�
     await pagina.keyboard.press('Escape');
     await pagina.waitForFunction(() => !seleccion.panel);
     await abrirPanelDe(pagina, 'REG-000022');
-    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo'], 'en Agendado ya no se ofrece «Pagó»');
     assert.equal(await pagina.evaluate(() => accionDrop(S.pacientes.find(x => x.id === 'REG-000022'), 2)), null, 'ya está en Agendado');
     assert.deepEqual(await pagina.evaluate(() => accionDrop(Object.assign({}, S.pacientes.find(x => x.id === 'REG-000022'), { col: 1 }), 2)), { paso: 'agendo' });
     assert.deepEqual(errores, []);
@@ -3510,12 +3585,14 @@ test('panel: un control dice «Control + laboratorio», no «(Procedimiento)»',
   } finally { await navegador.close(); }
 });
 
-test('tablero: la ayuda de atajos dice «1–3 qué pasó»', async () => {
+test('tablero: la ayuda de atajos dice «1–4 qué pasó (4 = pagó)» y que ↑ ↓ cambian de fase', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     const t = (await pagina.locator('.atajos').first().textContent()).replace(/\s+/g, ' ');
-    assert.match(t, /1–3\s*qué pasó/);
-    assert.doesNotMatch(t, /1–4/);
+    assert.match(t, /1–4\s*qué pasó \(4 = pagó\)/);
+    assert.match(t, /↑ ↓\s*j k\s*cambiar de fase/);
+    assert.match(t, /← →\s*moverse en la fase/);
+    assert.match(t, /arrastre una tarjeta a otra fase/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -3694,6 +3771,285 @@ test('DEMO: los SEG-… no se repiten tras anular y volver a agendar', async () 
       return (await llamar('getPaciente', '40111222')).seguimientos.concat(p.seguimientos).map(s => s.ID);
     }, SOFIA);
     assert.equal(new Set(ids).size, ids.length, ids.join(', '));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ============ Etapa 3: embudo de seis fases y «Pagó» ============ */
+
+test('Pagó: el atajo 4 abre el paso con fecha y confirmación; al guardar la tarjeta baja a Pago realizado y «Deshacer» la devuelve', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('4');
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'pago');
+    assert.match(await pagina.locator('#panel .paso h4').textContent(), /Pagó/);
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0, 'el 4 no guarda solo');
+    assert.equal(await pagina.locator('#panel #pf').inputValue(), HOY_DEMO, 'propone hoy');
+    assert.equal(await pagina.locator('#panel #pf').getAttribute('min'), masDiasIso(HOY_DEMO, -30));
+    assert.equal(await pagina.locator('#panel #pf').getAttribute('max'), HOY_DEMO);
+    assert.equal((await pagina.locator('#panel [data-confirmar]').textContent()).trim(), 'Pasar a Pago realizado');
+    await confirmarPaso(pagina, '2026-09-29');
+    await esperarCol(pagina, LUIS, '6');   // se mueve en el acto
+    await esperarEstable(pagina);
+    const u = await ultimo(pagina, 'registrarResultado');
+    assert.deepEqual([u.resultado, u.fecha], ['PAGO', '2026-09-29']);
+    assert.match(await textoTarjeta(pagina, LUIS), /Pagó el 29\/09 · falta agendar/);
+    assert.equal(await pagina.locator(`#tablero [data-col="6"] h2 .n`).textContent(), '2');
+    assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 7 de 15/, 'el pago cuenta en la meta del día');
+    // En Pago realizado, el 4 ya no hace nada y un «No contestó» no la devuelve a Contactado.
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('4');
+    assert.equal(await pagina.evaluate(() => seleccion.panel), '');
+    await pagina.locator('#aviso button:not([hidden])').waitFor();
+    await pagina.locator('#aviso button').click();   // Deshacer el pago
+    await pagina.waitForFunction(() => DEMO._llamadas.anularResultado === 1);
+    await esperarCol(pagina, LUIS, '1');
+    await pagina.waitForFunction(() => /Hoy: 6 de 15/.test(document.getElementById('metadia').textContent));
+    // De nuevo: pagar y luego «No contestó» se queda en Pago realizado.
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('4');
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'pago');
+    await confirmarPaso(pagina);
+    await esperarCol(pagina, LUIS, '6');
+    await esperarEstable(pagina);
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('1');
+    await esperarEstable(pagina);
+    assert.equal(await colPintada(pagina, LUIS), '6', 'quien pagó no vuelve a Contactado');
+    // «Agendó cita» la baja a Agendado.
+    await abrirPanelDe(pagina, LUIS);
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'agendo']);
+    await pagina.locator('#panel [data-acc="agendo"]').click();
+    await confirmarPaso(pagina, masDiasIso(HOY_DEMO, 4));
+    await esperarCol(pagina, LUIS, '2');
+    await esperarEstable(pagina);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Pagó: el servidor rechaza un pago sin fecha, fuera de rango o en Agendado', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const pagar = (o) => pagina.evaluate(o => llamar('registrarResultado', Object.assign({ usuario: 'MAGALY', especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'PAGO' }, o))
+      .then(() => 'ok', e => e.message), o);
+    assert.equal(await pagar({ dni: '40444555', fecha: '' }), 'Falta la fecha del pago.');
+    assert.equal(await pagar({ dni: '40444555', fecha: '2026-10-02' }), 'La fecha del pago va de hace 30 días a hoy.');
+    assert.equal(await pagar({ dni: '40777888', fecha: HOY_DEMO }), 'El paciente ya tiene fecha: el pago no cambia su fase.');
+    assert.equal(await pagar({ dni: '43777888', fecha: HOY_DEMO }), 'Ya figura el pago del 30/09.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('arrastrar: a Pago realizado abre «Pagó»; a Contactado abre «¿Qué pasó?» con No contestó y Lo pensará señalados; nada se guarda', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await arrastrar(pagina, LUIS, 6);
+    await pagina.waitForFunction(() => P.paso && P.paso.k === 'pago');
+    assert.equal(await colPintada(pagina, LUIS), '1', 'sigue en su fase hasta confirmar');
+    await pagina.keyboard.press('Escape'); await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !seleccion.panel);
+    await arrastrar(pagina, PEDRO, 5);
+    await pagina.waitForFunction(() => seleccion.panel === '40666777|PROCEDIMIENTO' && document.getElementById('panel').classList.contains('abierto'));
+    assert.equal(await pagina.evaluate(() => P.paso), null, 'no es un paso: ninguno pide confirmar');
+    assert.deepEqual(await pagina.locator('#panel .acc button.sugerido').evaluateAll(l => l.map(b => b.dataset.acc)), ['nocontesto', 'pensara']);
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !seleccion.panel);
+    // Una tarjeta con fecha no vuelve a Contactado ni a Pago realizado.
+    await arrastrar(pagina, '40777888|HEMATOLOGÍA', 6);
+    assert.equal(await aviso(pagina), 'El paciente ya tiene fecha: el pago no cambia su fase.');
+    await pagina.waitForFunction(() => !document.querySelector('.tarjeta.fantasma'));
+    await arrastrar(pagina, '43777888|HEMATOLOGÍA', 5);
+    assert.match(await aviso(pagina), /Ya pagó/);
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('embudo en oscuro: las franjas y sus cabeceras usan los tokens del modo oscuro', async () => {
+  const { navegador, pagina, errores } = await abrirTablero({ colorScheme: 'dark' });
+  try {
+    assert.equal(await pagina.evaluate(() => document.documentElement.dataset.modo), 'oscuro');
+    const c = await pagina.evaluate(() => {
+      const col = document.querySelector('#tablero [data-col="6"]'), cs = getComputedStyle(document.documentElement);
+      return { fondo: getComputedStyle(col).backgroundColor, cab: getComputedStyle(col.querySelector('.f-cab')).backgroundColor,
+        col: cs.getPropertyValue('--col').trim(), surface: cs.getPropertyValue('--surface').trim() };
+    });
+    assert.equal(c.col, '#13171D');
+    assert.equal(c.fondo, 'rgb(19, 23, 29)');
+    assert.equal(c.cab, 'rgb(23, 27, 34)', 'la cabecera de la franja es --surface en oscuro');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ============ Enfermería (spec 2026-10-20-enfermeria-design.md) ============ */
+
+async function abrirEnfermeria(opciones = {}) {
+  const r = await abrir(Object.assign({}, opciones, { guardado: { 'seg.usuario': 'ENFERMERA PRUEBA' } }));
+  try {
+    await r.pagina.locator('.menu [data-sec="enfermeria"]').click();
+    await r.pagina.waitForSelector('#enf-cuerpo .enf');
+  } catch (e) { await r.navegador.close(); throw e; }
+  return r;
+}
+const filasEnf = pagina => pagina.locator('#enf-cuerpo [data-enf]').evaluateAll(l => l.map(li => ({ clave: li.dataset.enf,
+  grupo: li.closest('[data-grupo-enf]').dataset.grupoEnf, texto: li.textContent.replace(/\s+/g, ' ').trim() })));
+
+test('Enfermería: contactos a los días 1, 3 y 5 de cada sesión de hierro, en orden de llamada (vencidos, hoy, próximos)', async () => {
+  const { navegador, pagina, errores } = await abrirEnfermeria();
+  try {
+    const f = await filasEnf(pagina);
+    assert.deepEqual(f.map(x => [x.clave, x.grupo]), [
+      ['SES-000003|5', 'VENCIDO'], ['SES-000002|1', 'VENCIDO'], ['SES-000004|1', 'VENCIDO'],
+      ['SES-000002|3', 'HOY'], ['SES-000004|3', 'PROXIMO'], ['SES-000002|5', 'PROXIMO'], ['SES-000004|5', 'PROXIMO']],
+      'las sesiones de hace más de 10 días no aparecen; los días 1 y 3 de Carlos ya están cumplidos');
+    const carlos = f[0].texto;
+    assert.match(carlos, /Carlos Enrique Núñez León/);
+    assert.match(carlos, /Hierro derisomaltosa · Monofer/);
+    assert.match(carlos, /Sesión 1 de 2 · aplicada el 22\/09/);
+    assert.match(carlos, /Día 5 · tocaba el 27\/09 · hace 4 días/);
+    assert.match(carlos, /Día 1: mediata · Cefalea/, 'la reacción de un contacto anterior de esa sesión');
+    assert.match(carlos, /No contestó 1 vez/);
+    assert.match(carlos, /987 333 444/);
+    assert.match(f[2].texto, /En la aplicación: inmediata · Náuseas/);
+    assert.match(f[3].texto, /Día 3 · toca hoy/);
+    assert.equal(await pagina.locator('#enf-cuerpo details[data-grupo-enf="PROXIMO"]').getAttribute('open'), null, 'Próximos va plegado');
+    assert.match(await pagina.locator('#enf-sub').textContent(), /^4 contactos por hacer hoy/);
+    assert.ok(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Enfermería: «Ya me contacté» pide la reacción (y la nota con «Otra»), guarda, saca la fila y «Deshacer» la devuelve', async () => {
+  const { navegador, pagina, errores } = await abrirEnfermeria();
+  try {
+    const clave = 'SES-000002|1';
+    const fila = `#enf-cuerpo [data-enf="${clave}"]`;
+    await pagina.locator(`${fila} [data-enf-ya]`).click();
+    assert.equal(await pagina.locator(`${fila} .enf-panel`).count(), 1, 'el panel se abre en la misma fila');
+    await pagina.locator(`${fila} [data-enf-guardar]`).click();
+    assert.equal(await aviso(pagina), 'Elija si tuvo reacción: no, inmediata o mediata.');
+    await pagina.locator(`${fila} [data-enf-tipo="INMEDIATA"]`).click();
+    assert.ok(await pagina.locator(`${fila} [data-enf-reac="Fiebre"]`).isVisible(), 'con reacción aparecen las del catálogo');
+    await pagina.locator(`${fila} [data-enf-guardar]`).click();
+    assert.equal(await aviso(pagina), 'Elija al menos una reacción.');
+    await pagina.locator(`${fila} [data-enf-reac="Fiebre"]`).click();
+    await pagina.locator(`${fila} [data-enf-reac="Otra"]`).click();
+    assert.match(await pagina.locator(`${fila} .enf-panel`).textContent(), /obligatoria/);
+    await pagina.locator(`${fila} [data-enf-guardar]`).click();
+    assert.equal(await aviso(pagina), 'Escriba cuál fue la reacción en la nota («Otra»).');
+    assert.equal(await llamadas(pagina, 'registrarContactoEnfermeria'), 0, 'nada se envía sin completar');
+    await pagina.locator('#enf-nota').fill('Escalofríos');
+    await pagina.locator(`${fila} [data-enf-guardar]`).click();
+    await pagina.waitForFunction(c => !document.querySelector(`#enf-cuerpo [data-enf="${c}"]`), clave);
+    await pagina.waitForFunction(() => /^Guardado:/.test(document.querySelector('#aviso span').textContent));
+    const u = await ultimo(pagina, 'registrarContactoEnfermeria');
+    assert.deepEqual([u.usuario, u.clave, u.resultado, u.reaccionTipo, u.reacciones, u.nota],
+      ['ENFERMERA PRUEBA', clave, 'CONTACTADO', 'INMEDIATA', ['Fiebre', 'Otra'], 'Escalofríos']);
+    assert.match(await aviso(pagina), /Sofía Alejandra Ruiz Pinto · día 1 · contactado, reacción inmediata: Fiebre, Otra\./);
+    // La reacción aparece en los contactos siguientes de esa sesión.
+    assert.match((await filasEnf(pagina)).find(x => x.clave === 'SES-000002|3').texto, /Día 1: inmediata · Fiebre · Otra/);
+    await pagina.locator('#aviso button:not([hidden])').click();   // Deshacer
+    await pagina.waitForFunction(() => DEMO._llamadas.anularContactoEnfermeria === 1);
+    await pagina.waitForFunction(c => !!document.querySelector(`#enf-cuerpo [data-enf="${c}"]`), clave);
+    assert.equal((await ultimo(pagina, 'anularContactoEnfermeria')).motivo, 'Deshecho al momento');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Enfermería: «No contestó» guarda sin preguntar y deja la fila con «No contestó n veces»; sin reacción también se cumple', async () => {
+  const { navegador, pagina, errores } = await abrirEnfermeria();
+  try {
+    const fila = '#enf-cuerpo [data-enf="SES-000003|5"]';
+    await pagina.locator(`${fila} [data-enf-nc]`).click();
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 1);
+    await pagina.waitForFunction(s => /No contestó 2 veces/.test(document.querySelector(s).textContent), fila);
+    assert.equal((await ultimo(pagina, 'registrarContactoEnfermeria')).resultado, 'NO CONTESTO');
+    await pagina.locator(`${fila} [data-enf-ya]`).click();
+    await pagina.locator(`${fila} [data-enf-tipo="NINGUNA"]`).click();
+    assert.equal(await pagina.locator(`${fila} [data-enf-reac]`).count(), 0, 'sin reacción no hay chips');
+    await pagina.locator(`${fila} [data-enf-guardar]`).click();
+    await pagina.waitForFunction(s => !document.querySelector(s), fila);
+    assert.equal((await ultimo(pagina, 'registrarContactoEnfermeria')).reaccionTipo, 'NINGUNA');
+    // Si el servidor falla, la fila vuelve y se avisa.
+    await pagina.evaluate(() => { DEMO._fallar.registrarContactoEnfermeria = 'Sin conexión.'; });
+    await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] [data-enf-nc]').click();
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] .enf-nc').count(), 0, 'la cuenta vuelve a cero');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Enfermería: marcar una sesión de hierro con «¿Reacción durante la aplicación?» guarda la reacción y crea sus contactos', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, SOFIA);
+    assert.ok(await pagina.locator('#panel .reac-aplic').isVisible());
+    assert.equal(await pagina.locator('#panel .reac-aplic [data-ra="no"]').getAttribute('aria-pressed'), 'true', 'por omisión, no');
+    await pagina.locator('#panel .reac-aplic [data-ra="si"]').click();
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    assert.equal(await aviso(pagina), 'Elija al menos una reacción.');
+    await pagina.locator('#panel .reac-aplic [data-ra-reac="Mareo"]').click();
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.marcarSesion > 0);
+    assert.deepEqual((await ultimo(pagina, 'marcarSesion')).reaccion, { hubo: true, reacciones: ['Mareo'], nota: '' });
+    await esperarEstable(pagina);
+    // La sesión nueva ya tiene sus contactos, con la reacción de la aplicación.
+    await pagina.locator('.menu [data-sec="enfermeria"]').click();
+    await pagina.waitForSelector('#enf-cuerpo .enf');
+    const f = await filasEnf(pagina);
+    const nueva = f.find(x => /Sofía/.test(x.texto) && /Sesión 2 de 3/.test(x.texto));
+    assert.ok(nueva, 'la sesión 2 de Sofía tiene sus contactos');
+    assert.match(nueva.texto, /En la aplicación: inmediata · Mareo/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Enfermería: la ficha muestra el historial bajo el tratamiento y el Resumen del mes trae las cifras', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    await pagina.evaluate(() => abrirFicha('41333444'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    const t = await pagina.locator('#ficha .trat-enf').first().textContent().then(x => x.replace(/\s+/g, ' '));
+    assert.match(t, /Sesión 1 · Día 1 · mediata: Cefalea · Leve, cedió con paracetamol/);
+    assert.match(t, /Sesión 1 · Día 5 · no contestó/);
+    assert.match(t, /Sesión 2 · En la aplicación · inmediata: Náuseas/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Registro: una primera sesión con fecha pasada avisa y marca la sesión 1 hecha al guardar', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('46111222');
+    await pagina.locator('#rnom').fill('Paciente Prueba Enfermería');
+    await pagina.locator('#rtel').fill('987111000');
+    await pagina.locator('#rfec').fill('2026-09-28');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.locator('#rtrats [data-trat="HIERRO SACARATO"]').click();
+    await pagina.locator('#rses [data-ses="3"], #rses button:has-text("3")').first().click();
+    await pagina.locator('#rinicio').fill('2026-09-30');
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    assert.equal((await pagina.locator('#rinicio-n').textContent()).trim(), 'La sesión 1 se marcará como hecha el 30/09.');
+    assert.equal(await pagina.locator('#rinicio').getAttribute('min'), '2026-09-28', 'desde la fecha del registro');
+    assert.equal((await pagina.locator('#rfalta').textContent()).trim(), 'Se creará 1 registro con la sesión 1 hecha el 30/09.');
+    await pagina.locator('#rinicio').fill('2026-10-05');
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    assert.equal((await pagina.locator('#rinicio-n').textContent()).trim(), 'Quedará programada para el 05/10.');
+    assert.equal((await pagina.locator('#rfalta').textContent()).trim(), 'Se creará 1 registro.');
+    await pagina.locator('#rinicio').fill('2026-09-30');
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForFunction(() => /^Registro guardado/.test(document.querySelector('#aviso span').textContent));
+    assert.match(await aviso(pagina), /sesión 1 hecha el 30\/09$/);
+    assert.equal((await ultimo(pagina, 'guardarRegistro')).fechaInicio, '2026-09-30');
+    const r = await pagina.evaluate(() => llamar('getPaciente', '46111222'));
+    assert.deepEqual(r.registros[0].sesiones.map(s => [s.NUMERO, s.FECHA]), [[1, '2026-09-30']]);
+    // Antes de la fecha del registro: el DEMO lo rechaza como el servidor.
+    const e = await pagina.evaluate(() => llamar('guardarRegistro', { usuario: 'MAGALY', dni: '46111333', nombre: 'Otra Prueba', contacto: '987111001',
+      fecha: '2026-09-28', doctor: 'Dr. Elí Cabanillas', tratamiento: 'HIERRO SACARATO', sesiones: 2, fechaInicio: '2026-09-20' }).then(() => 'ok', x => x.message));
+    assert.equal(e, 'La primera sesión no puede ser anterior a la fecha del registro (28/09/2026).');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

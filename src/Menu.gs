@@ -32,7 +32,8 @@ function hojasBase_() {
     KPI: ['RETORNO POR COHORTE'],
     REGISTROS: COLUMNAS_REGISTROS,
     SESIONES: COLUMNAS_SESIONES,
-    ALTAS: COLUMNAS_ALTAS
+    ALTAS: COLUMNAS_ALTAS,
+    ENFERMERIA: COLUMNAS_ENFERMERIA
   };
 }
 
@@ -44,11 +45,15 @@ var CATALOGO_REGISTRO_INICIAL = {
     'Dr. ALVARO MARTIN VILLANUEVA GARCIA', 'Dra. KAREN DIANA MATOS PEÑA', '', 'Dr. IVAN PAOLO PACHECO MODESTO'],
   PROCEDIMIENTOS: ['SANGRÍA', 'AMO', 'BIOPSIA', 'CITOMETRÍA DE FLUJO', 'CARIOTIPO', 'TRANSFUSIÓN DE SANGRE'],
   TRATAMIENTOS: ['HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA'],
-  MARCAS: ['HIERRO CARBOXIMALTOSA | FERINJECT', 'HIERRO CARBOXIMALTOSA | LIKFER', 'HIERRO DERISOMALTOSA | MONOFER']
+  MARCAS: ['HIERRO CARBOXIMALTOSA | FERINJECT', 'HIERRO CARBOXIMALTOSA | LIKFER', 'HIERRO DERISOMALTOSA | MONOFER'],
+  // Enfermería: las reacciones que se eligen al registrar un contacto o una sesión (REACCIONES_INICIALES en Logica.gs).
+  REACCIONES: REACCIONES_INICIALES
 };
 
 var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
-  ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30]];
+  ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30], ['META_CUMPLIMIENTO_TRATAMIENTO_PCT', 95],
+  // Enfermería: días tras cada sesión de hierro para llamar, y cuántos días atrás todavía se muestra un contacto.
+  ['ENFERMERIA_DIAS', '1,3,5'], ['ENFERMERIA_CORTE_DIAS', 10]];
 
 /** Lo que la pestaña Registro necesita en hojas que ya existen. No borra ni mueve nada. Devuelve qué cambió. */
 function ampliarHojas_() {
@@ -64,7 +69,7 @@ function ampliarHojas_() {
     }
   }
 
-  [['REGISTROS', COLUMNAS_REGISTROS], ['ALTAS', COLUMNAS_ALTAS]].forEach(function (par) {
+  [['REGISTROS', COLUMNAS_REGISTROS], ['ALTAS', COLUMNAS_ALTAS], ['ENFERMERIA', COLUMNAS_ENFERMERIA]].forEach(function (par) {
     var sh = ss.getSheetByName(par[0]);
     if (!sh) return;
     var cab = encabezado_(sh), plan = encabezadoAmpliable(cab, par[1]);
@@ -111,7 +116,10 @@ function ampliarHojas_() {
         var fila = col.length + 1;
         for (var i = 1; i < col.length; i++) if (!col[i]) { fila = i + 1; break; }
         rg.getRange(fila, cP + 1).setValue(par[0]);
-        rg.getRange(fila, cV + 1).setValue(par[1]);
+        // «1,3,5» se guarda como texto: Sheets no debe leerlo como un número.
+        var celdaV = rg.getRange(fila, cV + 1);
+        if (typeof par[1] === 'string') celdaV.setNumberFormat('@');
+        celdaV.setValue(par[1]);
         col[fila - 1] = par[0];
         cambios.push('REGLAS: ' + par[0] + ' = ' + par[1] + '.');
       });

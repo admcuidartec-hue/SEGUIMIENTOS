@@ -820,7 +820,8 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
     await esperarCol(pagina, SOFIA, '3');
-    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
+    // Como etiquetaDe de Tablero.gs: las sesiones hechas, las que faltan y la próxima.
+    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 2 de 3 · faltan 1 · próxima ~08\/10/);
     assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
     await abrirPanelDe(pagina, SOFIA);
     assert.match(await pagina.locator('#panel [data-marcar-sesion]').textContent(), /Marcar sesión 3 hecha/);
@@ -836,6 +837,36 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
       assert.ok((await textoTarjeta(pagina, id)).includes(t.ETIQUETA), `${id}: ${t.ETIQUETA}`);
     }
     assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 11 de 15/, 'la meta suma 1 por guardado');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('tablero y ficha: tras marcar una sesión, la tarjeta En tratamiento dice lo mismo que el servidor y que la ficha', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    // Todo lo que la tarjeta llega a mostrar, también la previsión antes de la respuesta.
+    await pagina.evaluate(id => {
+      window.__vistas = [];
+      const ver = () => { const el = [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id);
+        if (el) window.__vistas.push(el.textContent.replace(/\s+/g, ' ').trim()); };
+      new MutationObserver(ver).observe(document.getElementById('tablero'), { childList: true, subtree: true, characterData: true });
+    }, SOFIA);
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel #pfs').fill('2026-10-01');
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await esperarEstable(pagina);
+    await esperarCol(pagina, SOFIA, '3');
+    const esperado = 'Sesión 2 de 3 · faltan 1 · próxima ~08/10';
+    const d = await datosDemo(pagina);
+    assert.equal(d.columnas.EN_TRATAMIENTO.find(x => x.CLAVE === SOFIA).ETIQUETA, esperado, 'el DEMO, como Tablero.gs');
+    assert.ok((await textoTarjeta(pagina, SOFIA)).includes(esperado));
+    const vistas = (await pagina.evaluate(() => window.__vistas)).filter(v => /Sesión \d+ de 3/.test(v));
+    assert.ok(vistas.length, 'la tarjeta se pintó');
+    for (const v of vistas) assert.ok(!/Sesión 3 de 3/.test(v), 'ni la previsión cuenta la sesión siguiente: ' + v);
+    // La ficha cuenta lo mismo: 2 de 3.
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await abrirFicha(pagina, '41111222');
+    assert.match((await tratDe(pagina, SOFIA).textContent()).replace(/\s+/g, ' '), /Sesión 2 de 3/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -866,10 +897,10 @@ test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corres
     await abrirPanelDe(pagina, SOFIA);
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
-    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
+    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 2 de 3 · faltan 1/);
     await deshacer();
     await pagina.waitForFunction(() => DEMO._llamadas.anularSesion === 1);
-    await pagina.waitForFunction(() => /Sesión 2 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === 'REG-000002').textContent));
+    await pagina.waitForFunction(() => /Sesión 1 de 3 · faltan 2/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === 'REG-000002').textContent));
     assert.match((await ultimo(pagina, 'anularSesion')).id, /^SES-/);
     // Alta de una reevaluación: anularAlta.
     await abrirPanelDe(pagina, LUIS);
@@ -3675,7 +3706,7 @@ test('«Deshacer» tras marcar con próxima: anula la sesión y con ella la agen
     await pagina.waitForFunction(() => DEMO._llamadas.anularSesion === 1);
     assert.equal(await llamadas(pagina, 'anularResultado'), 0, 'se deshace la sesión, no solo la agenda');
     await esperarCol(pagina, SOFIA, '3');
-    await pagina.waitForFunction(id => /Sesión 2 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
+    await pagina.waitForFunction(id => /Sesión 1 de 3 · faltan 2/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
     const segs = await pagina.evaluate(() => llamar('getPaciente', '41111222').then(p => p.seguimientos.filter(s => s.REFERENCIA === 'REG-000002')));
     assert.deepEqual(segs.map(s => [s.RESULTADO, !!s.ANULADO]), [['AGENDÓ CITA', true]], 'la agenda quedó anulada con su sesión');
     assert.deepEqual(errores, []);
@@ -3755,7 +3786,7 @@ test('marcar con próxima: si la agenda no se pudo escribir, la sesión queda ma
     await pagina.waitForFunction(() => /^La sesión quedó marcada; agende la próxima con «Cambiar fecha»\.$/.test(document.querySelector('#aviso span').textContent));
     // El tablero recargado manda: la sesión 2 está hecha y la tarjeta sigue En tratamiento (falta la 3), sin agenda.
     await esperarCol(pagina, SOFIA, '3');
-    await pagina.waitForFunction(id => /Sesión 3 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
+    await pagina.waitForFunction(id => /Sesión 2 de 3 · faltan 1/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -4050,6 +4081,84 @@ test('Registro: una primera sesión con fecha pasada avisa y marca la sesión 1 
     const e = await pagina.evaluate(() => llamar('guardarRegistro', { usuario: 'MAGALY', dni: '46111333', nombre: 'Otra Prueba', contacto: '987111001',
       fecha: '2026-09-28', doctor: 'Dr. Elí Cabanillas', tratamiento: 'HIERRO SACARATO', sesiones: 2, fechaInicio: '2026-09-20' }).then(() => 'ok', x => x.message));
     assert.equal(e, 'La primera sesión no puede ser anterior a la fecha del registro (28/09/2026).');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Registro: una fecha que el servidor rechaza deshabilita «Registrar», la barra dice por qué y Enter no guarda', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const barra = async () => (await pagina.locator('#rfalta').textContent()).trim();
+    const poner = async (sel, v) => { await pagina.locator(sel).fill(v); await pagina.locator(sel).dispatchEvent('input'); };
+    await pagina.locator('#rdni').fill('46111444');
+    await pagina.locator('#rnom').fill('Paciente Prueba Fechas');
+    await pagina.locator('#rtel').fill('987111444');
+    await poner('#rfec', '2026-09-28');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.locator('#rtrats [data-trat="HIERRO SACARATO"]').click();
+    await pagina.locator('#rses [data-ses="3"], #rses button:has-text("3")').first().click();
+    // Primera sesión antes de la fecha del registro.
+    await poner('#rinicio', '2026-09-20');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true, 'el botón no se ofrece');
+    assert.equal(await barra(), 'La primera sesión no puede ser anterior a la fecha del registro (28/09/2026).');
+    await pagina.locator('#rnom').press('Enter');
+    await pagina.waitForTimeout(200);
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 0, 'Enter tampoco guarda');
+    // Más allá de 180 días.
+    await poner('#rinicio', masDiasIso(HOY_DEMO, 181));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha de la primera sesión va hasta 180 días desde hoy.');
+    // Lo que falta se dice primero; la fecha, cuando ya no falta nada.
+    await pagina.locator('#rnom').fill('');
+    await pagina.locator('#rnom').dispatchEvent('input');
+    assert.equal(await barra(), 'Falta: nombres.');
+    await pagina.locator('#rnom').fill('Paciente Prueba Fechas');
+    await pagina.locator('#rnom').dispatchEvent('input');
+    // Fecha del registro futura.
+    await poner('#rinicio', '');
+    await poner('#rfec', masDiasIso(HOY_DEMO, 2));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha no puede ser futura.');
+    // Corregida: vuelve a ofrecerse y guarda.
+    await poner('#rfec', '2026-09-28');
+    await poner('#rinicio', '2026-09-30');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.equal(await barra(), 'Se creará 1 registro con la sesión 1 hecha el 30/09.');
+
+    // Control + laboratorio: la fecha de retorno, después de hoy y hasta un año.
+    await pagina.locator('[data-rtab="control"]').click();
+    await pagina.locator('#rdni').fill('40111222');
+    await pagina.waitForSelector('text=Paciente conocido');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await poner('#rretorno', HOY_DEMO);
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha de retorno debe ser después de hoy.');
+    await poner('#rretorno', masDiasIso(HOY_DEMO, 366));
+    assert.equal(await barra(), 'La fecha de retorno va hasta un año desde hoy.');
+    await pagina.locator('#rexamenes').press('Enter');
+    await pagina.waitForTimeout(200);
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 0);
+    await poner('#rretorno', masDiasIso(HOY_DEMO, 20));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+
+    // Decisión del médico: la consulta no puede ser futura; el retorno, después de hoy y hasta dos años.
+    await pagina.locator('[data-rtab="decision"]').click();
+    await pagina.locator('#adni').fill('40111222');
+    await pagina.locator('#amed').selectOption({ index: 1 });
+    await pagina.waitForFunction(() => !document.getElementById('rgo').disabled);
+    await poner('#afec', masDiasIso(HOY_DEMO, 1));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha no puede ser futura.');
+    await poner('#afec', HOY_DEMO);
+    await pagina.locator('input[name="rdec"][value="NUEVA REEVALUACION"]').check();
+    await poner('#aretorno', HOY_DEMO);
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha de retorno debe ser después de hoy.');
+    await poner('#aretorno', masDiasIso(HOY_DEMO, 731));
+    assert.equal(await barra(), 'La fecha de retorno va hasta dos años desde hoy.');
+    await poner('#aretorno', masDiasIso(HOY_DEMO, 40));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.equal(await llamadas(pagina, 'darDeAlta'), 0);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

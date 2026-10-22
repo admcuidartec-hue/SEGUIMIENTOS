@@ -4808,7 +4808,8 @@ const DEMO = (() => {
     : r.TIPO !== 'HIERRO' ? frase(r.DETALLE)
     : frase(r.DETALLE) + (r.MARCA ? ' · ' + frase(r.MARCA) : '') + ' × ' + r.SESIONES + (Number(r.SESIONES) === 1 ? ' sesión' : ' sesiones');
   const clonar = x => JSON.parse(JSON.stringify(x));
-  const siguiente = (lista, prefijo) => prefijo + '-' + String(lista.length + 1).padStart(6, '0');
+  // Como siguienteId (Registro.gs): el mayor + 1, nunca la cantidad de filas (el DEMO trae REG-000021 y REG-000022: se repetirían).
+  const siguiente = (lista, prefijo) => prefijo + '-' + String(lista.reduce((m, x) => Math.max(m, Number((new RegExp('^' + prefijo + '-(\\d+)$').exec(x.ID) || [])[1]) || 0), 0) + 1).padStart(6, '0');
   const dniDe = v => String(v || '').trim().toUpperCase();
   const mismo = (a, b) => norm(a) === norm(b);
   let reloj = 0;

@@ -1670,8 +1670,8 @@ test('registro: un DNI de fallecido muestra el aviso y deja registrar', async ()
     assert.equal(await pagina.locator('#rgo').isDisabled(), false, 'el aviso no bloquea');
     assert.equal(await falta(pagina), 'Se creará 1 registro.');
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000010"]');
-    assert.equal(await aviso(pagina), 'Registro guardado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000010');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000023"]');
+    assert.equal(await aviso(pagina), 'Registro guardado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000023');
     const p = await ultimo(pagina, 'guardarRegistro');
     assert.equal(p.dni, '41999000');
     assert.equal(p.contacto, '933999000', 'el teléfono va sin espacios');
@@ -1693,7 +1693,7 @@ test('registro: el carné de extranjería AB123456X se acepta y no pierde las le
     await llenarIndicacion(pagina, { nombre: 'Juan Carlos Pérez Rojas', contacto: '@juan.perez', doctor: 'Dra. Karen Matos', procs: ['AMO'] });
     assert.doesNotMatch(await falta(pagina), /DNI/);
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000010"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000023"]');
     const p = await ultimo(pagina, 'guardarRegistro');
     assert.equal(p.dni, 'AB123456X');
     assert.equal(p.contacto, '@juan.perez');
@@ -1725,14 +1725,14 @@ test('registro: dos procedimientos y un tratamiento con sesiones y marca crean t
     await pagina.locator('#rses [data-marca="FERINJECT"]').click();
     await pagina.evaluate(() => { S.kpi = { viejo: 1 }; S.resumen = { viejo: 1 }; });
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000012"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000025"]');
     assert.deepEqual(await ultimo(pagina, 'guardarRegistro'), { usuario: 'MAGALY', dni: '45678901', nombre: 'Juana Pérez Soto', contacto: '987111333',
       fecha: '2026-10-01', doctor: 'Dra. Karen Matos', procedimientos: ['AMO', 'BIOPSIA'], tratamiento: 'HIERRO CARBOXIMALTOSA', sesiones: 2, marca: 'FERINJECT' });
     assert.equal(await aviso(pagina),
-      'Registro guardado: Amo + Biopsia + Hierro carboximaltosa · Ferinject × 2 sesiones · Juana Pérez Soto · REG-000010, REG-000011, REG-000012');
-    for (const id of ['REG-000010', 'REG-000011', 'REG-000012']) assert.match(await filaHoy(pagina, id).textContent(), /JUANA PÉREZ SOTO/);
-    assert.match(await filaHoy(pagina, 'REG-000012').textContent(), /Hierro carboximaltosa · Ferinject × 2 sesiones/);
-    assert.match(await filaHoy(pagina, 'REG-000012').textContent(), /REG-000012 · registró Magaly/);
+      'Registro guardado: Amo + Biopsia + Hierro carboximaltosa · Ferinject × 2 sesiones · Juana Pérez Soto · REG-000023, REG-000024, REG-000025');
+    for (const id of ['REG-000023', 'REG-000024', 'REG-000025']) assert.match(await filaHoy(pagina, id).textContent(), /JUANA PÉREZ SOTO/);
+    assert.match(await filaHoy(pagina, 'REG-000025').textContent(), /Hierro carboximaltosa · Ferinject × 2 sesiones/);
+    assert.match(await filaHoy(pagina, 'REG-000025').textContent(), /REG-000025 · registró Magaly/);
     assert.equal(await pagina.locator('#nhoy').textContent(), '4');
     // El formulario se limpia, salvo la fecha; los indicadores se vuelven a pedir.
     assert.equal(await pagina.locator('#rdni').inputValue(), '');
@@ -1754,14 +1754,14 @@ test('registro: «Posible duplicado» del servidor; «Revisar» la cierra y «Re
     };
     await llenar();
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000010"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000023"]');
     await llenar();
     const antes = await llamadas(pagina, 'guardarRegistro');
     await pagina.locator('#rgo').click();
     await pagina.waitForSelector('#rdup .dup');
     assert.match(await pagina.locator('#rdup').textContent(), /Posible duplicado/);
-    assert.match(await pagina.locator('#rdup').textContent(), /Ya se registró el 01\/10\/2026 \(REG-000010\): Sangría\./);
-    assert.equal(await filaHoy(pagina, 'REG-000011').count(), 0);
+    assert.match(await pagina.locator('#rdup').textContent(), /Ya se registró el 01\/10\/2026 \(REG-000023\): Sangría\./);
+    assert.equal(await filaHoy(pagina, 'REG-000024').count(), 0);
     assert.equal((await ultimo(pagina, 'guardarRegistro')).confirmado, undefined);
     await pagina.locator('#rrevisar').click();
     assert.equal(await pagina.locator('#rdup .dup').count(), 0);
@@ -1769,10 +1769,10 @@ test('registro: «Posible duplicado» del servidor; «Revisar» la cierra y «Re
     await pagina.locator('#rgo').click();
     await pagina.waitForSelector('#rdup .dup');
     await pagina.locator('#rforzar').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000011"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000024"]');
     assert.equal(await llamadas(pagina, 'guardarRegistro'), antes + 3);
     assert.equal((await ultimo(pagina, 'guardarRegistro')).confirmado, true);
-    assert.match(await aviso(pagina), /REG-000011$/);
+    assert.match(await aviso(pagina), /REG-000024$/);
     assert.equal(await pagina.locator('#rdup .dup').count(), 0);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -1908,7 +1908,7 @@ test('registro: Enter envía una sola vez, no reenvía con la caja de duplicado 
     await pagina.waitForFunction(() => RG.enviando);
     assert.equal(await pagina.locator('#rseg [data-rtab="decision"]').isDisabled(), true);
     await pagina.locator('#rnom').press('Enter');
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000010"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000023"]');
     assert.equal(await llamadas(pagina, 'guardarRegistro'), 1, 'Enter envía una sola vez');
     assert.equal((await ultimo(pagina, 'guardarRegistro')).contacto, '+51987654321', 'el + se conserva y los espacios no');
     assert.equal(await pagina.locator('#rseg [data-rtab="decision"]').isDisabled(), false);
@@ -2029,7 +2029,7 @@ test('registro: «Decisión del médico» a 6 meses avisa cuándo vuelve a «Por
     await llenarIndicacion(pagina, { nombre: 'Elsa Prueba Mora', contacto: '987000222', doctor: 'Dr. Elí Cabanillas', procs: ['SANGRÍA'] });
     await pagina.locator('#rinicio').fill(masDiasIso(HOY_DEMO, 3));
     await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000010"]');
+    await pagina.waitForSelector('#rlista li[data-reg="REG-000023"]');
     assert.equal((await ultimo(pagina, 'guardarRegistro')).fechaInicio, masDiasIso(HOY_DEMO, 3));
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -2490,8 +2490,8 @@ test('pacientes: «Lo hizo» registra la sesión; «Anular sesión» y «Anular 
     await pagina.locator('#fmotivo').fill('Fecha equivocada');
     await pagina.locator('#ficha [data-confirmar-anular]').click();
     await pagina.waitForSelector('#ficha .trat[data-reg="REG-000001"] .ses.anulada');
-    assert.deepEqual(await ultimo(pagina, 'anularSesion'), { usuario: 'MAGALY', id: 'SES-000007', motivo: 'Fecha equivocada' });
-    assert.equal(await aviso(pagina), 'Anulado: SES-000007.');
+    assert.deepEqual(await ultimo(pagina, 'anularSesion'), { usuario: 'MAGALY', id: 'SES-000022', motivo: 'Fecha equivocada' });
+    assert.equal(await aviso(pagina), 'Anulado: SES-000022.');
     const anulada = r1.locator('.ses.anulada');
     assert.match(await anulada.textContent(), /Sesión 2 · 30\/09\/2026 · Magaly · anulada: Fecha equivocada/);
     assert.equal(await anulada.evaluate(e => getComputedStyle(e.querySelector('.tx')).textDecorationLine), 'line-through');
@@ -4221,6 +4221,26 @@ test('ficha: un paciente sin teléfono pero con usuario de contacto (@…) lo mu
     assert.equal(await pagina.locator('#f-contacto [data-copiar="@ana.flores"]').count(), 1, 'se puede copiar');
     await abrirFicha(pagina, '40222333');
     assert.match(await pagina.locator('#f-contacto').textContent(), /Sin teléfono\. No hay número en SOFDOC ni en la otra base\./);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('DEMO: los ID nuevos son el mayor + 1 (como siguienteId): nunca repiten los que ya existen (REG-000021, REG-000022)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const ids = await pagina.evaluate(async () => {
+      const out = [];
+      for (let i = 0; i < 14; i++) {
+        const r = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: String(47000100 + i), nombre: 'Prueba Id ' + i, contacto: '987000' + String(100 + i),
+          fecha: S.hoy, doctor: 'Dr. Elí Cabanillas', procedimientos: ['SANGRÍA'] });
+        out.push(r.registros[0].ID);
+      }
+      return out;
+    });
+    assert.equal(ids[0], 'REG-000023', 'el siguiente al mayor de los que trae el DEMO');
+    assert.equal(new Set(ids).size, ids.length);
+    assert.ok(!ids.includes('REG-000021') && !ids.includes('REG-000022'), 'repite un ID existente: ' + ids.join(', '));
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

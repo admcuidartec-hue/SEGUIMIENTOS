@@ -4797,6 +4797,12 @@ async function iniciar() {
   addEventListener('resize', () => $$('.seg').forEach(s => pastilla(s)));
   if (document.fonts) document.fonts.ready.then(() => $$('.seg').forEach(s => pastilla(s, true)));
   ir('tablero', true);
+  arrancar();
+}
+/** bootstrap y lo que depende de él. Si falla, cada pantalla lo dice con «Reintentar», que vuelve a llamar aquí sin recargar. */
+async function arrancar() {
+  $$('.js-reintentar-arranque').forEach(b => b.remove());
+  $$('.cargando').forEach(p => { p.textContent = 'Cargando…'; });
   // bootstrap y getTablero en paralelo: getTablero no depende del usuario.
   const pedidoTablero = llamar('getTablero');
   pedidoTablero.catch(() => { /* lo atiende cargarTablero */ });
@@ -4804,7 +4810,11 @@ async function iniciar() {
   try {
     b = await llamar('bootstrap');
   } catch (e) {
-    $$('.cargando').forEach(p => { p.textContent = 'No se pudo iniciar: ' + e.message; });
+    $$('.cargando').forEach(p => {
+      p.textContent = 'No se pudo iniciar: ' + e.message;
+      p.insertAdjacentHTML('afterend', '<button type="button" class="btn btn-s js-reintentar-arranque"><i class="ph ph-arrow-clockwise"></i>Reintentar</button>');
+    });
+    $$('.js-reintentar-arranque').forEach(x => x.addEventListener('click', () => arrancar(), { once: true }));
     return;
   }
   S.boot = adaptarBoot(b);

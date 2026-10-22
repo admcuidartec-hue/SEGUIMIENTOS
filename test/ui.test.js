@@ -4510,3 +4510,21 @@ test('DEMO: anular un registro anula su próxima sesión agendada (deja de conta
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('arranque fallido: el aviso trae «Reintentar» y, si el servidor ya responde, la app arranca sin recargar', async () => {
+  const { navegador, pagina, errores } = await abrir({ fallar: { bootstrap: 'Se perdió la conexión con el servidor.' }, sinEsperar: true });
+  try {
+    await pagina.waitForSelector('#v-tablero .js-reintentar-arranque', { state: 'visible' });
+    assert.match(await pagina.locator('#v-tablero .cargando').textContent(), /^No se pudo iniciar: Se perdió la conexión con el servidor\.$/);
+    // Sigue fallando: el aviso vuelve, con su botón.
+    await pagina.locator('#v-tablero .js-reintentar-arranque').click();
+    await pagina.waitForSelector('#v-tablero .js-reintentar-arranque', { state: 'visible' });
+    await pagina.evaluate(() => { delete DEMO._fallar.bootstrap; });
+    await pagina.locator('#v-tablero .js-reintentar-arranque').click();
+    await pagina.waitForFunction(() => !!S.boot && S.fase === 'listo');
+    await pagina.waitForSelector('#tablero .tarjeta');
+    assert.equal(await pagina.locator('.js-reintentar-arranque').count(), 0);
+    assert.equal(await pagina.evaluate(() => DEMO._llamadas.bootstrap), 3);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

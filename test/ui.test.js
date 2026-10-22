@@ -4457,3 +4457,29 @@ test('Pacientes: con más resultados que los 6 que se muestran, la lista lo dice
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('tablero: médico y especialidad se recuerdan (seg.medico, seg.esp) como tipo y mes; si ya no existen, se ignoran', async () => {
+  const a = await abrirTablero();
+  let med, esp;
+  try {
+    med = await a.pagina.locator('#fmed option').evaluateAll(o => o[1].value);
+    esp = await a.pagina.locator('#fesp option').evaluateAll(o => o[1].value);
+    await a.pagina.locator('#fmed').selectOption(med);
+    await a.pagina.locator('#fesp').selectOption(esp);
+    assert.deepEqual(await a.pagina.evaluate(() => [localStorage.getItem('seg.medico'), localStorage.getItem('seg.esp')]), [med, esp]);
+    await a.pagina.evaluate(() => document.querySelector('#tablero .js-quitar') && document.querySelector('#tablero .js-quitar').click());
+  } finally { await a.navegador.close(); }
+  const b = await abrirTablero({ guardado: { 'seg.medico': med, 'seg.esp': esp } });
+  try {
+    assert.deepEqual([await b.pagina.locator('#fmed').inputValue(), await b.pagina.locator('#fesp').inputValue()], [med, esp]);
+    assert.deepEqual(await b.pagina.evaluate(() => [S.medico, S.esp]), [med, esp]);
+    assert.ok(await b.pagina.evaluate(() => filtrados(true).every(p => norm(p.med) === norm(S.medico) && norm(p.esp) === norm(S.esp))));
+    await b.pagina.locator('#tablero .js-quitar').first().click();
+    assert.deepEqual(await b.pagina.evaluate(() => [localStorage.getItem('seg.medico'), localStorage.getItem('seg.esp')]), ['', '']);
+  } finally { await b.navegador.close(); }
+  const c = await abrirTablero({ guardado: { 'seg.medico': 'Dr. QUE YA NO ESTA', 'seg.esp': 'ODONTOLOGÍA' } });
+  try {
+    assert.deepEqual(await c.pagina.evaluate(() => [S.medico, S.esp]), ['', '']);
+    assert.deepEqual([await c.pagina.locator('#fmed').inputValue(), await c.pagina.locator('#fesp').inputValue()], ['', '']);
+  } finally { await c.navegador.close(); }
+});

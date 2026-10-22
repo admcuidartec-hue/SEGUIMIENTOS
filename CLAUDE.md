@@ -85,7 +85,8 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
 `docs/superpowers/specs/2026-10-06-rediseno-frontend-design.md`. Todo vive en `src/Index.html`.
 
 - **Menú lateral** (en el celular, barra superior y barra inferior): Tablero, Registro, Pacientes, Indicadores y Enfermería,
-  más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y `seg.tipo`.
+  más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y, del tablero, `seg.tipo`, `seg.mes`, `seg.medico` y `seg.esp`
+  (un médico, especialidad o mes recordado que ya no está en la lista se ignora; «Quitar filtros» los borra).
 - **Tablero:** el embudo de seis fases en franjas (ver «Etapa 3») y el panel «¿Qué pasó?» de cada
   tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`. Se puede arrastrar una tarjeta a otra columna: abre el
   paso con confirmación, nunca guarda solo.

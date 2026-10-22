@@ -880,7 +880,7 @@ let reducido = mqReducido.matches;
 const marcarVT = () => document.documentElement.classList.toggle('con-vt', !!document.startViewTransition && !reducido);
 marcarVT();
 mqReducido.addEventListener('change', e => { reducido = e.matches; marcarVT(); });
-/** Preferencias del navegador (seg.usuario, seg.modo, seg.tipo). Sin almacenamiento no pasa nada. */
+/** Preferencias del navegador (seg.usuario, seg.modo, seg.tipo, seg.mes, seg.medico, seg.esp). Sin almacenamiento no pasa nada. */
 const LS = {
   get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
@@ -1314,6 +1314,10 @@ function iniciarTablero() {
   const t = LS.get('seg.tipo');
   S.tipo = TIPOS.some(([k]) => k === t) ? t : '';
   S.mes = LS.get('seg.mes');   // se valida contra los meses que hay cuando llega el tablero (pintarTablero)
+  // Médico y especialidad recordados, solo si siguen en la lista; al médico que usa la app, proponerMedico le pone el suyo.
+  const med = LS.get('seg.medico'), esp = LS.get('seg.esp');
+  S.medico = S.boot.medicos.some(m => m.k === med) ? med : '';
+  S.esp = S.boot.especialidades.includes(esp) ? esp : '';
   proponerMedico();
   $('#fmed').innerHTML = '<option value="">Todos los médicos</option>'
     + S.boot.medicos.map(m => `<option value="${esc(m.k)}" title="${esc(m.full)}">${esc(m.short)}</option>`).join('');
@@ -1324,9 +1328,9 @@ function iniciarTablero() {
     const b = e.target.closest('[data-tipo]'); if (!b) return;
     S.tipo = b.dataset.tipo; LS.set('seg.tipo', S.tipo); pintarTablero();
   });
-  $('#fmed').addEventListener('change', e => { S.medico = e.target.value; pintarTablero(); });
+  $('#fmed').addEventListener('change', e => { S.medico = e.target.value; LS.set('seg.medico', S.medico); pintarTablero(); });
   $('#fmes').addEventListener('change', e => { S.mes = e.target.value; LS.set('seg.mes', S.mes); pintarTablero(); });
-  $('#fesp').addEventListener('change', e => { S.esp = e.target.value; pintarTablero(); });
+  $('#fesp').addEventListener('change', e => { S.esp = e.target.value; LS.set('seg.esp', S.esp); pintarTablero(); });
   $('#fsin').addEventListener('click', () => { S.sinTel = !S.sinTel; pintarTablero(); });
   $('#q').addEventListener('input', e => { S.q = e.target.value; pintarTablero(); });
   $('#cerrar-cerrados').addEventListener('click', () => { verCerrados(false); const b = $('#ver-cerrados'); if (b) b.focus(); });
@@ -1346,7 +1350,7 @@ function iniciarTablero() {
     }
     if (e.target.closest('.js-quitar')) {
       Object.assign(S, { tipo: '', medico: '', mes: '', esp: '', sinTel: false, q: '' });
-      LS.set('seg.tipo', ''); LS.set('seg.mes', '');
+      LS.set('seg.tipo', ''); LS.set('seg.mes', ''); LS.set('seg.medico', ''); LS.set('seg.esp', '');
       $('#q').value = '';
       pintarTablero();
     }

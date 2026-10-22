@@ -332,3 +332,12 @@ test('getPaciente: cada alta trae su decisión, el retorno, cuándo vuelve a «P
   // Con una consulta realizada después, volvió.
   assert.deepEqual(con([alta()], [cita({ fecha: '2026-07-01' }), cita({ fecha: '2026-09-15' })]), [['ALT-000001', 'ALTA', '', '', 'VOLVIO', '2026-09-15', false]]);
 });
+
+test('getPaciente: también trae los contactos de Registro que no son teléfono (contactos), para la ficha', () => {
+  const reg = (ID, CONTACTO) => ({ ID, FECHA_HORA: '2026-09-20 10:00', FECHA: '2026-09-20', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE: 'WILFREDO PRUEBA', DNI: '45000333',
+    CONTACTO, TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: 1, ANULADO: '', MOTIVO_ANULACION: '' });
+  const { ctx } = servidor([], [], [reg('REG-000001', '@wprueba')]);
+  const r = plano(ctx.getPaciente('45000333'));
+  assert.deepEqual([r.telefonos, r.contactos], [[], ['@wprueba']]);
+  assert.deepEqual(plano(ctx.getPaciente('40111222')).contactos, []);
+});

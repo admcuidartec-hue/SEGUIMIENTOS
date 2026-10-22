@@ -680,3 +680,12 @@ test('Dos decisiones del médico el mismo día: manda la registrada después (FE
   r = ver([anio({ FECHA: '2026-10-06', FECHA_HORA: '2026-10-05 09:00' }), nueva({ FECHA_HORA: '2026-10-07 09:00' })]);
   assert.deepEqual([r.vigente, r.ficha], ['ALT-2', ['ALT-2:VIGENTE', 'ALT-1:REEMPLAZADA']]);
 });
+
+test('otrosContactos: los contactos de Registro que no son un teléfono (p. ej. @usuario), sin anulados ni repetidos, el más reciente primero', () => {
+  const r = (ID, FECHA, CONTACTO, o) => Object.assign({ ID, FECHA_HORA: FECHA + ' 10:00', FECHA, DNI: '45000111', CONTACTO, ANULADO: '' }, o);
+  const regs = [r('REG-1', '2026-09-01', '@ana.viejo'), r('REG-2', '2026-09-20', '987 000 111'), r('REG-3', '2026-09-25', '@ana.flores'),
+    r('REG-4', '2026-09-26', '@ana.flores'), r('REG-5', '2026-09-27', '@equivocado', { ANULADO: 'SÍ' }), r('REG-6', '2026-09-28', '@otra', { DNI: '45000222' }),
+    r('REG-7', '2026-09-29', '  ')];
+  assert.deepEqual(plano(L.otrosContactos(regs, '45000111')), ['@ana.flores', '@ana.viejo']);
+  assert.deepEqual(plano(L.otrosContactos(regs, '45000999')), []);
+});

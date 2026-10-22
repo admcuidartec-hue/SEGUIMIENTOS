@@ -3351,6 +3351,8 @@ function adaptarFicha(r) {
     fallecido: r.fallecido ? { f: isoDe(r.fallecido.fecha), quien: nombreBonito(r.fallecido.quien) } : null,
     malos,
     tels: (r.telefonos || []).map(String).filter(t => t && malos.indexOf(t) < 0),
+    // Contactos que no son teléfono (p. ej. «@usuario» del registro): otrosContactos del servidor.
+    otros: (r.contactos || []).map(String).filter(Boolean),
     porConfirmar: (r.porConfirmar || []).map(i => ({ id: String(i.ID || ''), tipo: frase(i.TIPO), f: isoDe(i.FECHA), nombre: nombreBonito(i.NOMBRE),
       tel: String(i.TELEFONO || ''), candidatos: (i.candidatos || []).map(c => ({ dni: String(c.dni || ''), nombre: nombreBonito(c.nombre) })) })),
     especialidades: (r.series || []).map(s => {
@@ -3531,8 +3533,10 @@ function htmlFicha(p) {
       + p.previos.map(x => `<tr><td class="mono">${esc(dmy(x.f))}</td><td>${esc(x.tipo)}</td><td>${esc(x.det)}</td><td>${esc(x.estado)}</td><td class="mono">${esc(x.tel)}</td><td class="obs">${esc(x.obs)}</td></tr>`).join('')
       + '</tbody></table></div>' : '<p class="p-vacio">Ninguno.</p>'}</section>`
     + '</div><aside class="lado">'
-    + `<section class="bloque" id="f-contacto"><h3>Contacto</h3> ${p.tels.length ? p.tels.map(t => `<div class="contacto"><span class="v"><small>Teléfono</small><span class="num">${esc(telBonito(t))}</span></span>`
+    + `<section class="bloque" id="f-contacto"><h3>Contacto</h3> ${p.tels.length || p.otros.length ? p.tels.map(t => `<div class="contacto"><span class="v"><small>Teléfono</small><span class="num">${esc(telBonito(t))}</span></span>`
       + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(t)}"><i class="ph ph-copy"></i>Copiar</button></div>`).join('')
+      + p.otros.map(u => `<div class="contacto"><span class="v"><small>Usuario</small><span class="num">${esc(u)}</span></span>`
+      + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(u)}"><i class="ph ph-copy"></i>Copiar</button></div>`).join('')
       : '<p class="sin-tel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}</section>`
     + `<section class="bloque" id="f-altas"><h3>Altas médicas</h3> ${p.altas.length ? '<ul class="altas">' + p.altas.map(htmlAlta).join('') + '</ul>' : '<p class="p-vacio">Ninguna.</p>'}</section>`
     + `<section class="bloque" id="f-hist"><h3>Historia de seguimientos</h3> ${htmlHistoria({ estado: 'listo', filas: p.hist }, h, 'fmotivo', PA.motivo, !!h && PA.enVuelo === h)}</section>`
@@ -5508,6 +5512,10 @@ const DEMO = (() => {
         altas: altasFicha(k),
         fallecido: muertos[k] || null,
         telefonos: telefonosDe(k),
+        // Como otrosContactos (Registro.gs): lo que no es un teléfono de 9 dígitos, sin anulados ni repetidos, lo más reciente primero.
+        contactos: [...new Set(registros.filter(r => r.DNI === k && !r.ANULADO)
+          .sort((a, b) => (a.FECHA + ' ' + a.FECHA_HORA) < (b.FECHA + ' ' + b.FECHA_HORA) ? 1 : -1)
+          .map(r => String(r.CONTACTO || '').replace(/\s+/g, ' ').trim()).filter(c => c && c.replace(/\D/g, '').length !== 9))],
         telefonosDescartados: descartadosDe(k)
       };
     },

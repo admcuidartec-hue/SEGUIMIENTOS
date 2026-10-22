@@ -4210,3 +4210,17 @@ test('DEMO: dos decisiones del médico para la misma especialidad: manda la de f
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('ficha: un paciente sin teléfono pero con usuario de contacto (@…) lo muestra en «Contacto»; «Sin teléfono» solo si no hay ninguno', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '40555666');
+    const c = (await pagina.locator('#f-contacto').textContent()).replace(/\s+/g, ' ');
+    assert.match(c, /Usuario\s*@ana\.flores/);
+    assert.doesNotMatch(c, /Sin teléfono/);
+    assert.equal(await pagina.locator('#f-contacto [data-copiar="@ana.flores"]').count(), 1, 'se puede copiar');
+    await abrirFicha(pagina, '40222333');
+    assert.match(await pagina.locator('#f-contacto').textContent(), /Sin teléfono\. No hay número en SOFDOC ni en la otra base\./);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

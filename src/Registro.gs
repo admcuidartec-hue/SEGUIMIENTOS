@@ -595,6 +595,25 @@ function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {
   }).filter(Boolean);
 }
 
+/**
+ * Los contactos de Registro del DNI que no son un teléfono de 9 dígitos (p. ej. «@usuario»): los teléfonos ya llegan por
+ * telefonosPorDni. Sin anulados ni repetidos, el registro más reciente primero. La ficha los muestra en «Contacto».
+ */
+function otrosContactos(registros, dni) {
+  var k = normDni(dni), vistos = {};
+  return (registros || []).filter(function (r) { return normDni(r.DNI) === k && !anulado_(r); })
+    .sort(function (a, b) {
+      var x = (fechaIso(a.FECHA) || '') + ' ' + String(a.FECHA_HORA || ''), y = (fechaIso(b.FECHA) || '') + ' ' + String(b.FECHA_HORA || '');
+      return x < y ? 1 : x > y ? -1 : 0;
+    })
+    .map(function (r) { return textoLimpio_(r.CONTACTO); })
+    .filter(function (c) {
+      if (!c || normTelefono(c).length === 9 || vistos[c]) return false;
+      vistos[c] = 1;
+      return true;
+    });
+}
+
 /** Líneas para «Verificar»: lo que la pestaña Registro necesita de CATALOGOS. */
 function revisarCatalogos(c) {
   var lineas = [];

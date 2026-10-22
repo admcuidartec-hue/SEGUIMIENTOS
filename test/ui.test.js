@@ -4189,3 +4189,24 @@ test('ficha: «Altas médicas» dice la decisión, cuándo vuelve y si está vig
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('DEMO: dos decisiones del médico para la misma especialidad: manda la de fecha posterior y, a igual fecha, la registrada después (como el servidor)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const estados = dni => pagina.evaluate(dni => llamar('getPaciente', dni).then(d => d.altas.map(a => a.DECISION + ':' + a.ESTADO_ALTA)), dni);
+    const decidir = (dni, decision, fecha, fechaRetorno) => pagina.evaluate(x => llamar('darDeAlta', Object.assign({ usuario: 'MAGALY', especialidad: 'HEMATOLOGÍA',
+      doctor: 'Dr. Elí Cabanillas' }, x)), { dni, decision, fecha, fechaRetorno: fechaRetorno || '' });
+    // Hoy, nueva reevaluación; después se registra un alta con la consulta de ayer: manda la de hoy (fecha posterior).
+    await decidir('42000103', 'NUEVA REEVALUACION', '2026-10-01', '2026-11-30');
+    await decidir('42000103', 'ALTA', '2026-09-30');
+    assert.deepEqual(await estados('42000103'), ['NUEVA REEVALUACION:PENDIENTE', 'ALTA:REEMPLAZADA']);
+    const b = await pagina.evaluate(() => llamar('buscarPacienteRegistro', '42000103'));
+    assert.equal(b.especialidades[0].alta, false, 'la nueva reevaluación no deja alta vigente');
+    // El mismo día: la registrada después manda.
+    await decidir('42000105', 'NUEVA REEVALUACION', '2026-10-01', '2026-11-30');
+    await decidir('42000105', 'ALTA 1 AÑO', '2026-10-01');
+    assert.deepEqual(await estados('42000105'), ['NUEVA REEVALUACION:REEMPLAZADA', 'ALTA 1 AÑO:VIGENTE']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

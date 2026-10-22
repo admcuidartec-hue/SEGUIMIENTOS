@@ -5355,9 +5355,13 @@ const DEMO = (() => {
   // Como altasVigentes: sin anular y sin ninguna consulta realizada después del alta.
   // Una nueva reevaluación no deja alta; la de 6 meses o 1 año, hasta AVISO_ALTA_CONTROL_DIAS antes del retorno (decisionesDeAlta).
   // Como getPaciente + altasParaFicha (Registro.gs): la decisión, su retorno, cuándo vuelve a «Por contactar» y el estado.
+  // Como decisionPosterior_ (Registro.gs): mayor FECHA; a igual fecha, mayor FECHA_HORA; si tampoco, la de más abajo en la hoja.
+  const posterior = (a, b) => a.FECHA !== b.FECHA ? a.FECHA > b.FECHA
+    : a.FECHA_HORA && b.FECHA_HORA && a.FECHA_HORA !== b.FECHA_HORA ? a.FECHA_HORA > b.FECHA_HORA : altas.indexOf(a) > altas.indexOf(b);
+  const ultimaDe = lista => lista.reduce((m, a) => !m || posterior(a, m) ? a : m, null);
   const altasFicha = dni => {
     const suyas = altas.filter(a => a.DNI === dni), ultimas = {};
-    suyas.forEach(a => { const e = norm(a.ESPECIALIDAD); if (!a.ANULADO && (!ultimas[e] || a.FECHA >= ultimas[e].FECHA)) ultimas[e] = a; });
+    suyas.forEach(a => { const e = norm(a.ESPECIALIDAD); if (!a.ANULADO && (!ultimas[e] || posterior(a, ultimas[e]))) ultimas[e] = a; });
     return suyas.map(a => {
       let d = decisionDe(a);
       const ret = a.FECHA_RETORNO || '';
@@ -5371,8 +5375,8 @@ const DEMO = (() => {
     });
   };
   const vigente = (dni, esp) => {
-    const a = altas.filter(x => !x.ANULADO && x.DNI === dni && mismo(x.ESPECIALIDAD, esp)
-      && !citas.some(c => c.DNI === dni && mismo(c.ESPECIALIDAD, esp) && c.ESTADO === 'REALIZADO' && c.FECHA > x.FECHA)).pop();
+    const a = ultimaDe(altas.filter(x => !x.ANULADO && x.DNI === dni && mismo(x.ESPECIALIDAD, esp)
+      && !citas.some(c => c.DNI === dni && mismo(c.ESPECIALIDAD, esp) && c.ESTADO === 'REALIZADO' && c.FECHA > x.FECHA)));
     if (!a) return null;
     const d = decisionDe(a);
     if (d.pideFecha) return null;

@@ -136,6 +136,8 @@ En un paso con fecha o motivo, Enter confirma.
   `AVISO_ALTA_CONTROL_DIAS` días antes: ese día la serie ya está vencida, `estadoDeSerie` pone `vence` = `esperada`); `NUEVA REEVALUACION` (el médico da la fecha de retorno, de mañana a dos años; no deja el alta vigente).
   Una alta a 6 meses o 1 año sin fecha de retorno se trata como alta simple. Se registran en Registro → Decisión del médico o en la ficha
   («Decisión del médico…»); el mensaje sin doctor dice «Elija el doctor.» solo en la nueva reevaluación.
+  En la ficha, «Altas médicas» muestra la decisión, «vuelve el …» y cuándo vuelve a «Por contactar», con el estado que calcula
+  `altasParaFicha` (vigente, pendiente de su retorno, cerrada porque volvió —solo con una consulta realizada después—, reemplazada o anulada).
 - **Editar** (`editarRegistro`, validada por `validarEdicionRegistro`): se puede cambiar fecha, doctor, nombre, contacto, tratamiento o
   procedimiento (`DETALLE`), marca, sesiones, `FECHA_INICIO` (solo si no empezó), y `EXAMENES` y `FECHA_RETORNO` de un control.
   **No** se puede cambiar el DNI (se anula y se registra de nuevo), ni las sesiones por debajo de las ya hechas, ni el tipo; un control no tiene

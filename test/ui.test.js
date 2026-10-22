@@ -2275,9 +2275,9 @@ test('pacientes: la ficha muestra estado por especialidad, «Debía volver el �
     assert.equal(await espDe(pagina, 'REUMATOLOGÍA').locator('[data-decision]').count(), 1);
     const alta = await textoDe(pagina, '#f-altas li');
     assert.equal(alta.length, 1);
-    assert.match(alta[0], /^Hematología · 18\/09\/2026\s*Vigente\s*Dr\. Elí Cabanillas · registró Magaly\s*Anular$/);
+    assert.match(alta[0], /^Hematología · 18\/09\/2026 · Alta\s*Vigente\s*Dr\. Elí Cabanillas · registró Magaly\s*Anular$/);
     await abrirFicha(pagina, '41222333');
-    assert.match((await textoDe(pagina, '#f-altas li'))[0], /^Hematología · 10\/08\/2026\s*Cerrada: volvió después/);
+    assert.match((await textoDe(pagina, '#f-altas li'))[0], /^Hematología · 10\/08\/2026 · Alta\s*Cerrada: volvió el 30\/09\/2026/);
 
     // En el celular la ficha no se sale de la pantalla.
     await abrirFicha(pagina, '40111222');
@@ -4159,6 +4159,33 @@ test('Registro: una fecha que el servidor rechaza deshabilita «Registrar», la 
     await poner('#aretorno', masDiasIso(HOY_DEMO, 40));
     assert.equal(await pagina.locator('#rgo').isDisabled(), false);
     assert.equal(await llamadas(pagina, 'darDeAlta'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('ficha: «Altas médicas» dice la decisión, cuándo vuelve y si está vigente, pendiente o volvió de verdad', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    const decidir = async (dni, dec, ret) => {
+      await abrirFicha(pagina, dni);
+      await pagina.locator('#ficha [data-decision="HEMATOLOGÍA"]').click();
+      await pagina.locator(`#ficha input[name="fdec"][value="${dec}"]`).check();
+      if (ret) await pagina.locator('#falta-ret').fill(ret);
+      await pagina.locator('#falta-doc').selectOption({ index: 1 });
+      await pagina.locator('#ficha [data-alta-ok]').click();
+      await pagina.waitForFunction(dni => !PA.enVuelo && !PA.alta && PA.dni === dni && !!document.querySelector('#ficha #f-altas li'), dni);
+      return (await textoDe(pagina, '#f-altas li'))[0];
+    };
+    // Alta a 6 meses (hoy 01/10/2026): vuelve el 01/04/2027 y a «Por contactar» 30 días antes.
+    const seis = await decidir('42000105', 'ALTA 6 MESES');
+    assert.match(seis, /^Hematología · 01\/10\/2026 · Alta con reevaluación a 6 meses\s*Vigente · vuelve el 01\/04\/2027 · vuelve a «Por contactar» el 02\/03\/2027/);
+    const d = await pagina.evaluate(() => llamar('getPaciente', '42000105'));
+    assert.deepEqual([d.altas[0].DECISION, d.altas[0].FECHA_RETORNO, d.altas[0].FECHA_AVISO, d.altas[0].ESTADO_ALTA], ['ALTA 6 MESES', '2027-04-01', '2027-03-02', 'VIGENTE']);
+    // Nueva reevaluación: pendiente de su retorno, nunca «volvió después»; el plazo máximo se cuenta desde el retorno.
+    const nueva = await decidir('42000106', 'NUEVA REEVALUACION', '2026-11-30');
+    assert.match(nueva, /^Hematología · 01\/10\/2026 · Nueva reevaluación\s*Pendiente: vuelve el 30\/11\/2026/);
+    assert.doesNotMatch(nueva, /volvió/);
+    assert.equal((await espDe(pagina, 'HEMATOLOGÍA').locator('.tiempo li.esperada').textContent()).trim(), 'Debe volver el 30/11/2026 (plazo máximo 15/12/2026)');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

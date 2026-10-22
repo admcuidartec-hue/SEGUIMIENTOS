@@ -623,3 +623,32 @@ test('pendientesRegistro: un «No vino» muy viejo (más de CORTE_INDICACIONES_D
   assert.equal(filaH(dReg([prog], [], [], dentro)).ESTADO, 'PENDIENTE');
   assert.equal(filaH(dReg([prog], [], [], fuera)).ESTADO, 'ANTIGUO');
 });
+
+test('altasParaFicha: la decisión, su retorno, cuándo vuelve a «Por contactar» y el estado de cada alta', () => {
+  const R = reglas(L), citas = [cita({ fecha: '2026-10-01' })];
+  const a = o => Object.assign({ ID: 'ALT-1', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dra. X', DECISION: '', FECHA_RETORNO: '', ANULADO: '' }, o);
+  const ficha = (altas, cs, hoy) => {
+    const vig = L.altasVigentes(altas, [], cs, R, hoy);
+    return plano(L.altasParaFicha(altas, cs, vig, R, hoy)).map(x => [x.ID, x.DECISION, x.FECHA_RETORNO, x.FECHA_AVISO, x.ESTADO_ALTA, x.FECHA_VOLVIO]);
+  };
+  // Antigua, sin DECISION: se lee como ALTA, sin retorno.
+  assert.deepEqual(ficha([a()], citas, '2026-10-09'), [['ALT-1', 'ALTA', '', '', 'VIGENTE', '']]);
+  // 6 meses: vigente hasta AVISO_ALTA_CONTROL_DIAS antes del retorno; desde entonces, pendiente de su control.
+  const seis = a({ DECISION: 'ALTA 6 MESES', FECHA_RETORNO: '2027-04-05' });
+  assert.deepEqual(ficha([seis], citas, '2026-10-09'), [['ALT-1', 'ALTA 6 MESES', '2027-04-05', '2027-03-06', 'VIGENTE', '']]);
+  assert.deepEqual(ficha([seis], citas, '2027-03-10'), [['ALT-1', 'ALTA 6 MESES', '2027-04-05', '2027-03-06', 'PENDIENTE', '']]);
+  // Nueva reevaluación: nunca es un alta vigente; está pendiente de su retorno, no «volvió».
+  const nueva = a({ DECISION: 'NUEVA REEVALUACION', FECHA_RETORNO: '2026-11-20' });
+  assert.deepEqual(ficha([nueva], citas, '2026-10-09'), [['ALT-1', 'NUEVA REEVALUACION', '2026-11-20', '', 'PENDIENTE', '']]);
+  // Volvió: solo con una consulta realizada después del alta, en su especialidad.
+  const volvio = citas.concat([cita({ fecha: '2026-11-18' })]);
+  assert.deepEqual(ficha([nueva], volvio, '2026-11-25'), [['ALT-1', 'NUEVA REEVALUACION', '2026-11-20', '', 'VOLVIO', '2026-11-18']]);
+  const otraEsp = citas.concat([cita({ fecha: '2026-11-18', esp: 'REUMATOLOGÍA' })]);
+  assert.equal(ficha([nueva], otraEsp, '2026-11-25')[0][4], 'PENDIENTE', 'una consulta de otra especialidad no cuenta');
+  // Anulada, y una decisión reemplazada por otra posterior sin que volviera.
+  assert.equal(ficha([a({ ANULADO: 'SÍ' })], citas, '2026-10-09')[0][4], 'ANULADA');
+  const r = ficha([nueva, a({ ID: 'ALT-2', FECHA: '2026-10-07' })], citas, '2026-10-09');
+  assert.deepEqual(r.map(x => [x[0], x[4]]), [['ALT-1', 'REEMPLAZADA'], ['ALT-2', 'VIGENTE']]);
+  // 6 meses sin fecha de retorno (hoja editada a mano): alta simple, sin NaN.
+  assert.deepEqual(ficha([a({ DECISION: 'ALTA 6 MESES' })], citas, '2026-10-09'), [['ALT-1', 'ALTA', '', '', 'VIGENTE', '']]);
+});

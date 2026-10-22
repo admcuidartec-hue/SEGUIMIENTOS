@@ -90,7 +90,9 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
   tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`. Se puede arrastrar una tarjeta a otra columna: abre el
   paso con confirmación, nunca guarda solo.
 - **Registro:** indicaciones (procedimientos y tratamientos) y altas médicas, con «Registrados hoy».
-- **Pacientes:** buscador y ficha completa, con anulaciones, Editar y «Decisión del médico…» (antes «Dar de alta…»).
+- **Pacientes:** buscador y ficha completa, con anulaciones, Editar y «Decisión del médico…» (antes «Dar de alta…»). El buscador
+  muestra 6 resultados; si hay más lo dice («Se muestran 6 de 8: escriba más para afinar.»; con 20, el tope del servidor,
+  «6 de 20 o más»).
 - **Indicadores:** siete pestañas para el director y el botón «Resumen para imprimir» (dos páginas A4). Un Ctrl+P sin
   ese botón imprime la pantalla tal como se ve.
 - Lo que se dispara con el teclado no se anima, y con «reducir movimiento» del sistema nada se anima.

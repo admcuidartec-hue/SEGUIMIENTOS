@@ -3447,6 +3447,13 @@ const PA = {
 };
 
 /* ---- Buscador: buscar(texto) desde 3 letras; se muestran los 6 primeros ---- */
+// buscarEnPacientes devuelve hasta 20: con 20 puede haber más, y la lista lo dice.
+const VISIBLES_PACIENTES = 6, TOPE_BUSCAR = 20;
+/** «Se muestran 6 de 8: escriba más para afinar.»; '' si se ven todos. */
+function textoMasResultados(total) {
+  if (total <= VISIBLES_PACIENTES) return '';
+  return `Se muestran ${VISIBLES_PACIENTES} de ${total}${total >= TOPE_BUSCAR ? ' o más' : ''}: escriba más para afinar.`;
+}
 function alEscribir() {
   const q = $('#pq').value;
   PA.q = q;
@@ -3460,7 +3467,8 @@ async function buscarPacientes(q) {
   try { r = await llamar('buscar', q.trim()); } catch (e) { error = e.message; }
   if (PA.q !== q) return;   // ya escribió otra cosa: esta respuesta es vieja
   PA.buscando = false;
-  PA.res = error ? [] : (r || []).slice(0, 6);
+  PA.res = error ? [] : (r || []).slice(0, VISIBLES_PACIENTES);
+  PA.total = error ? 0 : (r || []).length;
   PA.activo = 0;
   pintarLista(error ? 'No se pudo buscar: ' + error : '');
 }
@@ -3474,7 +3482,8 @@ function pintarLista(error) {
     return;
   }
   ul.innerHTML = PA.res.map((r, i) => `<li role="option" id="pres-${i}" aria-selected="${i === PA.activo}">`
-    + `<button type="button" tabindex="-1" data-dni="${esc(r.DNI)}"><span class="n">${esc(nombreBonito(r.NOMBRE))}</span> <span class="mono">DNI ${esc(r.DNI)}</span></button></li>`).join('');
+    + `<button type="button" tabindex="-1" data-dni="${esc(r.DNI)}"><span class="n">${esc(nombreBonito(r.NOMBRE))}</span> <span class="mono">DNI ${esc(r.DNI)}</span></button></li>`).join('')
+    + (textoMasResultados(PA.total) ? `<li class="nada mas" role="presentation">${esc(textoMasResultados(PA.total))}</li>` : '');
   q.setAttribute('aria-activedescendant', 'pres-' + PA.activo);
 }
 function cerrarLista() {

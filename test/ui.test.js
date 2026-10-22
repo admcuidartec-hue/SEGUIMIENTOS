@@ -4437,3 +4437,23 @@ test('buscadores: ignoran apóstrofos, guiones y puntos (tablero y Pacientes del
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('Pacientes: con más resultados que los 6 que se muestran, la lista lo dice', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await pagina.evaluate(async () => {
+      for (let i = 0; i < 8; i++) await llamar('guardarRegistro', { usuario: 'MAGALY', dni: String(47000800 + i), nombre: 'Prueba Quispilloclla ' + 'ABCDEFGH'[i],
+        contacto: '98700080' + i, fecha: S.hoy, doctor: 'Dra. Karen Matos', procedimientos: ['AMO'] });
+      for (let i = 0; i < 16; i++) await llamar('guardarRegistro', { usuario: 'MAGALY', dni: String(47000900 + i), nombre: 'Prueba Huarachi ' + 'ABCDEFGHIJKLMNOP'[i],
+        contacto: '9870009' + String(i).padStart(2, '0'), fecha: S.hoy, doctor: 'Dra. Karen Matos', procedimientos: ['AMO'] });
+    });
+    await buscarEn(pagina, 'quispilloclla');
+    assert.equal(await pagina.locator('#pres [role="option"]').count(), 6);
+    assert.equal((await pagina.locator('#pres .mas').textContent()).trim(), 'Se muestran 6 de 8: escriba más para afinar.');
+    await buscarEn(pagina, 'prueba');
+    assert.equal((await pagina.locator('#pres .mas').textContent()).trim(), 'Se muestran 6 de 20 o más: escriba más para afinar.');
+    await buscarEn(pagina, 'quispilloclla h');
+    assert.equal(await pagina.locator('#pres .mas').count(), 0, 'con 6 o menos no dice nada');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

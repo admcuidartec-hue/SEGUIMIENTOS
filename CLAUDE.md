@@ -102,6 +102,8 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
   «6 de 20 o más»).
 - **Indicadores:** siete pestañas para el director y el botón «Resumen para imprimir» (dos páginas A4). Un Ctrl+P sin
   ese botón imprime la pantalla tal como se ve.
+- Los nombres se guardan en MAYÚSCULAS y se muestran con `nombreBonito` (mayúscula inicial, también tras guion y apóstrofo:
+  «Ñahui-O'Higgins»; DE, DEL e Y en minúscula).
 - Si `bootstrap` falla al abrir, cada pantalla dice «No se pudo iniciar: …» con el botón **«Reintentar»** (`arrancar`), que
   vuelve a pedirlo sin recargar la página.
 - Lo que se dispara con el teclado no se anima, y con «reducir movimiento» del sistema nada se anima.

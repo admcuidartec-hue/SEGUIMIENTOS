@@ -941,10 +941,11 @@ const S = {
 
 /* ============ Adaptadores (MAPEO-SERVIDOR.md §0) ============ */
 const PARTICULAS = { DE: 1, DEL: 1, Y: 1 };
-/** 'ROSA ELENA QUISPE HUAMÁN' -> 'Rosa Elena Quispe Huamán'. Solo para mostrar. */
+/** 'ROSA ELENA QUISPE HUAMÁN' -> 'Rosa Elena Quispe Huamán'; tras guion o apóstrofo, también: 'Ñahui-O'Higgins'. Solo para mostrar. */
 function nombreBonito(txt) {
+  const mayus = w => w.replace(/(^|[-'\u2019])(\S)/g, (_, sep, c) => sep + c.toUpperCase());
   return String(txt || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
-    .map((w, i) => i && PARTICULAS[norm(w)] ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    .map((w, i) => i && PARTICULAS[norm(w)] ? w : mayus(w)).join(' ');
 }
 /** '987654321' -> '987 654 321'. Se muestra con espacios y se envía sin ellos. */
 function telBonito(tel) {

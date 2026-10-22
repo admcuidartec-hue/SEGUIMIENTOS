@@ -4528,3 +4528,12 @@ test('arranque fallido: el aviso trae «Reintentar» y, si el servidor ya respon
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('nombreBonito: mayúscula también tras guion y apóstrofo', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    const r = await pagina.evaluate(() => ["MARÍA DEL PILAR ÑAHUI-O'HIGGINS", 'JUAN PÉREZ-ALBELA Y ROJAS', "D'ANGELO"].map(nombreBonito));
+    assert.deepEqual(r, ["María del Pilar Ñahui-O'Higgins", 'Juan Pérez-Albela y Rojas', "D'Angelo"]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

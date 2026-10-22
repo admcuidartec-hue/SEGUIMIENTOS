@@ -312,3 +312,23 @@ test('«Pagó»: escribe ACCION = PAGO y la tarjeta pasa a Pago realizado; tambi
   const a = plano(ctx.registrarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' })));
   assert.equal(a.tarjeta.COLUMNA, 'AGENDADO');
 });
+
+test('getPaciente: cada alta trae su decisión, el retorno, cuándo vuelve a «Por contactar» y su estado', () => {
+  const { ctx } = servidor();
+  const L = cargar();
+  const alta = o => Object.assign({ ID: 'ALT-000001', FECHA_HORA: '2026-07-02 10:00', FECHA: '2026-07-02', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA',
+    DOCTOR: 'Dra. Karen Matos', REGISTRADO_POR: 'MAGALY', NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' }, o);
+  const con = (altas, citas) => {
+    ctx.datos_ = () => ctx.derivar_({ hoy: '2026-10-06', catalogos: CAT, reglas: reglas(L), citas: citas || [cita({ fecha: '2026-07-01' })], indicaciones: [],
+      contactos: [], registros: [], sesiones: [], altas, seguimientosTodos: [], seguimientos: [] });
+    return plano(ctx.getPaciente('40111222')).altas.map(a => [a.ID, a.DECISION, a.FECHA_RETORNO, a.FECHA_AVISO, a.ESTADO_ALTA, a.FECHA_VOLVIO, a.VIGENTE]);
+  };
+  // Antigua, sin DECISION: ALTA vigente.
+  assert.deepEqual(con([alta()]), [['ALT-000001', 'ALTA', '', '', 'VIGENTE', '', true]]);
+  assert.deepEqual(con([alta({ DECISION: 'ALTA 6 MESES', FECHA_RETORNO: '2027-01-02' })]), [['ALT-000001', 'ALTA 6 MESES', '2027-01-02', '2026-12-03', 'VIGENTE', '', true]]);
+  // Nueva reevaluación: pendiente de su retorno, no «volvió».
+  assert.deepEqual(con([alta({ DECISION: 'NUEVA REEVALUACION', FECHA_RETORNO: '2026-11-20' })]),
+    [['ALT-000001', 'NUEVA REEVALUACION', '2026-11-20', '', 'PENDIENTE', '', false]]);
+  // Con una consulta realizada después, volvió.
+  assert.deepEqual(con([alta()], [cita({ fecha: '2026-07-01' }), cita({ fecha: '2026-09-15' })]), [['ALT-000001', 'ALTA', '', '', 'VOLVIO', '2026-09-15', false]]);
+});

@@ -362,11 +362,17 @@ function getPaciente(dni) {
           return { ID: s.ID, NUMERO: Number(s.NUMERO), FECHA: fechaIso(s.FECHA), ASESORA: s.ASESORA };
         }) };
     }),
-    altas: d.altas.filter(function (a) { return a.DNI === k; }).map(function (a) {
-      var v = d.vigentes[claveSerie(k, a.ESPECIALIDAD)];
-      return { ID: a.ID, FECHA: fechaIso(a.FECHA), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR, REGISTRADO_POR: a.REGISTRADO_POR,
-        ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', VIGENTE: !!(v && v.ID === a.ID) };
-    }),
+    // La decisión, su retorno, cuándo vuelve a «Por contactar» y el estado (vigente, pendiente, volvió…): altasParaFicha.
+    altas: (function () {
+      var suyas = d.altas.filter(function (a) { return a.DNI === k; });
+      var ficha = altasParaFicha(suyas, citas, d.vigentes, d.reglas, d.hoy);
+      return suyas.map(function (a, i) {
+        var v = d.vigentes[claveSerie(k, a.ESPECIALIDAD)], f = ficha[i];
+        return { ID: a.ID, FECHA: fechaIso(a.FECHA), ESPECIALIDAD: a.ESPECIALIDAD, DOCTOR: a.DOCTOR, REGISTRADO_POR: a.REGISTRADO_POR,
+          ANULADO: anulado_(a), MOTIVO_ANULACION: a.MOTIVO_ANULACION || '', VIGENTE: !!(v && v.ID === a.ID),
+          DECISION: f.DECISION, FECHA_RETORNO: f.FECHA_RETORNO, FECHA_AVISO: f.FECHA_AVISO, ESTADO_ALTA: f.ESTADO_ALTA, FECHA_VOLVIO: f.FECHA_VOLVIO };
+      });
+    })(),
     // Enfermería: contactos y reacciones de sus tratamientos (también las anuladas, que la ficha muestra tachadas).
     enfermeria: (d.enfermeria || []).filter(function (f) { return f.DNI === k; }).map(function (f) {
       return { ID: f.ID, FECHA_HORA: String(f.FECHA_HORA || ''), ID_REGISTRO: f.ID_REGISTRO, ID_SESION: f.ID_SESION, NUMERO_SESION: Number(f.NUMERO_SESION) || 0,

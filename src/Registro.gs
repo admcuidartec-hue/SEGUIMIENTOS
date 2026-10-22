@@ -533,6 +533,33 @@ function decisionesDeAlta(altas, citas, reglas, hoy) {
   return out;
 }
 
+/**
+ * Las altas de un paciente como las lee la ficha: la decisión (las antiguas, sin DECISION, son ALTA), su fecha de retorno,
+ * cuándo vuelve a «Por contactar» (FECHA_AVISO, solo 6 meses y 1 año) y su estado:
+ * ANULADA; VOLVIO (hay una consulta realizada después del alta, en su especialidad; FECHA_VOLVIO es la primera);
+ * VIGENTE (es la de `vigentes`); PENDIENTE (la última decisión de la serie, con retorno aún no cumplido); REEMPLAZADA.
+ */
+function altasParaFicha(altas, citas, vigentes, reglas, hoy) {
+  var series = armarSeries(citas), ultimas = {};
+  (altas || []).forEach(function (a) {
+    if (anulado_(a)) return;
+    var k = claveSerie(normDni(a.DNI), a.ESPECIALIDAD), f = fechaIso(a.FECHA);
+    if (f && (!ultimas[k] || f >= ultimas[k].f)) ultimas[k] = { id: a.ID, f: f };
+  });
+  return (altas || []).map(function (a) {
+    var k = claveSerie(normDni(a.DNI), a.ESPECIALIDAD), f = fechaIso(a.FECHA), ret = fechaIso(a.FECHA_RETORNO) || '';
+    var dec = decisionDe_(a);
+    if (dec.meses && !ret) dec = DECISIONES.ALTA;
+    var despues = ((series[k] || {}).realizadas || []).map(function (c) { return fechaIso(c.FECHA); })
+      .filter(function (x) { return f && x > f; }).sort();
+    var v = (vigentes || {})[k], ultima = ultimas[k] && ultimas[k].id === a.ID;
+    var estado = anulado_(a) ? 'ANULADA' : despues.length ? 'VOLVIO' : v && v.ID === a.ID ? 'VIGENTE'
+      : dec.nombre !== 'ALTA' && ret && ultima ? 'PENDIENTE' : 'REEMPLAZADA';
+    return { ID: a.ID, DECISION: dec.nombre, FECHA_RETORNO: dec.nombre === 'ALTA' ? '' : ret,
+      FECHA_AVISO: dec.meses ? sumarDias(ret, -reglas.avisoAltaControl) : '', ESTADO_ALTA: estado, FECHA_VOLVIO: despues[0] || '' };
+  });
+}
+
 /* ---------- Registros como indicaciones (para las cifras y los teléfonos) ---------- */
 
 function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {

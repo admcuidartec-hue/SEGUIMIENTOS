@@ -4313,3 +4313,33 @@ test('DNI con ceros a la izquierda: el DEMO lo guarda como normDni y los buscado
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('«Número equivocado» con un @usuario en Registro: la reevaluación no se cierra y el panel no dice «No le queda otro contacto»', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    await pagina.evaluate(async () => {
+      await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '40333444', nombre: 'Carmen Sofía Torres Díaz', contacto: '@carmen.torres', fecha: S.hoy,
+        doctor: 'Dr. Juvenal Hanampa', procedimientos: ['AMO'] });
+      await cargarTablero(null, true);
+    });
+    const aviso = await pagina.evaluate(async () => {
+      const p = S.pacientes.find(x => x.dni === '40333444' && x.tipo === 'REEVALUACION');
+      prepararPaso(p, 'numero');
+      const div = document.createElement('div'); div.innerHTML = htmlPaso(p);
+      return { usuario: p.usuario, texto: div.textContent };
+    });
+    assert.equal(aviso.usuario, '@carmen.torres');
+    assert.match(aviso.texto, /Le queda el usuario @carmen\.torres: el seguimiento sigue\./);
+    assert.doesNotMatch(aviso.texto, /No le queda otro contacto/);
+    const r = await pagina.evaluate(async () => {
+      await llamar('registrarResultado', { usuario: 'MAGALY', dni: '40333444', especialidad: 'REUMATOLOGÍA', resultado: 'NÚMERO EQUIVOCADO', telefono: '912345678' });
+      const t = await llamar('getTablero');
+      const c = Object.keys(t.columnas).find(k => t.columnas[k].some(x => x.DNI === '40333444' && x.TIPO_SEGUIMIENTO === 'REEVALUACION'));
+      return { c: c || '', cerrado: t.cerrados.some(x => x.DNI === '40333444') };
+    });
+    assert.notEqual(r.c, '', 'la reevaluación sigue en el tablero');
+    assert.equal(r.cerrado, false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

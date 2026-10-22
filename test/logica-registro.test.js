@@ -717,3 +717,16 @@ test('pendientesRegistro: el doctor sin consultas de la paciente aporta su espec
   const citas = [cita({ dni: '40999000', fecha: '2026-07-01', medico: KAREN }), cita({ fecha: '2026-08-02', esp: 'REUMATOLOGÍA', medico: HANAMPA })];
   assert.equal(filaH(dReg([r], ses, citas, '2026-10-10')).ESPECIALIDAD_CONSULTA, 'HEMATOLOGÍA');
 });
+
+test('usuariosPorDni: el contacto de Registro que no es teléfono, del registro sin anular más reciente', () => {
+  const regs = [REGH({ ID: 'REG-1', FECHA: '2026-09-01', CONTACTO: '@viejo' }), REGH({ ID: 'REG-2', FECHA: '2026-10-01', CONTACTO: '@nuevo' }),
+    REGH({ ID: 'REG-3', FECHA: '2026-10-02', CONTACTO: '@anulado', ANULADO: 'SÍ' }), REGH({ ID: 'REG-4', DNI: '40999000', CONTACTO: '987654321' })];
+  assert.deepEqual(plano(L.usuariosPorDni(regs)), { 40111222: '@nuevo' });
+});
+
+test('pendientesRegistro: el @usuario de otro registro del DNI también es contacto', () => {
+  const marca = { ID: 'SEG-9', FECHA_HORA: '2026-10-18 10:00', DNI: '40111222', ESPECIALIDAD: 'CONTROL', RESPONSABLE: 'MAGALY', ACCION: 'TELEFONO',
+    REFERENCIA: 'REG-000010', RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: '987654321', ANULADO: '' };
+  const d = Object.assign(dReg([CTL()], [], [], '2026-10-19', [marca]), { telefonos: {}, usuarios: { 40111222: '@rosa' } });
+  assert.deepEqual([filaH(d).ESTADO, filaH(d).CIERRE], ['PENDIENTE', '']);
+});

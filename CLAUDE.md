@@ -68,7 +68,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - Las filas antiguas, sin `RESULTADO`, se leen con `resultadoDe`; no se reescriben.
 - Los resultados solo se aceptan sobre tarjetas abiertas (Por contactar, Agendado o En tratamiento): un resultado tardío no reabre un seguimiento ya cerrado; para corregir un cierre, primero se anula.
 - Solo «No contestó» cuenta para el cierre automático (`MAX_SEGUIMIENTOS` seguidos, más la espera).
-- «Número equivocado» marca el número y no cierra mientras quede otro contacto.
+- «Número equivocado» marca el número y no cierra mientras quede otro contacto: otro teléfono o el contacto de Registro que no
+  es teléfono («@usuario», `usuariosPorDni`), que llega a todas las tarjetas del DNI (también a la reevaluación) como `USUARIO`.
 - «Falleció» vale para todo el paciente.
 - Las filas anuladas (`ANULADO = SI`) no cuentan en ninguna cifra; `datos_` las filtra.
 - Tras publicar, usar «Preparar hojas», que agrega 5 columnas a `SEGUIMIENTOS` y los parámetros que falten en `REGLAS`

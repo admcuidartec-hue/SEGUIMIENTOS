@@ -222,3 +222,17 @@ test('validarResultado: «Aceptó» solo en un registro cotizado o programado; e
   assert.match(L.validarResultado(p({ resultado: 'AGENDÓ CITA', fecha: '2026-10-12' }), d([t({ ESTADO_REGISTRO: 'COTIZADO', HECHAS: 0 })])).error,
     /solo para reevaluaciones/);
 });
+
+test('armarPacientes y pendientesIndicacion: el @usuario de Registro es otro contacto («Número equivocado» no cierra)', () => {
+  const citas = [cita({ fecha: '2026-07-01' })];
+  const inds = [{ DNI: '40111222', TELEFONO: '987654321', FECHA: '2026-06-01', TIPO: 'HIERRO', ESTADO: 'ACEPTÓ' }];
+  const marca = equivocado('2026-09-28', '987654321');
+  const usuarios = { 40111222: '@rosa.quispe' };
+  const p = plano(L.armarPacientes(citas, inds, [marca], reglas(L), '2026-10-01', [], {}, {}, usuarios))[0];
+  assert.deepEqual([p.ESTADO, p.CIERRE, p.TELEFONOS, p.USUARIO], ['VENCIDO', '', '', '@rosa.quispe']);
+  const cot = inds.concat([{ DNI: '40111222', TELEFONO: '', FECHA: '2026-09-20', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO', ESTADO: 'COTIZÓ' }]);
+  const q = plano(L.pendientesIndicacion(citas, cot, [marca], reglas(L), '2026-10-01', [], usuarios))[0];
+  assert.deepEqual([q.ESTADO, q.CIERRE, q.USUARIO], ['PENDIENTE', '', '@rosa.quispe']);
+  const sin = plano(L.pendientesIndicacion(citas, cot, [marca], reglas(L), '2026-10-01', []))[0];
+  assert.equal(sin.ESTADO, 'CERRADO', 'sin usuario, el número equivocado sí cierra');
+});

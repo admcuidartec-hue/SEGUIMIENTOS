@@ -4847,6 +4847,10 @@ const DEMO = (() => {
   // En el DEMO, el Dr. Hanampa atiende Reumatología y los demás, Hematología.
   const ESP_MEDICO = { [HANAMPA]: 'REUMATOLOGÍA' };
   const especialidadDe = sofdoc => ESP_MEDICO[sofdoc] || 'HEMATOLOGÍA';
+  // Como usuariosPorDni (Registro.gs): el contacto de Registro que no es teléfono, del registro sin anular más reciente.
+  // Cuenta como otro contacto en todas las tarjetas del DNI: «Número equivocado» no cierra mientras quede.
+  const usuarioDe = dni => registros.filter(r => r.DNI === dni && !r.ANULADO && r.CONTACTO && String(r.CONTACTO).replace(/\D/g, '').length !== 9)
+    .sort((a, b) => (a.FECHA + ' ' + (a.FECHA_HORA || '')) < (b.FECHA + ' ' + (b.FECHA_HORA || '')) ? 1 : -1).map(r => String(r.CONTACTO).trim())[0] || '';
   const reg = (r, o) => {
     const ss = sesionesDe(r.ID), hechas = ss.length, ultima = hechas ? ss[hechas - 1].FECHA : '';
     const estadoReg = r.ANULADO ? 'ANULADO' : hechas >= r.SESIONES ? 'COMPLETO' : hechas ? 'EN CURSO' : 'COTIZADO';
@@ -5277,7 +5281,7 @@ const DEMO = (() => {
         if (y.TELEFONOS_DESCARTADOS.indexOf(tel) < 0) y.TELEFONOS_DESCARTADOS.push(tel);
         y.SIN_CONTACTO = !y.TELEFONOS && !String(y.USUARIO || '').trim();
       });
-      quedan = !!t.TELEFONOS || !!String(t.USUARIO || '').trim();
+      quedan = !!t.TELEFONOS || !!String(t.USUARIO || '').trim() || !!usuarioDe(dni);
       if (!quedan) cerrar(t, 'NÚMERO EQUIVOCADO');
     }
     const s = { ID: idSeg(), FECHA_HORA: ahora(), DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD,
@@ -5452,6 +5456,9 @@ const DEMO = (() => {
       const col = { POR_CONTACTAR: [], CONTACTADO: [], PAGO_REALIZADO: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] };
       // MES como en armarTablero (Tablero.gs): mesDe(...) = 'yyyy-mm'; reevaluación por su última cita, el resto por la cotización.
       tarjetas.forEach(t => { t.MES = String((t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.ULTIMA_CITA : t.FECHA_COTIZACION) || '').slice(0, 7); });
+      tarjetas.forEach(t => {
+        if (!t.ID_REGISTRO && !String(t.USUARIO || '').trim()) { t.USUARIO = usuarioDe(t.DNI); if (t.USUARIO) t.SIN_CONTACTO = false; }
+      });
       tarjetas.forEach(t => { if (col[t.COLUMNA]) col[t.COLUMNA].push(t); });
       // Como armarTablero: un registro completo que ya toca reevaluar (en cualquier columna abierta) tapa la reevaluación del paciente.
       const tapa = {};

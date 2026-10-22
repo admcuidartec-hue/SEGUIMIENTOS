@@ -266,10 +266,12 @@ function derivar_(d) {
   d.vigentes = altasVigentes(d.altas, d.seguimientos, d.citas, d.reglas, d.hoy);
   d.retornos = decisionesDeAlta(d.altas, d.citas, d.reglas, d.hoy).retornos;
   d.telefonos = telefonosPorDni(d.indicacionesTodas, d.contactos, d.seguimientos);
-  d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos);
-  d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos)
+  // El «@usuario» de Registro también es un contacto: «Número equivocado» no cierra mientras quede (sinContacto_).
+  d.usuarios = usuariosPorDni(d.registros);
+  d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos, d.usuarios);
+  d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.usuarios)
     .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
-      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos }));
+      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios }));
   return d;
 }
 

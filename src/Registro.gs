@@ -369,7 +369,7 @@ function pendientesRegistro(d) {
     if (!telefonos.length && tel.length === 9 && !(marcaTel && !(fechaIso(r.FECHA) > marcaTel))) telefonos = [tel];
     var mapaTel = {};
     mapaTel[dni] = telefonos;
-    var sc = sinContacto_(dni, marcas, mapaTel, usuario), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '', falta = '';
+    var sc = sinContacto_(dni, marcas, mapaTel, usuario || (d.usuarios || {})[dni]), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '', falta = '';
     var agenda = c.agenda;
     // En un tratamiento en curso, la cita que se agenda es su próxima sesión: «Sesión k+1 el …».
     if (agenda && enCurso && agenda.tipo === 'CITA') agenda = { tipo: 'SESION', fecha: agenda.fecha, intento: agenda.intento };
@@ -630,6 +630,20 @@ function otrosContactos(registros, dni) {
       vistos[c] = 1;
       return true;
     });
+}
+
+/**
+ * { dni: contacto } con el contacto de Registro que no es teléfono (otrosContactos), del registro sin anular más reciente.
+ * armarPacientes, pendientesIndicacion y pendientesRegistro lo cuentan como otro contacto ante un «Número equivocado».
+ */
+function usuariosPorDni(registros) {
+  var out = {}, cuando = {};
+  (registros || []).forEach(function (r) {
+    var dni = normDni(r.DNI), c = textoLimpio_(r.CONTACTO), k = (fechaIso(r.FECHA) || '') + ' ' + String(r.FECHA_HORA || '');
+    if (!dni || anulado_(r) || !c || normTelefono(c).length === 9) return;
+    if (!(dni in cuando) || k > cuando[dni]) { cuando[dni] = k; out[dni] = c; }
+  });
+  return out;
 }
 
 /** Líneas para «Verificar»: lo que la pestaña Registro necesita de CATALOGOS. */

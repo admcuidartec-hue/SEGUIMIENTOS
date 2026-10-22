@@ -49,6 +49,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - El buscador de Pacientes (`buscar` → `buscarEnPacientes`) pide todas las palabras en cualquier orden, o parte del
   DNI, y mira citas, Registro e `INDICACIONES`. Los buscadores comparan con `normBusqueda` (servidor, `Index.html` y DEMO):
   sin tildes, apóstrofos ni puntos, y el guion separa palabras («ohiggins» encuentra a «Ñahui-O'Higgins»).
+- **Documento**: el campo DNI de Registro ya no corta a 12 caracteres en silencio: con más de 12 avisa («El documento tiene 13
+  caracteres: el carné de extranjería va de 9 a 12.») y no deja registrar (`dniLargo`).
 - **Teléfono**: lo que parece un número (solo dígitos, espacios, +, guiones, puntos y paréntesis) debe dar 9 dígitos con
   `normTelefono` (vale el +51 y el 01 de un fijo de Lima); si no, «El teléfono debe tener 9 dígitos.» y no se guarda
   (`telefonoMal_` al registrar y al editar; `telefonoMal` en la pantalla y el DEMO). Un texto con @ o con letras es un usuario.

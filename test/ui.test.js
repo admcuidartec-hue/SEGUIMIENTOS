@@ -4537,3 +4537,25 @@ test('nombreBonito: mayúscula también tras guion y apóstrofo', async () => {
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('Registro: un documento de más de 12 caracteres no se corta en silencio: se avisa y no se registra', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('X123456789012');
+    await pagina.locator('#rdni').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rdni').inputValue(), 'X123456789012', 'no se corta');
+    await pagina.locator('#rnom').fill('Prueba Documento');
+    await pagina.locator('#rtel').fill('987001301');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.evaluate(() => { RG.procs = ['AMO']; validarRegistro(); });
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal((await pagina.locator('#rfalta').textContent()).trim(), 'El documento tiene 13 caracteres: el carné de extranjería va de 9 a 12.');
+    await pagina.locator('#rdni').press('Enter');
+    await pagina.waitForTimeout(150);
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 0);
+    await pagina.locator('#rdni').fill('X12345678901');
+    await pagina.locator('#rdni').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

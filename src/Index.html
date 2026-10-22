@@ -2632,7 +2632,9 @@ const RG = {
   recientes: {}                  // ID -> temporizador: la fila recién guardada, editada o anulada se tiñe 3 s
 };
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres (documentoValido del servidor). Nunca borra letras. */
-const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '').slice(0, 12);
+const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '');
+/** Un documento de más de 12 caracteres no se corta en silencio: se avisa (y no se registra). '' si no pasa de 12. */
+const dniLargo = v => { const n = dniLimpio(v).length; return n > 12 ? `El documento tiene ${n} caracteres: el carné de extranjería va de 9 a 12.` : ''; };
 const documentoOk = v => { const d = dniLimpio(v); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
 /** Un teléfono se envía sin espacios; un usuario (@…) tal cual. */
 /** Como normTelefono del servidor: solo los dígitos, sin el 51 de un +51 (11 dígitos); '' si quedan menos de 7. */
@@ -3031,14 +3033,15 @@ function validarRegistro() {
   const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0), d = decisionUi(RG.dec);
   const hecha = RG.modo === 'indicacion' ? primeraSesionHecha() : '';
   const conSesion = hecha ? (n === 1 ? ` con la sesión 1 hecha el ${dm(hecha)}` : `, cada uno con la sesión 1 hecha el ${dm(hecha)}`) : '';
-  const mal = f.length ? '' : fechaMalRegistro();
+  const campoDni = $(esDecision() ? '#adni' : '#rdni'), largo = dniLargo(campoDni ? campoDni.value : '');
+  const mal = largo || (f.length ? '' : fechaMalRegistro());
   b.disabled = f.length > 0 || !!mal || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
-  $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
+  $('#rfalta').textContent = largo || (f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
     : RG.modo === 'indicacion' ? (n === 1 ? `Se creará 1 registro${conSesion}.` : `Se crearán ${n} registros${conSesion}.`)
     : RG.modo === 'control' ? 'Volverá con sus resultados en la fecha de retorno.'
     : d.pideFecha ? (faltaRetorno() ? 'Elija la fecha de retorno.' : 'Lo esperamos en la fecha de retorno.')
-    : d.meses ? 'Cierra el seguimiento hasta su control.' : 'Cierra el seguimiento de esa especialidad.';
+    : d.meses ? 'Cierra el seguimiento hasta su control.' : 'Cierra el seguimiento de esa especialidad.');
 }
 
 /** Botón «Registrar» o Enter. Nunca reenvía con un envío en vuelo ni con la caja de duplicado abierta: ahí decide la asesora. */

@@ -652,3 +652,40 @@ test('altasParaFicha: la decisión, su retorno, cuándo vuelve a «Por contactar
   // 6 meses sin fecha de retorno (hoja editada a mano): alta simple, sin NaN.
   assert.deepEqual(ficha([a({ DECISION: 'ALTA 6 MESES' })], citas, '2026-10-09'), [['ALT-1', 'ALTA', '', '', 'VIGENTE', '']]);
 });
+
+test('Dos decisiones del médico el mismo día: manda la registrada después (FECHA_HORA; si no hay, la de más abajo), igual en decisionesDeAlta y altasParaFicha', () => {
+  const R = reglas(L), citas = [cita({ fecha: '2026-10-01' })], k = '40111222|HEMATOLOGIA', hoy = '2026-10-09';
+  const a = o => Object.assign({ ID: 'ALT-1', FECHA_HORA: '2026-10-05 10:00', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dra. X',
+    DECISION: '', FECHA_RETORNO: '', ANULADO: '' }, o);
+  const nueva = o => a(Object.assign({ DECISION: 'NUEVA REEVALUACION', FECHA_RETORNO: '2026-12-04' }, o));
+  const anio = o => a(Object.assign({ ID: 'ALT-2', DECISION: 'ALTA 1 AÑO', FECHA_RETORNO: '2027-10-05' }, o));
+  const ver = altas => {
+    const d = plano(L.decisionesDeAlta(altas, citas, R, hoy)), vig = L.altasVigentes(altas, [], citas, R, hoy);
+    return { vigente: d.vigentes[k] ? d.vigentes[k].ID : '', retorno: d.retornos[k] || null,
+      ficha: plano(L.altasParaFicha(altas, citas, vig, R, hoy)).map(x => x.ID + ':' + x.ESTADO_ALTA) };
+  };
+  // Nueva reevaluación a las 10:00 y, tras los resultados, alta a 1 año a las 10:30: manda el alta.
+  let r = ver([nueva(), anio({ FECHA_HORA: '2026-10-05 10:30' })]);
+  assert.deepEqual([r.vigente, r.retorno, r.ficha], ['ALT-2', null, ['ALT-1:REEMPLAZADA', 'ALT-2:VIGENTE']]);
+  // Al revés: alta a 1 año primero y nueva reevaluación después: manda la nueva reevaluación.
+  r = ver([anio({ FECHA_HORA: '2026-10-05 09:00' }), nueva({ FECHA_HORA: '2026-10-05 11:00' })]);
+  assert.deepEqual([r.vigente, r.retorno, r.ficha], ['', { fecha: '2026-12-04', tipo: 'REEVALUACION' }, ['ALT-2:REEMPLAZADA', 'ALT-1:PENDIENTE']]);
+  // La hora manda sobre el orden de la hoja (la hoja pudo ordenarse).
+  r = ver([anio({ FECHA_HORA: '2026-10-05 10:30' }), nueva()]);
+  assert.deepEqual([r.vigente, r.ficha], ['ALT-2', ['ALT-2:VIGENTE', 'ALT-1:REEMPLAZADA']]);
+  // Sin hora, la de más abajo en la hoja.
+  r = ver([nueva({ FECHA_HORA: '' }), anio({ FECHA_HORA: '' })]);
+  assert.deepEqual([r.vigente, r.ficha], ['ALT-2', ['ALT-1:REEMPLAZADA', 'ALT-2:VIGENTE']]);
+  // Una fecha de consulta posterior manda aunque se haya registrado antes.
+  r = ver([anio({ FECHA: '2026-10-06', FECHA_HORA: '2026-10-05 09:00' }), nueva({ FECHA_HORA: '2026-10-07 09:00' })]);
+  assert.deepEqual([r.vigente, r.ficha], ['ALT-2', ['ALT-2:VIGENTE', 'ALT-1:REEMPLAZADA']]);
+});
+
+test('otrosContactos: los contactos de Registro que no son un teléfono (p. ej. @usuario), sin anulados ni repetidos, el más reciente primero', () => {
+  const r = (ID, FECHA, CONTACTO, o) => Object.assign({ ID, FECHA_HORA: FECHA + ' 10:00', FECHA, DNI: '45000111', CONTACTO, ANULADO: '' }, o);
+  const regs = [r('REG-1', '2026-09-01', '@ana.viejo'), r('REG-2', '2026-09-20', '987 000 111'), r('REG-3', '2026-09-25', '@ana.flores'),
+    r('REG-4', '2026-09-26', '@ana.flores'), r('REG-5', '2026-09-27', '@equivocado', { ANULADO: 'SÍ' }), r('REG-6', '2026-09-28', '@otra', { DNI: '45000222' }),
+    r('REG-7', '2026-09-29', '  ')];
+  assert.deepEqual(plano(L.otrosContactos(regs, '45000111')), ['@ana.flores', '@ana.viejo']);
+  assert.deepEqual(plano(L.otrosContactos(regs, '45000999')), []);
+});

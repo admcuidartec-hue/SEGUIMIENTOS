@@ -512,13 +512,28 @@ function altasVigentes(altas, seguimientos, citas, reglas, hoy) {
 }
 
 /** Qué decidió el médico, por serie: lo que sigue de alta y lo que debe volver (con su fecha). */
+/**
+ * ¿La decisión `a` (fila `i` de ALTAS) es posterior a `b` (fila `j`)? La de mayor FECHA; a igual FECHA, la registrada después
+ * (FECHA_HORA); y si tampoco se distingue, la que está más abajo en la hoja. decisionesDeAlta y altasParaFicha usan esta misma
+ * regla: si discreparan, la ficha diría «vigente» una decisión que el tablero no aplica (dos decisiones el mismo día).
+ */
+function decisionPosterior_(a, i, b, j) {
+  var fa = fechaIso(a.FECHA) || '', fb = fechaIso(b.FECHA) || '';
+  if (fa !== fb) return fa > fb;
+  var ha = textoLimpio_(a.FECHA_HORA), hb = textoLimpio_(b.FECHA_HORA);
+  if (ha && hb && ha !== hb) return ha > hb;
+  return i > j;
+}
+
 function decisionesDeAlta(altas, citas, reglas, hoy) {
-  var series = armarSeries(citas), ultimas = {}, out = { vigentes: {}, retornos: {} };
-  (altas || []).forEach(function (a) {
+  var series = armarSeries(citas), ultimas = {}, filas = {}, out = { vigentes: {}, retornos: {} };
+  (altas || []).forEach(function (a, i) {
     if (anulado_(a)) return;
     var k = claveSerie(normDni(a.DNI), a.ESPECIALIDAD), f = fechaIso(a.FECHA), serie = series[k];
     if (!serie || !f || serie.realizadas.some(function (c) { return c.FECHA > f; })) return;
-    if (!ultimas[k] || f > ultimas[k].FECHA) ultimas[k] = { ID: a.ID, FECHA: f, DNI: normDni(a.DNI), ESPECIALIDAD: a.ESPECIALIDAD,
+    if (filas[k] && !decisionPosterior_(a, i, filas[k].a, filas[k].i)) return;
+    filas[k] = { a: a, i: i };
+    ultimas[k] = { ID: a.ID, FECHA: f, DNI: normDni(a.DNI), ESPECIALIDAD: a.ESPECIALIDAD,
       DOCTOR: a.DOCTOR || '', REGISTRADO_POR: a.REGISTRADO_POR || '', DECISION: decisionDe_(a).nombre, FECHA_RETORNO: fechaIso(a.FECHA_RETORNO) };
   });
   Object.keys(ultimas).forEach(function (k) {
@@ -541,10 +556,10 @@ function decisionesDeAlta(altas, citas, reglas, hoy) {
  */
 function altasParaFicha(altas, citas, vigentes, reglas, hoy) {
   var series = armarSeries(citas), ultimas = {};
-  (altas || []).forEach(function (a) {
-    if (anulado_(a)) return;
-    var k = claveSerie(normDni(a.DNI), a.ESPECIALIDAD), f = fechaIso(a.FECHA);
-    if (f && (!ultimas[k] || f >= ultimas[k].f)) ultimas[k] = { id: a.ID, f: f };
+  (altas || []).forEach(function (a, i) {
+    if (anulado_(a) || !fechaIso(a.FECHA)) return;
+    var k = claveSerie(normDni(a.DNI), a.ESPECIALIDAD);
+    if (!ultimas[k] || decisionPosterior_(a, i, ultimas[k].a, ultimas[k].i)) ultimas[k] = { id: a.ID, a: a, i: i };
   });
   return (altas || []).map(function (a) {
     var k = claveSerie(normDni(a.DNI), a.ESPECIALIDAD), f = fechaIso(a.FECHA), ret = fechaIso(a.FECHA_RETORNO) || '';
@@ -578,6 +593,25 @@ function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {
       EN_ESPERA: e.estado === 'COTIZADO' && fecha && diasEntre(fecha, hoy) < reglas.esperaCotizacion ? 'SÍ' : ''
     };
   }).filter(Boolean);
+}
+
+/**
+ * Los contactos de Registro del DNI que no son un teléfono de 9 dígitos (p. ej. «@usuario»): los teléfonos ya llegan por
+ * telefonosPorDni. Sin anulados ni repetidos, el registro más reciente primero. La ficha los muestra en «Contacto».
+ */
+function otrosContactos(registros, dni) {
+  var k = normDni(dni), vistos = {};
+  return (registros || []).filter(function (r) { return normDni(r.DNI) === k && !anulado_(r); })
+    .sort(function (a, b) {
+      var x = (fechaIso(a.FECHA) || '') + ' ' + String(a.FECHA_HORA || ''), y = (fechaIso(b.FECHA) || '') + ' ' + String(b.FECHA_HORA || '');
+      return x < y ? 1 : x > y ? -1 : 0;
+    })
+    .map(function (r) { return textoLimpio_(r.CONTACTO); })
+    .filter(function (c) {
+      if (!c || normTelefono(c).length === 9 || vistos[c]) return false;
+      vistos[c] = 1;
+      return true;
+    });
 }
 
 /** Líneas para «Verificar»: lo que la pestaña Registro necesita de CATALOGOS. */

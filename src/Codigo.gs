@@ -381,6 +381,8 @@ function getPaciente(dni) {
     }),
     fallecido: fallecidos(d.seguimientos)[k] || null,
     telefonos: d.telefonos[k] || [],
+    // Lo que no es un teléfono (p. ej. «@usuario» del registro): la ficha lo muestra como contacto.
+    contactos: otrosContactos(d.registros, k),
     telefonosDescartados: telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos)[k] || []
   });
 }

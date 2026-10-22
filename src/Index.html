@@ -870,6 +870,8 @@ const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 /** Sin tildes y en MAYÚSCULAS, como normTexto del servidor. */
 const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+/** Como normBusqueda del servidor: sin apóstrofos ni puntos, y el guion separa palabras («Ñahui-O'Higgins» → 'NAHUI OHIGGINS'). */
+const normBusqueda = s => norm(String(s == null ? '' : s).replace(/['\u2018\u2019`\u00B4.]/g, '').replace(/-/g, ' ')).replace(/\s+/g, ' ');
 /** Como normDni del servidor: sin espacios, puntos ni guiones, y un DNI de solo dígitos sin ceros a la izquierda. */
 const normDni = v => { let s = norm(v).replace(/[\s.\-]/g, ''); if (/^\d+$/.test(s)) s = s.replace(/^0+/, ''); return s; };
 /** prefers-reduced-motion, al día: si la persona lo cambia con la app abierta, se respeta sin recargar. */
@@ -1256,13 +1258,13 @@ function opcionesMes() {
 
 /** Filtros de la pantalla. conTipo = false da la base de los números del segmentado. */
 function filtrados(conTipo) {
-  const palabras = norm(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '').replace(/^0+/, '');   // como normDni: el DNI se guarda sin ceros a la izquierda
+  const palabras = normBusqueda(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '').replace(/^0+/, '');   // como normDni: el DNI se guarda sin ceros a la izquierda
   return S.pacientes.filter(p => !p.oculto
     && (!S.medico || norm(p.med) === norm(S.medico))
     && (!S.esp || norm(p.esp) === norm(S.esp))
     && (!S.sinTel || p.sinContacto)
     && (!S.mes || p.raw.MES === S.mes)
-    && (!palabras.length || (digitos && p.dni.includes(digitos)) || palabras.every(w => norm(p.n).includes(w)))
+    && (!S.q.trim() || (digitos && p.dni.includes(digitos)) || (palabras.length && palabras.every(w => normBusqueda(p.n).includes(w))))
     && (!conTipo || !S.tipo || p.tipo === S.tipo));
 }
 const hayFiltros = () => !!(S.tipo || S.medico || S.mes || S.esp || S.sinTel || S.q.trim());
@@ -5580,12 +5582,12 @@ const DEMO = (() => {
 
     // Como buscarEnPacientes: todas las palabras en cualquier orden, o parte del DNI; también quien solo está en Registro.
     buscar: q => {
-      const n = norm(q), d = dniDe(q).replace(/\s/g, ''), palabras = n.split(/\s+/).filter(Boolean);
-      if (n.replace(/\s/g, '').length < 3) return [];
+      const n = norm(q), d = dniDe(q).replace(/\s/g, ''), palabras = normBusqueda(q).split(/\s+/).filter(Boolean);
+      if (n.replace(/\s/g, '').length < 3 || !palabras.length) return [];
       const out = [], vistos = {};
       const ver = (dni, nombre) => {
         if (!dni || vistos[dni] || out.length >= 20) return;
-        if ((/\d/.test(d) && dni.includes(d)) || palabras.every(w => norm(nombre).includes(w))) { vistos[dni] = 1; out.push({ DNI: dni, NOMBRE: nombre }); }
+        if ((/\d/.test(d) && dni.includes(d)) || palabras.every(w => normBusqueda(nombre).includes(w))) { vistos[dni] = 1; out.push({ DNI: dni, NOMBRE: nombre }); }
       };
       for (let i = citas.length - 1; i >= 0; i--) ver(citas[i].DNI, citas[i].NOMBRE);
       for (let i = registros.length - 1; i >= 0; i--) if (registros[i].ANULADO !== 'SÍ') ver(registros[i].DNI, registros[i].NOMBRE);

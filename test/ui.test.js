@@ -4417,3 +4417,23 @@ test('teléfono: lo que parece un número y no da 9 dígitos se avisa y no se gu
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('buscadores: ignoran apóstrofos, guiones y puntos (tablero y Pacientes del DEMO, como normBusqueda)', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000701', nombre: "María del Pilar Ñahui-O'Higgins", contacto: '987000701', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      await cargarTablero(null, true);
+      const tab = q => { S.q = q; const n = filtrados(true).filter(p => p.dni === '47000701').length; S.q = ''; return n; };
+      const pac = async q => (await llamar('buscar', q)).map(x => x.DNI);
+      return { t: [tab('ohiggins'), tab("o'higgins"), tab('nahui-ohiggins'), tab('pilar ohiggins')], p: [await pac('ohiggins'), await pac('nahui-ohiggins')],
+        n: normBusqueda("Ñahui-O'Higgins") };
+    });
+    assert.deepEqual(r.t, [1, 1, 1, 1]);
+    assert.deepEqual(r.p, [['47000701'], ['47000701']]);
+    assert.equal(r.n, 'NAHUI OHIGGINS');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

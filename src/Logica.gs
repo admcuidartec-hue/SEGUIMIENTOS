@@ -506,15 +506,24 @@ function buscarFilaParaAsignar(encabezado, filas, id, dni, conocidos) {
  * escrito. Mira las citas (la más reciente primero), luego Registro y luego
  * el historial de indicaciones: quien vino solo por hierro también aparece.
  */
+/**
+ * Texto para comparar en un buscador: normTexto sin apóstrofos ni puntos, y con el guion como separador de palabras
+ * («Ñahui-O'Higgins» → 'NAHUI OHIGGINS'): «ohiggins», «o'higgins» y «nahui-ohiggins» lo encuentran. Index.html: normBusqueda.
+ */
+function normBusqueda(v) {
+  return normTexto(String(v == null ? '' : v).replace(/['\u2018\u2019`\u00B4.]/g, '').replace(/-/g, ' '));
+}
+
 function buscarEnPacientes(texto, f) {
-  var q = normTexto(texto);
-  if (q.replace(/\s/g, '').length < 3) return [];
-  var palabras = q.split(' '), dni = normDni(texto), conDigitos = /\d/.test(dni);
+  var q = normBusqueda(texto);
+  if (normTexto(texto).replace(/\s/g, '').length < 3) return [];
+  var palabras = q.split(' ').filter(Boolean), dni = normDni(texto), conDigitos = /\d/.test(dni);
+  if (!palabras.length) return [];   // solo signos («'''»): nada que buscar
   var vistos = {}, out = [];
   function ver(d, nombre) {
     d = normDni(d);
     if (!d || vistos[d] || out.length >= 20) return;
-    var n = normTexto(nombre);
+    var n = normBusqueda(nombre);
     if ((conDigitos && d.indexOf(dni) >= 0) || palabras.every(function (w) { return n.indexOf(w) >= 0; })) {
       vistos[d] = 1;
       out.push({ DNI: d, NOMBRE: textoLimpio_(nombre) });

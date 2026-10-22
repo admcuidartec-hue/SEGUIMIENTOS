@@ -766,3 +766,12 @@ test('validarEdicionRegistro: la fecha del registro no puede quedar después de 
   assert.deepEqual(v({ fecha: '2026-10-03' }).cambios, { FECHA: '2026-10-03' });
   assert.equal(v({ fecha: '2026-10-04' }).error, 'La fecha no puede ser posterior a la primera sesión (03/10/2026).');
 });
+
+test('contacto: lo que parece un teléfono debe dar 9 dígitos (con +51 o el 01 de un fijo); un @usuario o un texto con letras vale', () => {
+  const reg = c => L.validarRegistro(base3({ contacto: c, procedimientos: ['AMO'] }), Object.assign({}, CAT3, { procedimientos: ['AMO'] }), '2026-10-09').error;
+  ['999 740 311', '+51 999 740 311', '999-740-322', '(01) 433-2210', '@rosa.quispe', 'rosa quispe 99'].forEach(c => assert.equal(reg(c), '', c));
+  ['99974033', '9997403444', '433-2210', '+51 99974'].forEach(c => assert.equal(reg(c), 'El teléfono debe tener 9 dígitos.', c));
+  const v = c => L.validarEdicionRegistro(REGH(), { contacto: c }, [], CAT3, '2026-10-09').error;
+  assert.equal(v('99974033'), 'El teléfono debe tener 9 dígitos.');
+  assert.equal(v('@rosa'), '');
+});

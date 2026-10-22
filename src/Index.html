@@ -2628,6 +2628,10 @@ const RG = {
 const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '').slice(0, 12);
 const documentoOk = v => { const d = dniLimpio(v); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
 /** Un teléfono se envía sin espacios; un usuario (@…) tal cual. */
+/** Como normTelefono del servidor: solo los dígitos, sin el 51 de un +51 (11 dígitos); '' si quedan menos de 7. */
+const normTel = v => { let d = String(v == null ? '' : v).replace(/\D/g, ''); if (d.length === 11 && d.indexOf('51') === 0) d = d.slice(2); return d.length >= 7 ? d : ''; };
+/** Como telefonoMal_ del servidor: lo que parece un número debe dar 9 dígitos; un @usuario o un texto con letras vale. */
+const telefonoMal = v => { const t = String(v == null ? '' : v).trim(); return /^\+?[\d\s().\-]+$/.test(t) && normTel(t).length !== 9 ? 'El teléfono debe tener 9 dígitos.' : ''; };
 const contactoEnvio = v => { const t = String(v || '').trim(); return /^\+?[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t; };
 /** La clave es normTexto del tratamiento: sin tildes, en mayúsculas y con los espacios (y saltos de línea) juntados. */
 const marcasDe = t => (S.boot && S.boot.marcas && S.boot.marcas[norm(t).replace(/\s+/g, ' ')]) || [];
@@ -2970,7 +2974,7 @@ function faltanRegistro() {
   return f;
 }
 /**
- * Las fechas que el servidor rechaza (validarRegistro y validarAlta de Registro.gs), con sus mismos mensajes; '' si valen.
+ * Las fechas (y el teléfono) que el servidor rechaza (validarRegistro y validarAlta de Registro.gs), con sus mismos mensajes; '' si valen.
  * Se mira cuando ya no falta nada: el botón se deshabilita y la barra dice por qué, en vez de esperar al error del servidor.
  */
 function fechaMalRegistro() {
@@ -2982,6 +2986,7 @@ function fechaMalRegistro() {
     if (ret && ret > topeDosAnios(hoy)) return 'La fecha de retorno va hasta dos años desde hoy.';
     return '';
   }
+  if (telefonoMal(v('#rtel'))) return telefonoMal(v('#rtel'));
   const fec = v('#rfec');
   if (fec && fec > hoy) return 'La fecha no puede ser futura.';
   if (RG.modo === 'control') {
@@ -3187,11 +3192,12 @@ function formEdicion(x, ed) {
     <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${ed.guardando || mal ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
 }
 /**
- * Las fechas que validarEdicionRegistro rechaza, con sus mismos mensajes y solo en lo que cambia; '' si valen. Como en
+ * Las fechas (y el teléfono) que validarEdicionRegistro rechaza, con sus mismos mensajes y solo en lo que cambia; '' si valen. Como en
  * Registro (fechaMalRegistro): el botón se deshabilita y el formulario dice por qué, sin esperar al error del servidor.
  */
 function fechaMalEdicion(x, borrador) {
   const c = cambiosEdicion(x, borrador || {}), hoy = S.hoy;
+  if ('contacto' in c && telefonoMal(c.contacto)) return telefonoMal(c.contacto);
   if ('fecha' in c) { if (!c.fecha) return 'Falta la fecha.'; if (c.fecha > hoy) return 'La fecha no puede ser futura.'; }
   if (c.fechaInicio && (c.fechaInicio < hoy || c.fechaInicio > masDias(hoy, 180))) return 'La fecha de la primera sesión va de hoy a 180 días.';
   if ('fechaRetorno' in c) {
@@ -4887,7 +4893,7 @@ const DEMO = (() => {
   const especialidadDe = sofdoc => ESP_MEDICO[sofdoc] || 'HEMATOLOGÍA';
   // Como usuariosPorDni (Registro.gs): el contacto de Registro que no es teléfono, del registro sin anular más reciente.
   // Cuenta como otro contacto en todas las tarjetas del DNI: «Número equivocado» no cierra mientras quede.
-  const usuarioDe = dni => registros.filter(r => r.DNI === dni && !r.ANULADO && r.CONTACTO && String(r.CONTACTO).replace(/\D/g, '').length !== 9)
+  const usuarioDe = dni => registros.filter(r => r.DNI === dni && !r.ANULADO && r.CONTACTO && normTel(r.CONTACTO).length !== 9)
     .sort((a, b) => (a.FECHA + ' ' + (a.FECHA_HORA || '')) < (b.FECHA + ' ' + (b.FECHA_HORA || '')) ? 1 : -1).map(r => String(r.CONTACTO).trim())[0] || '';
   const reg = (r, o) => {
     const ss = sesionesDe(r.ID), hechas = ss.length, ultima = hechas ? ss[hechas - 1].FECHA : '';
@@ -4895,7 +4901,7 @@ const DEMO = (() => {
     // Completo: Completado hasta DIAS_POST_TRATAMIENTO después de la última sesión; desde ahí, «Por reevaluar».
     const reevaluar = estadoReg === 'COMPLETO' && ultima ? mas(ultima, reglas.postTratamiento) : '';
     const enCurso = estadoReg === 'EN CURSO', dias = Math.max(0, entre(enCurso ? ultima : reevaluar || r.FECHA, hoy));
-    const tel = r.CONTACTO.replace(/\D/g, ''), usuario = tel.length === 9 ? '' : r.CONTACTO;
+    const tel = normTel(r.CONTACTO), usuario = tel.length === 9 ? '' : r.CONTACTO;
     const d = doctorDe(r.DOCTOR);
     let estado = 'PENDIENTE';
     if (estadoReg === 'COMPLETO') estado = reevaluar && reevaluar <= hoy ? 'POR REEVALUAR' : 'COMPLETADO';
@@ -5016,7 +5022,7 @@ const DEMO = (() => {
       const filas = enfermeria.filter(f => vivaEnf(f) && f.ID_SESION === x.ID);
       const reacciones = filas.filter(f => f.RESULTADO === 'CONTACTADO' && f.REACCION_TIPO && f.REACCION_TIPO !== 'NINGUNA')
         .sort((a, b) => a.DIA - b.DIA).map(f => ({ DIA: f.DIA, TIPO: f.REACCION_TIPO, REACCION: f.REACCION }));
-      const tel = r.CONTACTO.replace(/\D/g, '');
+      const tel = normTel(r.CONTACTO);
       DIAS_ENF.forEach(dia => {
         const fecha = mas(x.FECHA, dia);
         if (fecha < desde || fecha > hasta) return;
@@ -5567,7 +5573,7 @@ const DEMO = (() => {
         // Como otrosContactos (Registro.gs): lo que no es un teléfono de 9 dígitos, sin anulados ni repetidos, lo más reciente primero.
         contactos: [...new Set(registros.filter(r => r.DNI === k && !r.ANULADO)
           .sort((a, b) => (a.FECHA + ' ' + a.FECHA_HORA) < (b.FECHA + ' ' + b.FECHA_HORA) ? 1 : -1)
-          .map(r => String(r.CONTACTO || '').replace(/\s+/g, ' ').trim()).filter(c => c && c.replace(/\D/g, '').length !== 9))],
+          .map(r => String(r.CONTACTO || '').replace(/\s+/g, ' ').trim()).filter(c => c && normTel(c).length !== 9))],
         telefonosDescartados: descartadosDe(k)
       };
     },
@@ -5605,6 +5611,7 @@ const DEMO = (() => {
       if (!nombre) throw new Error('Falta el nombre del paciente.');
       const contacto = String(x.contacto || '').trim();
       if (!contacto) throw new Error('Falta el teléfono o usuario.');
+      if (telefonoMal(contacto)) throw new Error(telefonoMal(contacto));
       const fecha = String(x.fecha || '').slice(0, 10);
       if (!fecha) throw new Error('Falta la fecha.');
       if (fecha > hoy) throw new Error('La fecha no puede ser futura.');
@@ -5721,7 +5728,10 @@ const DEMO = (() => {
         }
         else if (col === 'DOCTOR') { const d = doctorDe(t); if (!d) throw new Error('Elija el doctor de la lista.'); nuevo = d.doctor; }
         else if (col === 'NOMBRE') { nuevo = t.toUpperCase(); if (!nuevo) throw new Error('Falta el nombre del paciente.'); }
-        else if (col === 'CONTACTO') { nuevo = contactoEnvio(t); if (!nuevo) throw new Error('Falta el teléfono o usuario.'); }
+        else if (col === 'CONTACTO') {
+          nuevo = contactoEnvio(t); if (!nuevo) throw new Error('Falta el teléfono o usuario.');
+          if (telefonoMal(t)) throw new Error(telefonoMal(t));
+        }
         else if (col === 'DETALLE') {
           if (control) throw new Error('Un control no tiene procedimiento ni tratamiento.');
           nuevo = lista().find(y => mismo(y, t));

@@ -4379,3 +4379,41 @@ test('topes «hasta un año / dos años» por calendario, y Editar con los mismo
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('teléfono: lo que parece un número y no da 9 dígitos se avisa y no se guarda (Registro, Editar y DEMO); un @usuario vale', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const r = await pagina.evaluate(async () => {
+      const intenta = async c => { try { await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000601', nombre: 'Prueba Tel', contacto: c, fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', procedimientos: ['AMO'], confirmado: true }); return ''; } catch (e) { return e.message; } };
+      return { ocho: await intenta('99974033'), diez: await intenta('9997403444'), fijo: await intenta('(01) 433-2210'),
+        mas51: await intenta('+51 999 750 361'), usuario: await intenta('@prueba.tel'),
+        f: [telefonoMal('99974033'), telefonoMal('+51 999 740 311'), telefonoMal('@x'), telefonoMal('rosa 99')] };
+    });
+    assert.deepEqual([r.ocho, r.diez], ['El teléfono debe tener 9 dígitos.', 'El teléfono debe tener 9 dígitos.']);
+    assert.deepEqual([r.fijo, r.mas51, r.usuario], ['', '', '']);
+    assert.deepEqual(r.f, ['El teléfono debe tener 9 dígitos.', '', '', '']);
+    // En la pantalla: el botón se deshabilita y la barra lo dice.
+    await pagina.locator('#rdni').fill('47000602');
+    await pagina.locator('#rnom').fill('Prueba Tel Dos');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.locator('#rproc input, [data-proc]').first().click().catch(() => {});
+    await pagina.evaluate(() => { RG.procs = RG.procs.length ? RG.procs : ['AMO']; });
+    await pagina.locator('#rtel').fill('99974033');
+    await pagina.locator('#rtel').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal((await pagina.locator('#rfalta').textContent()).trim(), 'El teléfono debe tener 9 dígitos.');
+    await pagina.locator('#rtel').fill('999 740 311');
+    await pagina.locator('#rtel').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    // Editar.
+    const id = await pagina.locator('#rlista [data-editar]').first().getAttribute('data-editar');
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    await pagina.locator('#rlista [data-campo="contacto"]').fill('9997403444');
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').isDisabled(), true);
+    assert.equal((await pagina.locator('#rlista .aviso-edicion').textContent()).trim(), 'El teléfono debe tener 9 dígitos.');
+    const demo = await pagina.evaluate(async id => { try { await llamar('editarRegistro', { usuario: 'MAGALY', id, cambios: { contacto: '9997403444' } }); return ''; } catch (e) { return e.message; } }, id);
+    assert.equal(demo, 'El teléfono debe tener 9 dígitos.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

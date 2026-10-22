@@ -49,6 +49,16 @@ function contactoNormal_(v) {
   return /^\+?[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t;
 }
 
+/**
+ * Lo que parece un número (solo dígitos, espacios, +, guiones, puntos y paréntesis) debe dar un teléfono de 9 dígitos con
+ * normTelefono (vale el +51 y el 01 de un fijo de Lima). Un texto con @ o con letras es un usuario y vale. '' si vale.
+ * Index.html (telefonoMal) dice lo mismo antes de enviar.
+ */
+function telefonoMal_(v) {
+  var t = textoLimpio_(v);
+  return /^\+?[\d\s().\-]+$/.test(t) && normTelefono(t).length !== 9 ? 'El teléfono debe tener 9 dígitos.' : '';
+}
+
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres alfanuméricos. */
 function documentoValido(dni) {
   var d = normTexto(dni).replace(/[\s.\-]/g, '');
@@ -85,6 +95,7 @@ function validarRegistro(p, catalogos, hoy) {
   if (!nombre) return no('Falta el nombre del paciente.');
   var contacto = contactoNormal_(p.contacto);
   if (!contacto) return no('Falta el teléfono o usuario.');
+  if (telefonoMal_(p.contacto)) return no(telefonoMal_(p.contacto));
   var fecha = fechaIso(p.fecha);
   if (!fecha) return no('Falta la fecha.');
   if (fecha > hoy) return no('La fecha no puede ser futura.');
@@ -180,7 +191,11 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
       if (!doc) return no('Elija el doctor de la lista.');
       nuevo = doc.doctor;
     } else if (col === 'NOMBRE') { nuevo = textoLimpio_(v).toUpperCase(); if (!nuevo) return no('Falta el nombre del paciente.'); }
-    else if (col === 'CONTACTO') { nuevo = contactoNormal_(v); if (!nuevo) return no('Falta el teléfono o usuario.'); }
+    else if (col === 'CONTACTO') {
+      nuevo = contactoNormal_(v);
+      if (!nuevo) return no('Falta el teléfono o usuario.');
+      if (telefonoMal_(v)) return no(telefonoMal_(v));
+    }
     else if (col === 'DETALLE') {
       if (control) return no('Un control no tiene procedimiento ni tratamiento.');
       nuevo = enLista_(normTexto(r.TIPO) === 'HIERRO' ? catalogos.tratamientos : catalogos.procedimientos, v);

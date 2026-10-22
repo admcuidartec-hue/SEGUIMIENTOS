@@ -48,6 +48,9 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
   Indicadores → «Procedimientos sin paciente» (`asignarDniIndicacion`, solo DNI que ya estén en SOFDOC o Registro).
 - El buscador de Pacientes (`buscar` → `buscarEnPacientes`) pide todas las palabras en cualquier orden, o parte del
   DNI, y mira citas, Registro e `INDICACIONES`.
+- **Teléfono**: lo que parece un número (solo dígitos, espacios, +, guiones, puntos y paréntesis) debe dar 9 dígitos con
+  `normTelefono` (vale el +51 y el 01 de un fijo de Lima); si no, «El teléfono debe tener 9 dígitos.» y no se guarda
+  (`telefonoMal_` al registrar y al editar; `telefonoMal` en la pantalla y el DEMO). Un texto con @ o con letras es un usuario.
 - El DNI se guarda y se compara con `normDni` (sin puntos ni guiones, y sin ceros a la izquierda si es solo dígitos), también
   en el buscador del tablero (`normDni` de `Index.html`) y en el DEMO: «09997401» y «9997401» encuentran al mismo paciente.
 - Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión.

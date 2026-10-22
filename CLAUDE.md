@@ -54,7 +54,10 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
   (`telefonoMal_` al registrar y al editar; `telefonoMal` en la pantalla y el DEMO). Un texto con @ o con letras es un usuario.
 - El DNI se guarda y se compara con `normDni` (sin puntos ni guiones, y sin ceros a la izquierda si es solo dígitos), también
   en el buscador del tablero (`normDni` de `Index.html`) y en el DEMO: «09997401» y «9997401» encuentran al mismo paciente.
-- Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión.
+- Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión, y nunca la de un
+  registro anulado. Al anular un registro se anula **en el mismo candado** su agenda viva (`agendaVivaDeRegistro`: la próxima
+  sesión agendada al marcar una y un «Agendó cita» que aún no pasó); sus sesiones hechas no se tocan y siguen contando en la
+  meta del día en que se hicieron.
 - El estado de un registro (cotizado, en curso, completo, anulado) se calcula con `estadoRegistro`; no se guarda.
 - `SEGUIMIENTOS` se escribe por posición: una columna nueva solo se agrega al final (`encabezadoAmpliable`).
 - Sin conexión a WhatsApp: la app muestra los datos y se marca «Seguimiento hecho».
@@ -88,7 +91,10 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
   más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y, del tablero, `seg.tipo`, `seg.mes`, `seg.medico` y `seg.esp`
   (un médico, especialidad o mes recordado que ya no está en la lista se ignora; «Quitar filtros» los borra).
 - **Tablero:** el embudo de seis fases en franjas (ver «Etapa 3») y el panel «¿Qué pasó?» de cada
-  tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`. Se puede arrastrar una tarjeta a otra columna: abre el
+  tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`.
+  Cuenta (`hechosHoyPor_`) lo que registró hoy **cada usuario del catálogo, sea quien sea, incluida la enfermera**: resultados
+  de «¿Qué pasó?», sesiones marcadas y decisiones del médico, a nombre de quien estaba elegido al guardar. Los contactos de
+  Enfermería (`ENFERMERIA`) no cuentan. Lo anulado deja de contar; una sesión hecha de un registro anulado sigue contando. Se puede arrastrar una tarjeta a otra columna: abre el
   paso con confirmación, nunca guarda solo.
 - **Registro:** indicaciones (procedimientos y tratamientos) y altas médicas, con «Registrados hoy».
 - **Pacientes:** buscador y ficha completa, con anulaciones, Editar y «Decisión del médico…» (antes «Dar de alta…»). El buscador

@@ -127,8 +127,15 @@ function anularRegistro(p) {
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p);
   var lock = bloquear_();
   try {
-    marcarAnulado_('REGISTROS', textoLimpio_(p.id), motivo);
-    bitacora_(quien, 'ANULAR REGISTRO', textoLimpio_(p.id) + ' · ' + motivo);
+    var id = textoLimpio_(p.id);
+    marcarAnulado_('REGISTROS', id, motivo);
+    bitacora_(quien, 'ANULAR REGISTRO', id + ' · ' + motivo);
+    // En el mismo candado, su agenda viva (la próxima sesión agendada, un «Agendó cita» por venir): no queda una cita de un
+    // registro que ya no existe, ni cuenta en la meta del día. Sus sesiones hechas no se tocan.
+    agendaVivaDeRegistro(id, leerSeguimientos_(), d.hoy).forEach(function (g) {
+      marcarAnulado_('SEGUIMIENTOS', g.ID, motivo + ' (se anuló el registro ' + id + ')');
+      bitacora_(quien, 'ANULAR RESULTADO', g.ID + ' · con el registro ' + id);
+    });
     return { ok: true };
   } finally {
     soltar_(lock);
@@ -139,7 +146,7 @@ function anularSesion(p) {
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p);
   var lock = bloquear_();
   try {
-    var v = validarAnulacionSesion(textoLimpio_(p.id), leerSesiones_());
+    var v = validarAnulacionSesion(textoLimpio_(p.id), leerSesiones_(), leerRegistros_());
     if (v.error) throw new Error(v.error);
     marcarAnulado_('SESIONES', v.sesion.ID, motivo);
     bitacora_(quien, 'ANULAR SESIÓN', v.sesion.ID + ' (' + v.sesion.ID_REGISTRO + ') · ' + motivo);

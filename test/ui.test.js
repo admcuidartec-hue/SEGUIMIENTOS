@@ -4483,3 +4483,30 @@ test('tablero: médico y especialidad se recuerdan (seg.medico, seg.esp) como ti
     assert.deepEqual([await c.pagina.locator('#fmed').inputValue(), await c.pagina.locator('#fesp').inputValue()], ['', '']);
   } finally { await c.navegador.close(); }
 });
+
+test('DEMO: anular un registro anula su próxima sesión agendada (deja de contar en la meta); la sesión hecha sigue contando y ya no se anula', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const meta = async () => ((await llamar('getTablero')).cifras.hechosHoyPor || {}).RACHEL || 0;
+      const g = await llamar('guardarRegistro', { usuario: 'RACHEL', dni: '47001001', nombre: 'Prueba Anula', contacto: '987001001', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 3 });
+      const id = g.registros[0].ID, m0 = await meta();
+      const ses = await llamar('marcarSesion', { usuario: 'RACHEL', id, fecha: S.hoy, proxima: masDias(S.hoy, 7) });
+      const m1 = await meta();
+      await llamar('anularRegistro', { usuario: 'RACHEL', id, motivo: 'Paciente equivocado' });
+      const m2 = await meta();
+      let err = '';
+      try { await llamar('anularSesion', { usuario: 'RACHEL', id: ses.sesion.ID, motivo: 'x' }); } catch (e) { err = e.message; }
+      const t = await llamar('getTablero');
+      const sigue = Object.values(t.columnas).flat().some(x => x.ID_REGISTRO === id);
+      return { suma: m1 - m0, resta: m1 - m2, err, sigue, sesId: ses.sesion.ID };
+    });
+    assert.equal(r.suma, 2, 'la sesión y su próxima agendada');
+    assert.equal(r.resta, 1, 'al anular el registro se va la agenda; la sesión hecha sigue contando');
+    assert.match(r.err, /^El registro REG-\d+ está anulado: sus sesiones ya no se anulan\.$/);
+    assert.equal(r.sigue, false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

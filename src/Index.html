@@ -5808,6 +5808,14 @@ const DEMO = (() => {
       r.ANULADO = 'SÍ';
       r.MOTIVO_ANULACION = String(x.motivo).trim();
       tarjetas.filter(t => t.ID_REGISTRO === r.ID).forEach(t => { t.ESTADO_REGISTRO = 'ANULADO'; t.COLUMNA = ''; });
+      // Como agendaVivaDeRegistro: la próxima sesión ligada y un «Agendó cita» por venir se anulan con el registro (y dejan de
+      // contar en la meta del día); las sesiones hechas, no.
+      seguimientos.filter(g => !g.ANULADO && g.REFERENCIA === r.ID && g.RESULTADO === 'AGENDÓ CITA'
+        && (LIGA_SESION.test(String(g.NOTA || '').trim()) || String(g.FECHA_PROXIMA || '') >= hoy)).forEach(g => {
+        g.ANULADO = 'SÍ';
+        g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló el registro ' + r.ID + ')';
+        if (String(g.FECHA_HORA).slice(0, 10) === hoy) sumarHecho(g.RESPONSABLE, -1, true);
+      });
       return { ok: true };
     },
 
@@ -5869,6 +5877,8 @@ const DEMO = (() => {
       const s = sesiones.find(y => y.ID === String(x.id || '').trim());
       if (!s) throw new Error('No encontré la sesión ' + x.id + '.');
       if (s.ANULADO) throw new Error('La sesión ' + s.ID + ' ya estaba anulada.');
+      const delReg = regPorId(s.ID_REGISTRO);
+      if (delReg && delReg.ANULADO) throw new Error('El registro ' + delReg.ID + ' está anulado: sus sesiones ya no se anulan.');
       const propias = sesionesDe(s.ID_REGISTRO);
       if (propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
       s.ANULADO = 'SÍ';

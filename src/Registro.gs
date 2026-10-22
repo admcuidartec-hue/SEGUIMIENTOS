@@ -317,14 +317,30 @@ function sesionLigada(s) {
   return m ? m[1] : '';
 }
 
-/** Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. */
-function validarAnulacionSesion(id, sesiones) {
+/**
+ * Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. Con `registros`, tampoco la de
+ * un registro anulado: ya no está en ninguna lista, y sus sesiones hechas siguen contando en la meta del día en que se hicieron.
+ */
+function validarAnulacionSesion(id, sesiones, registros) {
   var s = (sesiones || []).filter(function (x) { return x.ID === id; })[0];
   if (!s) return { error: 'No encontré la sesión ' + id + '.', sesion: null };
   if (anulado_(s)) return { error: 'La sesión ' + id + ' ya estaba anulada.', sesion: null };
+  var r = (registros || []).filter(function (x) { return x.ID === s.ID_REGISTRO; })[0];
+  if (r && anulado_(r)) return { error: 'El registro ' + r.ID + ' está anulado: sus sesiones ya no se anulan.', sesion: null };
   var propias = sesionesDe_(s.ID_REGISTRO, sesiones);
   if (propias[propias.length - 1].ID !== id) return { error: 'Solo se puede anular la última sesión del tratamiento.', sesion: null };
   return { error: '', sesion: s };
+}
+
+/**
+ * La agenda viva de un registro, que se anula con él (anularRegistro): los «Agendó cita» ligados a sus sesiones (la próxima
+ * sesión agendada al marcar una) y los que aún no pasaron (FECHA_PROXIMA de hoy en adelante). Los ya pasados son historia.
+ */
+function agendaVivaDeRegistro(id, seguimientos, hoy) {
+  return (seguimientos || []).filter(function (g) {
+    if (anulado_(g) || textoLimpio_(g.REFERENCIA) !== id || normTexto(g.RESULTADO) !== 'AGENDO CITA') return false;
+    return !!sesionLigada(g) || fechaIso(g.FECHA_PROXIMA) >= hoy;
+  });
 }
 
 /* ---------- Filas de la bandeja ---------- */

@@ -327,3 +327,29 @@ test('anularSesion anula también un «Agendó cita» sin liga escrito después 
   ctx.anularSesion({ usuario: 'MAGALY', id: 'SES-000002', motivo: 'Error' });
   assert.deepEqual(escrito.anulados, [['SESIONES', 'SES-000002', 'Error'], ['SEGUIMIENTOS', 'SEG-2', 'Error (se anuló la sesión SES-000002)']]);
 });
+
+test('anularRegistro anula en el mismo candado su agenda viva: la próxima sesión ligada y un «Agendó cita» que aún no pasó', () => {
+  const s1 = { ID: 'SES-000001', FECHA_HORA: '2026-10-02 10:00', ID_REGISTRO: 'REG-000008', NUMERO: '1', FECHA: '2026-10-02', ANULADO: '' };
+  const g = (ID, o) => Object.assign({ ID, FECHA_HORA: '2026-10-02 10:00', DNI: '40111222', ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000008',
+    RESULTADO: 'AGENDÓ CITA', FECHA_PROXIMA: '2026-10-09', NOTA: '', ANULADO: '' }, o);
+  const hojas = { REGISTROS: [REG8], SESIONES: [s1], SEGUIMIENTOS: [
+    g('SEG-1', { NOTA: 'Agendada al marcar la sesión 1 (SES-000001)' }),   // ligada a su sesión
+    g('SEG-2', { FECHA_HORA: '2026-10-03 09:00', FECHA_PROXIMA: '2026-10-20' }), // agenda sin liga, aún viva
+    g('SEG-3', { FECHA_HORA: '2026-09-20 09:00', FECHA_PROXIMA: '2026-09-25' }), // ya pasó: es historia
+    g('SEG-4', { RESULTADO: 'NO CONTESTÓ', FECHA_PROXIMA: '' }),
+    g('SEG-5', { REFERENCIA: 'REG-000099', NOTA: 'Agendada al marcar la sesión 1 (SES-000009)' })] };
+  const { ctx, escrito, lock } = servidor({}, hojas);
+  ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000008', motivo: 'Paciente equivocado' });
+  assert.deepEqual(escrito.anulados, [['REGISTROS', 'REG-000008', 'Paciente equivocado'],
+    ['SEGUIMIENTOS', 'SEG-1', 'Paciente equivocado (se anuló el registro REG-000008)'],
+    ['SEGUIMIENTOS', 'SEG-2', 'Paciente equivocado (se anuló el registro REG-000008)']]);
+  assert.deepEqual(escrito.BITACORA.map(b => b[1]), ['ANULAR REGISTRO', 'ANULAR RESULTADO', 'ANULAR RESULTADO']);
+  assert.equal(lock.tomado, 0);
+});
+
+test('anularSesion: una sesión de un registro anulado no se anula (las hechas siguen contando el día en que se hicieron)', () => {
+  const s1 = { ID: 'SES-000001', FECHA_HORA: '2026-10-02 10:00', ID_REGISTRO: 'REG-000008', NUMERO: '1', FECHA: '2026-10-02', ANULADO: '' };
+  const { ctx, escrito } = servidor({}, { REGISTROS: [Object.assign({}, REG8, { ANULADO: 'SÍ' })], SESIONES: [s1], SEGUIMIENTOS: [] });
+  assert.throws(() => ctx.anularSesion({ usuario: 'MAGALY', id: 'SES-000001', motivo: 'x' }), /^Error: El registro REG-000008 está anulado: sus sesiones ya no se anulan\.$/);
+  assert.deepEqual(escrito.anulados, []);
+});

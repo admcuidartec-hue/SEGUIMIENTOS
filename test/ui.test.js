@@ -4244,3 +4244,36 @@ test('DEMO: los ID nuevos son el mayor + 1 (como siguienteId): nunca repiten los
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('DEMO: editarRegistro recalcula estado y franja como el servidor (bajar las sesiones a las hechas lo completa)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const donde = async id => { const t = await llamar('getTablero'); const c = Object.keys(t.columnas).find(k => t.columnas[k].some(x => x.CLAVE === id)); return c ? c + ' · ' + t.columnas[c].find(x => x.CLAVE === id).ETIQUETA : ''; };
+      // Última sesión en setiembre (hoy-7): completo, sale del tablero (Completado solo trae lo del mes, como armarTablero).
+      const viejo = DEMO._registroConSesiones();
+      const antes1 = await donde(viejo);
+      await llamar('editarRegistro', { usuario: 'MAGALY', id: viejo, cambios: { sesiones: 2 } });
+      const despues1 = await donde(viejo);
+      // Última sesión hoy: completo, va a Completado.
+      const g = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000200', nombre: 'Prueba Edicion', contacto: '987000200', fecha: S.hoy,
+        doctor: 'Dr. Elí Cabanillas', tratamiento: 'HIERRO SACARATO', sesiones: 3 });
+      const id = g.registros[0].ID;
+      await llamar('marcarSesion', { usuario: 'MAGALY', id, fecha: S.hoy });
+      const antes2 = await donde(id);
+      await llamar('editarRegistro', { usuario: 'MAGALY', id, cambios: { sesiones: 1 } });
+      const despues2 = await donde(id);
+      // Y al revés: subir las sesiones de un completo lo devuelve a En tratamiento.
+      await llamar('editarRegistro', { usuario: 'MAGALY', id, cambios: { sesiones: 2 } });
+      const otra = await donde(id);
+      return { antes1, despues1, antes2, despues2, otra };
+    });
+    assert.match(r.antes1, /^POR_CONTACTAR · Sesión 3 de 3/);
+    assert.equal(r.despues1, '', 'completo en setiembre: fuera del tablero');
+    assert.match(r.antes2, /^EN_TRATAMIENTO · Sesión 1 de 3/);
+    assert.match(r.despues2, /^COMPLETADO/);
+    assert.match(r.otra, /^EN_TRATAMIENTO · Sesión 1 de 2/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

@@ -5705,6 +5705,14 @@ const DEMO = (() => {
         ['NOMBRE', 'MEDICO_ULTIMO', 'FECHA_COTIZACION', 'DETALLE', 'TRATAMIENTO', 'MARCA', 'SESIONES', 'TELEFONOS', 'USUARIO'].forEach(k => { t[k] = n[k]; });
         if (r.FECHA_INICIO && t.AGENDA === 'SESION') t.FECHA_AGENDA = r.FECHA_INICIO;
         if (control && t.AGENDA === 'CONTROL') t.FECHA_AGENDA = r.FECHA_RETORNO;
+        // Otro total de sesiones puede cambiar el estado (estadoRegistro): se recalcula como al marcar una sesión. Completo,
+        // va a Completado solo si su última sesión es de este mes (armarTablero); si no, sale del tablero.
+        const n2 = reg(r), cambia = 'SESIONES' in out && (n2.ESTADO_REGISTRO === 'COMPLETO' || t.ESTADO_REGISTRO === 'COMPLETO');
+        if (cambia) {
+          trasSesion(t, r);
+          if (t.COLUMNA === 'COMPLETADO' && String(t.ULTIMA_SESION).slice(0, 7) !== hoy.slice(0, 7)) t.COLUMNA = '';
+          return;
+        }
         ubicar(t, t.COLUMNA, t.ETIQUETA, t.COLUMNA === 'COMPLETADO' ? t.FECHA_CLAVE : '');
       });
       return { ok: true, registro: filaRegistrada(r) };

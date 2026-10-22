@@ -96,7 +96,7 @@ function validarRegistro(p, catalogos, hoy) {
     var ret = fechaIso(p.fechaRetorno);
     if (!ret) return no('Falta la fecha de retorno a control.');
     if (ret <= hoy) return no('La fecha de retorno debe ser después de hoy.');
-    if (ret > sumarDias(hoy, 365)) return no('La fecha de retorno va hasta un año desde hoy.');
+    if (ret > topeUnAnio_(hoy)) return no('La fecha de retorno va hasta un año desde hoy.');
     return { error: '', filas: [copia_(base0, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: textoLimpio_(p.examenes), FECHA_RETORNO: ret })], sesionHecha: '' };
   }
   var inicio = fechaIso(p.fechaInicio);
@@ -167,7 +167,14 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
     var v = cambios[k], nuevo;
     // Un valor igual al actual no cuenta: se descarta antes de validar nada (el formulario manda todos los campos).
     if (iguales_(col, v, r, catalogos)) continue;
-    if (col === 'FECHA') { nuevo = fechaIso(v); if (!nuevo) return no('Falta la fecha.'); if (nuevo > hoy) return no('La fecha no puede ser futura.'); }
+    if (col === 'FECHA') {
+      nuevo = fechaIso(v);
+      if (!nuevo) return no('Falta la fecha.');
+      if (nuevo > hoy) return no('La fecha no puede ser futura.');
+      // Como al registrar: la primera sesión no puede ser anterior a la fecha del registro.
+      var primera = sesionesDe_(r.ID, sesiones)[0];
+      if (primera && nuevo > fechaIso(primera.FECHA)) return no('La fecha no puede ser posterior a la primera sesión (' + fechaDma_(fechaIso(primera.FECHA)) + ').');
+    }
     else if (col === 'DOCTOR') {
       var doc = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(v); })[0];
       if (!doc) return no('Elija el doctor de la lista.');
@@ -196,6 +203,7 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
     else if (col === 'FECHA_RETORNO') {
       if (!control) return no('Solo un control tiene fecha de retorno.');
       nuevo = fechaIso(v); if (!nuevo || nuevo <= hoy) return no('La fecha de retorno debe ser después de hoy.');
+      if (nuevo > topeUnAnio_(hoy)) return no('La fecha de retorno va hasta un año desde hoy.');
     }
     if (String(nuevo) === String(r[col] == null ? '' : r[col])) continue;
     out[col] = nuevo;
@@ -460,6 +468,13 @@ var DECISIONES = {
   'NUEVA REEVALUACION': { nombre: 'NUEVA REEVALUACION', texto: 'Nueva reevaluación', meses: 0, pideFecha: true, tipo: 'REEVALUACION' }
 };
 function decisionDe_(a) { return DECISIONES[normTexto(a && a.DECISION) || 'ALTA'] || DECISIONES.ALTA; }
+/**
+ * Topes de fecha «hasta un año» y «hasta dos años» desde hoy: por calendario (la misma fecha del año siguiente o de dentro de
+ * dos años, con sumarMeses_, como las altas), no 365 ni 730 días. Index.html (topeUnAnio, topeDosAnios) y el DEMO, igual.
+ */
+function topeUnAnio_(hoy) { return sumarMeses_(hoy, 12); }
+function topeDosAnios_(hoy) { return sumarMeses_(hoy, 24); }
+
 /** 'yyyy-mm-dd' + n meses; el día 31 de un mes corto pasa al último día de ese mes. */
 function sumarMeses_(iso, n) {
   var y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1 + n, d = Number(iso.slice(8, 10));
@@ -493,7 +508,7 @@ function validarAlta(p, catalogos, citas, vigentes, hoy) {
     retorno = fechaIso(p.fechaRetorno);
     if (!retorno) return no('Falta la fecha de retorno.');
     if (retorno <= hoy) return no('La fecha de retorno debe ser después de hoy.');
-    if (retorno > sumarDias(hoy, 730)) return no('La fecha de retorno va hasta dos años desde hoy.');
+    if (retorno > topeDosAnios_(hoy)) return no('La fecha de retorno va hasta dos años desde hoy.');
   }
   if ((vigentes || {})[k]) return no('Ese paciente ya tiene un alta vigente en ' + serie.especialidad + '.');
   return { error: '', alta: { FECHA: fecha, DNI: dni, ESPECIALIDAD: serie.especialidad, DOCTOR: doctor.doctor, REGISTRADO_POR: quien,

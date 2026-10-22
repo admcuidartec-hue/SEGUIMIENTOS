@@ -730,3 +730,39 @@ test('pendientesRegistro: el @usuario de otro registro del DNI también es conta
   const d = Object.assign(dReg([CTL()], [], [], '2026-10-19', [marca]), { telefonos: {}, usuarios: { 40111222: '@rosa' } });
   assert.deepEqual([filaH(d).ESTADO, filaH(d).CIERRE], ['PENDIENTE', '']);
 });
+
+/* ---------- Topes de fecha por calendario, iguales al registrar y al editar ---------- */
+test('validarRegistro: el retorno de un control va hasta la misma fecha del año siguiente (por calendario)', () => {
+  const ctl = (hoy, ret) => L.validarRegistro(base3({ tipo: 'CONTROL', fechaRetorno: ret, fecha: hoy }), CAT3, hoy).error;
+  assert.equal(ctl('2026-10-09', '2027-10-09'), '', 'un año exacto');
+  assert.equal(ctl('2026-10-09', '2027-10-10'), 'La fecha de retorno va hasta un año desde hoy.');
+  assert.equal(ctl('2027-03-01', '2028-03-01'), '', 'un año con 29/02 en medio son 366 días y vale');
+  assert.equal(ctl('2028-02-29', '2029-02-28'), '', 'del 29/02 al 28/02 del año siguiente');
+  assert.equal(ctl('2028-02-29', '2029-03-01'), 'La fecha de retorno va hasta un año desde hoy.');
+});
+
+test('validarAlta: la nueva reevaluación va hasta dos años de calendario', () => {
+  const citas = [cita({ fecha: '2026-09-30' })];
+  const p = ret => ({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-01',
+    decision: 'NUEVA REEVALUACION', fechaRetorno: ret });
+  assert.equal(L.validarAlta(p('2028-10-01'), CAT3, citas, {}, '2026-10-01').error, '', 'dos años exactos (731 días: 2028 tiene 29/02)');
+  assert.equal(L.validarAlta(p('2028-10-02'), CAT3, citas, {}, '2026-10-01').error, 'La fecha de retorno va hasta dos años desde hoy.');
+});
+
+test('validarEdicionRegistro: los mismos topes que al registrar (retorno hasta un año, primera sesión hasta 180 días)', () => {
+  const ctl = REGH({ TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: 'HEMOGRAMA', FECHA_RETORNO: '2026-10-20' });
+  const v = (r, c) => plano(L.validarEdicionRegistro(r, c, [], CAT3, '2026-10-09'));
+  assert.deepEqual(v(ctl, { fechaRetorno: '2027-10-09' }).cambios, { FECHA_RETORNO: '2027-10-09' });
+  assert.equal(v(ctl, { fechaRetorno: '2027-10-10' }).error, 'La fecha de retorno va hasta un año desde hoy.');
+  assert.equal(v(ctl, { fechaRetorno: '2027-11-05' }).error, 'La fecha de retorno va hasta un año desde hoy.');
+  const trat = REGH({ FECHA_INICIO: '2026-10-20' });
+  assert.deepEqual(v(trat, { fechaInicio: '2027-04-07' }).cambios, { FECHA_INICIO: '2027-04-07' }, '180 días');
+  assert.equal(v(trat, { fechaInicio: '2027-04-08' }).error, 'La fecha de la primera sesión va de hoy a 180 días.');
+});
+
+test('validarEdicionRegistro: la fecha del registro no puede quedar después de su primera sesión', () => {
+  const r = REGH({ FECHA: '2026-10-01', SESIONES: '3' }), ses = [SES(1, '2026-10-03')];
+  const v = c => plano(L.validarEdicionRegistro(r, c, ses, CAT3, '2026-10-09'));
+  assert.deepEqual(v({ fecha: '2026-10-03' }).cambios, { FECHA: '2026-10-03' });
+  assert.equal(v({ fecha: '2026-10-04' }).error, 'La fecha no puede ser posterior a la primera sesión (03/10/2026).');
+});

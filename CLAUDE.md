@@ -149,6 +149,12 @@ En un paso con fecha o motivo, Enter confirma.
   **No** se puede cambiar el DNI (se anula y se registra de nuevo), ni las sesiones por debajo de las ya hechas, ni el tipo; un control no tiene
   detalle ni sesiones. Solo viaja lo que cambió. Cada cambio escribe una línea en `BITACORA` (`EDITAR REGISTRO`, con el valor anterior y el nuevo) y
   sella `EDITADO`. Las decisiones del médico no se editan: se anulan.
+  Editar aplica **los mismos topes de fecha que Registro** (fecha no futura ni posterior a la primera sesión, primera sesión de
+  hoy a 180 días, retorno de un control hasta un año); el formulario deshabilita «Guardar cambios» y dice por qué
+  (`fechaMalEdicion`, como `fechaMalRegistro`).
+- **«Hasta un año» y «hasta dos años» son por calendario**: la misma fecha del año siguiente o de dentro de dos años, sumando
+  meses como las altas (`topeUnAnio_` / `topeDosAnios_` con `sumarMeses_`; `topeUnAnio` / `topeDosAnios` en `Index.html` y el
+  DEMO), no 365 ni 730 días. Los plazos en días (180 de la primera sesión, 30 del pago) siguen en días.
 - **Tablero:** filtro por mes (`#fmes`, se recuerda en `seg.mes`) además del de tipo, médico y especialidad.
 - **Publicar la Etapa 2:** «Preparar hojas» **antes** de usar las pantallas nuevas, y luego «Verificar»: sin las columnas nuevas,
   `guardarRegistro`, `editarRegistro` y `darDeAlta` se niegan a escribir (`REGISTROS` y `ALTAS` se escriben por posición). Después,

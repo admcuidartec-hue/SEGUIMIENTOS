@@ -354,6 +354,8 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .edita{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface);animation:subir .2s var(--ease-out)}
 .edita .campo.ancho,.edita .botones{grid-column:1/-1}
 .edita .botones{display:flex;gap:8px;flex-wrap:wrap}
+.edita .aviso-edicion{grid-column:1/-1;margin:0;color:var(--warn);font-size:13px}
+.edita .aviso-edicion:empty{display:none}
 .decs{display:flex;flex-direction:column;gap:8px}
 .dec{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);cursor:pointer}
 .dec:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
@@ -2659,6 +2661,9 @@ function sumarMesesIso(iso, n) {
   const ultimo = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
   return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(Math.min(d, ultimo)).padStart(2, '0');
 }
+/** «Hasta un año / dos años desde hoy», por calendario (topeUnAnio_ y topeDosAnios_ del servidor), no 365 ni 730 días. */
+const topeUnAnio = hoy => sumarMesesIso(hoy, 12);
+const topeDosAnios = hoy => sumarMesesIso(hoy, 24);
 /** Una regla de REGLAS; 0 vale (AVISO_ALTA_CONTROL_DIAS admite 0). Solo si falta o no es un número se usa `def`. */
 const reglaRG = (k, def) => {
   const v = S.reglas && S.reglas[k], n = Number(v);
@@ -2695,7 +2700,11 @@ function iniciarRegistro() {
   const L = $('#rlista');
   L.addEventListener('click', clicLista);
   L.addEventListener('input', e => {
-    if (e.target.matches('[data-campo]')) { RG.borrador[e.target.dataset.campo] = e.target.value; return; }
+    if (e.target.matches('[data-campo]')) {
+      RG.borrador[e.target.dataset.campo] = e.target.value;
+      refrescarEdicion(filaEl(RG.editando), (RG.lista || []).find(y => y.ID === RG.editando), RG.borrador, RG.guardandoEdicion);
+      return;
+    }
     if (!e.target.matches('.anula input')) return;
     RG.motivo = e.target.value;
     const ok = e.target.parentNode.querySelector('[data-confirmar-anular]');
@@ -2758,7 +2767,7 @@ function pintarFormRegistro(anim) {
   else if (RG.modo === 'control') f.innerHTML = paciente + `
     <fieldset><legend><span class="k">3</span>Control + laboratorio</legend>
       <label class="campo">Exámenes indicados <small>opcional</small><textarea id="rexamenes" rows="2" placeholder="Hemograma, ferritina…"></textarea></label>
-      <label class="campo">Fecha de retorno<input id="rretorno" type="date" value="${esc(masDias(S.hoy, reglaRG('controlLab', 15)))}" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 365))}"></label></fieldset>
+      <label class="campo">Fecha de retorno<input id="rretorno" type="date" value="${esc(masDias(S.hoy, reglaRG('controlLab', 15)))}" min="${esc(masDias(S.hoy, 1))}" max="${esc(topeUnAnio(S.hoy))}"></label></fieldset>
     <div id="rdup"></div>${barra('Registrar control')}`;
   else f.innerHTML = `
     <fieldset><legend><span class="k">1</span>Paciente</legend>${dni('adni')}<div class="avisos-dni" id="acon" aria-live="polite"></div></fieldset>
@@ -2782,7 +2791,7 @@ function pintarDecision() {
   if (!box) return;
   const d = decisionUi(RG.dec), fecha = ($('#afec') || {}).value || S.hoy;
   if (d.pideFecha) {
-    if (!$('#aretorno')) box.innerHTML = `<label class="campo">Fecha de retorno<input id="aretorno" type="date" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 730))}"></label>`;
+    if (!$('#aretorno')) box.innerHTML = `<label class="campo">Fecha de retorno<input id="aretorno" type="date" min="${esc(masDias(S.hoy, 1))}" max="${esc(topeDosAnios(S.hoy))}"></label>`;
     return;
   }
   box.innerHTML = notaDecision(d, fecha);
@@ -2970,7 +2979,7 @@ function fechaMalRegistro() {
     const fa = v('#afec'), ret = decisionUi(RG.dec).pideFecha ? v('#aretorno') : '';
     if (fa && fa > hoy) return 'La fecha no puede ser futura.';
     if (ret && ret <= hoy) return 'La fecha de retorno debe ser después de hoy.';
-    if (ret && ret > masDias(hoy, 730)) return 'La fecha de retorno va hasta dos años desde hoy.';
+    if (ret && ret > topeDosAnios(hoy)) return 'La fecha de retorno va hasta dos años desde hoy.';
     return '';
   }
   const fec = v('#rfec');
@@ -2978,7 +2987,7 @@ function fechaMalRegistro() {
   if (RG.modo === 'control') {
     const ret = v('#rretorno');
     if (ret && ret <= hoy) return 'La fecha de retorno debe ser después de hoy.';
-    if (ret && ret > masDias(hoy, 365)) return 'La fecha de retorno va hasta un año desde hoy.';
+    if (ret && ret > topeUnAnio(hoy)) return 'La fecha de retorno va hasta un año desde hoy.';
     return '';
   }
   const ini = v('#rinicio');
@@ -3171,9 +3180,32 @@ function formEdicion(x, ed) {
     sesiones: () => campo('sesiones', 'Sesiones', `<input type="number" data-campo="sesiones" class="mono" min="${Math.max(1, Number(x.HECHAS) || 0)}" max="20" value="${esc(v('sesiones'))}">`),
     fechaInicio: () => fecha('fechaInicio', 'Primera sesión', hoy, masDias(hoy, 180)),
     examenes: () => campo('examenes', 'Exámenes indicados', `<textarea data-campo="examenes" rows="2">${esc(v('examenes'))}</textarea>`, true),
-    fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), masDias(hoy, 365)) };
+    fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), topeUnAnio(hoy)) };
+  const mal = fechaMalEdicion(x, ed.borrador);
   return `<div class="edita">${camposEdicion(x).map(k => html[k]()).join('')}
-    <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${ed.guardando ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
+    <p class="aviso-edicion" role="status">${esc(mal)}</p>
+    <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${ed.guardando || mal ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
+}
+/**
+ * Las fechas que validarEdicionRegistro rechaza, con sus mismos mensajes y solo en lo que cambia; '' si valen. Como en
+ * Registro (fechaMalRegistro): el botón se deshabilita y el formulario dice por qué, sin esperar al error del servidor.
+ */
+function fechaMalEdicion(x, borrador) {
+  const c = cambiosEdicion(x, borrador || {}), hoy = S.hoy;
+  if ('fecha' in c) { if (!c.fecha) return 'Falta la fecha.'; if (c.fecha > hoy) return 'La fecha no puede ser futura.'; }
+  if (c.fechaInicio && (c.fechaInicio < hoy || c.fechaInicio > masDias(hoy, 180))) return 'La fecha de la primera sesión va de hoy a 180 días.';
+  if ('fechaRetorno' in c) {
+    if (!c.fechaRetorno || c.fechaRetorno <= hoy) return 'La fecha de retorno debe ser después de hoy.';
+    if (c.fechaRetorno > topeUnAnio(hoy)) return 'La fecha de retorno va hasta un año desde hoy.';
+  }
+  return '';
+}
+/** Al escribir en el formulario de Editar: el aviso y el botón, sin volver a pintar (no se pierde el foco). */
+function refrescarEdicion(caja, x, borrador, guardando) {
+  if (!caja || !x) return;
+  const mal = fechaMalEdicion(x, borrador), b = caja.querySelector('[data-guardar-edicion]'), p = caja.querySelector('.aviso-edicion');
+  if (b) b.disabled = !!mal || !!guardando;
+  if (p) p.textContent = mal;
 }
 function abrirEdicion(id) {
   if (RG.anulandoEnVuelo || RG.guardandoEdicion) return;
@@ -3207,6 +3239,8 @@ async function guardarEdicion() {
   if (!x || RG.guardandoEdicion) return;
   const cambios = cambiosEdicion(x, RG.borrador);
   if (!Object.keys(cambios).length) { avisar('No hay cambios.'); return; }
+  const mal = fechaMalEdicion(x, RG.borrador);
+  if (mal) { avisar(mal); return; }
   if (!exigirUsuario()) return;
   RG.guardandoEdicion = true;
   const b = $('#rlista [data-guardar-edicion]');
@@ -3570,7 +3604,7 @@ function htmlEsp(e) {
 /** Bajo los radios de la ficha: la fecha de retorno (nueva reevaluación) o cuándo vuelve a «Por contactar» (6 meses, 1 año). */
 function htmlDecisionFicha(a) {
   const d = decisionUi(a.dec);
-  if (d.pideFecha) return `<label class="campo">Fecha de retorno<input id="falta-ret" type="date" value="${esc(a.ret)}" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 730))}"></label>`;
+  if (d.pideFecha) return `<label class="campo">Fecha de retorno<input id="falta-ret" type="date" value="${esc(a.ret)}" min="${esc(masDias(S.hoy, 1))}" max="${esc(topeDosAnios(S.hoy))}"></label>`;
   return notaDecision(d, a.fecha || S.hoy);
 }
 function pintarDecisionFicha() {
@@ -3704,6 +3738,8 @@ function guardarEdicionFicha(b) {
   if (!t || PA.enVuelo) return;
   const cambios = cambiosEdicion(t.fila, PA.borrador);
   if (!Object.keys(cambios).length) { avisar('No hay cambios.'); return; }
+  const mal = fechaMalEdicion(t.fila, PA.borrador);
+  if (mal) { avisar(mal); return; }
   escribirFicha({ boton: b || $('#ficha [data-guardar-edicion]'), fn: 'editarRegistro', datos: { id: t.id, cambios },
     aviso: r => r.ok === false && r.sinCambios ? 'No hay cambios.' : 'Registro editado: ' + ((r.registro && r.registro.TEXTO) || t.titulo) + ' · ' + t.id,
     luego: () => { PA.editando = ''; PA.borrador = {}; } });
@@ -3790,6 +3826,8 @@ function entradaFicha(e) {
   else if (PA.alta && el.name === 'fdec') { PA.alta.dec = el.value; pintarDecisionFicha(); }
   else if (PA.editando && el.dataset.campo) {
     PA.borrador[el.dataset.campo] = el.value;
+    const tr = PA.p && PA.p.trats.find(x => x.id === PA.editando);
+    refrescarEdicion(tratEl(PA.editando), tr && tr.fila, PA.borrador, PA.enVuelo);
     if (el.dataset.campo === 'detalle' && e.type === 'change') {
       // Otro tratamiento: la marca se vuelve a elegir (la única, si tiene una sola), como en «Registrados».
       const m = marcasDe(el.value);
@@ -5580,7 +5618,7 @@ const DEMO = (() => {
         const ret = String(x.fechaRetorno || '').slice(0, 10);
         if (!ret) throw new Error('Falta la fecha de retorno a control.');
         if (ret <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
-        if (ret > mas(hoy, 365)) throw new Error('La fecha de retorno va hasta un año desde hoy.');
+        if (ret > sumarMeses(hoy, 12)) throw new Error('La fecha de retorno va hasta un año desde hoy.');
         filas.push(Object.assign({}, base, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: String(x.examenes || '').trim(), FECHA_RETORNO: ret }));
       }
       const inicio = String(x.fechaInicio || '').trim().slice(0, 10);
@@ -5676,7 +5714,11 @@ const DEMO = (() => {
           : /^FECHA/.test(col) ? t.slice(0, 10) === actual.slice(0, 10) : t === actual;
         if (igual) continue;
         let nuevo;
-        if (col === 'FECHA') { nuevo = t.slice(0, 10); if (!nuevo) throw new Error('Falta la fecha.'); if (nuevo > hoy) throw new Error('La fecha no puede ser futura.'); }
+        if (col === 'FECHA') {
+          nuevo = t.slice(0, 10); if (!nuevo) throw new Error('Falta la fecha.'); if (nuevo > hoy) throw new Error('La fecha no puede ser futura.');
+          const primera = sesionesDe(r.ID)[0];
+          if (primera && nuevo > primera.FECHA) throw new Error('La fecha no puede ser posterior a la primera sesión (' + dmyDemo(primera.FECHA) + ').');
+        }
         else if (col === 'DOCTOR') { const d = doctorDe(t); if (!d) throw new Error('Elija el doctor de la lista.'); nuevo = d.doctor; }
         else if (col === 'NOMBRE') { nuevo = t.toUpperCase(); if (!nuevo) throw new Error('Falta el nombre del paciente.'); }
         else if (col === 'CONTACTO') { nuevo = contactoEnvio(t); if (!nuevo) throw new Error('Falta el teléfono o usuario.'); }
@@ -5703,6 +5745,7 @@ const DEMO = (() => {
           if (!control) throw new Error('Solo un control tiene fecha de retorno.');
           nuevo = t.slice(0, 10);
           if (!nuevo || nuevo <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
+          if (nuevo > sumarMeses(hoy, 12)) throw new Error('La fecha de retorno va hasta un año desde hoy.');
         }
         if (String(nuevo) !== actual) out[col] = nuevo;
       }
@@ -5842,7 +5885,7 @@ const DEMO = (() => {
         retorno = String(x.fechaRetorno || '').slice(0, 10);
         if (!retorno) throw new Error('Falta la fecha de retorno.');
         if (retorno <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
-        if (retorno > mas(hoy, 730)) throw new Error('La fecha de retorno va hasta dos años desde hoy.');
+        if (retorno > sumarMeses(hoy, 24)) throw new Error('La fecha de retorno va hasta dos años desde hoy.');
       }
       if (vigente(dni, esp)) throw new Error('Ese paciente ya tiene un alta vigente en ' + esp + '.');
       const a = { ID: siguiente(altas, 'ALT'), FECHA_HORA: ahora(), FECHA: f, DNI: dni, ESPECIALIDAD: esp, DOCTOR: doc.doctor, REGISTRADO_POR: quien,

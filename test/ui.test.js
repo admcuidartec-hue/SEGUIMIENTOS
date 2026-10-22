@@ -4154,7 +4154,10 @@ test('Registro: una fecha que el servidor rechaza deshabilita «Registrar», la 
     await poner('#aretorno', HOY_DEMO);
     assert.equal(await pagina.locator('#rgo').isDisabled(), true);
     assert.equal(await barra(), 'La fecha de retorno debe ser después de hoy.');
+    // Dos años por calendario: el 01/10/2028 (731 días, 2028 tiene 29/02) vale; el día siguiente, no.
     await poner('#aretorno', masDiasIso(HOY_DEMO, 731));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    await poner('#aretorno', masDiasIso(HOY_DEMO, 732));
     assert.equal(await barra(), 'La fecha de retorno va hasta dos años desde hoy.');
     await poner('#aretorno', masDiasIso(HOY_DEMO, 40));
     assert.equal(await pagina.locator('#rgo').isDisabled(), false);
@@ -4340,6 +4343,39 @@ test('«Número equivocado» con un @usuario en Registro: la reevaluación no se
     });
     assert.notEqual(r.c, '', 'la reevaluación sigue en el tablero');
     assert.equal(r.cerrado, false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('topes «hasta un año / dos años» por calendario, y Editar con los mismos topes que Registro (aviso y botón deshabilitado)', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const topes = await pagina.evaluate(() => [topeUnAnio('2027-03-01'), topeUnAnio('2028-02-29'), topeDosAnios('2026-10-01')]);
+    assert.deepEqual(topes, ['2028-03-01', '2029-02-28', '2028-10-01']);
+    assert.equal(await pagina.evaluate(async () => {
+      try { await llamar('darDeAlta', { usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: S.hoy,
+        decision: 'NUEVA REEVALUACION', fechaRetorno: '2028-10-01' }); return ''; } catch (e) { return e.message; }
+    }), '', 'el DEMO acepta dos años exactos');
+    const id = await pagina.evaluate(async () => (await llamar('guardarRegistro', { usuario: 'MAGALY', tipo: 'CONTROL', dni: '47000501', nombre: 'Prueba Tope',
+      contacto: '987000501', fecha: S.hoy, doctor: 'Dra. Karen Matos', fechaRetorno: masDias(S.hoy, 20), examenes: 'Hemograma' })).registros[0].ID);
+    await pagina.evaluate(() => cargarRegistros());
+    await pagina.waitForSelector(`#rlista [data-editar="${id}"]`);
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    const campo = pagina.locator('#rlista [data-campo="fechaRetorno"]');
+    assert.equal(await campo.getAttribute('max'), '2027-10-01');
+    await campo.fill('2027-10-02');
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').isDisabled(), true);
+    assert.equal((await pagina.locator('#rlista .aviso-edicion').textContent()).trim(), 'La fecha de retorno va hasta un año desde hoy.');
+    await campo.press('Enter');
+    await pagina.waitForTimeout(150);
+    assert.equal(await llamadas(pagina, 'editarRegistro'), 0, 'ni el botón ni Enter guardan');
+    await campo.fill('2027-10-01');
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').isDisabled(), false);
+    assert.equal((await pagina.locator('#rlista .aviso-edicion').textContent()).trim(), '');
+    const err = await pagina.evaluate(async id => {
+      try { await llamar('editarRegistro', { usuario: 'MAGALY', id, cambios: { fechaRetorno: '2027-11-05' } }); return ''; } catch (e) { return e.message; }
+    }, id);
+    assert.equal(err, 'La fecha de retorno va hasta un año desde hoy.', 'el DEMO rechaza como validarEdicionRegistro');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

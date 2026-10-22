@@ -45,6 +45,11 @@ Las etiquetas de Contactado son las de siempre («Llamar el lun 12/10», «Reint
 - **Un paciente que pagó no se cierra solo por tiempo**: ni por `MAX_SEGUIMIENTOS` «No contestó» seguidos ni por pasar
   `CORTE_INDICACIONES_DIAS` (no queda ANTIGUO). Sí se cierra con un cierre explícito (Falleció, No desea…).
 - Si una cita agendada después del pago pasa sin cita realizada, vuelve a Pago realizado *(decidido aquí)*, no a Por contactar.
+- **Anular la única sesión de un registro con fecha de inicio** (p. ej. uno registrado con la «Primera sesión» ya aplicada)
+  lo devuelve a **Programado** para esa misma fecha, aunque ya haya pasado *(decidido el 22/10/2026; se deja así)*:
+  `estadoRegistro` no guarda el estado, lo calcula, y sin sesiones con `FECHA_INICIO` es PROGRAMADO. En el tablero sigue
+  la regla de siempre: en Agendado «Sesión 1 el …» hasta `GRACIA_AGENDA_DIAS` después de esa fecha y luego Por contactar
+  «No vino a su sesión 1 (…)». Para otra fecha, se edita la «Primera sesión» (Editar) o se usa «Cambiar fecha».
 
 ### 2.3 Automatización
 

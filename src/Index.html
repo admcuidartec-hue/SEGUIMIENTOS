@@ -4841,6 +4841,10 @@ const DEMO = (() => {
   const registros = [], sesiones = [], altas = [];
   const sesionesDe = id => sesiones.filter(s => s.ID_REGISTRO === id && !s.ANULADO).sort((a, b) => a.NUMERO - b.NUMERO);
   const doctorDe = nombre => doctores.find(d => mismo(d.doctor, nombre));
+  // Como especialidadDelRegistro_ (Registro.gs): el registro se une a la serie de la especialidad de su doctor en las citas.
+  // En el DEMO, el Dr. Hanampa atiende Reumatología y los demás, Hematología.
+  const ESP_MEDICO = { [HANAMPA]: 'REUMATOLOGÍA' };
+  const especialidadDe = sofdoc => ESP_MEDICO[sofdoc] || 'HEMATOLOGÍA';
   const reg = (r, o) => {
     const ss = sesionesDe(r.ID), hechas = ss.length, ultima = hechas ? ss[hechas - 1].FECHA : '';
     const estadoReg = r.ANULADO ? 'ANULADO' : hechas >= r.SESIONES ? 'COMPLETO' : hechas ? 'EN CURSO' : 'COTIZADO';
@@ -4854,7 +4858,7 @@ const DEMO = (() => {
     else if (dias < (enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion)) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     return Object.assign({ ID_REGISTRO: r.ID, DNI: r.DNI, ESPECIALIDAD: r.TIPO, TIPO_SEGUIMIENTO: r.TIPO, NOMBRE: r.NOMBRE,
       TELEFONOS: tel.length === 9 ? tel : '', USUARIO: usuario, MEDICO_ULTIMO: d && d.sofdoc ? d.sofdoc : r.DOCTOR,
-      ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
+      ESPECIALIDAD_CONSULTA: especialidadDe(d && d.sofdoc ? d.sofdoc : ''), FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase(r.DETALLE) : '', MARCA: r.TIPO === 'HIERRO' ? frase(r.MARCA) : '',
       SESIONES: r.SESIONES, HECHAS: hechas, ULTIMA_SESION: ultima, ULTIMA_SESION_ID: hechas ? ss[hechas - 1].ID : '', DIAS: dias, ULTIMA_CITA: r.FECHA, N_SEGUIMIENTOS: 0,
       ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg, FECHA_REEVALUAR: reevaluar,

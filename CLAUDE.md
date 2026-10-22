@@ -128,7 +128,10 @@ En un paso con fecha o motivo, Enter confirma.
   las citas; si no se sabe, cualquiera). Sin teléfonos conocidos del DNI, la tarjeta usa el `CONTACTO` del registro (si no está marcado).
   Un «Por reevaluar» cuya fecha de reevaluar pasó hace más de `CORTE_INDICACIONES_DIAS` queda ANTIGUO y no se muestra (para no
   inundar el tablero al publicar). La tarjeta de un registro por reevaluar, esté en Por contactar o ya en Agendado, tapa la
-  reevaluación del mismo paciente y especialidad.
+  reevaluación del mismo paciente y especialidad. Esa especialidad (`ESPECIALIDAD_CONSULTA`, `especialidadDelRegistro_`) es la
+  que **su doctor** tiene en las citas (si el paciente tiene consultas en varias de ellas, la más reciente); si no se sabe, la
+  de la última consulta del paciente hasta el fin del tratamiento. Solo una consulta realizada **de esa especialidad** después
+  de la última sesión lo da por «Volvió».
 - **Registro tiene tres pestañas:** Indicación, Control + laboratorio y Decisión del médico. «Registrados» se ve por periodo (hoy o cada
   uno de los últimos 6 meses, `getRegistros`) y trae Anular y **Editar**.
 - **Las cuatro decisiones del médico** (`ALTAS.DECISION`, `DECISIONES` en `Registro.gs`): `ALTA` (definitiva); `ALTA 6 MESES` y

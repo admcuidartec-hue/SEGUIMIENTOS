@@ -689,3 +689,31 @@ test('otrosContactos: los contactos de Registro que no son un teléfono (p. ej. 
   assert.deepEqual(plano(L.otrosContactos(regs, '45000111')), ['@ana.flores', '@ana.viejo']);
   assert.deepEqual(plano(L.otrosContactos(regs, '45000999')), []);
 });
+
+/* ---------- Por reevaluar: la serie del médico que indicó (Etapa 2, §3.1) ---------- */
+test('pendientesRegistro: un hierro por reevaluar se une a la especialidad de su doctor, no a la de la última consulta', () => {
+  // Hierro de la Dra. Matos (hematóloga en las citas); la última consulta de la paciente fue en Reumatología.
+  const r = REGH({ FECHA_INICIO: '2026-08-01' }), ses = [SES(1, '2026-08-01'), SES(2, '2026-08-03')];
+  const citas = [cita({ fecha: '2026-07-20', medico: KAREN }), cita({ fecha: '2026-08-02', esp: 'REUMATOLOGÍA', medico: HANAMPA })];
+  const f = filaH(dReg([r], ses, citas, '2026-10-10'));
+  assert.deepEqual([f.ESTADO, f.ESPECIALIDAD_CONSULTA], ['POR REEVALUAR', 'HEMATOLOGÍA']);
+  const otra = filaH(dReg([r], ses, citas.concat(cita({ fecha: '2026-10-05', esp: 'REUMATOLOGÍA', medico: HANAMPA })), '2026-10-10'));
+  assert.deepEqual([otra.ESTADO, otra.VOLVIO], ['POR REEVALUAR', ''], 'una consulta de otra especialidad no es «Volvió»');
+  const misma = filaH(dReg([r], ses, citas.concat(cita({ fecha: '2026-10-05', medico: KAREN })), '2026-10-10'));
+  assert.deepEqual([misma.ESTADO, misma.VOLVIO], ['COMPLETADO', '2026-10-05']);
+});
+
+test('pendientesRegistro: si no se sabe la especialidad del doctor, la de la última consulta (y solo ella cierra)', () => {
+  const r = REGH({ FECHA_INICIO: '2026-08-01', DOCTOR: 'Dr. Desconocido' }), ses = [SES(1, '2026-08-01'), SES(2, '2026-08-03')];
+  const citas = [cita({ fecha: '2026-07-20', medico: KAREN }), cita({ fecha: '2026-08-02', esp: 'REUMATOLOGÍA', medico: HANAMPA })];
+  const f = filaH(dReg([r], ses, citas, '2026-10-10'));
+  assert.equal(f.ESPECIALIDAD_CONSULTA, 'REUMATOLOGÍA');
+  const hema = filaH(dReg([r], ses, citas.concat(cita({ fecha: '2026-10-05', medico: KAREN })), '2026-10-10'));
+  assert.equal(hema.ESTADO, 'POR REEVALUAR', 'una consulta de Hematología no cierra la serie de Reumatología');
+});
+
+test('pendientesRegistro: el doctor sin consultas de la paciente aporta su especialidad de las citas de otros', () => {
+  const r = REGH({ FECHA_INICIO: '2026-08-01' }), ses = [SES(1, '2026-08-01'), SES(2, '2026-08-03')];
+  const citas = [cita({ dni: '40999000', fecha: '2026-07-01', medico: KAREN }), cita({ fecha: '2026-08-02', esp: 'REUMATOLOGÍA', medico: HANAMPA })];
+  assert.equal(filaH(dReg([r], ses, citas, '2026-10-10')).ESPECIALIDAD_CONSULTA, 'HEMATOLOGÍA');
+});

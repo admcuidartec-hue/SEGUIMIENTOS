@@ -4277,3 +4277,20 @@ test('DEMO: editarRegistro recalcula estado y franja como el servidor (bajar las
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('DEMO: un registro se une a la especialidad de su doctor (como especialidadDelRegistro_)', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const esp = async id => { const t = await llamar('getTablero'); const x = Object.values(t.columnas).flat().find(y => y.CLAVE === id); return x ? x.ESPECIALIDAD_CONSULTA : '?'; };
+      const g = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000301', nombre: 'Prueba Reuma', contacto: '987000301', fecha: S.hoy,
+        doctor: 'Dr. Juvenal Hanampa', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      const h = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000302', nombre: 'Prueba Hema', contacto: '987000302', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      return [await esp(g.registros[0].ID), await esp(h.registros[0].ID)];
+    });
+    assert.deepEqual(r, ['REUMATOLOGÍA', 'HEMATOLOGÍA']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

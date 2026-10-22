@@ -307,14 +307,28 @@ function validarAnulacionSesion(id, sesiones) {
 /* ---------- Filas de la bandeja ---------- */
 
 /**
- * Especialidades en que atiende el médico SOFDOC `medico`, según las citas: { 'HEMATOLOGIA': 1 }.
- * Vacío si no aparece en ninguna (entonces cualquier especialidad vale).
+ * Especialidades en que atiende el médico SOFDOC `medico`, según las citas: { 'HEMATOLOGIA': 'HEMATOLOGÍA' } (clave normalizada,
+ * valor tal como viene en las citas). Vacío si no aparece en ninguna (entonces cualquier especialidad vale).
  */
 function especialidadesDeMedico_(medico, citas) {
   var out = {}, m = normTexto(medico);
   if (!m) return out;
-  (citas || []).forEach(function (c) { if (normTexto(c.MEDICO) === m && c.ESPECIALIDAD) out[normTexto(c.ESPECIALIDAD)] = 1; });
+  (citas || []).forEach(function (c) { if (normTexto(c.MEDICO) === m && c.ESPECIALIDAD) out[normTexto(c.ESPECIALIDAD)] = c.ESPECIALIDAD; });
   return out;
+}
+
+/**
+ * La serie de reevaluación a la que se une un registro (Etapa 2, §3.1): la especialidad de su doctor en las citas (si el
+ * paciente tiene consultas en varias de ellas, la más reciente); si no se sabe, la de la última consulta del paciente hasta
+ * `hasta` (el fin del tratamiento): una consulta posterior en otra especialidad no le cambia la serie.
+ */
+function especialidadDelRegistro_(espDoc, realizadas, hasta) {
+  var delDoc = (realizadas || []).filter(function (x) { return espDoc[normTexto(x.ESPECIALIDAD)]; }).slice(-1)[0];
+  if (delDoc) return delDoc.ESPECIALIDAD;
+  var claves = Object.keys(espDoc);
+  if (claves.length) return espDoc[claves.sort()[0]];
+  var ultima = (hasta && ultimaAntesDe_(realizadas, hasta)) || (realizadas || [])[(realizadas || []).length - 1];
+  return ultima ? ultima.ESPECIALIDAD : '';
 }
 
 function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; }
@@ -362,11 +376,15 @@ function pendientesRegistro(d) {
     var dias = Math.max(0, diasEntre(desde, hoy)), espera = enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion;
     // La consulta realizada que cierra el control (después de la fecha del registro, en la especialidad de su doctor
     // si se sabe) o la reevaluación (después de la última sesión).
-    var espDoc = control ? especialidadesDeMedico_(medicoDeRegistro(r, d.catalogos || {}), d.citas) : {};
+    // Un tratamiento completo se reevalúa en la serie de su doctor (especialidadDelRegistro_): solo una consulta de ESA
+    // especialidad después de la última sesión es «Volvió».
+    var espDoc = especialidadesDeMedico_(medicoDeRegistro(r, d.catalogos || {}), d.citas), espSerie = especialidadDelRegistro_(espDoc, realizadas, e.ultima || fechaIso(r.FECHA));
     var vuelta = control ? realizadas.filter(function (x) {
       return x.FECHA > fechaIso(r.FECHA) && (!Object.keys(espDoc).length || espDoc[normTexto(x.ESPECIALIDAD)]);
     })[0]
-      : e.estado === 'COMPLETO' ? realizadas.filter(function (x) { return x.FECHA > e.ultima; })[0] : null;
+      : e.estado === 'COMPLETO' ? realizadas.filter(function (x) {
+        return x.FECHA > e.ultima && (!espSerie || normTexto(x.ESPECIALIDAD) === normTexto(espSerie));
+      })[0] : null;
     if (muertos[dni]) estado = 'FALLECIDO';
     else if (cierre) estado = 'CERRADO';
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
@@ -401,7 +419,7 @@ function pendientesRegistro(d) {
       TELEFONOS: telefonos.join(' / '),
       USUARIO: usuario,
       MEDICO_ULTIMO: medicoDeRegistro(r, d.catalogos),
-      ESPECIALIDAD_CONSULTA: ultima ? ultima.ESPECIALIDAD : '',
+      ESPECIALIDAD_CONSULTA: espSerie,
       FECHA_COTIZACION: fechaIso(r.FECHA),
       DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase_(r.DETALLE) : '',

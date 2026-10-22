@@ -4084,3 +4084,81 @@ test('Registro: una primera sesión con fecha pasada avisa y marca la sesión 1 
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('Registro: una fecha que el servidor rechaza deshabilita «Registrar», la barra dice por qué y Enter no guarda', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const barra = async () => (await pagina.locator('#rfalta').textContent()).trim();
+    const poner = async (sel, v) => { await pagina.locator(sel).fill(v); await pagina.locator(sel).dispatchEvent('input'); };
+    await pagina.locator('#rdni').fill('46111444');
+    await pagina.locator('#rnom').fill('Paciente Prueba Fechas');
+    await pagina.locator('#rtel').fill('987111444');
+    await poner('#rfec', '2026-09-28');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.locator('#rtrats [data-trat="HIERRO SACARATO"]').click();
+    await pagina.locator('#rses [data-ses="3"], #rses button:has-text("3")').first().click();
+    // Primera sesión antes de la fecha del registro.
+    await poner('#rinicio', '2026-09-20');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true, 'el botón no se ofrece');
+    assert.equal(await barra(), 'La primera sesión no puede ser anterior a la fecha del registro (28/09/2026).');
+    await pagina.locator('#rnom').press('Enter');
+    await pagina.waitForTimeout(200);
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 0, 'Enter tampoco guarda');
+    // Más allá de 180 días.
+    await poner('#rinicio', masDiasIso(HOY_DEMO, 181));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha de la primera sesión va hasta 180 días desde hoy.');
+    // Lo que falta se dice primero; la fecha, cuando ya no falta nada.
+    await pagina.locator('#rnom').fill('');
+    await pagina.locator('#rnom').dispatchEvent('input');
+    assert.equal(await barra(), 'Falta: nombres.');
+    await pagina.locator('#rnom').fill('Paciente Prueba Fechas');
+    await pagina.locator('#rnom').dispatchEvent('input');
+    // Fecha del registro futura.
+    await poner('#rinicio', '');
+    await poner('#rfec', masDiasIso(HOY_DEMO, 2));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha no puede ser futura.');
+    // Corregida: vuelve a ofrecerse y guarda.
+    await poner('#rfec', '2026-09-28');
+    await poner('#rinicio', '2026-09-30');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.equal(await barra(), 'Se creará 1 registro con la sesión 1 hecha el 30/09.');
+
+    // Control + laboratorio: la fecha de retorno, después de hoy y hasta un año.
+    await pagina.locator('[data-rtab="control"]').click();
+    await pagina.locator('#rdni').fill('40111222');
+    await pagina.waitForSelector('text=Paciente conocido');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await poner('#rretorno', HOY_DEMO);
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha de retorno debe ser después de hoy.');
+    await poner('#rretorno', masDiasIso(HOY_DEMO, 366));
+    assert.equal(await barra(), 'La fecha de retorno va hasta un año desde hoy.');
+    await pagina.locator('#rexamenes').press('Enter');
+    await pagina.waitForTimeout(200);
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 0);
+    await poner('#rretorno', masDiasIso(HOY_DEMO, 20));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+
+    // Decisión del médico: la consulta no puede ser futura; el retorno, después de hoy y hasta dos años.
+    await pagina.locator('[data-rtab="decision"]').click();
+    await pagina.locator('#adni').fill('40111222');
+    await pagina.locator('#amed').selectOption({ index: 1 });
+    await pagina.waitForFunction(() => !document.getElementById('rgo').disabled);
+    await poner('#afec', masDiasIso(HOY_DEMO, 1));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha no puede ser futura.');
+    await poner('#afec', HOY_DEMO);
+    await pagina.locator('input[name="rdec"][value="NUEVA REEVALUACION"]').check();
+    await poner('#aretorno', HOY_DEMO);
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal(await barra(), 'La fecha de retorno debe ser después de hoy.');
+    await poner('#aretorno', masDiasIso(HOY_DEMO, 731));
+    assert.equal(await barra(), 'La fecha de retorno va hasta dos años desde hoy.');
+    await poner('#aretorno', masDiasIso(HOY_DEMO, 40));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.equal(await llamadas(pagina, 'darDeAlta'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

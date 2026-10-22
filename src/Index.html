@@ -2957,6 +2957,32 @@ function faltanRegistro() {
   }
   return f;
 }
+/**
+ * Las fechas que el servidor rechaza (validarRegistro y validarAlta de Registro.gs), con sus mismos mensajes; '' si valen.
+ * Se mira cuando ya no falta nada: el botón se deshabilita y la barra dice por qué, en vez de esperar al error del servidor.
+ */
+function fechaMalRegistro() {
+  const v = s => ($(s) ? $(s).value.trim() : ''), hoy = S.hoy;
+  if (esDecision()) {
+    const fa = v('#afec'), ret = decisionUi(RG.dec).pideFecha ? v('#aretorno') : '';
+    if (fa && fa > hoy) return 'La fecha no puede ser futura.';
+    if (ret && ret <= hoy) return 'La fecha de retorno debe ser después de hoy.';
+    if (ret && ret > masDias(hoy, 730)) return 'La fecha de retorno va hasta dos años desde hoy.';
+    return '';
+  }
+  const fec = v('#rfec');
+  if (fec && fec > hoy) return 'La fecha no puede ser futura.';
+  if (RG.modo === 'control') {
+    const ret = v('#rretorno');
+    if (ret && ret <= hoy) return 'La fecha de retorno debe ser después de hoy.';
+    if (ret && ret > masDias(hoy, 365)) return 'La fecha de retorno va hasta un año desde hoy.';
+    return '';
+  }
+  const ini = v('#rinicio');
+  if (ini && fec && ini < fec) return `La primera sesión no puede ser anterior a la fecha del registro (${dmy(fec)}).`;
+  if (ini && ini > masDias(hoy, 180)) return 'La fecha de la primera sesión va hasta 180 días desde hoy.';
+  return '';
+}
 /** La fecha de retorno de una nueva reevaluación no bloquea el botón: al pulsarlo, el aviso dice que falta. */
 const faltaRetorno = () => esDecision() && decisionUi(RG.dec).pideFecha && !($('#aretorno') && $('#aretorno').value);
 /**
@@ -2981,9 +3007,10 @@ function validarRegistro() {
   const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0), d = decisionUi(RG.dec);
   const hecha = RG.modo === 'indicacion' ? primeraSesionHecha() : '';
   const conSesion = hecha ? (n === 1 ? ` con la sesión 1 hecha el ${dm(hecha)}` : `, cada uno con la sesión 1 hecha el ${dm(hecha)}`) : '';
-  b.disabled = f.length > 0 || RG.enviando;
+  const mal = f.length ? '' : fechaMalRegistro();
+  b.disabled = f.length > 0 || !!mal || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
-  $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.`
+  $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
     : RG.modo === 'indicacion' ? (n === 1 ? `Se creará 1 registro${conSesion}.` : `Se crearán ${n} registros${conSesion}.`)
     : RG.modo === 'control' ? 'Volverá con sus resultados en la fecha de retorno.'
     : d.pideFecha ? (faltaRetorno() ? 'Elija la fecha de retorno.' : 'Lo esperamos en la fecha de retorno.')
@@ -3001,7 +3028,7 @@ function enviarRegistro() {
 }
 /** guardarRegistro (MAPEO §1.4; también el control) o darDeAlta (§1.8, con la decisión). Los ID son los que devuelve el servidor. */
 async function registrar(forzar, teclado) {
-  if (RG.enviando || faltanRegistro().length) return;
+  if (RG.enviando || faltanRegistro().length || fechaMalRegistro()) return;
   if (faltaRetorno()) { avisar('Falta la fecha de retorno.'); $('#aretorno').focus(); return; }
   if (!exigirUsuario()) return;
   RG.enviando = true;

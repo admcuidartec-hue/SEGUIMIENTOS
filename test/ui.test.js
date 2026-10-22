@@ -4294,3 +4294,22 @@ test('DEMO: un registro se une a la especialidad de su doctor (como especialidad
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('DNI con ceros a la izquierda: el DEMO lo guarda como normDni y los buscadores lo encuentran con o sin el cero', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const g = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '09997401', nombre: 'Prueba Cero', contacto: '987000401', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      await cargarTablero(null, true);
+      const busca = q => { S.q = q; const n = filtrados(true).filter(p => p.n.includes('Cero') || /CERO/i.test(p.n)).length; S.q = ''; return n; };
+      const pac = (await llamar('buscar', '009997401')).map(x => x.DNI);
+      return { dni: g.registros[0].DNI, con: busca('09997401'), sin: busca('9997401'), parte: busca('0999740'), pac };
+    });
+    assert.equal(r.dni, '9997401');
+    assert.deepEqual([r.con, r.sin, r.parte], [1, 1, 1]);
+    assert.deepEqual(r.pac, ['9997401']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

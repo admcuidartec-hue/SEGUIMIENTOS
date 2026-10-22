@@ -2230,7 +2230,9 @@ function previsto(p, res, extra) {
       if (fp) return en('AGENDADO', `Sesión ${hechas + 1} el ${diaSem(fp)} ${dm(fp)}`, fp, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'EN CURSO', AGENDA: 'SESION',
         FECHA_AGENDA: fp, INTENTO: 0, ATRASO: 0, N_SEGUIMIENTOS: 1 });
       const entre = Number(R.diasEntreSesiones) || 7, dias = diasEntre(f, hoy), sig = `Sesión ${hechas + 1} de ${N}`;
-      if (dias < entre) return en('EN_TRATAMIENTO', `${sig} · próxima ~${dm(masDias(f, entre))}`, masDias(f, entre), { ESTADO_REGISTRO: 'EN CURSO', ATRASO: 0 });
+      // En tratamiento cuenta las hechas y las que faltan, como etiquetaDe de Tablero.gs; Por contactar nombra la siguiente.
+      if (dias < entre) return en('EN_TRATAMIENTO', `Sesión ${hechas} de ${N} · faltan ${N - hechas} · próxima ~${dm(masDias(f, entre))}`, masDias(f, entre),
+        { ESTADO_REGISTRO: 'EN CURSO', ATRASO: 0 });
       const atr = dias - entre;
       return en('POR_CONTACTAR', sig + (atr > 0 ? ` · atrasada ${plural(atr, 'día', 'días')}` : ' · tocaba hoy'), '', { ESTADO_REGISTRO: 'EN CURSO', ATRASO: atr, DIAS: dias });
     }
@@ -4837,7 +4839,8 @@ const DEMO = (() => {
       if (t.PROXIMA_AGENDADA) return 'Cita el ' + diaCorto(t.PROXIMA_AGENDADA);
       return '';
     }
-    if (t.COLUMNA === 'EN_TRATAMIENTO') return sesion + ' · próxima ~' + dm(mas(t.ULTIMA_SESION, reglas.diasEntreSesiones));
+    if (t.COLUMNA === 'EN_TRATAMIENTO') return 'Sesión ' + t.HECHAS + ' de ' + t.SESIONES + ' · faltan ' + (Number(t.SESIONES) - Number(t.HECHAS))
+      + ' · próxima ~' + dm(mas(t.ULTIMA_SESION, reglas.diasEntreSesiones));
     return t.ETIQUETA || '';
   }
   /** Pone la tarjeta en `columna` (o la saca del tablero con ''), con CLAVE, ETIQUETA y FECHA_CLAVE como tarjeta_(). */

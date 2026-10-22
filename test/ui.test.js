@@ -820,7 +820,8 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
     await esperarCol(pagina, SOFIA, '3');
-    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
+    // Como etiquetaDe de Tablero.gs: las sesiones hechas, las que faltan y la próxima.
+    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 2 de 3 · faltan 1 · próxima ~08\/10/);
     assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
     await abrirPanelDe(pagina, SOFIA);
     assert.match(await pagina.locator('#panel [data-marcar-sesion]').textContent(), /Marcar sesión 3 hecha/);
@@ -836,6 +837,36 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
       assert.ok((await textoTarjeta(pagina, id)).includes(t.ETIQUETA), `${id}: ${t.ETIQUETA}`);
     }
     assert.match(await pagina.locator('#metadia').textContent(), /Hoy: 11 de 15/, 'la meta suma 1 por guardado');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('tablero y ficha: tras marcar una sesión, la tarjeta En tratamiento dice lo mismo que el servidor y que la ficha', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    // Todo lo que la tarjeta llega a mostrar, también la previsión antes de la respuesta.
+    await pagina.evaluate(id => {
+      window.__vistas = [];
+      const ver = () => { const el = [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id);
+        if (el) window.__vistas.push(el.textContent.replace(/\s+/g, ' ').trim()); };
+      new MutationObserver(ver).observe(document.getElementById('tablero'), { childList: true, subtree: true, characterData: true });
+    }, SOFIA);
+    await abrirPanelDe(pagina, SOFIA);
+    await pagina.locator('#panel #pfs').fill('2026-10-01');
+    await pagina.locator('#panel [data-marcar-sesion]').click();
+    await esperarEstable(pagina);
+    await esperarCol(pagina, SOFIA, '3');
+    const esperado = 'Sesión 2 de 3 · faltan 1 · próxima ~08/10';
+    const d = await datosDemo(pagina);
+    assert.equal(d.columnas.EN_TRATAMIENTO.find(x => x.CLAVE === SOFIA).ETIQUETA, esperado, 'el DEMO, como Tablero.gs');
+    assert.ok((await textoTarjeta(pagina, SOFIA)).includes(esperado));
+    const vistas = (await pagina.evaluate(() => window.__vistas)).filter(v => /Sesión \d+ de 3/.test(v));
+    assert.ok(vistas.length, 'la tarjeta se pintó');
+    for (const v of vistas) assert.ok(!/Sesión 3 de 3/.test(v), 'ni la previsión cuenta la sesión siguiente: ' + v);
+    // La ficha cuenta lo mismo: 2 de 3.
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await abrirFicha(pagina, '41111222');
+    assert.match((await tratDe(pagina, SOFIA).textContent()).replace(/\s+/g, ' '), /Sesión 2 de 3/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -866,10 +897,10 @@ test('panel: «Deshacer» devuelve la tarjeta y llama a la anulación que corres
     await abrirPanelDe(pagina, SOFIA);
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
-    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 3 de 3/);
+    assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 2 de 3 · faltan 1/);
     await deshacer();
     await pagina.waitForFunction(() => DEMO._llamadas.anularSesion === 1);
-    await pagina.waitForFunction(() => /Sesión 2 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === 'REG-000002').textContent));
+    await pagina.waitForFunction(() => /Sesión 1 de 3 · faltan 2/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === 'REG-000002').textContent));
     assert.match((await ultimo(pagina, 'anularSesion')).id, /^SES-/);
     // Alta de una reevaluación: anularAlta.
     await abrirPanelDe(pagina, LUIS);
@@ -3675,7 +3706,7 @@ test('«Deshacer» tras marcar con próxima: anula la sesión y con ella la agen
     await pagina.waitForFunction(() => DEMO._llamadas.anularSesion === 1);
     assert.equal(await llamadas(pagina, 'anularResultado'), 0, 'se deshace la sesión, no solo la agenda');
     await esperarCol(pagina, SOFIA, '3');
-    await pagina.waitForFunction(id => /Sesión 2 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
+    await pagina.waitForFunction(id => /Sesión 1 de 3 · faltan 2/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
     const segs = await pagina.evaluate(() => llamar('getPaciente', '41111222').then(p => p.seguimientos.filter(s => s.REFERENCIA === 'REG-000002')));
     assert.deepEqual(segs.map(s => [s.RESULTADO, !!s.ANULADO]), [['AGENDÓ CITA', true]], 'la agenda quedó anulada con su sesión');
     assert.deepEqual(errores, []);
@@ -3755,7 +3786,7 @@ test('marcar con próxima: si la agenda no se pudo escribir, la sesión queda ma
     await pagina.waitForFunction(() => /^La sesión quedó marcada; agende la próxima con «Cambiar fecha»\.$/.test(document.querySelector('#aviso span').textContent));
     // El tablero recargado manda: la sesión 2 está hecha y la tarjeta sigue En tratamiento (falta la 3), sin agenda.
     await esperarCol(pagina, SOFIA, '3');
-    await pagina.waitForFunction(id => /Sesión 3 de 3/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
+    await pagina.waitForFunction(id => /Sesión 2 de 3 · faltan 1/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

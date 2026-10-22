@@ -4154,7 +4154,10 @@ test('Registro: una fecha que el servidor rechaza deshabilita «Registrar», la 
     await poner('#aretorno', HOY_DEMO);
     assert.equal(await pagina.locator('#rgo').isDisabled(), true);
     assert.equal(await barra(), 'La fecha de retorno debe ser después de hoy.');
+    // Dos años por calendario: el 01/10/2028 (731 días, 2028 tiene 29/02) vale; el día siguiente, no.
     await poner('#aretorno', masDiasIso(HOY_DEMO, 731));
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    await poner('#aretorno', masDiasIso(HOY_DEMO, 732));
     assert.equal(await barra(), 'La fecha de retorno va hasta dos años desde hoy.');
     await poner('#aretorno', masDiasIso(HOY_DEMO, 40));
     assert.equal(await pagina.locator('#rgo').isDisabled(), false);
@@ -4274,6 +4277,285 @@ test('DEMO: editarRegistro recalcula estado y franja como el servidor (bajar las
     assert.match(r.antes2, /^EN_TRATAMIENTO · Sesión 1 de 3/);
     assert.match(r.despues2, /^COMPLETADO/);
     assert.match(r.otra, /^EN_TRATAMIENTO · Sesión 1 de 2/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('DEMO: un registro se une a la especialidad de su doctor (como especialidadDelRegistro_)', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const esp = async id => { const t = await llamar('getTablero'); const x = Object.values(t.columnas).flat().find(y => y.CLAVE === id); return x ? x.ESPECIALIDAD_CONSULTA : '?'; };
+      const g = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000301', nombre: 'Prueba Reuma', contacto: '987000301', fecha: S.hoy,
+        doctor: 'Dr. Juvenal Hanampa', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      const h = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000302', nombre: 'Prueba Hema', contacto: '987000302', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      return [await esp(g.registros[0].ID), await esp(h.registros[0].ID)];
+    });
+    assert.deepEqual(r, ['REUMATOLOGÍA', 'HEMATOLOGÍA']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('DNI con ceros a la izquierda: el DEMO lo guarda como normDni y los buscadores lo encuentran con o sin el cero', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const g = await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '09997401', nombre: 'Prueba Cero', contacto: '987000401', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      await cargarTablero(null, true);
+      const busca = q => { S.q = q; const n = filtrados(true).filter(p => p.n.includes('Cero') || /CERO/i.test(p.n)).length; S.q = ''; return n; };
+      const pac = (await llamar('buscar', '009997401')).map(x => x.DNI);
+      return { dni: g.registros[0].DNI, con: busca('09997401'), sin: busca('9997401'), parte: busca('0999740'), pac };
+    });
+    assert.equal(r.dni, '9997401');
+    assert.deepEqual([r.con, r.sin, r.parte], [1, 1, 1]);
+    assert.deepEqual(r.pac, ['9997401']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('«Número equivocado» con un @usuario en Registro: la reevaluación no se cierra y el panel no dice «No le queda otro contacto»', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    await pagina.evaluate(async () => {
+      await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '40333444', nombre: 'Carmen Sofía Torres Díaz', contacto: '@carmen.torres', fecha: S.hoy,
+        doctor: 'Dr. Juvenal Hanampa', procedimientos: ['AMO'] });
+      await cargarTablero(null, true);
+    });
+    const aviso = await pagina.evaluate(async () => {
+      const p = S.pacientes.find(x => x.dni === '40333444' && x.tipo === 'REEVALUACION');
+      prepararPaso(p, 'numero');
+      const div = document.createElement('div'); div.innerHTML = htmlPaso(p);
+      return { usuario: p.usuario, texto: div.textContent };
+    });
+    assert.equal(aviso.usuario, '@carmen.torres');
+    assert.match(aviso.texto, /Le queda el usuario @carmen\.torres: el seguimiento sigue\./);
+    assert.doesNotMatch(aviso.texto, /No le queda otro contacto/);
+    const r = await pagina.evaluate(async () => {
+      await llamar('registrarResultado', { usuario: 'MAGALY', dni: '40333444', especialidad: 'REUMATOLOGÍA', resultado: 'NÚMERO EQUIVOCADO', telefono: '912345678' });
+      const t = await llamar('getTablero');
+      const c = Object.keys(t.columnas).find(k => t.columnas[k].some(x => x.DNI === '40333444' && x.TIPO_SEGUIMIENTO === 'REEVALUACION'));
+      return { c: c || '', cerrado: t.cerrados.some(x => x.DNI === '40333444') };
+    });
+    assert.notEqual(r.c, '', 'la reevaluación sigue en el tablero');
+    assert.equal(r.cerrado, false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('topes «hasta un año / dos años» por calendario, y Editar con los mismos topes que Registro (aviso y botón deshabilitado)', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const topes = await pagina.evaluate(() => [topeUnAnio('2027-03-01'), topeUnAnio('2028-02-29'), topeDosAnios('2026-10-01')]);
+    assert.deepEqual(topes, ['2028-03-01', '2029-02-28', '2028-10-01']);
+    assert.equal(await pagina.evaluate(async () => {
+      try { await llamar('darDeAlta', { usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: S.hoy,
+        decision: 'NUEVA REEVALUACION', fechaRetorno: '2028-10-01' }); return ''; } catch (e) { return e.message; }
+    }), '', 'el DEMO acepta dos años exactos');
+    const id = await pagina.evaluate(async () => (await llamar('guardarRegistro', { usuario: 'MAGALY', tipo: 'CONTROL', dni: '47000501', nombre: 'Prueba Tope',
+      contacto: '987000501', fecha: S.hoy, doctor: 'Dra. Karen Matos', fechaRetorno: masDias(S.hoy, 20), examenes: 'Hemograma' })).registros[0].ID);
+    await pagina.evaluate(() => cargarRegistros());
+    await pagina.waitForSelector(`#rlista [data-editar="${id}"]`);
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    const campo = pagina.locator('#rlista [data-campo="fechaRetorno"]');
+    assert.equal(await campo.getAttribute('max'), '2027-10-01');
+    await campo.fill('2027-10-02');
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').isDisabled(), true);
+    assert.equal((await pagina.locator('#rlista .aviso-edicion').textContent()).trim(), 'La fecha de retorno va hasta un año desde hoy.');
+    await campo.press('Enter');
+    await pagina.waitForTimeout(150);
+    assert.equal(await llamadas(pagina, 'editarRegistro'), 0, 'ni el botón ni Enter guardan');
+    await campo.fill('2027-10-01');
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').isDisabled(), false);
+    assert.equal((await pagina.locator('#rlista .aviso-edicion').textContent()).trim(), '');
+    const err = await pagina.evaluate(async id => {
+      try { await llamar('editarRegistro', { usuario: 'MAGALY', id, cambios: { fechaRetorno: '2027-11-05' } }); return ''; } catch (e) { return e.message; }
+    }, id);
+    assert.equal(err, 'La fecha de retorno va hasta un año desde hoy.', 'el DEMO rechaza como validarEdicionRegistro');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('teléfono: lo que parece un número y no da 9 dígitos se avisa y no se guarda (Registro, Editar y DEMO); un @usuario vale', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const r = await pagina.evaluate(async () => {
+      const intenta = async c => { try { await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000601', nombre: 'Prueba Tel', contacto: c, fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', procedimientos: ['AMO'], confirmado: true }); return ''; } catch (e) { return e.message; } };
+      return { ocho: await intenta('99974033'), diez: await intenta('9997403444'), fijo: await intenta('(01) 433-2210'),
+        mas51: await intenta('+51 999 750 361'), usuario: await intenta('@prueba.tel'),
+        f: [telefonoMal('99974033'), telefonoMal('+51 999 740 311'), telefonoMal('@x'), telefonoMal('rosa 99')] };
+    });
+    assert.deepEqual([r.ocho, r.diez], ['El teléfono debe tener 9 dígitos.', 'El teléfono debe tener 9 dígitos.']);
+    assert.deepEqual([r.fijo, r.mas51, r.usuario], ['', '', '']);
+    assert.deepEqual(r.f, ['El teléfono debe tener 9 dígitos.', '', '', '']);
+    // En la pantalla: el botón se deshabilita y la barra lo dice.
+    await pagina.locator('#rdni').fill('47000602');
+    await pagina.locator('#rnom').fill('Prueba Tel Dos');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.locator('#rproc input, [data-proc]').first().click().catch(() => {});
+    await pagina.evaluate(() => { RG.procs = RG.procs.length ? RG.procs : ['AMO']; });
+    await pagina.locator('#rtel').fill('99974033');
+    await pagina.locator('#rtel').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal((await pagina.locator('#rfalta').textContent()).trim(), 'El teléfono debe tener 9 dígitos.');
+    await pagina.locator('#rtel').fill('999 740 311');
+    await pagina.locator('#rtel').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    // Editar.
+    const id = await pagina.locator('#rlista [data-editar]').first().getAttribute('data-editar');
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    await pagina.locator('#rlista [data-campo="contacto"]').fill('9997403444');
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').isDisabled(), true);
+    assert.equal((await pagina.locator('#rlista .aviso-edicion').textContent()).trim(), 'El teléfono debe tener 9 dígitos.');
+    const demo = await pagina.evaluate(async id => { try { await llamar('editarRegistro', { usuario: 'MAGALY', id, cambios: { contacto: '9997403444' } }); return ''; } catch (e) { return e.message; } }, id);
+    assert.equal(demo, 'El teléfono debe tener 9 dígitos.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('buscadores: ignoran apóstrofos, guiones y puntos (tablero y Pacientes del DEMO, como normBusqueda)', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      await llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47000701', nombre: "María del Pilar Ñahui-O'Higgins", contacto: '987000701', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 1, fechaInicio: S.hoy });
+      await cargarTablero(null, true);
+      const tab = q => { S.q = q; const n = filtrados(true).filter(p => p.dni === '47000701').length; S.q = ''; return n; };
+      const pac = async q => (await llamar('buscar', q)).map(x => x.DNI);
+      return { t: [tab('ohiggins'), tab("o'higgins"), tab('nahui-ohiggins'), tab('pilar ohiggins')], p: [await pac('ohiggins'), await pac('nahui-ohiggins')],
+        n: normBusqueda("Ñahui-O'Higgins") };
+    });
+    assert.deepEqual(r.t, [1, 1, 1, 1]);
+    assert.deepEqual(r.p, [['47000701'], ['47000701']]);
+    assert.equal(r.n, 'NAHUI OHIGGINS');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Pacientes: con más resultados que los 6 que se muestran, la lista lo dice', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await pagina.evaluate(async () => {
+      for (let i = 0; i < 8; i++) await llamar('guardarRegistro', { usuario: 'MAGALY', dni: String(47000800 + i), nombre: 'Prueba Quispilloclla ' + 'ABCDEFGH'[i],
+        contacto: '98700080' + i, fecha: S.hoy, doctor: 'Dra. Karen Matos', procedimientos: ['AMO'] });
+      for (let i = 0; i < 16; i++) await llamar('guardarRegistro', { usuario: 'MAGALY', dni: String(47000900 + i), nombre: 'Prueba Huarachi ' + 'ABCDEFGHIJKLMNOP'[i],
+        contacto: '9870009' + String(i).padStart(2, '0'), fecha: S.hoy, doctor: 'Dra. Karen Matos', procedimientos: ['AMO'] });
+    });
+    await buscarEn(pagina, 'quispilloclla');
+    assert.equal(await pagina.locator('#pres [role="option"]').count(), 6);
+    assert.equal((await pagina.locator('#pres .mas').textContent()).trim(), 'Se muestran 6 de 8: escriba más para afinar.');
+    await buscarEn(pagina, 'prueba');
+    assert.equal((await pagina.locator('#pres .mas').textContent()).trim(), 'Se muestran 6 de 20 o más: escriba más para afinar.');
+    await buscarEn(pagina, 'quispilloclla h');
+    assert.equal(await pagina.locator('#pres .mas').count(), 0, 'con 6 o menos no dice nada');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('tablero: médico y especialidad se recuerdan (seg.medico, seg.esp) como tipo y mes; si ya no existen, se ignoran', async () => {
+  const a = await abrirTablero();
+  let med, esp;
+  try {
+    med = await a.pagina.locator('#fmed option').evaluateAll(o => o[1].value);
+    esp = await a.pagina.locator('#fesp option').evaluateAll(o => o[1].value);
+    await a.pagina.locator('#fmed').selectOption(med);
+    await a.pagina.locator('#fesp').selectOption(esp);
+    assert.deepEqual(await a.pagina.evaluate(() => [localStorage.getItem('seg.medico'), localStorage.getItem('seg.esp')]), [med, esp]);
+    await a.pagina.evaluate(() => document.querySelector('#tablero .js-quitar') && document.querySelector('#tablero .js-quitar').click());
+  } finally { await a.navegador.close(); }
+  const b = await abrirTablero({ guardado: { 'seg.medico': med, 'seg.esp': esp } });
+  try {
+    assert.deepEqual([await b.pagina.locator('#fmed').inputValue(), await b.pagina.locator('#fesp').inputValue()], [med, esp]);
+    assert.deepEqual(await b.pagina.evaluate(() => [S.medico, S.esp]), [med, esp]);
+    assert.ok(await b.pagina.evaluate(() => filtrados(true).every(p => norm(p.med) === norm(S.medico) && norm(p.esp) === norm(S.esp))));
+    await b.pagina.locator('#tablero .js-quitar').first().click();
+    assert.deepEqual(await b.pagina.evaluate(() => [localStorage.getItem('seg.medico'), localStorage.getItem('seg.esp')]), ['', '']);
+  } finally { await b.navegador.close(); }
+  const c = await abrirTablero({ guardado: { 'seg.medico': 'Dr. QUE YA NO ESTA', 'seg.esp': 'ODONTOLOGÍA' } });
+  try {
+    assert.deepEqual(await c.pagina.evaluate(() => [S.medico, S.esp]), ['', '']);
+    assert.deepEqual([await c.pagina.locator('#fmed').inputValue(), await c.pagina.locator('#fesp').inputValue()], ['', '']);
+  } finally { await c.navegador.close(); }
+});
+
+test('DEMO: anular un registro anula su próxima sesión agendada (deja de contar en la meta); la sesión hecha sigue contando y ya no se anula', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const meta = async () => ((await llamar('getTablero')).cifras.hechosHoyPor || {}).RACHEL || 0;
+      const g = await llamar('guardarRegistro', { usuario: 'RACHEL', dni: '47001001', nombre: 'Prueba Anula', contacto: '987001001', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', tratamiento: 'HIERRO SACARATO', sesiones: 3 });
+      const id = g.registros[0].ID, m0 = await meta();
+      const ses = await llamar('marcarSesion', { usuario: 'RACHEL', id, fecha: S.hoy, proxima: masDias(S.hoy, 7) });
+      const m1 = await meta();
+      await llamar('anularRegistro', { usuario: 'RACHEL', id, motivo: 'Paciente equivocado' });
+      const m2 = await meta();
+      let err = '';
+      try { await llamar('anularSesion', { usuario: 'RACHEL', id: ses.sesion.ID, motivo: 'x' }); } catch (e) { err = e.message; }
+      const t = await llamar('getTablero');
+      const sigue = Object.values(t.columnas).flat().some(x => x.ID_REGISTRO === id);
+      return { suma: m1 - m0, resta: m1 - m2, err, sigue, sesId: ses.sesion.ID };
+    });
+    assert.equal(r.suma, 2, 'la sesión y su próxima agendada');
+    assert.equal(r.resta, 1, 'al anular el registro se va la agenda; la sesión hecha sigue contando');
+    assert.match(r.err, /^El registro REG-\d+ está anulado: sus sesiones ya no se anulan\.$/);
+    assert.equal(r.sigue, false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('arranque fallido: el aviso trae «Reintentar» y, si el servidor ya responde, la app arranca sin recargar', async () => {
+  const { navegador, pagina, errores } = await abrir({ fallar: { bootstrap: 'Se perdió la conexión con el servidor.' }, sinEsperar: true });
+  try {
+    await pagina.waitForSelector('#v-tablero .js-reintentar-arranque', { state: 'visible' });
+    assert.match(await pagina.locator('#v-tablero .cargando').textContent(), /^No se pudo iniciar: Se perdió la conexión con el servidor\.$/);
+    // Sigue fallando: el aviso vuelve, con su botón.
+    await pagina.locator('#v-tablero .js-reintentar-arranque').click();
+    await pagina.waitForSelector('#v-tablero .js-reintentar-arranque', { state: 'visible' });
+    await pagina.evaluate(() => { delete DEMO._fallar.bootstrap; });
+    await pagina.locator('#v-tablero .js-reintentar-arranque').click();
+    await pagina.waitForFunction(() => !!S.boot && S.fase === 'listo');
+    await pagina.waitForSelector('#tablero .tarjeta');
+    assert.equal(await pagina.locator('.js-reintentar-arranque').count(), 0);
+    assert.equal(await pagina.evaluate(() => DEMO._llamadas.bootstrap), 3);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('nombreBonito: mayúscula también tras guion y apóstrofo', async () => {
+  const { navegador, pagina, errores } = await abrir();
+  try {
+    const r = await pagina.evaluate(() => ["MARÍA DEL PILAR ÑAHUI-O'HIGGINS", 'JUAN PÉREZ-ALBELA Y ROJAS', "D'ANGELO"].map(nombreBonito));
+    assert.deepEqual(r, ["María del Pilar Ñahui-O'Higgins", 'Juan Pérez-Albela y Rojas', "D'Angelo"]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Registro: un documento de más de 12 caracteres no se corta en silencio: se avisa y no se registra', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('X123456789012');
+    await pagina.locator('#rdni').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rdni').inputValue(), 'X123456789012', 'no se corta');
+    await pagina.locator('#rnom').fill('Prueba Documento');
+    await pagina.locator('#rtel').fill('987001301');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.evaluate(() => { RG.procs = ['AMO']; validarRegistro(); });
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    assert.equal((await pagina.locator('#rfalta').textContent()).trim(), 'El documento tiene 13 caracteres: el carné de extranjería va de 9 a 12.');
+    await pagina.locator('#rdni').press('Enter');
+    await pagina.waitForTimeout(150);
+    assert.equal(await llamadas(pagina, 'guardarRegistro'), 0);
+    await pagina.locator('#rdni').fill('X12345678901');
+    await pagina.locator('#rdni').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), false);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

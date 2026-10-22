@@ -689,3 +689,89 @@ test('otrosContactos: los contactos de Registro que no son un teléfono (p. ej. 
   assert.deepEqual(plano(L.otrosContactos(regs, '45000111')), ['@ana.flores', '@ana.viejo']);
   assert.deepEqual(plano(L.otrosContactos(regs, '45000999')), []);
 });
+
+/* ---------- Por reevaluar: la serie del médico que indicó (Etapa 2, §3.1) ---------- */
+test('pendientesRegistro: un hierro por reevaluar se une a la especialidad de su doctor, no a la de la última consulta', () => {
+  // Hierro de la Dra. Matos (hematóloga en las citas); la última consulta de la paciente fue en Reumatología.
+  const r = REGH({ FECHA_INICIO: '2026-08-01' }), ses = [SES(1, '2026-08-01'), SES(2, '2026-08-03')];
+  const citas = [cita({ fecha: '2026-07-20', medico: KAREN }), cita({ fecha: '2026-08-02', esp: 'REUMATOLOGÍA', medico: HANAMPA })];
+  const f = filaH(dReg([r], ses, citas, '2026-10-10'));
+  assert.deepEqual([f.ESTADO, f.ESPECIALIDAD_CONSULTA], ['POR REEVALUAR', 'HEMATOLOGÍA']);
+  const otra = filaH(dReg([r], ses, citas.concat(cita({ fecha: '2026-10-05', esp: 'REUMATOLOGÍA', medico: HANAMPA })), '2026-10-10'));
+  assert.deepEqual([otra.ESTADO, otra.VOLVIO], ['POR REEVALUAR', ''], 'una consulta de otra especialidad no es «Volvió»');
+  const misma = filaH(dReg([r], ses, citas.concat(cita({ fecha: '2026-10-05', medico: KAREN })), '2026-10-10'));
+  assert.deepEqual([misma.ESTADO, misma.VOLVIO], ['COMPLETADO', '2026-10-05']);
+});
+
+test('pendientesRegistro: si no se sabe la especialidad del doctor, la de la última consulta (y solo ella cierra)', () => {
+  const r = REGH({ FECHA_INICIO: '2026-08-01', DOCTOR: 'Dr. Desconocido' }), ses = [SES(1, '2026-08-01'), SES(2, '2026-08-03')];
+  const citas = [cita({ fecha: '2026-07-20', medico: KAREN }), cita({ fecha: '2026-08-02', esp: 'REUMATOLOGÍA', medico: HANAMPA })];
+  const f = filaH(dReg([r], ses, citas, '2026-10-10'));
+  assert.equal(f.ESPECIALIDAD_CONSULTA, 'REUMATOLOGÍA');
+  const hema = filaH(dReg([r], ses, citas.concat(cita({ fecha: '2026-10-05', medico: KAREN })), '2026-10-10'));
+  assert.equal(hema.ESTADO, 'POR REEVALUAR', 'una consulta de Hematología no cierra la serie de Reumatología');
+});
+
+test('pendientesRegistro: el doctor sin consultas de la paciente aporta su especialidad de las citas de otros', () => {
+  const r = REGH({ FECHA_INICIO: '2026-08-01' }), ses = [SES(1, '2026-08-01'), SES(2, '2026-08-03')];
+  const citas = [cita({ dni: '40999000', fecha: '2026-07-01', medico: KAREN }), cita({ fecha: '2026-08-02', esp: 'REUMATOLOGÍA', medico: HANAMPA })];
+  assert.equal(filaH(dReg([r], ses, citas, '2026-10-10')).ESPECIALIDAD_CONSULTA, 'HEMATOLOGÍA');
+});
+
+test('usuariosPorDni: el contacto de Registro que no es teléfono, del registro sin anular más reciente', () => {
+  const regs = [REGH({ ID: 'REG-1', FECHA: '2026-09-01', CONTACTO: '@viejo' }), REGH({ ID: 'REG-2', FECHA: '2026-10-01', CONTACTO: '@nuevo' }),
+    REGH({ ID: 'REG-3', FECHA: '2026-10-02', CONTACTO: '@anulado', ANULADO: 'SÍ' }), REGH({ ID: 'REG-4', DNI: '40999000', CONTACTO: '987654321' })];
+  assert.deepEqual(plano(L.usuariosPorDni(regs)), { 40111222: '@nuevo' });
+});
+
+test('pendientesRegistro: el @usuario de otro registro del DNI también es contacto', () => {
+  const marca = { ID: 'SEG-9', FECHA_HORA: '2026-10-18 10:00', DNI: '40111222', ESPECIALIDAD: 'CONTROL', RESPONSABLE: 'MAGALY', ACCION: 'TELEFONO',
+    REFERENCIA: 'REG-000010', RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: '987654321', ANULADO: '' };
+  const d = Object.assign(dReg([CTL()], [], [], '2026-10-19', [marca]), { telefonos: {}, usuarios: { 40111222: '@rosa' } });
+  assert.deepEqual([filaH(d).ESTADO, filaH(d).CIERRE], ['PENDIENTE', '']);
+});
+
+/* ---------- Topes de fecha por calendario, iguales al registrar y al editar ---------- */
+test('validarRegistro: el retorno de un control va hasta la misma fecha del año siguiente (por calendario)', () => {
+  const ctl = (hoy, ret) => L.validarRegistro(base3({ tipo: 'CONTROL', fechaRetorno: ret, fecha: hoy }), CAT3, hoy).error;
+  assert.equal(ctl('2026-10-09', '2027-10-09'), '', 'un año exacto');
+  assert.equal(ctl('2026-10-09', '2027-10-10'), 'La fecha de retorno va hasta un año desde hoy.');
+  assert.equal(ctl('2027-03-01', '2028-03-01'), '', 'un año con 29/02 en medio son 366 días y vale');
+  assert.equal(ctl('2028-02-29', '2029-02-28'), '', 'del 29/02 al 28/02 del año siguiente');
+  assert.equal(ctl('2028-02-29', '2029-03-01'), 'La fecha de retorno va hasta un año desde hoy.');
+});
+
+test('validarAlta: la nueva reevaluación va hasta dos años de calendario', () => {
+  const citas = [cita({ fecha: '2026-09-30' })];
+  const p = ret => ({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-01',
+    decision: 'NUEVA REEVALUACION', fechaRetorno: ret });
+  assert.equal(L.validarAlta(p('2028-10-01'), CAT3, citas, {}, '2026-10-01').error, '', 'dos años exactos (731 días: 2028 tiene 29/02)');
+  assert.equal(L.validarAlta(p('2028-10-02'), CAT3, citas, {}, '2026-10-01').error, 'La fecha de retorno va hasta dos años desde hoy.');
+});
+
+test('validarEdicionRegistro: los mismos topes que al registrar (retorno hasta un año, primera sesión hasta 180 días)', () => {
+  const ctl = REGH({ TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: 'HEMOGRAMA', FECHA_RETORNO: '2026-10-20' });
+  const v = (r, c) => plano(L.validarEdicionRegistro(r, c, [], CAT3, '2026-10-09'));
+  assert.deepEqual(v(ctl, { fechaRetorno: '2027-10-09' }).cambios, { FECHA_RETORNO: '2027-10-09' });
+  assert.equal(v(ctl, { fechaRetorno: '2027-10-10' }).error, 'La fecha de retorno va hasta un año desde hoy.');
+  assert.equal(v(ctl, { fechaRetorno: '2027-11-05' }).error, 'La fecha de retorno va hasta un año desde hoy.');
+  const trat = REGH({ FECHA_INICIO: '2026-10-20' });
+  assert.deepEqual(v(trat, { fechaInicio: '2027-04-07' }).cambios, { FECHA_INICIO: '2027-04-07' }, '180 días');
+  assert.equal(v(trat, { fechaInicio: '2027-04-08' }).error, 'La fecha de la primera sesión va de hoy a 180 días.');
+});
+
+test('validarEdicionRegistro: la fecha del registro no puede quedar después de su primera sesión', () => {
+  const r = REGH({ FECHA: '2026-10-01', SESIONES: '3' }), ses = [SES(1, '2026-10-03')];
+  const v = c => plano(L.validarEdicionRegistro(r, c, ses, CAT3, '2026-10-09'));
+  assert.deepEqual(v({ fecha: '2026-10-03' }).cambios, { FECHA: '2026-10-03' });
+  assert.equal(v({ fecha: '2026-10-04' }).error, 'La fecha no puede ser posterior a la primera sesión (03/10/2026).');
+});
+
+test('contacto: lo que parece un teléfono debe dar 9 dígitos (con +51 o el 01 de un fijo); un @usuario o un texto con letras vale', () => {
+  const reg = c => L.validarRegistro(base3({ contacto: c, procedimientos: ['AMO'] }), Object.assign({}, CAT3, { procedimientos: ['AMO'] }), '2026-10-09').error;
+  ['999 740 311', '+51 999 740 311', '999-740-322', '(01) 433-2210', '@rosa.quispe', 'rosa quispe 99'].forEach(c => assert.equal(reg(c), '', c));
+  ['99974033', '9997403444', '433-2210', '+51 99974'].forEach(c => assert.equal(reg(c), 'El teléfono debe tener 9 dígitos.', c));
+  const v = c => L.validarEdicionRegistro(REGH(), { contacto: c }, [], CAT3, '2026-10-09').error;
+  assert.equal(v('99974033'), 'El teléfono debe tener 9 dígitos.');
+  assert.equal(v('@rosa'), '');
+});

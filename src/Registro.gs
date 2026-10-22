@@ -49,6 +49,16 @@ function contactoNormal_(v) {
   return /^\+?[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t;
 }
 
+/**
+ * Lo que parece un número (solo dígitos, espacios, +, guiones, puntos y paréntesis) debe dar un teléfono de 9 dígitos con
+ * normTelefono (vale el +51 y el 01 de un fijo de Lima). Un texto con @ o con letras es un usuario y vale. '' si vale.
+ * Index.html (telefonoMal) dice lo mismo antes de enviar.
+ */
+function telefonoMal_(v) {
+  var t = textoLimpio_(v);
+  return /^\+?[\d\s().\-]+$/.test(t) && normTelefono(t).length !== 9 ? 'El teléfono debe tener 9 dígitos.' : '';
+}
+
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres alfanuméricos. */
 function documentoValido(dni) {
   var d = normTexto(dni).replace(/[\s.\-]/g, '');
@@ -85,6 +95,7 @@ function validarRegistro(p, catalogos, hoy) {
   if (!nombre) return no('Falta el nombre del paciente.');
   var contacto = contactoNormal_(p.contacto);
   if (!contacto) return no('Falta el teléfono o usuario.');
+  if (telefonoMal_(p.contacto)) return no(telefonoMal_(p.contacto));
   var fecha = fechaIso(p.fecha);
   if (!fecha) return no('Falta la fecha.');
   if (fecha > hoy) return no('La fecha no puede ser futura.');
@@ -96,7 +107,7 @@ function validarRegistro(p, catalogos, hoy) {
     var ret = fechaIso(p.fechaRetorno);
     if (!ret) return no('Falta la fecha de retorno a control.');
     if (ret <= hoy) return no('La fecha de retorno debe ser después de hoy.');
-    if (ret > sumarDias(hoy, 365)) return no('La fecha de retorno va hasta un año desde hoy.');
+    if (ret > topeUnAnio_(hoy)) return no('La fecha de retorno va hasta un año desde hoy.');
     return { error: '', filas: [copia_(base0, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: textoLimpio_(p.examenes), FECHA_RETORNO: ret })], sesionHecha: '' };
   }
   var inicio = fechaIso(p.fechaInicio);
@@ -167,13 +178,24 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
     var v = cambios[k], nuevo;
     // Un valor igual al actual no cuenta: se descarta antes de validar nada (el formulario manda todos los campos).
     if (iguales_(col, v, r, catalogos)) continue;
-    if (col === 'FECHA') { nuevo = fechaIso(v); if (!nuevo) return no('Falta la fecha.'); if (nuevo > hoy) return no('La fecha no puede ser futura.'); }
+    if (col === 'FECHA') {
+      nuevo = fechaIso(v);
+      if (!nuevo) return no('Falta la fecha.');
+      if (nuevo > hoy) return no('La fecha no puede ser futura.');
+      // Como al registrar: la primera sesión no puede ser anterior a la fecha del registro.
+      var primera = sesionesDe_(r.ID, sesiones)[0];
+      if (primera && nuevo > fechaIso(primera.FECHA)) return no('La fecha no puede ser posterior a la primera sesión (' + fechaDma_(fechaIso(primera.FECHA)) + ').');
+    }
     else if (col === 'DOCTOR') {
       var doc = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(v); })[0];
       if (!doc) return no('Elija el doctor de la lista.');
       nuevo = doc.doctor;
     } else if (col === 'NOMBRE') { nuevo = textoLimpio_(v).toUpperCase(); if (!nuevo) return no('Falta el nombre del paciente.'); }
-    else if (col === 'CONTACTO') { nuevo = contactoNormal_(v); if (!nuevo) return no('Falta el teléfono o usuario.'); }
+    else if (col === 'CONTACTO') {
+      nuevo = contactoNormal_(v);
+      if (!nuevo) return no('Falta el teléfono o usuario.');
+      if (telefonoMal_(v)) return no(telefonoMal_(v));
+    }
     else if (col === 'DETALLE') {
       if (control) return no('Un control no tiene procedimiento ni tratamiento.');
       nuevo = enLista_(normTexto(r.TIPO) === 'HIERRO' ? catalogos.tratamientos : catalogos.procedimientos, v);
@@ -196,6 +218,7 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
     else if (col === 'FECHA_RETORNO') {
       if (!control) return no('Solo un control tiene fecha de retorno.');
       nuevo = fechaIso(v); if (!nuevo || nuevo <= hoy) return no('La fecha de retorno debe ser después de hoy.');
+      if (nuevo > topeUnAnio_(hoy)) return no('La fecha de retorno va hasta un año desde hoy.');
     }
     if (String(nuevo) === String(r[col] == null ? '' : r[col])) continue;
     out[col] = nuevo;
@@ -294,27 +317,57 @@ function sesionLigada(s) {
   return m ? m[1] : '';
 }
 
-/** Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. */
-function validarAnulacionSesion(id, sesiones) {
+/**
+ * Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. Con `registros`, tampoco la de
+ * un registro anulado: ya no está en ninguna lista, y sus sesiones hechas siguen contando en la meta del día en que se hicieron.
+ */
+function validarAnulacionSesion(id, sesiones, registros) {
   var s = (sesiones || []).filter(function (x) { return x.ID === id; })[0];
   if (!s) return { error: 'No encontré la sesión ' + id + '.', sesion: null };
   if (anulado_(s)) return { error: 'La sesión ' + id + ' ya estaba anulada.', sesion: null };
+  var r = (registros || []).filter(function (x) { return x.ID === s.ID_REGISTRO; })[0];
+  if (r && anulado_(r)) return { error: 'El registro ' + r.ID + ' está anulado: sus sesiones ya no se anulan.', sesion: null };
   var propias = sesionesDe_(s.ID_REGISTRO, sesiones);
   if (propias[propias.length - 1].ID !== id) return { error: 'Solo se puede anular la última sesión del tratamiento.', sesion: null };
   return { error: '', sesion: s };
 }
 
+/**
+ * La agenda viva de un registro, que se anula con él (anularRegistro): los «Agendó cita» ligados a sus sesiones (la próxima
+ * sesión agendada al marcar una) y los que aún no pasaron (FECHA_PROXIMA de hoy en adelante). Los ya pasados son historia.
+ */
+function agendaVivaDeRegistro(id, seguimientos, hoy) {
+  return (seguimientos || []).filter(function (g) {
+    if (anulado_(g) || textoLimpio_(g.REFERENCIA) !== id || normTexto(g.RESULTADO) !== 'AGENDO CITA') return false;
+    return !!sesionLigada(g) || fechaIso(g.FECHA_PROXIMA) >= hoy;
+  });
+}
+
 /* ---------- Filas de la bandeja ---------- */
 
 /**
- * Especialidades en que atiende el médico SOFDOC `medico`, según las citas: { 'HEMATOLOGIA': 1 }.
- * Vacío si no aparece en ninguna (entonces cualquier especialidad vale).
+ * Especialidades en que atiende el médico SOFDOC `medico`, según las citas: { 'HEMATOLOGIA': 'HEMATOLOGÍA' } (clave normalizada,
+ * valor tal como viene en las citas). Vacío si no aparece en ninguna (entonces cualquier especialidad vale).
  */
 function especialidadesDeMedico_(medico, citas) {
   var out = {}, m = normTexto(medico);
   if (!m) return out;
-  (citas || []).forEach(function (c) { if (normTexto(c.MEDICO) === m && c.ESPECIALIDAD) out[normTexto(c.ESPECIALIDAD)] = 1; });
+  (citas || []).forEach(function (c) { if (normTexto(c.MEDICO) === m && c.ESPECIALIDAD) out[normTexto(c.ESPECIALIDAD)] = c.ESPECIALIDAD; });
   return out;
+}
+
+/**
+ * La serie de reevaluación a la que se une un registro (Etapa 2, §3.1): la especialidad de su doctor en las citas (si el
+ * paciente tiene consultas en varias de ellas, la más reciente); si no se sabe, la de la última consulta del paciente hasta
+ * `hasta` (el fin del tratamiento): una consulta posterior en otra especialidad no le cambia la serie.
+ */
+function especialidadDelRegistro_(espDoc, realizadas, hasta) {
+  var delDoc = (realizadas || []).filter(function (x) { return espDoc[normTexto(x.ESPECIALIDAD)]; }).slice(-1)[0];
+  if (delDoc) return delDoc.ESPECIALIDAD;
+  var claves = Object.keys(espDoc);
+  if (claves.length) return espDoc[claves.sort()[0]];
+  var ultima = (hasta && ultimaAntesDe_(realizadas, hasta)) || (realizadas || [])[(realizadas || []).length - 1];
+  return ultima ? ultima.ESPECIALIDAD : '';
 }
 
 function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; }
@@ -355,18 +408,22 @@ function pendientesRegistro(d) {
     if (!telefonos.length && tel.length === 9 && !(marcaTel && !(fechaIso(r.FECHA) > marcaTel))) telefonos = [tel];
     var mapaTel = {};
     mapaTel[dni] = telefonos;
-    var sc = sinContacto_(dni, marcas, mapaTel, usuario), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '', falta = '';
+    var sc = sinContacto_(dni, marcas, mapaTel, usuario || (d.usuarios || {})[dni]), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '', falta = '';
     var agenda = c.agenda;
     // En un tratamiento en curso, la cita que se agenda es su próxima sesión: «Sesión k+1 el …».
     if (agenda && enCurso && agenda.tipo === 'CITA') agenda = { tipo: 'SESION', fecha: agenda.fecha, intento: agenda.intento };
     var dias = Math.max(0, diasEntre(desde, hoy)), espera = enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion;
     // La consulta realizada que cierra el control (después de la fecha del registro, en la especialidad de su doctor
     // si se sabe) o la reevaluación (después de la última sesión).
-    var espDoc = control ? especialidadesDeMedico_(medicoDeRegistro(r, d.catalogos || {}), d.citas) : {};
+    // Un tratamiento completo se reevalúa en la serie de su doctor (especialidadDelRegistro_): solo una consulta de ESA
+    // especialidad después de la última sesión es «Volvió».
+    var espDoc = especialidadesDeMedico_(medicoDeRegistro(r, d.catalogos || {}), d.citas), espSerie = especialidadDelRegistro_(espDoc, realizadas, e.ultima || fechaIso(r.FECHA));
     var vuelta = control ? realizadas.filter(function (x) {
       return x.FECHA > fechaIso(r.FECHA) && (!Object.keys(espDoc).length || espDoc[normTexto(x.ESPECIALIDAD)]);
     })[0]
-      : e.estado === 'COMPLETO' ? realizadas.filter(function (x) { return x.FECHA > e.ultima; })[0] : null;
+      : e.estado === 'COMPLETO' ? realizadas.filter(function (x) {
+        return x.FECHA > e.ultima && (!espSerie || normTexto(x.ESPECIALIDAD) === normTexto(espSerie));
+      })[0] : null;
     if (muertos[dni]) estado = 'FALLECIDO';
     else if (cierre) estado = 'CERRADO';
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
@@ -401,7 +458,7 @@ function pendientesRegistro(d) {
       TELEFONOS: telefonos.join(' / '),
       USUARIO: usuario,
       MEDICO_ULTIMO: medicoDeRegistro(r, d.catalogos),
-      ESPECIALIDAD_CONSULTA: ultima ? ultima.ESPECIALIDAD : '',
+      ESPECIALIDAD_CONSULTA: espSerie,
       FECHA_COTIZACION: fechaIso(r.FECHA),
       DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase_(r.DETALLE) : '',
@@ -442,6 +499,13 @@ var DECISIONES = {
   'NUEVA REEVALUACION': { nombre: 'NUEVA REEVALUACION', texto: 'Nueva reevaluación', meses: 0, pideFecha: true, tipo: 'REEVALUACION' }
 };
 function decisionDe_(a) { return DECISIONES[normTexto(a && a.DECISION) || 'ALTA'] || DECISIONES.ALTA; }
+/**
+ * Topes de fecha «hasta un año» y «hasta dos años» desde hoy: por calendario (la misma fecha del año siguiente o de dentro de
+ * dos años, con sumarMeses_, como las altas), no 365 ni 730 días. Index.html (topeUnAnio, topeDosAnios) y el DEMO, igual.
+ */
+function topeUnAnio_(hoy) { return sumarMeses_(hoy, 12); }
+function topeDosAnios_(hoy) { return sumarMeses_(hoy, 24); }
+
 /** 'yyyy-mm-dd' + n meses; el día 31 de un mes corto pasa al último día de ese mes. */
 function sumarMeses_(iso, n) {
   var y = Number(iso.slice(0, 4)), m = Number(iso.slice(5, 7)) - 1 + n, d = Number(iso.slice(8, 10));
@@ -475,7 +539,7 @@ function validarAlta(p, catalogos, citas, vigentes, hoy) {
     retorno = fechaIso(p.fechaRetorno);
     if (!retorno) return no('Falta la fecha de retorno.');
     if (retorno <= hoy) return no('La fecha de retorno debe ser después de hoy.');
-    if (retorno > sumarDias(hoy, 730)) return no('La fecha de retorno va hasta dos años desde hoy.');
+    if (retorno > topeDosAnios_(hoy)) return no('La fecha de retorno va hasta dos años desde hoy.');
   }
   if ((vigentes || {})[k]) return no('Ese paciente ya tiene un alta vigente en ' + serie.especialidad + '.');
   return { error: '', alta: { FECHA: fecha, DNI: dni, ESPECIALIDAD: serie.especialidad, DOCTOR: doctor.doctor, REGISTRADO_POR: quien,
@@ -612,6 +676,20 @@ function otrosContactos(registros, dni) {
       vistos[c] = 1;
       return true;
     });
+}
+
+/**
+ * { dni: contacto } con el contacto de Registro que no es teléfono (otrosContactos), del registro sin anular más reciente.
+ * armarPacientes, pendientesIndicacion y pendientesRegistro lo cuentan como otro contacto ante un «Número equivocado».
+ */
+function usuariosPorDni(registros) {
+  var out = {}, cuando = {};
+  (registros || []).forEach(function (r) {
+    var dni = normDni(r.DNI), c = textoLimpio_(r.CONTACTO), k = (fechaIso(r.FECHA) || '') + ' ' + String(r.FECHA_HORA || '');
+    if (!dni || anulado_(r) || !c || normTelefono(c).length === 9) return;
+    if (!(dni in cuando) || k > cuando[dni]) { cuando[dni] = k; out[dni] = c; }
+  });
+  return out;
 }
 
 /** Líneas para «Verificar»: lo que la pestaña Registro necesita de CATALOGOS. */

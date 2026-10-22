@@ -47,8 +47,19 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
   por fecha, nombre, tipo y detalle). Repetirlo no duplica. Las que quedan SIN CANDIDATO reciben su DNI a mano en
   Indicadores → «Procedimientos sin paciente» (`asignarDniIndicacion`, solo DNI que ya estén en SOFDOC o Registro).
 - El buscador de Pacientes (`buscar` → `buscarEnPacientes`) pide todas las palabras en cualquier orden, o parte del
-  DNI, y mira citas, Registro e `INDICACIONES`.
-- Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión.
+  DNI, y mira citas, Registro e `INDICACIONES`. Los buscadores comparan con `normBusqueda` (servidor, `Index.html` y DEMO):
+  sin tildes, apóstrofos ni puntos, y el guion separa palabras («ohiggins» encuentra a «Ñahui-O'Higgins»).
+- **Documento**: el campo DNI de Registro ya no corta a 12 caracteres en silencio: con más de 12 avisa («El documento tiene 13
+  caracteres: el carné de extranjería va de 9 a 12.») y no deja registrar (`dniLargo`).
+- **Teléfono**: lo que parece un número (solo dígitos, espacios, +, guiones, puntos y paréntesis) debe dar 9 dígitos con
+  `normTelefono` (vale el +51 y el 01 de un fijo de Lima); si no, «El teléfono debe tener 9 dígitos.» y no se guarda
+  (`telefonoMal_` al registrar y al editar; `telefonoMal` en la pantalla y el DEMO). Un texto con @ o con letras es un usuario.
+- El DNI se guarda y se compara con `normDni` (sin puntos ni guiones, y sin ceros a la izquierda si es solo dígitos), también
+  en el buscador del tablero (`normDni` de `Index.html`) y en el DEMO: «09997401» y «9997401» encuentran al mismo paciente.
+- Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión, y nunca la de un
+  registro anulado. Al anular un registro se anula **en el mismo candado** su agenda viva (`agendaVivaDeRegistro`: la próxima
+  sesión agendada al marcar una y un «Agendó cita» que aún no pasó); sus sesiones hechas no se tocan y siguen contando en la
+  meta del día en que se hicieron.
 - El estado de un registro (cotizado, en curso, completo, anulado) se calcula con `estadoRegistro`; no se guarda.
 - `SEGUIMIENTOS` se escribe por posición: una columna nueva solo se agrega al final (`encabezadoAmpliable`).
 - Sin conexión a WhatsApp: la app muestra los datos y se marca «Seguimiento hecho».
@@ -66,7 +77,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - Las filas antiguas, sin `RESULTADO`, se leen con `resultadoDe`; no se reescriben.
 - Los resultados solo se aceptan sobre tarjetas abiertas (Por contactar, Agendado o En tratamiento): un resultado tardío no reabre un seguimiento ya cerrado; para corregir un cierre, primero se anula.
 - Solo «No contestó» cuenta para el cierre automático (`MAX_SEGUIMIENTOS` seguidos, más la espera).
-- «Número equivocado» marca el número y no cierra mientras quede otro contacto.
+- «Número equivocado» marca el número y no cierra mientras quede otro contacto: otro teléfono o el contacto de Registro que no
+  es teléfono («@usuario», `usuariosPorDni`), que llega a todas las tarjetas del DNI (también a la reevaluación) como `USUARIO`.
 - «Falleció» vale para todo el paciente.
 - Las filas anuladas (`ANULADO = SI`) no cuentan en ninguna cifra; `datos_` las filtra.
 - Tras publicar, usar «Preparar hojas», que agrega 5 columnas a `SEGUIMIENTOS` y los parámetros que falten en `REGLAS`
@@ -78,14 +90,24 @@ El diseño está en `docs/diseno/handoff-etapa1` (las maquetas mandan en lo visu
 `docs/superpowers/specs/2026-10-06-rediseno-frontend-design.md`. Todo vive en `src/Index.html`.
 
 - **Menú lateral** (en el celular, barra superior y barra inferior): Tablero, Registro, Pacientes, Indicadores y Enfermería,
-  más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y `seg.tipo`.
+  más «¿Quién es usted?» y el modo claro u oscuro. Las preferencias se guardan en `seg.usuario`, `seg.modo` y, del tablero, `seg.tipo`, `seg.mes`, `seg.medico` y `seg.esp`
+  (un médico, especialidad o mes recordado que ya no está en la lista se ignora; «Quitar filtros» los borra).
 - **Tablero:** el embudo de seis fases en franjas (ver «Etapa 3») y el panel «¿Qué pasó?» de cada
-  tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`. Se puede arrastrar una tarjeta a otra columna: abre el
+  tarjeta. La meta del día sale de `META_DIARIA_SEGUIMIENTOS`.
+  Cuenta (`hechosHoyPor_`) lo que registró hoy **cada usuario del catálogo, sea quien sea, incluida la enfermera**: resultados
+  de «¿Qué pasó?», sesiones marcadas y decisiones del médico, a nombre de quien estaba elegido al guardar. Los contactos de
+  Enfermería (`ENFERMERIA`) no cuentan. Lo anulado deja de contar; una sesión hecha de un registro anulado sigue contando. Se puede arrastrar una tarjeta a otra columna: abre el
   paso con confirmación, nunca guarda solo.
 - **Registro:** indicaciones (procedimientos y tratamientos) y altas médicas, con «Registrados hoy».
-- **Pacientes:** buscador y ficha completa, con anulaciones, Editar y «Decisión del médico…» (antes «Dar de alta…»).
+- **Pacientes:** buscador y ficha completa, con anulaciones, Editar y «Decisión del médico…» (antes «Dar de alta…»). El buscador
+  muestra 6 resultados; si hay más lo dice («Se muestran 6 de 8: escriba más para afinar.»; con 20, el tope del servidor,
+  «6 de 20 o más»).
 - **Indicadores:** siete pestañas para el director y el botón «Resumen para imprimir» (dos páginas A4). Un Ctrl+P sin
   ese botón imprime la pantalla tal como se ve.
+- Los nombres se guardan en MAYÚSCULAS y se muestran con `nombreBonito` (mayúscula inicial, también tras guion y apóstrofo:
+  «Ñahui-O'Higgins»; DE, DEL e Y en minúscula).
+- Si `bootstrap` falla al abrir, cada pantalla dice «No se pudo iniciar: …» con el botón **«Reintentar»** (`arrancar`), que
+  vuelve a pedirlo sin recargar la página.
 - Lo que se dispara con el teclado no se anima, y con «reducir movimiento» del sistema nada se anima.
 
 **Atajos del tablero.** **H** («hecho») y **D** («descartar») ya no existen: se reemplazan por **1 a 4** y **X** (ver «Etapa 2» y «Etapa 3»).
@@ -128,7 +150,10 @@ En un paso con fecha o motivo, Enter confirma.
   las citas; si no se sabe, cualquiera). Sin teléfonos conocidos del DNI, la tarjeta usa el `CONTACTO` del registro (si no está marcado).
   Un «Por reevaluar» cuya fecha de reevaluar pasó hace más de `CORTE_INDICACIONES_DIAS` queda ANTIGUO y no se muestra (para no
   inundar el tablero al publicar). La tarjeta de un registro por reevaluar, esté en Por contactar o ya en Agendado, tapa la
-  reevaluación del mismo paciente y especialidad.
+  reevaluación del mismo paciente y especialidad. Esa especialidad (`ESPECIALIDAD_CONSULTA`, `especialidadDelRegistro_`) es la
+  que **su doctor** tiene en las citas (si el paciente tiene consultas en varias de ellas, la más reciente); si no se sabe, la
+  de la última consulta del paciente hasta el fin del tratamiento. Solo una consulta realizada **de esa especialidad** después
+  de la última sesión lo da por «Volvió».
 - **Registro tiene tres pestañas:** Indicación, Control + laboratorio y Decisión del médico. «Registrados» se ve por periodo (hoy o cada
   uno de los últimos 6 meses, `getRegistros`) y trae Anular y **Editar**.
 - **Las cuatro decisiones del médico** (`ALTAS.DECISION`, `DECISIONES` en `Registro.gs`): `ALTA` (definitiva); `ALTA 6 MESES` y
@@ -143,6 +168,12 @@ En un paso con fecha o motivo, Enter confirma.
   **No** se puede cambiar el DNI (se anula y se registra de nuevo), ni las sesiones por debajo de las ya hechas, ni el tipo; un control no tiene
   detalle ni sesiones. Solo viaja lo que cambió. Cada cambio escribe una línea en `BITACORA` (`EDITAR REGISTRO`, con el valor anterior y el nuevo) y
   sella `EDITADO`. Las decisiones del médico no se editan: se anulan.
+  Editar aplica **los mismos topes de fecha que Registro** (fecha no futura ni posterior a la primera sesión, primera sesión de
+  hoy a 180 días, retorno de un control hasta un año); el formulario deshabilita «Guardar cambios» y dice por qué
+  (`fechaMalEdicion`, como `fechaMalRegistro`).
+- **«Hasta un año» y «hasta dos años» son por calendario**: la misma fecha del año siguiente o de dentro de dos años, sumando
+  meses como las altas (`topeUnAnio_` / `topeDosAnios_` con `sumarMeses_`; `topeUnAnio` / `topeDosAnios` en `Index.html` y el
+  DEMO), no 365 ni 730 días. Los plazos en días (180 de la primera sesión, 30 del pago) siguen en días.
 - **Tablero:** filtro por mes (`#fmes`, se recuerda en `seg.mes`) además del de tipo, médico y especialidad.
 - **Publicar la Etapa 2:** «Preparar hojas» **antes** de usar las pantallas nuevas, y luego «Verificar»: sin las columnas nuevas,
   `guardarRegistro`, `editarRegistro` y `darDeAlta` se niegan a escribir (`REGISTROS` y `ALTAS` se escriben por posición). Después,

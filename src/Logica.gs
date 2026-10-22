@@ -506,15 +506,24 @@ function buscarFilaParaAsignar(encabezado, filas, id, dni, conocidos) {
  * escrito. Mira las citas (la más reciente primero), luego Registro y luego
  * el historial de indicaciones: quien vino solo por hierro también aparece.
  */
+/**
+ * Texto para comparar en un buscador: normTexto sin apóstrofos ni puntos, y con el guion como separador de palabras
+ * («Ñahui-O'Higgins» → 'NAHUI OHIGGINS'): «ohiggins», «o'higgins» y «nahui-ohiggins» lo encuentran. Index.html: normBusqueda.
+ */
+function normBusqueda(v) {
+  return normTexto(String(v == null ? '' : v).replace(/['\u2018\u2019`\u00B4.]/g, '').replace(/-/g, ' '));
+}
+
 function buscarEnPacientes(texto, f) {
-  var q = normTexto(texto);
-  if (q.replace(/\s/g, '').length < 3) return [];
-  var palabras = q.split(' '), dni = normDni(texto), conDigitos = /\d/.test(dni);
+  var q = normBusqueda(texto);
+  if (normTexto(texto).replace(/\s/g, '').length < 3) return [];
+  var palabras = q.split(' ').filter(Boolean), dni = normDni(texto), conDigitos = /\d/.test(dni);
+  if (!palabras.length) return [];   // solo signos («'''»): nada que buscar
   var vistos = {}, out = [];
   function ver(d, nombre) {
     d = normDni(d);
     if (!d || vistos[d] || out.length >= 20) return;
-    var n = normTexto(nombre);
+    var n = normBusqueda(nombre);
     if ((conDigitos && d.indexOf(dni) >= 0) || palabras.every(function (w) { return n.indexOf(w) >= 0; })) {
       vistos[d] = 1;
       out.push({ DNI: d, NOMBRE: textoLimpio_(nombre) });
@@ -685,7 +694,11 @@ function segsPorSerie(seguimientos) {
   return out;
 }
 
-function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas, retornos) {
+/**
+ * `usuarios` (opcional, usuariosPorDni): el contacto de Registro que no es teléfono (p. ej. «@usuario»), por DNI. Cuenta como
+ * otro contacto: un «Número equivocado» no cierra mientras quede.
+ */
+function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas, retornos, usuarios) {
   var series = armarSeries(citas);
   var tel = telefonosPorDni(indicaciones, contactos, seguimientos), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
   var marcas = marcasTelefono(seguimientos), muertos = fallecidos(seguimientos);
@@ -694,7 +707,7 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
     var s = series[k];
     if (!s.realizadas.length) return;
     var e = estadoDeSerie(s, segs[k], reglas, hoy, (altas || {})[k],
-      { fallecido: !!muertos[s.dni], sinContacto: sinContacto_(s.dni, marcas, tel, ''), retorno: (retornos || {})[k] });
+      { fallecido: !!muertos[s.dni], sinContacto: sinContacto_(s.dni, marcas, tel, (usuarios || {})[s.dni]), retorno: (retornos || {})[k] });
     out.push({
       DNI: s.dni,
       ESPECIALIDAD: s.especialidad,
@@ -719,7 +732,8 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
       INTENTO: e.agenda ? e.agenda.intento : 0,
       RETORNO_TIPO: ((retornos || {})[k] || {}).tipo || '',
       FECHA_RETORNO: ((retornos || {})[k] || {}).fecha || '',
-      FECHA_PAGO: e.pago || ''
+      FECHA_PAGO: e.pago || '',
+      USUARIO: (usuarios || {})[s.dni] || ''   // fuera de la hoja PACIENTES, como el retorno y el pago
     });
   });
   return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });
@@ -732,7 +746,7 @@ var TIPOS_INDICACION = { HIERRO: 1, PROCEDIMIENTO: 1 };
  * una fila por DNI y tipo, estén o no al día con su reevaluación. En
  * SEGUIMIENTOS se registran con ESPECIALIDAD = HIERRO o PROCEDIMIENTO.
  */
-function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, contactos) {
+function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, contactos, usuarios) {
   var aceptado = {}, grupos = {};
   (indicaciones || []).forEach(function (i) {
     if (!i.DNI || i.ESTADO !== 'ACEPTÓ') return;
@@ -765,7 +779,7 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
       .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; });
     var c = leerCiclo(lista, reglas, hoy);
     var dias = Math.max(0, diasEntre(g.fecha, hoy)), estado = 'PENDIENTE', cierre = c.cierre;
-    var sc = sinContacto_(g.dni, marcas, tel, '');
+    var sc = sinContacto_(g.dni, marcas, tel, (usuarios || {})[g.dni]);
     if (muertos[g.dni]) estado = 'FALLECIDO';
     else if (cierre) estado = 'CERRADO';
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
@@ -779,6 +793,7 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
       TIPO_SEGUIMIENTO: g.tipo,
       NOMBRE: ultima ? ultima.NOMBRE : g.nombre,
       TELEFONOS: (tel[g.dni] || []).join(' / '),
+      USUARIO: (usuarios || {})[g.dni] || '',
       MEDICO_ULTIMO: g.solicitante || (previa ? previa.MEDICO : ''),
       ESPECIALIDAD_CONSULTA: previa ? previa.ESPECIALIDAD : '',
       FECHA_COTIZACION: g.fecha,

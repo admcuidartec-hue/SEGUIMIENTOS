@@ -354,6 +354,8 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .edita{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px;margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface);animation:subir .2s var(--ease-out)}
 .edita .campo.ancho,.edita .botones{grid-column:1/-1}
 .edita .botones{display:flex;gap:8px;flex-wrap:wrap}
+.edita .aviso-edicion{grid-column:1/-1;margin:0;color:var(--warn);font-size:13px}
+.edita .aviso-edicion:empty{display:none}
 .decs{display:flex;flex-direction:column;gap:8px}
 .dec{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);cursor:pointer}
 .dec:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
@@ -868,13 +870,17 @@ const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 /** Sin tildes y en MAYÚSCULAS, como normTexto del servidor. */
 const norm = s => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+/** Como normBusqueda del servidor: sin apóstrofos ni puntos, y el guion separa palabras («Ñahui-O'Higgins» → 'NAHUI OHIGGINS'). */
+const normBusqueda = s => norm(String(s == null ? '' : s).replace(/['\u2018\u2019`\u00B4.]/g, '').replace(/-/g, ' ')).replace(/\s+/g, ' ');
+/** Como normDni del servidor: sin espacios, puntos ni guiones, y un DNI de solo dígitos sin ceros a la izquierda. */
+const normDni = v => { let s = norm(v).replace(/[\s.\-]/g, ''); if (/^\d+$/.test(s)) s = s.replace(/^0+/, ''); return s; };
 /** prefers-reduced-motion, al día: si la persona lo cambia con la app abierta, se respeta sin recargar. */
 const mqReducido = matchMedia('(prefers-reduced-motion: reduce)');
 let reducido = mqReducido.matches;
 const marcarVT = () => document.documentElement.classList.toggle('con-vt', !!document.startViewTransition && !reducido);
 marcarVT();
 mqReducido.addEventListener('change', e => { reducido = e.matches; marcarVT(); });
-/** Preferencias del navegador (seg.usuario, seg.modo, seg.tipo). Sin almacenamiento no pasa nada. */
+/** Preferencias del navegador (seg.usuario, seg.modo, seg.tipo, seg.mes, seg.medico, seg.esp). Sin almacenamiento no pasa nada. */
 const LS = {
   get: k => { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
@@ -935,10 +941,11 @@ const S = {
 
 /* ============ Adaptadores (MAPEO-SERVIDOR.md §0) ============ */
 const PARTICULAS = { DE: 1, DEL: 1, Y: 1 };
-/** 'ROSA ELENA QUISPE HUAMÁN' -> 'Rosa Elena Quispe Huamán'. Solo para mostrar. */
+/** 'ROSA ELENA QUISPE HUAMÁN' -> 'Rosa Elena Quispe Huamán'; tras guion o apóstrofo, también: 'Ñahui-O'Higgins'. Solo para mostrar. */
 function nombreBonito(txt) {
+  const mayus = w => w.replace(/(^|[-'\u2019])(\S)/g, (_, sep, c) => sep + c.toUpperCase());
   return String(txt || '').trim().toLowerCase().split(/\s+/).filter(Boolean)
-    .map((w, i) => i && PARTICULAS[norm(w)] ? w : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    .map((w, i) => i && PARTICULAS[norm(w)] ? w : mayus(w)).join(' ');
 }
 /** '987654321' -> '987 654 321'. Se muestra con espacios y se envía sin ellos. */
 function telBonito(tel) {
@@ -1164,7 +1171,7 @@ function adaptarTarjeta(t) {
   const n = x => Number(x) || 0;
   const tipo = t.TIPO_SEGUIMIENTO || 'REEVALUACION', reev = tipo === 'REEVALUACION', col = COLUMNAS[t.COLUMNA] || 0;
   return {
-    id: String(t.CLAVE), n: nombreBonito(t.NOMBRE), dni: String(t.DNI || ''),
+    id: String(t.CLAVE), n: nombreBonito(t.NOMBRE), dni: normDni(t.DNI),
     tipo, t: TIPO_CORTO[tipo] || 'reev', col,
     // En hierro y procedimiento ESPECIALIDAD vale 'HIERRO' o 'PROCEDIMIENTO': la de la consulta es otra columna.
     esp: String((reev ? t.ESPECIALIDAD : t.ESPECIALIDAD_CONSULTA) || ''),
@@ -1252,13 +1259,13 @@ function opcionesMes() {
 
 /** Filtros de la pantalla. conTipo = false da la base de los números del segmentado. */
 function filtrados(conTipo) {
-  const palabras = norm(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '');
+  const palabras = normBusqueda(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '').replace(/^0+/, '');   // como normDni: el DNI se guarda sin ceros a la izquierda
   return S.pacientes.filter(p => !p.oculto
     && (!S.medico || norm(p.med) === norm(S.medico))
     && (!S.esp || norm(p.esp) === norm(S.esp))
     && (!S.sinTel || p.sinContacto)
     && (!S.mes || p.raw.MES === S.mes)
-    && (!palabras.length || (digitos && p.dni.includes(digitos)) || palabras.every(w => norm(p.n).includes(w)))
+    && (!S.q.trim() || (digitos && p.dni.includes(digitos)) || (palabras.length && palabras.every(w => normBusqueda(p.n).includes(w))))
     && (!conTipo || !S.tipo || p.tipo === S.tipo));
 }
 const hayFiltros = () => !!(S.tipo || S.medico || S.mes || S.esp || S.sinTel || S.q.trim());
@@ -1308,6 +1315,10 @@ function iniciarTablero() {
   const t = LS.get('seg.tipo');
   S.tipo = TIPOS.some(([k]) => k === t) ? t : '';
   S.mes = LS.get('seg.mes');   // se valida contra los meses que hay cuando llega el tablero (pintarTablero)
+  // Médico y especialidad recordados, solo si siguen en la lista; al médico que usa la app, proponerMedico le pone el suyo.
+  const med = LS.get('seg.medico'), esp = LS.get('seg.esp');
+  S.medico = S.boot.medicos.some(m => m.k === med) ? med : '';
+  S.esp = S.boot.especialidades.includes(esp) ? esp : '';
   proponerMedico();
   $('#fmed').innerHTML = '<option value="">Todos los médicos</option>'
     + S.boot.medicos.map(m => `<option value="${esc(m.k)}" title="${esc(m.full)}">${esc(m.short)}</option>`).join('');
@@ -1318,9 +1329,9 @@ function iniciarTablero() {
     const b = e.target.closest('[data-tipo]'); if (!b) return;
     S.tipo = b.dataset.tipo; LS.set('seg.tipo', S.tipo); pintarTablero();
   });
-  $('#fmed').addEventListener('change', e => { S.medico = e.target.value; pintarTablero(); });
+  $('#fmed').addEventListener('change', e => { S.medico = e.target.value; LS.set('seg.medico', S.medico); pintarTablero(); });
   $('#fmes').addEventListener('change', e => { S.mes = e.target.value; LS.set('seg.mes', S.mes); pintarTablero(); });
-  $('#fesp').addEventListener('change', e => { S.esp = e.target.value; pintarTablero(); });
+  $('#fesp').addEventListener('change', e => { S.esp = e.target.value; LS.set('seg.esp', S.esp); pintarTablero(); });
   $('#fsin').addEventListener('click', () => { S.sinTel = !S.sinTel; pintarTablero(); });
   $('#q').addEventListener('input', e => { S.q = e.target.value; pintarTablero(); });
   $('#cerrar-cerrados').addEventListener('click', () => { verCerrados(false); const b = $('#ver-cerrados'); if (b) b.focus(); });
@@ -1340,7 +1351,7 @@ function iniciarTablero() {
     }
     if (e.target.closest('.js-quitar')) {
       Object.assign(S, { tipo: '', medico: '', mes: '', esp: '', sinTel: false, q: '' });
-      LS.set('seg.tipo', ''); LS.set('seg.mes', '');
+      LS.set('seg.tipo', ''); LS.set('seg.mes', ''); LS.set('seg.medico', ''); LS.set('seg.esp', '');
       $('#q').value = '';
       pintarTablero();
     }
@@ -2621,9 +2632,15 @@ const RG = {
   recientes: {}                  // ID -> temporizador: la fila recién guardada, editada o anulada se tiñe 3 s
 };
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres (documentoValido del servidor). Nunca borra letras. */
-const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '').slice(0, 12);
+const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '');
+/** Un documento de más de 12 caracteres no se corta en silencio: se avisa (y no se registra). '' si no pasa de 12. */
+const dniLargo = v => { const n = dniLimpio(v).length; return n > 12 ? `El documento tiene ${n} caracteres: el carné de extranjería va de 9 a 12.` : ''; };
 const documentoOk = v => { const d = dniLimpio(v); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
 /** Un teléfono se envía sin espacios; un usuario (@…) tal cual. */
+/** Como normTelefono del servidor: solo los dígitos, sin el 51 de un +51 (11 dígitos); '' si quedan menos de 7. */
+const normTel = v => { let d = String(v == null ? '' : v).replace(/\D/g, ''); if (d.length === 11 && d.indexOf('51') === 0) d = d.slice(2); return d.length >= 7 ? d : ''; };
+/** Como telefonoMal_ del servidor: lo que parece un número debe dar 9 dígitos; un @usuario o un texto con letras vale. */
+const telefonoMal = v => { const t = String(v == null ? '' : v).trim(); return /^\+?[\d\s().\-]+$/.test(t) && normTel(t).length !== 9 ? 'El teléfono debe tener 9 dígitos.' : ''; };
 const contactoEnvio = v => { const t = String(v || '').trim(); return /^\+?[\d\s().\-]+$/.test(t) ? t.replace(/[\s().\-]/g, '') : t; };
 /** La clave es normTexto del tratamiento: sin tildes, en mayúsculas y con los espacios (y saltos de línea) juntados. */
 const marcasDe = t => (S.boot && S.boot.marcas && S.boot.marcas[norm(t).replace(/\s+/g, ' ')]) || [];
@@ -2657,6 +2674,9 @@ function sumarMesesIso(iso, n) {
   const ultimo = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
   return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(Math.min(d, ultimo)).padStart(2, '0');
 }
+/** «Hasta un año / dos años desde hoy», por calendario (topeUnAnio_ y topeDosAnios_ del servidor), no 365 ni 730 días. */
+const topeUnAnio = hoy => sumarMesesIso(hoy, 12);
+const topeDosAnios = hoy => sumarMesesIso(hoy, 24);
 /** Una regla de REGLAS; 0 vale (AVISO_ALTA_CONTROL_DIAS admite 0). Solo si falta o no es un número se usa `def`. */
 const reglaRG = (k, def) => {
   const v = S.reglas && S.reglas[k], n = Number(v);
@@ -2693,7 +2713,11 @@ function iniciarRegistro() {
   const L = $('#rlista');
   L.addEventListener('click', clicLista);
   L.addEventListener('input', e => {
-    if (e.target.matches('[data-campo]')) { RG.borrador[e.target.dataset.campo] = e.target.value; return; }
+    if (e.target.matches('[data-campo]')) {
+      RG.borrador[e.target.dataset.campo] = e.target.value;
+      refrescarEdicion(filaEl(RG.editando), (RG.lista || []).find(y => y.ID === RG.editando), RG.borrador, RG.guardandoEdicion);
+      return;
+    }
     if (!e.target.matches('.anula input')) return;
     RG.motivo = e.target.value;
     const ok = e.target.parentNode.querySelector('[data-confirmar-anular]');
@@ -2756,7 +2780,7 @@ function pintarFormRegistro(anim) {
   else if (RG.modo === 'control') f.innerHTML = paciente + `
     <fieldset><legend><span class="k">3</span>Control + laboratorio</legend>
       <label class="campo">Exámenes indicados <small>opcional</small><textarea id="rexamenes" rows="2" placeholder="Hemograma, ferritina…"></textarea></label>
-      <label class="campo">Fecha de retorno<input id="rretorno" type="date" value="${esc(masDias(S.hoy, reglaRG('controlLab', 15)))}" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 365))}"></label></fieldset>
+      <label class="campo">Fecha de retorno<input id="rretorno" type="date" value="${esc(masDias(S.hoy, reglaRG('controlLab', 15)))}" min="${esc(masDias(S.hoy, 1))}" max="${esc(topeUnAnio(S.hoy))}"></label></fieldset>
     <div id="rdup"></div>${barra('Registrar control')}`;
   else f.innerHTML = `
     <fieldset><legend><span class="k">1</span>Paciente</legend>${dni('adni')}<div class="avisos-dni" id="acon" aria-live="polite"></div></fieldset>
@@ -2780,7 +2804,7 @@ function pintarDecision() {
   if (!box) return;
   const d = decisionUi(RG.dec), fecha = ($('#afec') || {}).value || S.hoy;
   if (d.pideFecha) {
-    if (!$('#aretorno')) box.innerHTML = `<label class="campo">Fecha de retorno<input id="aretorno" type="date" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 730))}"></label>`;
+    if (!$('#aretorno')) box.innerHTML = `<label class="campo">Fecha de retorno<input id="aretorno" type="date" min="${esc(masDias(S.hoy, 1))}" max="${esc(topeDosAnios(S.hoy))}"></label>`;
     return;
   }
   box.innerHTML = notaDecision(d, fecha);
@@ -2959,7 +2983,7 @@ function faltanRegistro() {
   return f;
 }
 /**
- * Las fechas que el servidor rechaza (validarRegistro y validarAlta de Registro.gs), con sus mismos mensajes; '' si valen.
+ * Las fechas (y el teléfono) que el servidor rechaza (validarRegistro y validarAlta de Registro.gs), con sus mismos mensajes; '' si valen.
  * Se mira cuando ya no falta nada: el botón se deshabilita y la barra dice por qué, en vez de esperar al error del servidor.
  */
 function fechaMalRegistro() {
@@ -2968,15 +2992,16 @@ function fechaMalRegistro() {
     const fa = v('#afec'), ret = decisionUi(RG.dec).pideFecha ? v('#aretorno') : '';
     if (fa && fa > hoy) return 'La fecha no puede ser futura.';
     if (ret && ret <= hoy) return 'La fecha de retorno debe ser después de hoy.';
-    if (ret && ret > masDias(hoy, 730)) return 'La fecha de retorno va hasta dos años desde hoy.';
+    if (ret && ret > topeDosAnios(hoy)) return 'La fecha de retorno va hasta dos años desde hoy.';
     return '';
   }
+  if (telefonoMal(v('#rtel'))) return telefonoMal(v('#rtel'));
   const fec = v('#rfec');
   if (fec && fec > hoy) return 'La fecha no puede ser futura.';
   if (RG.modo === 'control') {
     const ret = v('#rretorno');
     if (ret && ret <= hoy) return 'La fecha de retorno debe ser después de hoy.';
-    if (ret && ret > masDias(hoy, 365)) return 'La fecha de retorno va hasta un año desde hoy.';
+    if (ret && ret > topeUnAnio(hoy)) return 'La fecha de retorno va hasta un año desde hoy.';
     return '';
   }
   const ini = v('#rinicio');
@@ -3008,14 +3033,15 @@ function validarRegistro() {
   const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0), d = decisionUi(RG.dec);
   const hecha = RG.modo === 'indicacion' ? primeraSesionHecha() : '';
   const conSesion = hecha ? (n === 1 ? ` con la sesión 1 hecha el ${dm(hecha)}` : `, cada uno con la sesión 1 hecha el ${dm(hecha)}`) : '';
-  const mal = f.length ? '' : fechaMalRegistro();
+  const campoDni = $(esDecision() ? '#adni' : '#rdni'), largo = dniLargo(campoDni ? campoDni.value : '');
+  const mal = largo || (f.length ? '' : fechaMalRegistro());
   b.disabled = f.length > 0 || !!mal || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
-  $('#rfalta').textContent = f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
+  $('#rfalta').textContent = largo || (f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
     : RG.modo === 'indicacion' ? (n === 1 ? `Se creará 1 registro${conSesion}.` : `Se crearán ${n} registros${conSesion}.`)
     : RG.modo === 'control' ? 'Volverá con sus resultados en la fecha de retorno.'
     : d.pideFecha ? (faltaRetorno() ? 'Elija la fecha de retorno.' : 'Lo esperamos en la fecha de retorno.')
-    : d.meses ? 'Cierra el seguimiento hasta su control.' : 'Cierra el seguimiento de esa especialidad.';
+    : d.meses ? 'Cierra el seguimiento hasta su control.' : 'Cierra el seguimiento de esa especialidad.');
 }
 
 /** Botón «Registrar» o Enter. Nunca reenvía con un envío en vuelo ni con la caja de duplicado abierta: ahí decide la asesora. */
@@ -3169,9 +3195,33 @@ function formEdicion(x, ed) {
     sesiones: () => campo('sesiones', 'Sesiones', `<input type="number" data-campo="sesiones" class="mono" min="${Math.max(1, Number(x.HECHAS) || 0)}" max="20" value="${esc(v('sesiones'))}">`),
     fechaInicio: () => fecha('fechaInicio', 'Primera sesión', hoy, masDias(hoy, 180)),
     examenes: () => campo('examenes', 'Exámenes indicados', `<textarea data-campo="examenes" rows="2">${esc(v('examenes'))}</textarea>`, true),
-    fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), masDias(hoy, 365)) };
+    fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), topeUnAnio(hoy)) };
+  const mal = fechaMalEdicion(x, ed.borrador);
   return `<div class="edita">${camposEdicion(x).map(k => html[k]()).join('')}
-    <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${ed.guardando ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
+    <p class="aviso-edicion" role="status">${esc(mal)}</p>
+    <div class="botones"><button type="button" class="btn btn-p" data-guardar-edicion${ed.guardando || mal ? ' disabled' : ''}>Guardar cambios</button><button type="button" class="btn btn-s" data-cancelar-edicion>Cancelar</button></div></div>`;
+}
+/**
+ * Las fechas (y el teléfono) que validarEdicionRegistro rechaza, con sus mismos mensajes y solo en lo que cambia; '' si valen. Como en
+ * Registro (fechaMalRegistro): el botón se deshabilita y el formulario dice por qué, sin esperar al error del servidor.
+ */
+function fechaMalEdicion(x, borrador) {
+  const c = cambiosEdicion(x, borrador || {}), hoy = S.hoy;
+  if ('contacto' in c && telefonoMal(c.contacto)) return telefonoMal(c.contacto);
+  if ('fecha' in c) { if (!c.fecha) return 'Falta la fecha.'; if (c.fecha > hoy) return 'La fecha no puede ser futura.'; }
+  if (c.fechaInicio && (c.fechaInicio < hoy || c.fechaInicio > masDias(hoy, 180))) return 'La fecha de la primera sesión va de hoy a 180 días.';
+  if ('fechaRetorno' in c) {
+    if (!c.fechaRetorno || c.fechaRetorno <= hoy) return 'La fecha de retorno debe ser después de hoy.';
+    if (c.fechaRetorno > topeUnAnio(hoy)) return 'La fecha de retorno va hasta un año desde hoy.';
+  }
+  return '';
+}
+/** Al escribir en el formulario de Editar: el aviso y el botón, sin volver a pintar (no se pierde el foco). */
+function refrescarEdicion(caja, x, borrador, guardando) {
+  if (!caja || !x) return;
+  const mal = fechaMalEdicion(x, borrador), b = caja.querySelector('[data-guardar-edicion]'), p = caja.querySelector('.aviso-edicion');
+  if (b) b.disabled = !!mal || !!guardando;
+  if (p) p.textContent = mal;
 }
 function abrirEdicion(id) {
   if (RG.anulandoEnVuelo || RG.guardandoEdicion) return;
@@ -3205,6 +3255,8 @@ async function guardarEdicion() {
   if (!x || RG.guardandoEdicion) return;
   const cambios = cambiosEdicion(x, RG.borrador);
   if (!Object.keys(cambios).length) { avisar('No hay cambios.'); return; }
+  const mal = fechaMalEdicion(x, RG.borrador);
+  if (mal) { avisar(mal); return; }
   if (!exigirUsuario()) return;
   RG.guardandoEdicion = true;
   const b = $('#rlista [data-guardar-edicion]');
@@ -3403,6 +3455,13 @@ const PA = {
 };
 
 /* ---- Buscador: buscar(texto) desde 3 letras; se muestran los 6 primeros ---- */
+// buscarEnPacientes devuelve hasta 20: con 20 puede haber más, y la lista lo dice.
+const VISIBLES_PACIENTES = 6, TOPE_BUSCAR = 20;
+/** «Se muestran 6 de 8: escriba más para afinar.»; '' si se ven todos. */
+function textoMasResultados(total) {
+  if (total <= VISIBLES_PACIENTES) return '';
+  return `Se muestran ${VISIBLES_PACIENTES} de ${total}${total >= TOPE_BUSCAR ? ' o más' : ''}: escriba más para afinar.`;
+}
 function alEscribir() {
   const q = $('#pq').value;
   PA.q = q;
@@ -3416,7 +3475,8 @@ async function buscarPacientes(q) {
   try { r = await llamar('buscar', q.trim()); } catch (e) { error = e.message; }
   if (PA.q !== q) return;   // ya escribió otra cosa: esta respuesta es vieja
   PA.buscando = false;
-  PA.res = error ? [] : (r || []).slice(0, 6);
+  PA.res = error ? [] : (r || []).slice(0, VISIBLES_PACIENTES);
+  PA.total = error ? 0 : (r || []).length;
   PA.activo = 0;
   pintarLista(error ? 'No se pudo buscar: ' + error : '');
 }
@@ -3430,7 +3490,8 @@ function pintarLista(error) {
     return;
   }
   ul.innerHTML = PA.res.map((r, i) => `<li role="option" id="pres-${i}" aria-selected="${i === PA.activo}">`
-    + `<button type="button" tabindex="-1" data-dni="${esc(r.DNI)}"><span class="n">${esc(nombreBonito(r.NOMBRE))}</span> <span class="mono">DNI ${esc(r.DNI)}</span></button></li>`).join('');
+    + `<button type="button" tabindex="-1" data-dni="${esc(r.DNI)}"><span class="n">${esc(nombreBonito(r.NOMBRE))}</span> <span class="mono">DNI ${esc(r.DNI)}</span></button></li>`).join('')
+    + (textoMasResultados(PA.total) ? `<li class="nada mas" role="presentation">${esc(textoMasResultados(PA.total))}</li>` : '');
   q.setAttribute('aria-activedescendant', 'pres-' + PA.activo);
 }
 function cerrarLista() {
@@ -3568,7 +3629,7 @@ function htmlEsp(e) {
 /** Bajo los radios de la ficha: la fecha de retorno (nueva reevaluación) o cuándo vuelve a «Por contactar» (6 meses, 1 año). */
 function htmlDecisionFicha(a) {
   const d = decisionUi(a.dec);
-  if (d.pideFecha) return `<label class="campo">Fecha de retorno<input id="falta-ret" type="date" value="${esc(a.ret)}" min="${esc(masDias(S.hoy, 1))}" max="${esc(masDias(S.hoy, 730))}"></label>`;
+  if (d.pideFecha) return `<label class="campo">Fecha de retorno<input id="falta-ret" type="date" value="${esc(a.ret)}" min="${esc(masDias(S.hoy, 1))}" max="${esc(topeDosAnios(S.hoy))}"></label>`;
   return notaDecision(d, a.fecha || S.hoy);
 }
 function pintarDecisionFicha() {
@@ -3702,6 +3763,8 @@ function guardarEdicionFicha(b) {
   if (!t || PA.enVuelo) return;
   const cambios = cambiosEdicion(t.fila, PA.borrador);
   if (!Object.keys(cambios).length) { avisar('No hay cambios.'); return; }
+  const mal = fechaMalEdicion(t.fila, PA.borrador);
+  if (mal) { avisar(mal); return; }
   escribirFicha({ boton: b || $('#ficha [data-guardar-edicion]'), fn: 'editarRegistro', datos: { id: t.id, cambios },
     aviso: r => r.ok === false && r.sinCambios ? 'No hay cambios.' : 'Registro editado: ' + ((r.registro && r.registro.TEXTO) || t.titulo) + ' · ' + t.id,
     luego: () => { PA.editando = ''; PA.borrador = {}; } });
@@ -3788,6 +3851,8 @@ function entradaFicha(e) {
   else if (PA.alta && el.name === 'fdec') { PA.alta.dec = el.value; pintarDecisionFicha(); }
   else if (PA.editando && el.dataset.campo) {
     PA.borrador[el.dataset.campo] = el.value;
+    const tr = PA.p && PA.p.trats.find(x => x.id === PA.editando);
+    refrescarEdicion(tratEl(PA.editando), tr && tr.fila, PA.borrador, PA.enVuelo);
     if (el.dataset.campo === 'detalle' && e.type === 'change') {
       // Otro tratamiento: la marca se vuelve a elegir (la única, si tiene una sola), como en «Registrados».
       const m = marcasDe(el.value);
@@ -4736,6 +4801,12 @@ async function iniciar() {
   addEventListener('resize', () => $$('.seg').forEach(s => pastilla(s)));
   if (document.fonts) document.fonts.ready.then(() => $$('.seg').forEach(s => pastilla(s, true)));
   ir('tablero', true);
+  arrancar();
+}
+/** bootstrap y lo que depende de él. Si falla, cada pantalla lo dice con «Reintentar», que vuelve a llamar aquí sin recargar. */
+async function arrancar() {
+  $$('.js-reintentar-arranque').forEach(b => b.remove());
+  $$('.cargando').forEach(p => { p.textContent = 'Cargando…'; });
   // bootstrap y getTablero en paralelo: getTablero no depende del usuario.
   const pedidoTablero = llamar('getTablero');
   pedidoTablero.catch(() => { /* lo atiende cargarTablero */ });
@@ -4743,7 +4814,11 @@ async function iniciar() {
   try {
     b = await llamar('bootstrap');
   } catch (e) {
-    $$('.cargando').forEach(p => { p.textContent = 'No se pudo iniciar: ' + e.message; });
+    $$('.cargando').forEach(p => {
+      p.textContent = 'No se pudo iniciar: ' + e.message;
+      p.insertAdjacentHTML('afterend', '<button type="button" class="btn btn-s js-reintentar-arranque"><i class="ph ph-arrow-clockwise"></i>Reintentar</button>');
+    });
+    $$('.js-reintentar-arranque').forEach(x => x.addEventListener('click', () => arrancar(), { once: true }));
     return;
   }
   S.boot = adaptarBoot(b);
@@ -4810,7 +4885,7 @@ const DEMO = (() => {
   const clonar = x => JSON.parse(JSON.stringify(x));
   // Como siguienteId (Registro.gs): el mayor + 1, nunca la cantidad de filas (el DEMO trae REG-000021 y REG-000022: se repetirían).
   const siguiente = (lista, prefijo) => prefijo + '-' + String(lista.reduce((m, x) => Math.max(m, Number((new RegExp('^' + prefijo + '-(\\d+)$').exec(x.ID) || [])[1]) || 0), 0) + 1).padStart(6, '0');
-  const dniDe = v => String(v || '').trim().toUpperCase();
+  const dniDe = v => normDni(v);   // como el servidor: el DNI se guarda y se compara con normDni
   const mismo = (a, b) => norm(a) === norm(b);
   let reloj = 0;
   const ahora = () => { reloj++; return hoy + ' ' + String(10 + Math.floor(reloj / 60)).padStart(2, '0') + ':' + String(reloj % 60).padStart(2, '0'); };
@@ -4841,20 +4916,28 @@ const DEMO = (() => {
   const registros = [], sesiones = [], altas = [];
   const sesionesDe = id => sesiones.filter(s => s.ID_REGISTRO === id && !s.ANULADO).sort((a, b) => a.NUMERO - b.NUMERO);
   const doctorDe = nombre => doctores.find(d => mismo(d.doctor, nombre));
+  // Como especialidadDelRegistro_ (Registro.gs): el registro se une a la serie de la especialidad de su doctor en las citas.
+  // En el DEMO, el Dr. Hanampa atiende Reumatología y los demás, Hematología.
+  const ESP_MEDICO = { [HANAMPA]: 'REUMATOLOGÍA' };
+  const especialidadDe = sofdoc => ESP_MEDICO[sofdoc] || 'HEMATOLOGÍA';
+  // Como usuariosPorDni (Registro.gs): el contacto de Registro que no es teléfono, del registro sin anular más reciente.
+  // Cuenta como otro contacto en todas las tarjetas del DNI: «Número equivocado» no cierra mientras quede.
+  const usuarioDe = dni => registros.filter(r => r.DNI === dni && !r.ANULADO && r.CONTACTO && normTel(r.CONTACTO).length !== 9)
+    .sort((a, b) => (a.FECHA + ' ' + (a.FECHA_HORA || '')) < (b.FECHA + ' ' + (b.FECHA_HORA || '')) ? 1 : -1).map(r => String(r.CONTACTO).trim())[0] || '';
   const reg = (r, o) => {
     const ss = sesionesDe(r.ID), hechas = ss.length, ultima = hechas ? ss[hechas - 1].FECHA : '';
     const estadoReg = r.ANULADO ? 'ANULADO' : hechas >= r.SESIONES ? 'COMPLETO' : hechas ? 'EN CURSO' : 'COTIZADO';
     // Completo: Completado hasta DIAS_POST_TRATAMIENTO después de la última sesión; desde ahí, «Por reevaluar».
     const reevaluar = estadoReg === 'COMPLETO' && ultima ? mas(ultima, reglas.postTratamiento) : '';
     const enCurso = estadoReg === 'EN CURSO', dias = Math.max(0, entre(enCurso ? ultima : reevaluar || r.FECHA, hoy));
-    const tel = r.CONTACTO.replace(/\D/g, ''), usuario = tel.length === 9 ? '' : r.CONTACTO;
+    const tel = normTel(r.CONTACTO), usuario = tel.length === 9 ? '' : r.CONTACTO;
     const d = doctorDe(r.DOCTOR);
     let estado = 'PENDIENTE';
     if (estadoReg === 'COMPLETO') estado = reevaluar && reevaluar <= hoy ? 'POR REEVALUAR' : 'COMPLETADO';
     else if (dias < (enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion)) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     return Object.assign({ ID_REGISTRO: r.ID, DNI: r.DNI, ESPECIALIDAD: r.TIPO, TIPO_SEGUIMIENTO: r.TIPO, NOMBRE: r.NOMBRE,
       TELEFONOS: tel.length === 9 ? tel : '', USUARIO: usuario, MEDICO_ULTIMO: d && d.sofdoc ? d.sofdoc : r.DOCTOR,
-      ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA', FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
+      ESPECIALIDAD_CONSULTA: especialidadDe(d && d.sofdoc ? d.sofdoc : ''), FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase(r.DETALLE) : '', MARCA: r.TIPO === 'HIERRO' ? frase(r.MARCA) : '',
       SESIONES: r.SESIONES, HECHAS: hechas, ULTIMA_SESION: ultima, ULTIMA_SESION_ID: hechas ? ss[hechas - 1].ID : '', DIAS: dias, ULTIMA_CITA: r.FECHA, N_SEGUIMIENTOS: 0,
       ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg, FECHA_REEVALUAR: reevaluar,
@@ -4968,7 +5051,7 @@ const DEMO = (() => {
       const filas = enfermeria.filter(f => vivaEnf(f) && f.ID_SESION === x.ID);
       const reacciones = filas.filter(f => f.RESULTADO === 'CONTACTADO' && f.REACCION_TIPO && f.REACCION_TIPO !== 'NINGUNA')
         .sort((a, b) => a.DIA - b.DIA).map(f => ({ DIA: f.DIA, TIPO: f.REACCION_TIPO, REACCION: f.REACCION }));
-      const tel = r.CONTACTO.replace(/\D/g, '');
+      const tel = normTel(r.CONTACTO);
       DIAS_ENF.forEach(dia => {
         const fecha = mas(x.FECHA, dia);
         if (fecha < desde || fecha > hasta) return;
@@ -5271,7 +5354,7 @@ const DEMO = (() => {
         if (y.TELEFONOS_DESCARTADOS.indexOf(tel) < 0) y.TELEFONOS_DESCARTADOS.push(tel);
         y.SIN_CONTACTO = !y.TELEFONOS && !String(y.USUARIO || '').trim();
       });
-      quedan = !!t.TELEFONOS || !!String(t.USUARIO || '').trim();
+      quedan = !!t.TELEFONOS || !!String(t.USUARIO || '').trim() || !!usuarioDe(dni);
       if (!quedan) cerrar(t, 'NÚMERO EQUIVOCADO');
     }
     const s = { ID: idSeg(), FECHA_HORA: ahora(), DNI: dni, ESPECIALIDAD: t.ESPECIALIDAD,
@@ -5446,6 +5529,9 @@ const DEMO = (() => {
       const col = { POR_CONTACTAR: [], CONTACTADO: [], PAGO_REALIZADO: [], AGENDADO: [], EN_TRATAMIENTO: [], COMPLETADO: [] };
       // MES como en armarTablero (Tablero.gs): mesDe(...) = 'yyyy-mm'; reevaluación por su última cita, el resto por la cotización.
       tarjetas.forEach(t => { t.MES = String((t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.ULTIMA_CITA : t.FECHA_COTIZACION) || '').slice(0, 7); });
+      tarjetas.forEach(t => {
+        if (!t.ID_REGISTRO && !String(t.USUARIO || '').trim()) { t.USUARIO = usuarioDe(t.DNI); if (t.USUARIO) t.SIN_CONTACTO = false; }
+      });
       tarjetas.forEach(t => { if (col[t.COLUMNA]) col[t.COLUMNA].push(t); });
       // Como armarTablero: un registro completo que ya toca reevaluar (en cualquier columna abierta) tapa la reevaluación del paciente.
       const tapa = {};
@@ -5516,19 +5602,19 @@ const DEMO = (() => {
         // Como otrosContactos (Registro.gs): lo que no es un teléfono de 9 dígitos, sin anulados ni repetidos, lo más reciente primero.
         contactos: [...new Set(registros.filter(r => r.DNI === k && !r.ANULADO)
           .sort((a, b) => (a.FECHA + ' ' + a.FECHA_HORA) < (b.FECHA + ' ' + b.FECHA_HORA) ? 1 : -1)
-          .map(r => String(r.CONTACTO || '').replace(/\s+/g, ' ').trim()).filter(c => c && c.replace(/\D/g, '').length !== 9))],
+          .map(r => String(r.CONTACTO || '').replace(/\s+/g, ' ').trim()).filter(c => c && normTel(c).length !== 9))],
         telefonosDescartados: descartadosDe(k)
       };
     },
 
     // Como buscarEnPacientes: todas las palabras en cualquier orden, o parte del DNI; también quien solo está en Registro.
     buscar: q => {
-      const n = norm(q), d = dniDe(q).replace(/\s/g, ''), palabras = n.split(/\s+/).filter(Boolean);
-      if (n.replace(/\s/g, '').length < 3) return [];
+      const n = norm(q), d = dniDe(q).replace(/\s/g, ''), palabras = normBusqueda(q).split(/\s+/).filter(Boolean);
+      if (n.replace(/\s/g, '').length < 3 || !palabras.length) return [];
       const out = [], vistos = {};
       const ver = (dni, nombre) => {
         if (!dni || vistos[dni] || out.length >= 20) return;
-        if ((/\d/.test(d) && dni.includes(d)) || palabras.every(w => norm(nombre).includes(w))) { vistos[dni] = 1; out.push({ DNI: dni, NOMBRE: nombre }); }
+        if ((/\d/.test(d) && dni.includes(d)) || palabras.every(w => normBusqueda(nombre).includes(w))) { vistos[dni] = 1; out.push({ DNI: dni, NOMBRE: nombre }); }
       };
       for (let i = citas.length - 1; i >= 0; i--) ver(citas[i].DNI, citas[i].NOMBRE);
       for (let i = registros.length - 1; i >= 0; i--) if (registros[i].ANULADO !== 'SÍ') ver(registros[i].DNI, registros[i].NOMBRE);
@@ -5547,12 +5633,14 @@ const DEMO = (() => {
 
     guardarRegistro: x => {
       const quien = exigir(x);
-      const dni = dniDe(x.dni).replace(/[\s.\-]/g, '');
-      if (!/^\d{8}$/.test(dni) && !/^[A-Z0-9]{9,12}$/.test(dni)) throw new Error('El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).');
+      // Como documentoValido y normDni: se valida lo escrito (8 dígitos, con su cero) y se guarda normalizado.
+      const escrito = norm(x.dni).replace(/[\s.\-]/g, ''), dni = dniDe(x.dni);
+      if (!/^\d{8}$/.test(escrito) && !/^[A-Z0-9]{9,12}$/.test(escrito)) throw new Error('El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).');
       const nombre = String(x.nombre || '').trim().toUpperCase();
       if (!nombre) throw new Error('Falta el nombre del paciente.');
       const contacto = String(x.contacto || '').trim();
       if (!contacto) throw new Error('Falta el teléfono o usuario.');
+      if (telefonoMal(contacto)) throw new Error(telefonoMal(contacto));
       const fecha = String(x.fecha || '').slice(0, 10);
       if (!fecha) throw new Error('Falta la fecha.');
       if (fecha > hoy) throw new Error('La fecha no puede ser futura.');
@@ -5566,7 +5654,7 @@ const DEMO = (() => {
         const ret = String(x.fechaRetorno || '').slice(0, 10);
         if (!ret) throw new Error('Falta la fecha de retorno a control.');
         if (ret <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
-        if (ret > mas(hoy, 365)) throw new Error('La fecha de retorno va hasta un año desde hoy.');
+        if (ret > sumarMeses(hoy, 12)) throw new Error('La fecha de retorno va hasta un año desde hoy.');
         filas.push(Object.assign({}, base, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: String(x.examenes || '').trim(), FECHA_RETORNO: ret }));
       }
       const inicio = String(x.fechaInicio || '').trim().slice(0, 10);
@@ -5662,10 +5750,17 @@ const DEMO = (() => {
           : /^FECHA/.test(col) ? t.slice(0, 10) === actual.slice(0, 10) : t === actual;
         if (igual) continue;
         let nuevo;
-        if (col === 'FECHA') { nuevo = t.slice(0, 10); if (!nuevo) throw new Error('Falta la fecha.'); if (nuevo > hoy) throw new Error('La fecha no puede ser futura.'); }
+        if (col === 'FECHA') {
+          nuevo = t.slice(0, 10); if (!nuevo) throw new Error('Falta la fecha.'); if (nuevo > hoy) throw new Error('La fecha no puede ser futura.');
+          const primera = sesionesDe(r.ID)[0];
+          if (primera && nuevo > primera.FECHA) throw new Error('La fecha no puede ser posterior a la primera sesión (' + dmyDemo(primera.FECHA) + ').');
+        }
         else if (col === 'DOCTOR') { const d = doctorDe(t); if (!d) throw new Error('Elija el doctor de la lista.'); nuevo = d.doctor; }
         else if (col === 'NOMBRE') { nuevo = t.toUpperCase(); if (!nuevo) throw new Error('Falta el nombre del paciente.'); }
-        else if (col === 'CONTACTO') { nuevo = contactoEnvio(t); if (!nuevo) throw new Error('Falta el teléfono o usuario.'); }
+        else if (col === 'CONTACTO') {
+          nuevo = contactoEnvio(t); if (!nuevo) throw new Error('Falta el teléfono o usuario.');
+          if (telefonoMal(t)) throw new Error(telefonoMal(t));
+        }
         else if (col === 'DETALLE') {
           if (control) throw new Error('Un control no tiene procedimiento ni tratamiento.');
           nuevo = lista().find(y => mismo(y, t));
@@ -5689,6 +5784,7 @@ const DEMO = (() => {
           if (!control) throw new Error('Solo un control tiene fecha de retorno.');
           nuevo = t.slice(0, 10);
           if (!nuevo || nuevo <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
+          if (nuevo > sumarMeses(hoy, 12)) throw new Error('La fecha de retorno va hasta un año desde hoy.');
         }
         if (String(nuevo) !== actual) out[col] = nuevo;
       }
@@ -5726,6 +5822,14 @@ const DEMO = (() => {
       r.ANULADO = 'SÍ';
       r.MOTIVO_ANULACION = String(x.motivo).trim();
       tarjetas.filter(t => t.ID_REGISTRO === r.ID).forEach(t => { t.ESTADO_REGISTRO = 'ANULADO'; t.COLUMNA = ''; });
+      // Como agendaVivaDeRegistro: la próxima sesión ligada y un «Agendó cita» por venir se anulan con el registro (y dejan de
+      // contar en la meta del día); las sesiones hechas, no.
+      seguimientos.filter(g => !g.ANULADO && g.REFERENCIA === r.ID && g.RESULTADO === 'AGENDÓ CITA'
+        && (LIGA_SESION.test(String(g.NOTA || '').trim()) || String(g.FECHA_PROXIMA || '') >= hoy)).forEach(g => {
+        g.ANULADO = 'SÍ';
+        g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló el registro ' + r.ID + ')';
+        if (String(g.FECHA_HORA).slice(0, 10) === hoy) sumarHecho(g.RESPONSABLE, -1, true);
+      });
       return { ok: true };
     },
 
@@ -5787,6 +5891,8 @@ const DEMO = (() => {
       const s = sesiones.find(y => y.ID === String(x.id || '').trim());
       if (!s) throw new Error('No encontré la sesión ' + x.id + '.');
       if (s.ANULADO) throw new Error('La sesión ' + s.ID + ' ya estaba anulada.');
+      const delReg = regPorId(s.ID_REGISTRO);
+      if (delReg && delReg.ANULADO) throw new Error('El registro ' + delReg.ID + ' está anulado: sus sesiones ya no se anulan.');
       const propias = sesionesDe(s.ID_REGISTRO);
       if (propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
       s.ANULADO = 'SÍ';
@@ -5828,7 +5934,7 @@ const DEMO = (() => {
         retorno = String(x.fechaRetorno || '').slice(0, 10);
         if (!retorno) throw new Error('Falta la fecha de retorno.');
         if (retorno <= hoy) throw new Error('La fecha de retorno debe ser después de hoy.');
-        if (retorno > mas(hoy, 730)) throw new Error('La fecha de retorno va hasta dos años desde hoy.');
+        if (retorno > sumarMeses(hoy, 24)) throw new Error('La fecha de retorno va hasta dos años desde hoy.');
       }
       if (vigente(dni, esp)) throw new Error('Ese paciente ya tiene un alta vigente en ' + esp + '.');
       const a = { ID: siguiente(altas, 'ALT'), FECHA_HORA: ahora(), FECHA: f, DNI: dni, ESPECIALIDAD: esp, DOCTOR: doc.doctor, REGISTRADO_POR: quien,

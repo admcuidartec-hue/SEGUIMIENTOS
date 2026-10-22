@@ -48,3 +48,14 @@ test('buscarEnPacientes: un paciente una vez, primero el de cita más reciente, 
   assert.equal(new Set(r.map(x => x.DNI)).size, 20);
   assert.equal(buscar('juana').length, 1);
 });
+
+test('buscarEnPacientes: ignora apóstrofos, guiones y puntos («ohiggins» encuentra a O\'Higgins)', () => {
+  const f = { citas: [cita({ dni: '40555666', nombre: "MARÍA DEL PILAR ÑAHUI-O'HIGGINS", fecha: '2026-07-01' }),
+    cita({ dni: '40555777', nombre: 'JUAN PÉREZ ALBELA', fecha: '2026-07-01' }), cita({ dni: '40555888', nombre: 'STA. ROSA LIMA', fecha: '2026-07-01' })] };
+  const b = q => plano(L.buscarEnPacientes(q, f)).map(r => r.DNI);
+  assert.deepEqual(b('ohiggins'), ['40555666']);
+  assert.deepEqual(b("o'higgins nahui"), ['40555666']);
+  assert.deepEqual(b('nahui-ohiggins'), ['40555666']);
+  assert.deepEqual(b('perez-albela'), ['40555777']);
+  assert.deepEqual(b('sta rosa'), ['40555888']);
+});

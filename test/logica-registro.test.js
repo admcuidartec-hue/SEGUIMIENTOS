@@ -282,6 +282,27 @@ test('resumenPorMes: altas aparte y hierro completado', () => {
   assert.deepEqual([jul.NUEVOS, jul.NUEVOS_NO, jul.NUEVOS_ALTA, jul.HIERRO, jul.HIERRO_NO, jul.HIERRO_COMPLETO], [2, 1, 1, 2, 0, 1]);
 });
 
+test('no realizado: un programado rechazado (cierre) o que no vino pasada la gracia cuenta como «no siguió» / «no realizado»', () => {
+  const R = reglas(L);   // gracia 2 días
+  const segNo = (id, f, res) => ({ ID: 'SEG-' + id + f, FECHA_HORA: f + ' 10:00', DNI: '40111222', ESPECIALIDAD: 'HIERRO', RESPONSABLE: 'MAGALY',
+    ACCION: 'DESCARTADO', MOTIVO: res, NOTA: '', REFERENCIA: id, RESULTADO: res, FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '' });
+  const r = [reg({ ID: 'REG-000001', FECHA: '2026-09-20', SESIONES: '1', FECHA_INICIO: '2026-09-25' }),            // rechazó: No desea realizarse
+    reg({ ID: 'REG-000002', DNI: '40111223', FECHA: '2026-09-20', TIPO: 'PROCEDIMIENTO', DETALLE: 'BIOPSIA', SESIONES: '1', FECHA_INICIO: '2026-10-01' }),  // no vino (gracia hasta 03/10)
+    reg({ ID: 'REG-000003', DNI: '40111224', FECHA: '2026-09-20', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO', SESIONES: '1', FECHA_INICIO: '2026-10-04' }),     // aún en la gracia
+    reg({ ID: 'REG-000004', DNI: '40111225', FECHA: '2026-09-20', SESIONES: '2', FECHA_INICIO: '2026-09-21' })];                       // en curso: no se toca
+  const s = [ses(1, '2026-09-21', { ID_REGISTRO: 'REG-000004' })];
+  const segs = [segNo('REG-000001', '2026-09-27', 'NO DESEA REALIZARSE')];
+  const inds = L.indicacionesDeRegistros(r, s, CAT, R, HOY);
+  const pends = L.pendientesRegistro({ registros: r, sesiones: s, seguimientos: segs, citas: [cita({ fecha: '2026-09-01' })], reglas: R, hoy: HOY,
+    telefonos: { '40111222': ['987654321'] }, catalogos: CAT2 });
+  L.marcarNoRealizados(inds, pends, R, HOY);
+  assert.deepEqual(plano(inds).map(x => [x.ID, x.ESTADO, x.NO_REALIZADO || '']),
+    [['REG-000001', 'ACEPTÓ', 'CERRADO'], ['REG-000002', 'ACEPTÓ', 'NO VINO'], ['REG-000003', 'ACEPTÓ', ''], ['REG-000004', 'ACEPTÓ', '']]);
+  const sep = plano(L.resumenPorMes([cita({ fecha: '2026-09-01' })], inds, [], R, HOY)).find(x => x.MES === '2026-09' && x.MEDICO === 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
+  // Hierro: 2 indicados (REG-1 no siguió, REG-4 en curso); procedimientos: BIOPSIA no realizada, AMO aún cuenta como aceptado.
+  assert.deepEqual([sep.HIERRO, sep.HIERRO_NO, sep.HIERRO_COMPLETO, sep.PROC, sep.PROC_NO], [2, 1, 0, 2, 1]);
+});
+
 test('el texto de pendiente de una reevaluación nombra el hierro registrado, no «Ferinject» a ciegas', () => {
   const p = L.pendientesPorDni([{ DNI: '1', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', ESTADO: 'COTIZÓ', FECHA: '2026-09-01', CANTIDAD: 2 }]);
   assert.equal(p['1'][0], 'Hierro sacarato ×2: cotizó y no lo hizo');

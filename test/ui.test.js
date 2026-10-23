@@ -2135,6 +2135,28 @@ const textoDe = (pagina, sel) => pagina.locator(sel).evaluateAll(l => l.map(x =>
 const espDe = (pagina, esp) => pagina.locator(`#ficha .esp[data-esp="${esp}"]`);
 const tratDe = (pagina, id) => pagina.locator(`#ficha .trat[data-reg="${id}"]`);
 
+test('pacientes: un registro sin empezar cerrado con «No desea realizarse» dice «Cerrado» con su motivo y no ofrece «Lo hizo»', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    const t = await pagina.evaluate(() => {
+      const c = DEMO.getTablero().columnas.POR_CONTACTAR.find(x => x.ID_REGISTRO && ['COTIZADO', 'PROGRAMADO'].includes(x.ESTADO_REGISTRO));
+      DEMO.registrarResultado({ usuario: 'MAGALY', dni: c.DNI, especialidad: c.ESPECIALIDAD, referencia: c.ID_REGISTRO, resultado: 'NO DESEA REALIZARSE', motivo: 'Por el precio' });
+      const r = DEMO.getPaciente(c.DNI).registros.find(x => x.ID === c.ID_REGISTRO);
+      return { dni: c.DNI, id: c.ID_REGISTRO, estado: r.ESTADO_REGISTRO, cierre: r.CIERRE };
+    });
+    assert.deepEqual([t.estado, t.cierre], ['CERRADO', 'NO DESEA REALIZARSE']);
+    await abrirFicha(pagina, t.dni);
+    const tr = tratDe(pagina, t.id);
+    assert.equal((await tr.locator('.trat-cab .tag').textContent()).trim(), 'Cerrado');
+    assert.match(await tr.textContent(), /Seguimiento cerrado: No desea realizarse \(\d\d\/\d\d\)/);
+    assert.equal(await tr.locator('[data-lohizo]').count(), 0);
+    // Lo mismo con lo que manda el servidor: un programado que no vino dice «· no vino» y sigue ofreciendo «Lo hizo».
+    const linea = await pagina.evaluate(() => lineaEstadoRegistro({ ESTADO_REGISTRO: 'PROGRAMADO', TIPO: 'HIERRO', FECHA_INICIO: '2026-09-12', NO_VINO: '2026-09-12' }));
+    assert.equal(linea, 'Programado el 12/09 · no vino');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('pacientes: el buscador encuentra por nombre y por DNI y se usa con el teclado', async () => {
   const { navegador, pagina, errores } = await abrirPacientes();
   try {

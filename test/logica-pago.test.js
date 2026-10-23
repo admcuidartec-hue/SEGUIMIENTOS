@@ -91,6 +91,11 @@ test('pendientesRegistro: pagó, aceptó y no vino a su 1.ª sesión → vuelve 
   // Un cierre explícito sí lo cierra.
   const cierre = res('2026-10-02', 'NO DESEA REALIZARSE', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001', MOTIVO: 'NO DESEA REALIZARSE' });
   assert.equal(pend([r], [p1, acepto, cierre])[0].ESTADO, 'CERRADO');
+  // Un «No desea realizarse» mientras esperaba su fecha (antes de FECHA_INICIO, después de aceptar) lo cierra; uno anterior al «Aceptó», no.
+  const antes = res('2026-09-27', 'NO DESEA REALIZARSE', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001', MOTIVO: 'NO DESEA REALIZARSE', FECHA_HORA: '2026-09-27 09:00' });
+  assert.equal(pend([regi({ FECHA_INICIO: '2026-10-20' })], [acepto, antes])[0].ESTADO, 'CERRADO');
+  const previo = res('2026-09-24', 'NO DESEA REALIZARSE', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001', MOTIVO: 'NO DESEA REALIZARSE' });
+  assert.equal(pend([regi({ FECHA_INICIO: '2026-10-20' })], [previo, acepto])[0].ESTADO, 'AGENDADO');
   // Ya empezado, el pago de la cotización no cuenta para el ciclo de la sesión siguiente.
   const enCurso = plano(L.pendientesRegistro({ registros: [r], seguimientos: [p1, acepto], citas: [cita({ fecha: '2026-09-01' })], reglas: R, hoy: HOY,
     sesiones: [{ ID: 'SES-000001', ID_REGISTRO: 'REG-000001', NUMERO: 1, FECHA: '2026-09-28', FECHA_HORA: '2026-09-28 10:00', ANULADO: '' }],

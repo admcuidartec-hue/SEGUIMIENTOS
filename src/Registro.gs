@@ -418,11 +418,20 @@ function pendientesRegistro(d) {
     // Un programado lee su ciclo desde la fecha de la primera sesión, pero el «Pagó» de su cotización (anterior a esa fecha)
     // sigue siendo de este ciclo hasta que empiece el tratamiento: si no viene, vuelve a Pago realizado, no a Por contactar
     // (Etapa 3: el pago nunca retrocede), y no se cierra solo por tiempo.
-    var desdeCotizacion = programado && !control ? fechaIso(r.FECHA) : '';
+    // Y un cierre («No desea realizarse», «Falleció»…) registrado mientras esperaba su fecha, después de aceptar (o de
+    // registrarse ya programado), también: si no, el tablero seguía en Agendado y luego decía «No vino».
+    var desdeCotizacion = programado && !control ? fechaIso(r.FECHA) : '', trasAceptar = '';
+    if (desdeCotizacion) {
+      trasAceptar = String(r.FECHA_HORA || '') || desdeCotizacion;
+      (segs[r.ID] || []).forEach(function (s) {
+        if (normTexto(s.RESULTADO) === 'ACEPTO' && !anulado_(s) && String(s.FECHA_HORA || '') > trasAceptar) trasAceptar = String(s.FECHA_HORA || '');
+      });
+    }
     var lista = (segs[r.ID] || []).filter(function (s) {
       var ligada = sesionLigada(s);
       if (ligada && (!ultimaSes || ligada !== ultimaSes.ID)) return false;
       if (desdeCotizacion && fechaIso(s.FECHA_HORA) >= desdeCotizacion && normTexto(s.RESULTADO) === 'PAGO') return true;
+      if (desdeCotizacion && String(s.FECHA_HORA || '') > trasAceptar && (resultadoDe(s) || {}).grupo === 'CIERRE') return true;
       return fechaIso(s.FECHA_HORA) >= desde && String(s.FECHA_HORA || '') >= corte;
     }).sort(porFechaHora_);
     var c = leerCiclo(lista, reglas, hoy);
@@ -682,6 +691,36 @@ function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {
       EN_ESPERA: e.estado === 'COTIZADO' && fecha && diasEntre(fecha, hoy) < reglas.esperaCotizacion ? 'SÍ' : ''
     };
   }).filter(Boolean);
+}
+
+/**
+ * ¿Un registro aceptado que nunca empezó ya no se va a realizar? Mira la fila de pendientesRegistro (la tarjeta), con las mismas
+ * reglas del tablero: 'CERRADO' si su seguimiento se cerró («No desea realizarse», «Se atiende en otro lugar», sin respuesta,
+ * número equivocado, falleció…) sin ninguna sesión; 'NO VINO' si es un PROGRAMADO cuya fecha de primera sesión pasó, más
+ * GRACIA_AGENDA_DIAS, sin marcarse (aunque haya pagado: lo pagado y no hecho no es un tratamiento realizado). '' en lo demás:
+ * dentro de la gracia sigue «en curso»; con una sesión ya empezó (en curso o completo); un cotizado ya cuenta como COTIZÓ.
+ */
+function noRealizadoDeRegistro(fila, reglas, hoy) {
+  if (!fila || fila.ESTADO_REGISTRO !== 'PROGRAMADO' || fila.TIPO_SEGUIMIENTO === 'CONTROL' || Number(fila.HECHAS) > 0) return '';
+  if (fila.ESTADO === 'CERRADO' || fila.ESTADO === 'FALLECIDO') return 'CERRADO';
+  if (fila.FECHA_INICIO && hoy > sumarDias(fila.FECHA_INICIO, reglas.graciaAgenda)) return 'NO VINO';
+  return '';
+}
+
+/**
+ * Marca NO_REALIZADO en las indicaciones que vienen de Registro (indicacionesDeRegistros) según noRealizadoDeRegistro de su
+ * tarjeta. ESTADO sigue siendo 'ACEPTÓ' (aceptó, y eso no cambia lo que se muestra en el tablero ni tapa otras cotizaciones):
+ * resumenPorMes lo cuenta como «no siguió» (hierro) o «no realizado» (procedimientos). Modifica y devuelve `indicaciones`.
+ */
+function marcarNoRealizados(indicaciones, pendientes, reglas, hoy) {
+  var por = {};
+  (pendientes || []).forEach(function (p) { if (p.ID_REGISTRO) por[p.ID_REGISTRO] = p; });
+  (indicaciones || []).forEach(function (i) {
+    if (i.ORIGEN !== 'REGISTROS') return;
+    var n = noRealizadoDeRegistro(por[i.ID], reglas, hoy);
+    if (n) i.NO_REALIZADO = n;
+  });
+  return indicaciones;
 }
 
 /**

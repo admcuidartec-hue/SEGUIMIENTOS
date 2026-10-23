@@ -1152,7 +1152,8 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
   // Hierro y procedimientos: una vez por paciente, tipo y mes.
   var porDni = realizadasPorDni_(citas), grupos = {}, aceptado = {}, completoDe = {};
   (indicaciones || []).forEach(function (i) {
-    if (i.DNI && i.ESTADO === 'ACEPTÓ') {
+    // Aceptó pero no se realizó (programado rechazado o que no vino, marcarNoRealizados): cuenta como no siguió.
+    if (i.DNI && i.ESTADO === 'ACEPTÓ' && !i.NO_REALIZADO) {
       var a = i.DNI + '|' + i.TIPO;
       if (!aceptado[a] || i.FECHA > aceptado[a]) { aceptado[a] = i.FECHA; completoDe[a] = i.COMPLETO !== 'NO'; }
     }
@@ -1166,7 +1167,7 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
         medico: i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO', acepto: false, completo: false };
     }
     if (i.FECHA < grupos[g].primera) grupos[g].primera = i.FECHA;
-    if (i.ESTADO === 'ACEPTÓ') { grupos[g].acepto = true; if (i.COMPLETO !== 'NO') grupos[g].completo = true; }
+    if (i.ESTADO === 'ACEPTÓ' && !i.NO_REALIZADO) { grupos[g].acepto = true; if (i.COMPLETO !== 'NO') grupos[g].completo = true; }
   });
   Object.keys(grupos).forEach(function (k) {
     var g = grupos[k], clave = g.dni + '|' + g.tipo;

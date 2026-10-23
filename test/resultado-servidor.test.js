@@ -341,3 +341,17 @@ test('getPaciente: también trae los contactos de Registro que no son teléfono 
   assert.deepEqual([r.telefonos, r.contactos], [[], ['@wprueba']]);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).contactos, []);
 });
+
+test('getPaciente: un programado que rechazó («No desea realizarse», 0 sesiones) sale CERRADO con su motivo; uno que no vino, con NO_VINO', () => {
+  const reg = (ID, DNI, FECHA_INICIO) => ({ ID, FECHA_HORA: '2026-09-20 10:00', FECHA: '2026-09-20', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ANA PÉREZ', DNI,
+    CONTACTO: '987000111', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', MARCA: '', SESIONES: 1, ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO });
+  const no = { ID: 'SEG-1', FECHA_HORA: '2026-10-01 10:00', DNI: '45000111', ESPECIALIDAD: 'HIERRO', RESPONSABLE: 'MAGALY', ACCION: 'DESCARTADO',
+    MOTIVO: 'NO DESEA REALIZARSE', NOTA: 'Motivo: por el precio', REFERENCIA: 'REG-000001', RESULTADO: 'NO DESEA REALIZARSE', FECHA_PROXIMA: '', TELEFONO: '', ANULADO: '' };
+  const { ctx } = servidor([no], [], [reg('REG-000001', '45000111', '2026-09-30'), reg('REG-000002', '45000222', '2026-09-30'), reg('REG-000003', '45000333', '2026-10-05')]);
+  const r1 = plano(ctx.getPaciente('45000111')).registros[0];
+  assert.deepEqual([r1.ESTADO_REGISTRO, r1.CIERRE, r1.FECHA_CIERRE, r1.NO_VINO], ['CERRADO', 'NO DESEA REALIZARSE', '2026-10-01', '']);
+  const r2 = plano(ctx.getPaciente('45000222')).registros[0];
+  assert.deepEqual([r2.ESTADO_REGISTRO, r2.NO_VINO], ['PROGRAMADO', '2026-09-30'], 'hoy 06/10: pasó la gracia (02/10)');
+  const r3 = plano(ctx.getPaciente('45000333')).registros[0];
+  assert.deepEqual([r3.ESTADO_REGISTRO, r3.NO_VINO], ['PROGRAMADO', ''], 'aún dentro de la gracia');
+});

@@ -115,7 +115,8 @@ function tarjeta_(t, columna, reglas, hoy, fechaClave, etiqueta) {
 function hechosHoyPor_(d) {
   var out = {}, hoy = d.hoy;
   function sumar(quien) { quien = textoLimpio_(quien); if (quien) out[quien] = (out[quien] || 0) + 1; }
-  (d.seguimientos || []).forEach(function (s) { var r = resultadoDe(s); if (r && r.fecha === hoy) sumar(s.RESPONSABLE); });
+  // La agenda que se escribe al marcar una sesión con «Próxima sesión» (sesionLigada) es parte de esa sesión: no suma aparte.
+  (d.seguimientos || []).forEach(function (s) { var r = resultadoDe(s); if (r && r.fecha === hoy && !sesionLigada(s)) sumar(s.RESPONSABLE); });
   (d.sesiones || []).forEach(function (s) { if (!anulado_(s) && fechaIso(s.FECHA_HORA) === hoy) sumar(s.ASESORA); });
   (d.altas || []).forEach(function (a) { if (!anulado_(a) && fechaIso(a.FECHA_HORA) === hoy) sumar(a.REGISTRADO_POR); });
   return out;
@@ -197,7 +198,7 @@ function armarTablero(d) {
   col.COMPLETADO.sort(function (a, b) { return -asc(a, b); });
   var hechosHoy = (d.seguimientos || []).filter(function (s) {
     var r = resultadoDe(s);
-    return r && (r.grupo === 'SIGUE' || r.grupo === 'PAGO') && r.fecha === hoy;
+    return r && (r.grupo === 'SIGUE' || r.grupo === 'PAGO') && r.fecha === hoy && !sesionLigada(s);
   }).length;
   var marcadas = telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos);
   Object.keys(col).forEach(function (c) {

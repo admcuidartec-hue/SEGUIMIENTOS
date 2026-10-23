@@ -15,6 +15,7 @@ function exigirUsuario_(catalogos, usuario) {
 function exigirMotivo_(p) {
   var m = textoLimpio_(p && p.motivo);
   if (!m) throw new Error('Escriba el motivo de la anulación.');
+  if (largoMal_(m, LARGO_TEXTO, 'El motivo')) throw new Error(largoMal_(m, LARGO_TEXTO, 'El motivo'));
   return m;
 }
 
@@ -136,7 +137,7 @@ function marcarSesion(p) {
     // La sesión que vio la persona (p.sesion): si otra pestaña ya la marcó, no se guarda como la siguiente.
     var error = r && !anulado_(r) ? sesionYaNoEsLaSiguiente(estadoRegistro(r, sesiones), p.sesion) : '';
     if (error) throw new Error(error);
-    error = validarSesion(r, sesiones, p.fecha, d.hoy);
+    error = validarSesion(r, sesiones, p.fecha, d.hoy) || largoMal_(p.nota, LARGO_TEXTO, 'La nota');
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
     // «¿Reacción durante la aplicación?»: se valida antes de escribir nada, para no dejar la sesión a medias.

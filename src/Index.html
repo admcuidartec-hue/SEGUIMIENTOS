@@ -393,6 +393,8 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .resultados .nada{padding:14px 10px;color:var(--muted)}
 .ficha-skel{margin-top:32px;max-width:640px}
 .ficha{margin-top:32px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:36px 48px;align-items:start}
+/* Una palabra larguísima (un nombre de 1000 letras, una nota sin espacios) se parte en vez de desbordar la ficha y el panel. */
+.ficha,.ficha *,.panel,.panel *,.card,.card *{overflow-wrap:anywhere}
 .ficha header{grid-column:1/-1;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding-bottom:20px;border-bottom:1px solid var(--line)}
 .ficha header h2{margin:0;font-size:36px;font-weight:600;letter-spacing:-.03em;line-height:1.1;text-wrap:balance;outline:none}
 .ficha header>.mono{color:var(--muted)}
@@ -921,7 +923,26 @@ function conOp(fn, args) {
   }
   return { args: [Object.assign({}, p, { op: o.op })].concat(args.slice(1)), clave };
 }
+/* Como textoLimpio_ y largoMal_ del servidor: sin caracteres invisibles, y nombre hasta 120 y notas, motivos y exámenes hasta 2000. */
+const INVISIBLES = /[\u0000-\u0008\u000B\u000E-\u001F\u007F-\u009F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+const limpioTexto = v => String(v == null ? '' : v).replace(INVISIBLES, '').replace(/\s+/g, ' ').trim();
+const LARGO_NOMBRE = 120, LARGO_TEXTO = 2000;
+function largoMal(v, max, que) {
+  const n = limpioTexto(v).length;
+  return n > max ? `${que} ${/^L[ao]s /.test(que) ? 'van' : 'va'} hasta ${max} caracteres (tiene ${n}).` : '';
+}
+/** Lo que el servidor rechazaría por largo, dicho antes de enviar (el mismo texto); '' si todo cabe. */
+function textoDemasiadoLargo(p) {
+  if (!p || typeof p !== 'object') return '';
+  const c = p.cambios || {}, r = p.reaccion || {};
+  return largoMal(p.nombre, LARGO_NOMBRE, 'El nombre') || largoMal(c.nombre, LARGO_NOMBRE, 'El nombre')
+    || largoMal(p.nota, LARGO_TEXTO, 'La nota') || largoMal(p.motivo, LARGO_TEXTO, 'El motivo')
+    || largoMal(p.examenes, LARGO_TEXTO, 'Los exámenes') || largoMal(c.examenes, LARGO_TEXTO, 'Los exámenes')
+    || largoMal(r.nota, LARGO_TEXTO, 'La nota de la reacción');
+}
 function llamar(fn, ...args0) {
+  const largo = ESCRIBEN_CON_OP[fn] || fn === 'editarRegistro' ? textoDemasiadoLargo(args0[0]) : '';
+  if (largo) return Promise.reject(new Error(largo));
   const { args, clave } = conOp(fn, args0);
   const listo = r => { if (clave) OPS.delete(clave); return r; };
   if (EN_APPS_SCRIPT) {
@@ -2655,9 +2676,21 @@ const RG = {
   recientes: {}                  // ID -> temporizador: la fila recién guardada, editada o anulada se tiñe 3 s
 };
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres (documentoValido del servidor). Nunca borra letras. */
-const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '');
+// La Ñ y las vocales con tilde se conservan (no se cambian por N ni A en silencio): documentoMal dice que no valen.
+const dniLimpio = v => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9ÑÁÉÍÓÚÜ]/g, '');
 /** Un documento de más de 12 caracteres no se corta en silencio: se avisa (y no se registra). '' si no pasa de 12. */
 const dniLargo = v => { const n = dniLimpio(v).length; return n > 12 ? `El documento tiene ${n} caracteres: el carné de extranjería va de 9 a 12.` : ''; };
+/** Como documentoMal de Registro.gs (mismos mensajes): por qué no vale el documento escrito; '' si vale. */
+function documentoMal(v) {
+  const t = limpioTexto(v), DOC = 'El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).';
+  if (/[^A-Za-z0-9\s.\-]/.test(t)) return 'El documento solo lleva letras de la A a la Z (sin Ñ ni tildes), números, espacios, puntos o guiones.';
+  const d = t.toUpperCase().replace(/[\s.\-]/g, '');
+  if (d.length > 12) return `El documento tiene ${d.length} caracteres: el carné de extranjería va de 9 a 12.`;
+  if (!/^\d{8}$/.test(d) && !/^[A-Z0-9]{9,12}$/.test(d)) return DOC;
+  if (/^0\d{8,11}$/.test(d)) return `El documento ${d} empieza con 0 y se confundiría con el DNI ${d.replace(/^0+/, '')}. ` +
+    `Si es un DNI, escriba sus 8 dígitos; si es un carné de extranjería, escríbalo con sus letras (p. ej. CE${d}).`;
+  return '';
+}
 const documentoOk = v => { const d = dniLimpio(v); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
 /** Un teléfono se envía sin espacios; un usuario (@…) tal cual. */
 /** Como normTelefono del servidor: solo los dígitos, sin el 51 de un +51 (11 dígitos); '' si quedan menos de 7. */
@@ -2982,7 +3015,7 @@ function clicRegistro(e) {
 function faltanRegistro() {
   const f = [], v = s => ($(s) ? $(s).value.trim() : '');
   if (!esDecision()) {
-    if (!documentoOk(v('#rdni'))) f.push('DNI');
+    if (!v('#rdni')) f.push('DNI');
     if (!v('#rnom')) f.push('nombres');
     if (!v('#rtel')) f.push('teléfono o usuario');
     if (!v('#rfec')) f.push('fecha');
@@ -3056,7 +3089,11 @@ function validarRegistro() {
   const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0), d = decisionUi(RG.dec);
   const hecha = RG.modo === 'indicacion' ? primeraSesionHecha() : '';
   const conSesion = hecha ? (n === 1 ? ` con la sesión 1 hecha el ${dm(hecha)}` : `, cada uno con la sesión 1 hecha el ${dm(hecha)}`) : '';
-  const campoDni = $(esDecision() ? '#adni' : '#rdni'), largo = dniLargo(campoDni ? campoDni.value : '');
+  // El documento escrito que no vale dice por qué (documentoMal, el mismo texto que el servidor), no «Falta: DNI».
+  const campoDni = $(esDecision() ? '#adni' : '#rdni'), dniEscrito = campoDni ? campoDni.value.trim() : '';
+  const largo = esDecision() ? dniLargo(dniEscrito) : (dniEscrito ? documentoMal(dniEscrito) : '')
+    || (!esDecision() && $('#rnom') ? largoMal($('#rnom').value, LARGO_NOMBRE, 'El nombre') : '')
+    || (RG.modo === 'control' && $('#rexamenes') ? largoMal($('#rexamenes').value, LARGO_TEXTO, 'Los exámenes') : '');
   const mal = largo || (f.length ? '' : fechaMalRegistro());
   b.disabled = f.length > 0 || !!mal || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
@@ -5664,10 +5701,11 @@ const DEMO = (() => {
     guardarRegistro: x => {
       const quien = exigir(x);
       // Como documentoValido y normDni: se valida lo escrito (8 dígitos, con su cero) y se guarda normalizado.
-      const escrito = norm(x.dni).replace(/[\s.\-]/g, ''), dni = dniDe(x.dni);
-      if (!/^\d{8}$/.test(escrito) && !/^[A-Z0-9]{9,12}$/.test(escrito)) throw new Error('El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).');
-      const nombre = String(x.nombre || '').trim().toUpperCase();
+      const dni = dniDe(x.dni);
+      if (documentoMal(x.dni)) throw new Error(documentoMal(x.dni));
+      const nombre = limpioTexto(x.nombre).toUpperCase();
       if (!nombre) throw new Error('Falta el nombre del paciente.');
+      if (largoMal(nombre, LARGO_NOMBRE, 'El nombre')) throw new Error(largoMal(nombre, LARGO_NOMBRE, 'El nombre'));
       const contacto = String(x.contacto || '').trim();
       if (!contacto) throw new Error('Falta el teléfono o usuario.');
       if (telefonoMal(contacto)) throw new Error(telefonoMal(contacto));

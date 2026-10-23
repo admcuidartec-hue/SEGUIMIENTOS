@@ -65,6 +65,25 @@ function documentoValido(dni) {
   return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d);
 }
 
+/**
+ * Por qué no vale un documento, con el mismo texto que el formulario (documentoMal de Index.html); '' si vale.
+ * - Solo letras A-Z, números, espacios, puntos y guiones: una «Ñ» o una tilde se perdían al normalizar («ÑA1234567» quedaba
+ *   como «NA1234567», otro documento).
+ * - Más de 12 caracteres: se avisa en vez de cortar.
+ * - Solo números, de 9 a 12, empezando con 0: normDni le quitaría los ceros y se confundiría con un DNI («0012345678» →
+ *   12345678). Se rechaza con un mensaje claro (decidido el 23/10/2026; un carné se escribe con sus letras, p. ej. CE…).
+ */
+function documentoMal(dni) {
+  var t = textoLimpio_(dni), DOC = 'El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).';
+  if (/[^A-Za-z0-9\s.\-]/.test(t)) return 'El documento solo lleva letras de la A a la Z (sin Ñ ni tildes), números, espacios, puntos o guiones.';
+  var d = t.toUpperCase().replace(/[\s.\-]/g, '');
+  if (d.length > 12) return 'El documento tiene ' + d.length + ' caracteres: el carné de extranjería va de 9 a 12.';
+  if (!/^\d{8}$/.test(d) && !/^[A-Z0-9]{9,12}$/.test(d)) return DOC;
+  if (/^0\d{8,11}$/.test(d)) return 'El documento ' + d + ' empieza con 0 y se confundiría con el DNI ' + d.replace(/^0+/, '') + '. ' +
+    'Si es un DNI, escriba sus 8 dígitos; si es un carné de extranjería, escríbalo con sus letras (p. ej. CE' + d + ').';
+  return '';
+}
+
 /** 'Hierro carboximaltosa · Ferinject × 3 sesiones' o 'Sangría'. */
 function textoRegistro(r) {
   if (normTexto(r.TIPO) === 'CONTROL') return 'Control + laboratorio' + (textoLimpio_(r.EXAMENES) ? ' · ' + textoLimpio_(r.EXAMENES) : '');
@@ -90,9 +109,10 @@ function validarRegistro(p, catalogos, hoy) {
   if (!p) return no('Faltan los datos del registro.');
   var asesora = enLista_(catalogos.usuarios, p.usuario);
   if (!asesora) return no('Elija quién es usted en el selector de arriba.');
-  if (!documentoValido(p.dni)) return no('El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).');
+  if (documentoMal(p.dni)) return no(documentoMal(p.dni));
   var nombre = textoLimpio_(p.nombre).toUpperCase();
   if (!nombre) return no('Falta el nombre del paciente.');
+  if (largoMal_(nombre, LARGO_NOMBRE, 'El nombre')) return no(largoMal_(nombre, LARGO_NOMBRE, 'El nombre'));
   var contacto = contactoNormal_(p.contacto);
   if (!contacto) return no('Falta el teléfono o usuario.');
   if (telefonoMal_(p.contacto)) return no(telefonoMal_(p.contacto));
@@ -108,6 +128,7 @@ function validarRegistro(p, catalogos, hoy) {
     if (!ret) return no('Falta la fecha de retorno a control.');
     if (ret <= hoy) return no('La fecha de retorno debe ser después de hoy.');
     if (ret > topeUnAnio_(hoy)) return no('La fecha de retorno va hasta un año desde hoy.');
+    if (largoMal_(p.examenes, LARGO_TEXTO, 'Los exámenes')) return no(largoMal_(p.examenes, LARGO_TEXTO, 'Los exámenes'));
     return { error: '', filas: [copia_(base0, { TIPO: 'CONTROL', DETALLE: 'CONTROL', SESIONES: 0, EXAMENES: textoLimpio_(p.examenes), FECHA_RETORNO: ret })], sesionHecha: '' };
   }
   var inicio = fechaIso(p.fechaInicio);
@@ -190,7 +211,11 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
       var doc = (catalogos.doctores || []).filter(function (d) { return normTexto(d.doctor) === normTexto(v); })[0];
       if (!doc) return no('Elija el doctor de la lista.');
       nuevo = doc.doctor;
-    } else if (col === 'NOMBRE') { nuevo = textoLimpio_(v).toUpperCase(); if (!nuevo) return no('Falta el nombre del paciente.'); }
+    } else if (col === 'NOMBRE') {
+      nuevo = textoLimpio_(v).toUpperCase();
+      if (!nuevo) return no('Falta el nombre del paciente.');
+      if (largoMal_(nuevo, LARGO_NOMBRE, 'El nombre')) return no(largoMal_(nuevo, LARGO_NOMBRE, 'El nombre'));
+    }
     else if (col === 'CONTACTO') {
       nuevo = contactoNormal_(v);
       if (!nuevo) return no('Falta el teléfono o usuario.');
@@ -214,7 +239,11 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
       nuevo = fechaIso(v) || '';
       if (nuevo && e.hechas) return no('Ya empezó el tratamiento: la fecha de inicio no se cambia.');
       if (nuevo && (nuevo < hoy || nuevo > sumarDias(hoy, 180))) return no('La fecha de la primera sesión va de hoy a 180 días.');
-    } else if (col === 'EXAMENES') { if (!control) return no('Solo un control tiene exámenes.'); nuevo = textoLimpio_(v); }
+    } else if (col === 'EXAMENES') {
+      if (!control) return no('Solo un control tiene exámenes.');
+      nuevo = textoLimpio_(v);
+      if (largoMal_(nuevo, LARGO_TEXTO, 'Los exámenes')) return no(largoMal_(nuevo, LARGO_TEXTO, 'Los exámenes'));
+    }
     else if (col === 'FECHA_RETORNO') {
       if (!control) return no('Solo un control tiene fecha de retorno.');
       nuevo = fechaIso(v); if (!nuevo || nuevo <= hoy) return no('La fecha de retorno debe ser después de hoy.');
@@ -586,6 +615,7 @@ function validarAlta(p, catalogos, citas, vigentes, hoy) {
     if (retorno <= hoy) return no('La fecha de retorno debe ser después de hoy.');
     if (retorno > topeDosAnios_(hoy)) return no('La fecha de retorno va hasta dos años desde hoy.');
   }
+  if (largoMal_(p.nota, LARGO_TEXTO, 'La nota')) return no(largoMal_(p.nota, LARGO_TEXTO, 'La nota'));
   if ((vigentes || {})[k]) return no('Ese paciente ya tiene un alta vigente en ' + serie.especialidad + '.');
   return { error: '', alta: { FECHA: fecha, DNI: dni, ESPECIALIDAD: serie.especialidad, DOCTOR: doctor.doctor, REGISTRADO_POR: quien,
     NOTA: textoLimpio_(p.nota), ANULADO: '', MOTIVO_ANULACION: '', DECISION: dec.nombre, FECHA_RETORNO: retorno } };

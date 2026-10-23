@@ -1659,7 +1659,32 @@ test('registro: un DNI conocido completa nombre, contacto y doctor y muestra «P
     // Un DNI incompleto quita el aviso.
     await pagina.locator('#rdni').fill('4033');
     await pagina.waitForFunction(() => !document.querySelector('#rcon .conocido'));
-    assert.match(await falta(pagina), /^Falta: DNI/);
+    assert.match(await falta(pagina), /^El DNI debe tener 8 dígitos/, 'dice por qué no vale, como el servidor');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: un documento inválido dice por qué, con el mismo texto que el servidor (7 dígitos, Ñ, ceros de más) y el nombre de 121 letras avisa', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await llenarIndicacion(pagina, { procs: ['AMO'] });
+    const casos = [['1234567', 'El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).'],
+      ['ÑA1234567', 'El documento solo lleva letras de la A a la Z (sin Ñ ni tildes), números, espacios, puntos o guiones.'],
+      ['0012345678', 'El documento 0012345678 empieza con 0 y se confundiría con el DNI 12345678. Si es un DNI, escriba sus 8 dígitos; si es un carné de extranjería, escríbalo con sus letras (p. ej. CE0012345678).']];
+    for (const [dni, msg] of casos) {
+      await pagina.locator('#rdni').fill(dni);
+      await pagina.waitForFunction(m => document.querySelector('#rfalta').textContent === m, msg);
+      assert.equal(await pagina.locator('#rgo').isDisabled(), true, dni);
+      const srv = await pagina.evaluate(d => { try { DEMO.guardarRegistro({ usuario: 'MAGALY', dni: d, nombre: 'X', contacto: '987654321', fecha: S.hoy, doctor: 'Dra. Karen Matos', procedimientos: ['AMO'] }); return ''; } catch (e) { return e.message; } }, dni);
+      assert.equal(srv, msg, 'el DEMO (como el servidor) dice lo mismo');
+    }
+    await pagina.locator('#rdni').fill('40999111');
+    await pagina.locator('#rnom').fill('A'.repeat(121));
+    await pagina.waitForFunction(() => document.querySelector('#rfalta').textContent === 'El nombre va hasta 120 caracteres (tiene 121).');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    // Lo que llega a llamar con un texto de más se rechaza antes de enviar, con el texto del servidor.
+    const r = await pagina.evaluate(async () => { try { await llamar('registrarResultado', { usuario: 'MAGALY', dni: '1', especialidad: 'X', resultado: 'LO PENSARÁ', nota: 'n'.repeat(60000) }); return ''; } catch (e) { return e.message; } });
+    assert.equal(r, 'La nota va hasta 2000 caracteres (tiene 60000).');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -1690,7 +1715,7 @@ test('registro: el carné de extranjería AB123456X se acepta y no pierde las le
   try {
     await pagina.locator('#rdni').fill('AB12');
     assert.equal(await pagina.locator('#rdni').inputValue(), 'AB12');
-    assert.match(await falta(pagina), /^Falta: DNI/);
+    assert.match(await falta(pagina), /^El DNI debe tener 8 dígitos \(o el carné de extranjería, de 9 a 12 caracteres\)\.$/);
     await pagina.locator('#rdni').fill('ab123456x');
     assert.equal(await pagina.locator('#rdni').inputValue(), 'AB123456X');
     await pagina.waitForSelector('#rcon .nuevo');
@@ -4627,6 +4652,20 @@ test('idempotencia: cada escritura lleva un op; si falla, repetir lo mismo manda
     assert.equal(r.repetida, true, 'y el DEMO devuelve lo de la primera vez');
     assert.notEqual(r.ops[2], r.ops[0], 'lo que salió bien suelta su op');
     assert.equal(r.r3repetida, false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('la ficha y el panel parten las palabras larguísimas (overflow-wrap) en vez de desbordar', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '40111222');
+    await pagina.evaluate(() => { document.querySelector('#ficha .ficha header h2').textContent = 'A'.repeat(1000); });
+    const r = await pagina.evaluate(() => {
+      const h = document.querySelector('#ficha .ficha header h2'), f = document.querySelector('#ficha .ficha');
+      return { wrap: getComputedStyle(h).overflowWrap, ancho: f.scrollWidth <= f.clientWidth + 1, pagina: document.documentElement.scrollWidth <= window.innerWidth };
+    });
+    assert.deepEqual(r, { wrap: 'anywhere', ancho: true, pagina: true });
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

@@ -176,6 +176,8 @@ function validarResultado(p, d) {
   if (r.soloReevaluacion && esIndicacion && !porReevaluar && !empezado) return no('«Agendó cita» es solo para reevaluaciones. Use «Aceptó».');
   if (r.nombre === 'ACEPTÓ' && empezado) return no('El tratamiento ya empezó: use «Agendó cita» para la próxima sesión.');
   var hoy = d.hoy, f = fechaIso(p.fecha), nota = textoLimpio_(p.nota);
+  if (largoMal_(nota, LARGO_TEXTO, 'La nota')) return no(largoMal_(nota, LARGO_TEXTO, 'La nota'));
+  if (largoMal_(p.motivo, LARGO_TEXTO, 'El motivo')) return no(largoMal_(p.motivo, LARGO_TEXTO, 'El motivo'));
   if (r.nombre === 'PAGO') {
     // Solo antes de tener fecha: el pago lleva a Pago realizado; después de agendar no cambia la fase (Etapa 3, §3).
     if (t.COLUMNA === 'PAGO_REALIZADO') return no('Ya figura el pago del ' + fechaCorta_(t.FECHA_PAGO) + '.');

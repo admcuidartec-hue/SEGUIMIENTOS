@@ -88,8 +88,24 @@ function indiceDeEncabezado(encabezado) {
   return idx;
 }
 
+/*
+ * Caracteres que no se ven y no deben guardarse: los de control (U+0000…U+001F salvo los espacios, U+007F…U+009F), los de
+ * dirección (U+200E, U+200F, U+202A…U+202E, U+2066…U+2069: U+202E invertía cómo se veía el resto del nombre), el espacio de
+ * ancho cero (U+200B) y la marca U+FEFF. El tabulador y los saltos de línea quedan como espacio. Quedan U+200C y U+200D (emojis).
+ */
+var INVISIBLES_ = /[\u0000-\u0008\u000B\u000E-\u001F\u007F-\u009F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+
 function textoLimpio_(v) {
-  return String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  return String(v == null ? '' : v).replace(INVISIBLES_, '').replace(/\s+/g, ' ').trim();
+}
+
+/** Largos máximos de los textos libres (una celda de Sheets admite 50 000; la pantalla y el servidor avisan antes). */
+var LARGO_NOMBRE = 120, LARGO_TEXTO = 2000;
+
+/** '' si `v` (ya limpio) cabe en `max`; si no, «El nombre va hasta 120 caracteres (tiene 999).». `que` lleva su artículo. */
+function largoMal_(v, max, que) {
+  var n = textoLimpio_(v).length;
+  return n > max ? que + (/^L[ao]s /.test(que) ? ' van' : ' va') + ' hasta ' + max + ' caracteres (tiene ' + n + ').' : '';
 }
 
 /** 'HIERRO CARBOXIMALTOSA' -> 'Hierro carboximaltosa'. */

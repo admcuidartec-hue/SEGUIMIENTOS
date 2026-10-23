@@ -902,15 +902,36 @@ function limpiarParaEnvio(v) {
 /* ============ Puente con Apps Script. Abierto como archivo, usa el DEMO del final ============ */
 const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
 
-function llamar(fn, ...args) {
+/*
+ * Idempotencia: cada acción que escribe lleva un identificador de operación (`op`). Si falla (p. ej. se perdió la respuesta
+ * aunque el servidor guardó) y la persona repite lo mismo, se manda el MISMO op y el servidor devuelve lo de la primera vez
+ * sin escribir otra vez (opDe_ y filasDeOp_ en el servidor). Lo que salió bien suelta su op; uno viejo (10 minutos) se renueva.
+ */
+const ESCRIBEN_CON_OP = { registrarResultado: 1, marcarSesion: 1, guardarRegistro: 1, registrarContactoEnfermeria: 1, darDeAlta: 1,
+  anularRegistro: 1, anularSesion: 1, anularAlta: 1, anularResultado: 1, anularContactoEnfermeria: 1 };
+const OPS = new Map(), OP_VIGENCIA_MS = 10 * 60 * 1000;
+function conOp(fn, args) {
+  const p = args[0];
+  if (!ESCRIBEN_CON_OP[fn] || !p || typeof p !== 'object' || p.op) return { args, clave: '' };
+  const clave = fn + '|' + S.hoy + '|' + JSON.stringify(p), ahora = Date.now();
+  let o = OPS.get(clave);
+  if (!o || ahora - o.t > OP_VIGENCIA_MS) {
+    o = { op: 'OP-' + ahora.toString(36) + '-' + Math.random().toString(36).slice(2, 10), t: ahora };
+    OPS.set(clave, o);
+  }
+  return { args: [Object.assign({}, p, { op: o.op })].concat(args.slice(1)), clave };
+}
+function llamar(fn, ...args0) {
+  const { args, clave } = conOp(fn, args0);
+  const listo = r => { if (clave) OPS.delete(clave); return r; };
   if (EN_APPS_SCRIPT) {
     return new Promise((res, rej) => google.script.run
       .withSuccessHandler(res)
-      .withFailureHandler(e => rej(new Error(e.message || e)))[fn](...args));
+      .withFailureHandler(e => rej(new Error(e.message || e)))[fn](...args)).then(listo);
   }
   if (!DEMO[fn]) return Promise.reject(new Error('El modo de demostración no tiene ' + fn + '.'));
   // Limpia como el servidor y copia, como google.script.run: tocar la respuesta no cambia el DEMO.
-  return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(limpiarParaEnvio(x))));
+  return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(limpiarParaEnvio(x)))).then(listo);
 }
 
 /* ============ Estado global ============ */
@@ -2407,6 +2428,7 @@ async function guardarResultado(clave, resultado, extra) {
   if (seleccion.panel === clave) { pintarPanel(); const pa = S.pacientes.find(x => x.id === clave); if (pa) cargarHistoria(pa); }
   const d = deshacerDe(r);
   if (r && r.agendaError) { avisar('La sesión quedó marcada; agende la próxima con «Cambiar fecha».', d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null); return; }
+  if (r && r.reaccionError) { avisar(r.reaccionError, d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null); return; }
   avisar(textoGuardado(p, resultado, r) + (resultado === 'ACEPTÓ' ? '. Para cambiar la fecha o deshacerlo, edite o anule el registro.' : ''), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
 }
 /** La recarga silenciosa que se descartó por un guardado en vuelo se pide de nuevo al terminar el último. */
@@ -3705,7 +3727,7 @@ async function escribirFicha(o) {
     avisar('No se guardó: ' + e.message);
     return false;
   }
-  avisar(o.aviso(r || {}));
+  avisar((r && r.reaccionError) || o.aviso(r || {}));
   if (o.luego) o.luego(r || {});
   await trasEscribirFicha();
   PA.enVuelo = '';
@@ -5836,7 +5858,7 @@ const DEMO = (() => {
         && (LIGA_SESION.test(String(g.NOTA || '').trim()) || String(g.FECHA_PROXIMA || '') >= hoy)).forEach(g => {
         g.ANULADO = 'SÍ';
         g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló el registro ' + r.ID + ')';
-        if (String(g.FECHA_HORA).slice(0, 10) === hoy) sumarHecho(g.RESPONSABLE, -1, true);
+        if (String(g.FECHA_HORA).slice(0, 10) === hoy && !LIGA_SESION.test(String(g.NOTA || '').trim())) sumarHecho(g.RESPONSABLE, -1, true);
       });
       return { ok: true };
     },
@@ -5891,7 +5913,7 @@ const DEMO = (() => {
           ACCION: 'HECHO', MOTIVO: '', NOTA: 'Agendada al marcar la sesión ' + s.NUMERO + ' (' + s.ID + ')', REFERENCIA: r.ID, RESULTADO: 'AGENDÓ CITA',
           FECHA_PROXIMA: prox, TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
         seguimientos.push(g);
-        sumarHecho(quien, 1, true);
+        // Como hechosHoyPor_: la agenda ligada a la sesión es parte de ella; la meta del día suma 1 (la sesión), no 2.
         Object.assign(t, { ESTADO: 'AGENDADO', AGENDA: 'SESION', FECHA_AGENDA: prox, INTENTO: 0, N_SEGUIMIENTOS: 1, ULTIMO_SEGUIMIENTO: hoy, ATRASO: 0 });
         ubicar(t, 'AGENDADO');
         out.agenda = g;
@@ -5919,7 +5941,7 @@ const DEMO = (() => {
       }).forEach(g => {
           g.ANULADO = 'SÍ';
           g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló la sesión ' + s.ID + ')';
-          sumarHecho(g.RESPONSABLE, -1, true);
+          if (!LIGA_SESION.test(String(g.NOTA || '').trim())) sumarHecho(g.RESPONSABLE, -1, true);   // la ligada no sumó
         });
       if (fotos[s.ID]) { restaurar(fotos[s.ID]); delete fotos[s.ID]; } else {
         const t = tarjetas.find(y => y.ID_REGISTRO === s.ID_REGISTRO);
@@ -6121,11 +6143,20 @@ const DEMO = (() => {
     if (typeof cargarRegistros === 'function') cargarRegistros();
     return r.ID;
   };
+  // Como el servidor (filasDeOp_): una operación que ya se guardó con ese op devuelve lo de la primera vez, sin volver a escribir.
+  const hechasPorOp = {};
   Object.keys(api).forEach(fn => {
     demo[fn] = (...args) => {
       demo._llamadas[fn] = (demo._llamadas[fn] || 0) + 1;
       demo._ultimo[fn] = clonar(args);
-      const correr = () => { if (demo._fallar[fn]) throw new Error(demo._fallar[fn]); return api[fn](...args); };
+      const op = args[0] && typeof args[0] === 'object' ? String(args[0].op || '') : '';
+      const correr = () => {
+        if (op && hechasPorOp[fn + '|' + op]) return Object.assign(clonar(hechasPorOp[fn + '|' + op]), { repetida: true });
+        if (demo._fallar[fn]) throw new Error(demo._fallar[fn]);
+        const r = api[fn](...args);
+        if (op && r && r.ok !== false) hechasPorOp[fn + '|' + op] = clonar(r);
+        return r;
+      };
       if (!demo._demora[fn]) return correr();
       if (demo._alPedir[fn]) {
         let foto, error;

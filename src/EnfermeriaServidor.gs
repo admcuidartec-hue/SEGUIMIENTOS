@@ -28,7 +28,10 @@ function filaEnfermeria_(fila, filas) {
 }
 
 function registrarContactoEnfermeria(p) {
-  var d = datos_();
+  var d = datos_(), op = opDe_(p);
+  // El mismo op ya se guardó (se perdió la respuesta): lo de la primera vez, sin otro contacto.
+  var previa = filasDeOp_(d.enfermeria, op)[0];
+  if (previa) return limpiarParaEnvio({ ok: true, repetida: true, fila: previa, contactos: contactosDe_(d) });
   var v = validarContactoEnfermeria(p, { catalogos: d.catalogos, contactos: contactosDe_(d) });
   if (v.error) throw new Error(v.error);
   var lock = bloquear_(), f;
@@ -36,29 +39,33 @@ function registrarContactoEnfermeria(p) {
     exigirColumnas_('ENFERMERIA', COLUMNAS_ENFERMERIA);
     // Otra enfermera pudo registrar ese mismo contacto entretanto: se vuelve a validar con la hoja releída.
     d.enfermeria = leerEnfermeria_();
+    previa = filasDeOp_(d.enfermeria, op)[0];
+    if (previa) return limpiarParaEnvio({ ok: true, repetida: true, fila: previa, contactos: contactosDe_(d) });
     v = validarContactoEnfermeria(p, { catalogos: d.catalogos, contactos: contactosDe_(d) });
     if (v.error) throw new Error(v.error);
     f = filaEnfermeria_(v.fila, d.enfermeria);
-    anexarObjeto_('ENFERMERIA', COLUMNAS_ENFERMERIA, f);
+    if (op) f.OP = op;
+    anexarObjeto_('ENFERMERIA', conOp_('ENFERMERIA', COLUMNAS_ENFERMERIA), f);
     bitacora_(f.ENFERMERA, 'ENFERMERÍA', f.ID + ' · ' + f.DNI + ' · sesión ' + f.NUMERO_SESION + ' · día ' + f.DIA + ' · ' + f.RESULTADO +
-      (f.REACCION ? ' · ' + f.REACCION_TIPO + ': ' + f.REACCION : ''));
+      (f.REACCION ? ' · ' + f.REACCION_TIPO + ': ' + f.REACCION : ''), op);
   } finally {
     soltar_(lock);
   }
   d.enfermeria = d.enfermeria.concat([f]);
-  return limpiarParaEnvio({ ok: true, fila: f, contactos: contactosDe_(d) });
+  return limpiarParaEnvio(avisos_({ ok: true, fila: f, contactos: contactosDe_(d) }));
 }
 
 function anularContactoEnfermeria(p) {
-  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id);
+  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id), op = opDe_(p);
   if (id.indexOf('ENF-') !== 0) throw new Error('Aquí solo se anulan contactos de Enfermería (ENF-…).');
   var lock = bloquear_();
   try {
     var error = validarAnulacionEnfermeria(id, leerEnfermeria_());
+    if (error && /ya estaba anulad/.test(error) && anulacionHecha_(op)) return { ok: true, repetida: true };
     if (error) throw new Error(error);
     marcarAnulado_('ENFERMERIA', id, motivo);
-    bitacora_(quien, 'ANULAR ENFERMERÍA', id + ' · ' + motivo);
-    return { ok: true };
+    bitacora_(quien, 'ANULAR ENFERMERÍA', id + ' · ' + motivo, op);
+    return avisos_({ ok: true });
   } finally {
     soltar_(lock);
   }

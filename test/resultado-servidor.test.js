@@ -355,3 +355,19 @@ test('getPaciente: un programado que rechazó («No desea realizarse», 0 sesion
   const r3 = plano(ctx.getPaciente('45000333')).registros[0];
   assert.deepEqual([r3.ESTADO_REGISTRO, r3.NO_VINO], ['PROGRAMADO', ''], 'aún dentro de la gracia');
 });
+
+test('registrarResultado con op: el reintento de un «No contestó» cuya respuesta se perdió no suma otro intento', () => {
+  const { ctx, escrito } = servidor();
+  ctx.conOp_ = (n, cols) => cols.concat(['OP']);
+  const a = plano(ctx.registrarResultado(p({ op: 'OP-nc-000001' })));
+  // La app reintenta lo mismo: el datos_ de la nueva petición ya trae la fila escrita (leerSeguimientos_ la incluye).
+  const base = ctx.datos_;
+  ctx.datos_ = () => { const d = base(); d.seguimientosTodos = d.seguimientosTodos.concat(escrito.SEGUIMIENTOS); d.seguimientos = d.seguimientos.concat(escrito.SEGUIMIENTOS); return ctx.derivar_(d); };
+  const b = plano(ctx.registrarResultado(p({ op: 'OP-nc-000001' })));
+  assert.equal(escrito.SEGUIMIENTOS.length, 1);
+  assert.deepEqual([b.ok, b.repetida, b.seguimiento.ID, b.tarjeta.CLAVE], [true, true, a.seguimiento.ID, a.tarjeta.CLAVE]);
+  assert.equal(escrito.SEGUIMIENTOS[0].OP, 'OP-nc-000001');
+  // Sin op (una app vieja): como antes, otro intento.
+  ctx.registrarResultado(p());
+  assert.equal(escrito.SEGUIMIENTOS.length, 2);
+});

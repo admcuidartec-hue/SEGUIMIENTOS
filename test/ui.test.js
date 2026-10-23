@@ -662,7 +662,12 @@ const esperarCol = (pagina, id, col) => pagina.waitForFunction(([id, col]) => {
 }, [id, col]);
 const textoTarjeta = (pagina, id) => pagina.evaluate(id => [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent.replace(/\s+/g, ' ').trim(), id);
 const llamadas = (pagina, fn) => pagina.evaluate(fn => DEMO._llamadas[fn] || 0, fn);
-const ultimo = (pagina, fn) => pagina.evaluate(fn => DEMO._ultimo[fn][0], fn);
+// Sin el `op` (idempotencia), que es distinto en cada operación: lo prueba aparte «idempotencia: …».
+const ultimo = (pagina, fn) => pagina.evaluate(fn => {
+  const a = DEMO._ultimo[fn][0];
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return a;
+  const o = Object.assign({}, a); delete o.op; return o;
+}, fn);
 const aviso = pagina => pagina.locator('#aviso span').textContent();
 async function abrirPanelDe(pagina, id) {
   await pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
@@ -4506,7 +4511,7 @@ test('tablero: médico y especialidad se recuerdan (seg.medico, seg.esp) como ti
   } finally { await c.navegador.close(); }
 });
 
-test('DEMO: anular un registro anula su próxima sesión agendada (deja de contar en la meta); la sesión hecha sigue contando y ya no se anula', async () => {
+test('DEMO: anular un registro anula su próxima sesión agendada; la sesión hecha sigue contando en la meta (la agenda no sumaba) y ya no se anula', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
     await pagina.waitForFunction(() => S.fase === 'listo');
@@ -4525,8 +4530,8 @@ test('DEMO: anular un registro anula su próxima sesión agendada (deja de conta
       const sigue = Object.values(t.columnas).flat().some(x => x.ID_REGISTRO === id);
       return { suma: m1 - m0, resta: m1 - m2, err, sigue, sesId: ses.sesion.ID };
     });
-    assert.equal(r.suma, 2, 'la sesión y su próxima agendada');
-    assert.equal(r.resta, 1, 'al anular el registro se va la agenda; la sesión hecha sigue contando');
+    assert.equal(r.suma, 1, 'la sesión; su próxima agendada es parte de ella y no suma aparte (hechosHoyPor_)');
+    assert.equal(r.resta, 0, 'al anular el registro se va la agenda; la sesión hecha sigue contando');
     assert.match(r.err, /^El registro REG-\d+ está anulado: sus sesiones ya no se anulan\.$/);
     assert.equal(r.sigue, false);
     assert.deepEqual(errores, []);
@@ -4592,6 +4597,36 @@ test('dos pestañas: «Marcar sesión 3 hecha» desde una pantalla vieja se rech
     assert.equal(otra, 3);
     const msg = await pagina.evaluate(id => { try { DEMO.marcarSesion({ usuario: 'MAGALY', id, fecha: S.hoy, sesion: 3 }); return 'guardó'; } catch (e) { return e.message; } }, id);
     assert.equal(msg, 'La sesión 3 ya se registró; recargue.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('idempotencia: cada escritura lleva un op; si falla, repetir lo mismo manda el MISMO op y el DEMO no escribe dos veces', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const t = DEMO.getTablero().columnas.POR_CONTACTAR.find(x => x.TIPO_SEGUIMIENTO === 'REEVALUACION');
+      const datos = { usuario: 'MAGALY', dni: t.DNI, especialidad: t.ESPECIALIDAD, referencia: '', resultado: 'NO CONTESTÓ' };
+      // 1) La primera llamada «se pierde»: el DEMO guarda pero la app recibe un error de red.
+      DEMO._fallar.registrarResultado = '';
+      const real = DEMO.registrarResultado;
+      let ops = [];
+      DEMO.registrarResultado = (x) => { ops.push(x.op); const out = real(x); if (ops.length === 1) throw new Error('NetworkError: Connection failure due to HTTP 0'); return out; };
+      let e1 = '';
+      try { await llamar('registrarResultado', datos); } catch (e) { e1 = e.message; }
+      const r2 = await llamar('registrarResultado', datos);   // la asesora lo repite
+      const r3 = await llamar('registrarResultado', datos);   // y otra vez, después de que salió bien: es otra operación
+      DEMO.registrarResultado = real;
+      return { e1, ops, repetida: r2.repetida === true, r3repetida: !!r3.repetida };
+    });
+    assert.match(r.e1, /NetworkError/);
+    assert.equal(r.ops.length, 3);
+    assert.match(r.ops[0], /^OP-[a-z0-9]+-[a-z0-9]+$/);
+    assert.equal(r.ops[1], r.ops[0], 'el reintento manda el mismo op');
+    assert.equal(r.repetida, true, 'y el DEMO devuelve lo de la primera vez');
+    assert.notEqual(r.ops[2], r.ops[0], 'lo que salió bien suelta su op');
+    assert.equal(r.r3repetida, false);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

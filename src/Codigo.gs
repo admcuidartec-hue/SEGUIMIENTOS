@@ -152,10 +152,80 @@ function anexarObjeto_(nombre, columnas, objeto) {
   hoja_(nombre).appendRow(columnas.map(function (c) { return celdaParaHoja_(objeto[c], c); }));
 }
 
-function bitacora_(usuario, accion, detalle) {
-  anexarObjeto_('BITACORA', COLUMNAS_BITACORA, {
-    FECHA_HORA: fechaHoraTexto_(new Date()), USUARIO: usuario, ACCION: accion, DETALLE: detalle
+/**
+ * Una línea de BITACORA. Se escribe DESPUÉS de lo que registra: si falla, lo registrado ya está guardado y no se deshace
+ * (decidido el 23/10/2026: decir «No se guardó» habiendo guardado hacía que la asesora lo repitiera). Por eso no lanza:
+ * deja el error en MEMO.avisos y la respuesta lo trae en `aviso` (avisos_). `op`, el identificador de la operación (opDe_).
+ */
+function bitacora_(usuario, accion, detalle, op) {
+  try {
+    anexarObjeto_('BITACORA', conOp_('BITACORA', COLUMNAS_BITACORA), {
+      FECHA_HORA: fechaHoraTexto_(new Date()), USUARIO: usuario, ACCION: accion, DETALLE: detalle, OP: op || ''
+    });
+  } catch (e) {
+    (MEMO.avisos = MEMO.avisos || []).push('Se guardó, pero no se pudo escribir la BITACORA: ' + (e && e.message || e));
+  }
+}
+
+/** La respuesta con `aviso` si algo secundario falló después de guardar (p. ej. la BITACORA). */
+function avisos_(out) {
+  if (MEMO.avisos && MEMO.avisos.length && out && typeof out === 'object') out.aviso = MEMO.avisos.join(' ');
+  return out;
+}
+
+/**
+ * Una escritura de varias filas falló a mitad: se deshace lo escrito en ESTA llamada (las funciones de `deshacer`, de la última a
+ * la primera: anulan la fila o devuelven la celda a su valor) y se lanza el error, para que la app diga «No se guardó» sin que
+ * quede nada a medias. Si deshacer también falla, el mensaje lo dice: quedaría algo que anular a mano.
+ */
+function deshacerEscritura_(deshacer, err) {
+  var fallos = [];
+  (deshacer || []).slice().reverse().forEach(function (f) { try { f(); } catch (e) { fallos.push(e && e.message || String(e)); } });
+  var m = (err && err.message) || String(err);
+  throw new Error(m + (fallos.length ? ' Además no se pudo deshacer todo (' + fallos.join('; ') + '): revise Registrados y anule lo que haya quedado.'
+    : ' No quedó nada guardado: se deshizo lo escrito.'));
+}
+
+/* ---------- Idempotencia: el identificador de operación (op) ---------- */
+
+/*
+ * Cada acción que escribe lleva un `op` generado en la app; al reintentar lo mismo (p. ej. tras perderse la respuesta) la app
+ * manda el mismo op y el servidor devuelve lo de la primera vez sin escribir otra vez. Se guarda en la columna OP, al final de
+ * SEGUIMIENTOS, SESIONES, REGISTROS, ALTAS, ENFERMERIA y BITACORA (la agrega «Preparar hojas»). Sin esa columna, se escribe
+ * como antes, sin idempotencia: nunca se niega a escribir por eso.
+ */
+var COLUMNA_OP = 'OP';
+
+/** El op de la petición: letras, números, punto, guion o guion bajo (6 a 80); si no, '' (sin idempotencia). */
+function opDe_(p) {
+  var o = String((p && p.op) || '').trim();
+  return /^[A-Za-z0-9._\-]{6,80}$/.test(o) ? o : '';
+}
+
+/** Las columnas con que se escribe `nombre`: con OP al final si la hoja ya la tiene; si no (o no se puede saber), sin ella. */
+function conOp_(nombre, columnas) {
+  MEMO.conOp = MEMO.conOp || {};
+  if (!(nombre in MEMO.conOp)) {
+    var tiene = false;
+    try { var cab = encabezado_(hoja_(nombre)); tiene = cab.length === columnas.length + 1 && cab[columnas.length] === COLUMNA_OP; } catch (e) { tiene = false; }
+    MEMO.conOp[nombre] = tiene;
+  }
+  return MEMO.conOp[nombre] ? columnas.concat([COLUMNA_OP]) : columnas;
+}
+
+/** Las filas sin anular de `filas` escritas con ese op (o con op + '#n', las de una operación de varias filas). */
+function filasDeOp_(filas, op) {
+  if (!op) return [];
+  return (filas || []).filter(function (f) {
+    var o = String(f.OP || '').trim();
+    return !anulado_(f) && (o === op || o.indexOf(op + '#') === 0);
   });
+}
+
+/** ¿Ya se registró una anulación con este op? (BITACORA): el reintento de una anulación que ya se hizo vale como hecha. */
+function anulacionHecha_(op) {
+  if (!op) return false;
+  return leerOpcional_('BITACORA').some(function (b) { return String(b.OP || '').trim() === op; });
 }
 
 /** Confirma lo escrito y suelta el candado. Sin flush, la siguiente asesora podría leer los IDs antes de que se guarden. */

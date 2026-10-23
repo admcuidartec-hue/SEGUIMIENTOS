@@ -415,9 +415,14 @@ function pendientesRegistro(d) {
     // fecha: un «Agendó cita» de esa misma mañana era para la sesión que se acaba de marcar. Y una agenda ligada a una sesión
     // (la que se agendó al marcarla) vale solo mientras esa sesión siga siendo la última válida: si se anuló, la agenda no cuenta.
     var ultimaSes = sesionesDe_(r.ID, d.sesiones).slice(-1)[0] || null, corte = enCurso && ultimaSes ? String(ultimaSes.FECHA_HORA || '') : '';
+    // Un programado lee su ciclo desde la fecha de la primera sesión, pero el «Pagó» de su cotización (anterior a esa fecha)
+    // sigue siendo de este ciclo hasta que empiece el tratamiento: si no viene, vuelve a Pago realizado, no a Por contactar
+    // (Etapa 3: el pago nunca retrocede), y no se cierra solo por tiempo.
+    var desdeCotizacion = programado && !control ? fechaIso(r.FECHA) : '';
     var lista = (segs[r.ID] || []).filter(function (s) {
       var ligada = sesionLigada(s);
       if (ligada && (!ultimaSes || ligada !== ultimaSes.ID)) return false;
+      if (desdeCotizacion && fechaIso(s.FECHA_HORA) >= desdeCotizacion && normTexto(s.RESULTADO) === 'PAGO') return true;
       return fechaIso(s.FECHA_HORA) >= desde && String(s.FECHA_HORA || '') >= corte;
     }).sort(porFechaHora_);
     var c = leerCiclo(lista, reglas, hoy);

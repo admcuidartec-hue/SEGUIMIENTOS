@@ -268,10 +268,12 @@ function derivar_(d) {
   d.telefonos = telefonosPorDni(d.indicacionesTodas, d.contactos, d.seguimientos);
   // El «@usuario» de Registro también es un contacto: «Número equivocado» no cierra mientras quede (sinContacto_).
   d.usuarios = usuariosPorDni(d.registros);
+  // Las citas no cambian dentro de una petición: el índice médico → especialidades se arma una vez (pendientesRegistro).
+  if (!d.espPorMedico) d.espPorMedico = indiceEspecialidadesMedico(d.citas);
   d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos, d.usuarios);
   d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.usuarios)
     .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
-      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios }));
+      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios, espPorMedico: d.espPorMedico }));
   return d;
 }
 

@@ -13,6 +13,25 @@ function tarjetasAbiertas_(d) {
 
 function registrarResultado(p) { return registrarResultado_(p, null); }
 
+/**
+ * Lo leído (antes de derivar_), reducido a las filas de UN paciente: sus citas, indicaciones, seguimientos, contactos, registros
+ * (y sus sesiones), altas y Enfermería. La tarjeta de un paciente solo depende de sus filas —y del índice médico →
+ * especialidades, que se conserva entero—, así que derivar_ y armarTablero sobre esto dan sus mismas tarjetas (lo comprueba
+ * logica-rendimiento.test.js) en milisegundos: es lo que se recalcula DENTRO del candado, en vez del libro entero.
+ */
+function soloDelPaciente_(d, dni) {
+  var k = normDni(dni), suyo = function (x) { return normDni(x.DNI) === k; };
+  var registros = (d.registros || []).filter(suyo), ids = {};
+  registros.forEach(function (r) { ids[r.ID] = 1; });
+  return { hoy: d.hoy, reglas: d.reglas, catalogos: d.catalogos,
+    espPorMedico: d.espPorMedico || indiceEspecialidadesMedico(d.citas),
+    citas: (d.citas || []).filter(suyo), indicaciones: (d.indicaciones || []).filter(suyo),
+    seguimientosTodos: (d.seguimientosTodos || []).filter(suyo), seguimientos: (d.seguimientos || []).filter(suyo),
+    contactos: (d.contactos || []).filter(function (c) { return normDni(c.DNI_PACIENTE) === k; }),
+    registros: registros, sesiones: (d.sesiones || []).filter(function (x) { return ids[x.ID_REGISTRO]; }),
+    altas: (d.altas || []).filter(suyo), enfermeria: (d.enfermeria || []).filter(suyo) };
+}
+
 /** Guarda contra la ventana de publicación: SEGUIMIENTOS se escribe por posición y necesita sus columnas nuevas. */
 function exigirHojaPreparada_() {
   var plan = encabezadoAmpliable(encabezado_(hoja_('SEGUIMIENTOS')), COLUMNAS_SEGUIMIENTOS);
@@ -32,8 +51,11 @@ function conTarjeta_(r, clave) {
 
 /** `opciones` es interno (no viene de la app): { motivo } conserva el motivo original de una pestaña vieja. */
 function registrarResultado_(p, opciones) {
-  var d = datos_();
-  var v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(d) });
+  var d = datos_(), dni = normDni(p && p.dni);
+  // La tarjeta se busca entre las del paciente, calculadas solo con sus filas (soloDelPaciente_): lo mismo que el tablero
+  // entero, sin recalcular todo el libro dentro del candado.
+  var dp = derivar_(soloDelPaciente_(d, dni));
+  var v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(dp) });
   if (v.error) throw new Error(v.error);
   var t = v.tarjeta, indicacion = !!TIPOS_INDICACION[normTexto(t.ESPECIALIDAD)];
   if (v.fila.RESULTADO === 'ALTA MÉDICA' && !indicacion) {
@@ -54,15 +76,15 @@ function registrarResultado_(p, opciones) {
     d.seguimientos = frescos;
     // «Aceptó» crea o programa un registro: otra asesora pudo hacerlo entretanto, y su registro cierra la cotización.
     if (v.fila.RESULTADO === 'ACEPTÓ') d.registros = leerRegistros_();
-    derivar_(d);
-    v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(d) });
+    dp = derivar_(soloDelPaciente_(d, dni));
+    v = validarResultado(p, { catalogos: d.catalogos, hoy: d.hoy, tarjetas: tarjetasAbiertas_(dp) });
     if (v.error) throw new Error(v.error);
     t = v.tarjeta;
     if (opciones && opciones.motivo) v.fila.MOTIVO = opciones.motivo;
     var quedan = true;
     if (v.fila.TELEFONO) {
       var marca = { DNI: v.fila.DNI, RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: v.fila.TELEFONO, FECHA_HORA: fechaHoraTexto_(ahora) };
-      quedan = (telefonosPorDni(d.indicacionesTodas, d.contactos, frescos.concat([marca]))[v.fila.DNI] || []).length > 0 || !!t.USUARIO;
+      quedan = (telefonosPorDni(dp.indicacionesTodas, dp.contactos, dp.seguimientos.concat([marca]))[v.fila.DNI] || []).length > 0 || !!t.USUARIO;
     }
     var registro = null;
     if (v.fila.RESULTADO === 'ACEPTÓ') {
@@ -96,8 +118,8 @@ function registrarResultado_(p, opciones) {
   }
   // Fuera del candado: la tarjeta recalculada en memoria, para que la app confirme el movimiento.
   d.seguimientosTodos = d.seguimientosTodos.concat([s]);
-  derivar_(d);
-  var clave = registro ? registro.ID : claveTarjeta(t), tab = armarTablero(d), nueva = null;
+  MEMO.datos = null;   // lo derivado de d ya no vale: si algo más lo pide en esta ejecución, se vuelve a leer
+  var clave = registro ? registro.ID : claveTarjeta(t), tab = armarTablero(derivar_(soloDelPaciente_(d, dni))), nueva = null;
   Object.keys(tab.columnas).forEach(function (c) {
     tab.columnas[c].forEach(function (x) { if (x.CLAVE === clave && !nueva) nueva = x; });
   });

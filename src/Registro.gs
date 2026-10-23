@@ -348,12 +348,31 @@ function agendaVivaDeRegistro(id, seguimientos, hoy) {
 /**
  * Especialidades en que atiende el médico SOFDOC `medico`, según las citas: { 'HEMATOLOGIA': 'HEMATOLOGÍA' } (clave normalizada,
  * valor tal como viene en las citas). Vacío si no aparece en ninguna (entonces cualquier especialidad vale).
+ * Con `indice` (indiceEspecialidadesMedico de esas mismas citas) no recorre las citas: pendientesRegistro lo pide por cada
+ * registro, y recorrerlas cada vez era el 92 % del tiempo de cada llamada con 1000 registros y 5000 citas.
  */
-function especialidadesDeMedico_(medico, citas) {
+function especialidadesDeMedico_(medico, citas, indice) {
   var out = {}, m = normTexto(medico);
   if (!m) return out;
-  (citas || []).forEach(function (c) { if (normTexto(c.MEDICO) === m && c.ESPECIALIDAD) out[normTexto(c.ESPECIALIDAD)] = c.ESPECIALIDAD; });
+  var idx = indice || indiceEspecialidadesMedico(citas), suyas = idx[m] || {};
+  Object.keys(suyas).forEach(function (k) { out[k] = suyas[k]; });
   return out;
+}
+
+/**
+ * { MEDICO normalizado: { ESPECIALIDAD normalizada: tal como viene } } en una sola pasada por las citas. Si una especialidad
+ * aparece escrita de dos formas, vale la de la última cita (como recorrerlas una por una).
+ */
+function indiceEspecialidadesMedico(citas) {
+  var idx = {}, norm = {};
+  var n = function (v) { var k = String(v); return k in norm ? norm[k] : (norm[k] = normTexto(v)); };
+  (citas || []).forEach(function (c) {
+    if (!c.ESPECIALIDAD) return;
+    var m = n(c.MEDICO);
+    if (!m) return;
+    (idx[m] = idx[m] || {})[n(c.ESPECIALIDAD)] = c.ESPECIALIDAD;
+  });
+  return idx;
 }
 
 /**
@@ -380,6 +399,7 @@ function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA
 function pendientesRegistro(d) {
   var porDni = realizadasPorDni_(d.citas), segs = {}, reglas = d.reglas, hoy = d.hoy;
   var marcas = marcasTelefono(d.seguimientos), muertos = fallecidos(d.seguimientos);
+  var espPorMedico = d.espPorMedico || indiceEspecialidadesMedico(d.citas);
   (d.seguimientos || []).forEach(function (s) {
     if (s.REFERENCIA) (segs[s.REFERENCIA] = segs[s.REFERENCIA] || []).push(s);
   });
@@ -417,7 +437,7 @@ function pendientesRegistro(d) {
     // si se sabe) o la reevaluación (después de la última sesión).
     // Un tratamiento completo se reevalúa en la serie de su doctor (especialidadDelRegistro_): solo una consulta de ESA
     // especialidad después de la última sesión es «Volvió».
-    var espDoc = especialidadesDeMedico_(medicoDeRegistro(r, d.catalogos || {}), d.citas), espSerie = especialidadDelRegistro_(espDoc, realizadas, e.ultima || fechaIso(r.FECHA));
+    var espDoc = especialidadesDeMedico_(medicoDeRegistro(r, d.catalogos || {}), d.citas, espPorMedico), espSerie = especialidadDelRegistro_(espDoc, realizadas, e.ultima || fechaIso(r.FECHA));
     var vuelta = control ? realizadas.filter(function (x) {
       return x.FECHA > fechaIso(r.FECHA) && (!Object.keys(espDoc).length || espDoc[normTexto(x.ESPECIALIDAD)]);
     })[0]

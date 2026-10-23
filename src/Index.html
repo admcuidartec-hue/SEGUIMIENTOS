@@ -393,6 +393,8 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .resultados .nada{padding:14px 10px;color:var(--muted)}
 .ficha-skel{margin-top:32px;max-width:640px}
 .ficha{margin-top:32px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:36px 48px;align-items:start}
+/* Una palabra larguísima (un nombre de 1000 letras, una nota sin espacios) se parte en vez de desbordar la ficha y el panel. */
+.ficha,.ficha *,.panel,.panel *,.card,.card *{overflow-wrap:anywhere}
 .ficha header{grid-column:1/-1;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding-bottom:20px;border-bottom:1px solid var(--line)}
 .ficha header h2{margin:0;font-size:36px;font-weight:600;letter-spacing:-.03em;line-height:1.1;text-wrap:balance;outline:none}
 .ficha header>.mono{color:var(--muted)}
@@ -902,15 +904,55 @@ function limpiarParaEnvio(v) {
 /* ============ Puente con Apps Script. Abierto como archivo, usa el DEMO del final ============ */
 const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
 
-function llamar(fn, ...args) {
+/*
+ * Idempotencia: cada acción que escribe lleva un identificador de operación (`op`). Si falla (p. ej. se perdió la respuesta
+ * aunque el servidor guardó) y la persona repite lo mismo, se manda el MISMO op y el servidor devuelve lo de la primera vez
+ * sin escribir otra vez (opDe_ y filasDeOp_ en el servidor). Lo que salió bien suelta su op; uno viejo (10 minutos) se renueva.
+ */
+const ESCRIBEN_CON_OP = { registrarResultado: 1, marcarSesion: 1, guardarRegistro: 1, registrarContactoEnfermeria: 1, darDeAlta: 1,
+  anularRegistro: 1, anularSesion: 1, anularAlta: 1, anularResultado: 1, anularContactoEnfermeria: 1 };
+const OPS = new Map(), OP_VIGENCIA_MS = 10 * 60 * 1000;
+function conOp(fn, args) {
+  const p = args[0];
+  if (!ESCRIBEN_CON_OP[fn] || !p || typeof p !== 'object' || p.op) return { args, clave: '' };
+  const clave = fn + '|' + S.hoy + '|' + JSON.stringify(p), ahora = Date.now();
+  let o = OPS.get(clave);
+  if (!o || ahora - o.t > OP_VIGENCIA_MS) {
+    o = { op: 'OP-' + ahora.toString(36) + '-' + Math.random().toString(36).slice(2, 10), t: ahora };
+    OPS.set(clave, o);
+  }
+  return { args: [Object.assign({}, p, { op: o.op })].concat(args.slice(1)), clave };
+}
+/* Como textoLimpio_ y largoMal_ del servidor: sin caracteres invisibles, y nombre hasta 120 y notas, motivos y exámenes hasta 2000. */
+const INVISIBLES = /[\u0000-\u0008\u000B\u000E-\u001F\u007F-\u009F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+const limpioTexto = v => String(v == null ? '' : v).replace(INVISIBLES, '').replace(/\s+/g, ' ').trim();
+const LARGO_NOMBRE = 120, LARGO_TEXTO = 2000;
+function largoMal(v, max, que) {
+  const n = limpioTexto(v).length;
+  return n > max ? `${que} ${/^L[ao]s /.test(que) ? 'van' : 'va'} hasta ${max} caracteres (tiene ${n}).` : '';
+}
+/** Lo que el servidor rechazaría por largo, dicho antes de enviar (el mismo texto); '' si todo cabe. */
+function textoDemasiadoLargo(p) {
+  if (!p || typeof p !== 'object') return '';
+  const c = p.cambios || {}, r = p.reaccion || {};
+  return largoMal(p.nombre, LARGO_NOMBRE, 'El nombre') || largoMal(c.nombre, LARGO_NOMBRE, 'El nombre')
+    || largoMal(p.nota, LARGO_TEXTO, 'La nota') || largoMal(p.motivo, LARGO_TEXTO, 'El motivo')
+    || largoMal(p.examenes, LARGO_TEXTO, 'Los exámenes') || largoMal(c.examenes, LARGO_TEXTO, 'Los exámenes')
+    || largoMal(r.nota, LARGO_TEXTO, 'La nota de la reacción');
+}
+function llamar(fn, ...args0) {
+  const largo = ESCRIBEN_CON_OP[fn] || fn === 'editarRegistro' ? textoDemasiadoLargo(args0[0]) : '';
+  if (largo) return Promise.reject(new Error(largo));
+  const { args, clave } = conOp(fn, args0);
+  const listo = r => { if (clave) OPS.delete(clave); return r; };
   if (EN_APPS_SCRIPT) {
     return new Promise((res, rej) => google.script.run
       .withSuccessHandler(res)
-      .withFailureHandler(e => rej(new Error(e.message || e)))[fn](...args));
+      .withFailureHandler(e => rej(new Error(e.message || e)))[fn](...args)).then(listo);
   }
   if (!DEMO[fn]) return Promise.reject(new Error('El modo de demostración no tiene ' + fn + '.'));
   // Limpia como el servidor y copia, como google.script.run: tocar la respuesta no cambia el DEMO.
-  return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(limpiarParaEnvio(x))));
+  return new Promise(res => res(DEMO[fn](...args))).then(x => JSON.parse(JSON.stringify(limpiarParaEnvio(x)))).then(listo);
 }
 
 /* ============ Estado global ============ */
@@ -2358,7 +2400,8 @@ async function guardarResultado(clave, resultado, extra) {
   const viaSesion = resultado === 'LO HIZO' && !!p.idRegistro;
   let r;
   try {
-    r = viaSesion ? await llamar('marcarSesion', Object.assign({ usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota }, extra.proxima ? { proxima: extra.proxima } : {},
+    // `sesion`: la que la persona ve («Marcar sesión k hecha»); si otra pestaña ya la marcó, el servidor la rechaza.
+    r = viaSesion ? await llamar('marcarSesion', Object.assign({ usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota, sesion: (Number(p.raw.HECHAS) || 0) + 1 }, extra.proxima ? { proxima: extra.proxima } : {},
       extra.reaccion ? { reaccion: extra.reaccion } : {}))
       : await llamar('registrarResultado', payload);
   } catch (e) {
@@ -2406,6 +2449,7 @@ async function guardarResultado(clave, resultado, extra) {
   if (seleccion.panel === clave) { pintarPanel(); const pa = S.pacientes.find(x => x.id === clave); if (pa) cargarHistoria(pa); }
   const d = deshacerDe(r);
   if (r && r.agendaError) { avisar('La sesión quedó marcada; agende la próxima con «Cambiar fecha».', d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null); return; }
+  if (r && r.reaccionError) { avisar(r.reaccionError, d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null); return; }
   avisar(textoGuardado(p, resultado, r) + (resultado === 'ACEPTÓ' ? '. Para cambiar la fecha o deshacerlo, edite o anule el registro.' : ''), d ? { texto: 'Deshacer', fn: () => deshacer(d[0], d[1], quien, nombreDe(p)) } : null);
 }
 /** La recarga silenciosa que se descartó por un guardado en vuelo se pide de nuevo al terminar el último. */
@@ -2632,9 +2676,21 @@ const RG = {
   recientes: {}                  // ID -> temporizador: la fila recién guardada, editada o anulada se tiñe 3 s
 };
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres (documentoValido del servidor). Nunca borra letras. */
-const dniLimpio = v => norm(v).replace(/[^A-Z0-9]/g, '');
+// La Ñ y las vocales con tilde se conservan (no se cambian por N ni A en silencio): documentoMal dice que no valen.
+const dniLimpio = v => String(v == null ? '' : v).toUpperCase().replace(/[^A-Z0-9ÑÁÉÍÓÚÜ]/g, '');
 /** Un documento de más de 12 caracteres no se corta en silencio: se avisa (y no se registra). '' si no pasa de 12. */
 const dniLargo = v => { const n = dniLimpio(v).length; return n > 12 ? `El documento tiene ${n} caracteres: el carné de extranjería va de 9 a 12.` : ''; };
+/** Como documentoMal de Registro.gs (mismos mensajes): por qué no vale el documento escrito; '' si vale. */
+function documentoMal(v) {
+  const t = limpioTexto(v), DOC = 'El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).';
+  if (/[^A-Za-z0-9\s.\-]/.test(t)) return 'El documento solo lleva letras de la A a la Z (sin Ñ ni tildes), números, espacios, puntos o guiones.';
+  const d = t.toUpperCase().replace(/[\s.\-]/g, '');
+  if (d.length > 12) return `El documento tiene ${d.length} caracteres: el carné de extranjería va de 9 a 12.`;
+  if (!/^\d{8}$/.test(d) && !/^[A-Z0-9]{9,12}$/.test(d)) return DOC;
+  if (/^0\d{8,11}$/.test(d)) return `El documento ${d} empieza con 0 y se confundiría con el DNI ${d.replace(/^0+/, '')}. ` +
+    `Si es un DNI, escriba sus 8 dígitos; si es un carné de extranjería, escríbalo con sus letras (p. ej. CE${d}).`;
+  return '';
+}
 const documentoOk = v => { const d = dniLimpio(v); return /^\d{8}$/.test(d) || /^[A-Z0-9]{9,12}$/.test(d); };
 /** Un teléfono se envía sin espacios; un usuario (@…) tal cual. */
 /** Como normTelefono del servidor: solo los dígitos, sin el 51 de un +51 (11 dígitos); '' si quedan menos de 7. */
@@ -2959,7 +3015,7 @@ function clicRegistro(e) {
 function faltanRegistro() {
   const f = [], v = s => ($(s) ? $(s).value.trim() : '');
   if (!esDecision()) {
-    if (!documentoOk(v('#rdni'))) f.push('DNI');
+    if (!v('#rdni')) f.push('DNI');
     if (!v('#rnom')) f.push('nombres');
     if (!v('#rtel')) f.push('teléfono o usuario');
     if (!v('#rfec')) f.push('fecha');
@@ -3033,7 +3089,11 @@ function validarRegistro() {
   const f = faltanRegistro(), n = RG.procs.length + (RG.trat ? 1 : 0), d = decisionUi(RG.dec);
   const hecha = RG.modo === 'indicacion' ? primeraSesionHecha() : '';
   const conSesion = hecha ? (n === 1 ? ` con la sesión 1 hecha el ${dm(hecha)}` : `, cada uno con la sesión 1 hecha el ${dm(hecha)}`) : '';
-  const campoDni = $(esDecision() ? '#adni' : '#rdni'), largo = dniLargo(campoDni ? campoDni.value : '');
+  // El documento escrito que no vale dice por qué (documentoMal, el mismo texto que el servidor), no «Falta: DNI».
+  const campoDni = $(esDecision() ? '#adni' : '#rdni'), dniEscrito = campoDni ? campoDni.value.trim() : '';
+  const largo = esDecision() ? dniLargo(dniEscrito) : (dniEscrito ? documentoMal(dniEscrito) : '')
+    || (!esDecision() && $('#rnom') ? largoMal($('#rnom').value, LARGO_NOMBRE, 'El nombre') : '')
+    || (RG.modo === 'control' && $('#rexamenes') ? largoMal($('#rexamenes').value, LARGO_TEXTO, 'Los exámenes') : '');
   const mal = largo || (f.length ? '' : fechaMalRegistro());
   b.disabled = f.length > 0 || !!mal || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
@@ -3352,14 +3412,16 @@ const NOMBRE_ESTADO = { 'VENCIDO': 'No volvió', 'ANTIGUO': 'No vuelve hace más
   'PAGO REALIZADO': 'Pagó, falta agendar' };
 // Con estos estados ya no se espera que vuelva: sin la línea «Debía volver el …».
 const SIN_ESPERA = { 'ALTA': 1, 'CERRADO': 1, 'FALLECIDO': 1, 'DESCARTADO': 1 };
-const NOMBRE_REG = { COTIZADO: 'Pendiente', PROGRAMADO: 'Programado', 'EN CURSO': 'En curso', COMPLETO: 'Completado', ANULADO: 'Anulado' };
-const TONO_REG = { COTIZADO: 'e-pend', PROGRAMADO: 'e-curso', 'EN CURSO': 'e-curso', COMPLETO: 'e-ok', ANULADO: 'e-anulado' };
+// CERRADO: su seguimiento se cerró sin terminar («No desea realizarse», «Falleció»…; cierreDeRegistroFicha_ del servidor).
+const NOMBRE_REG = { COTIZADO: 'Pendiente', PROGRAMADO: 'Programado', 'EN CURSO': 'En curso', COMPLETO: 'Completado', ANULADO: 'Anulado', CERRADO: 'Cerrado' };
+const TONO_REG = { COTIZADO: 'e-pend', PROGRAMADO: 'e-curso', 'EN CURSO': 'e-curso', COMPLETO: 'e-ok', ANULADO: 'e-anulado', CERRADO: 'e-mal' };
 /** La línea de estado de un registro de la ficha (estadoRegistro del servidor). El anulado no tiene: ya lo dice su etiqueta. */
 function lineaEstadoRegistro(x) {
   const e = String(x.ESTADO_REGISTRO || x.ESTADO || '');
   if (e === 'ANULADO') return '';
   if (x.TIPO === 'CONTROL') return (x.FECHA_RETORNO ? 'Control el ' + dm(x.FECHA_RETORNO) : 'Control') + (String(x.EXAMENES || '').trim() ? ' · exámenes: ' + String(x.EXAMENES).trim() : '');
-  if (e === 'PROGRAMADO') return 'Programado el ' + dm(x.FECHA_INICIO);
+  if (e === 'CERRADO') return 'Seguimiento cerrado' + (x.CIERRE ? ': ' + frase(x.CIERRE) : '') + (x.FECHA_CIERRE ? ' (' + dm(x.FECHA_CIERRE) + ')' : '');
+  if (e === 'PROGRAMADO') return 'Programado el ' + dm(x.FECHA_INICIO) + (x.NO_VINO ? ' · no vino' : '');
   if (e === 'EN CURSO') return `Sesión ${Number(x.HECHAS) || 0} de ${Number(x.SESIONES) || 0}`;
   return e === 'COMPLETO' ? 'Completo' : e === 'COTIZADO' ? 'Cotizado' : '';
 }
@@ -3702,7 +3764,7 @@ async function escribirFicha(o) {
     avisar('No se guardó: ' + e.message);
     return false;
   }
-  avisar(o.aviso(r || {}));
+  avisar((r && r.reaccionError) || o.aviso(r || {}));
   if (o.luego) o.luego(r || {});
   await trasEscribirFicha();
   PA.enVuelo = '';
@@ -3776,7 +3838,7 @@ function loHizo(b) {
   if (!f) { avisar('Falta la fecha de la sesión.'); return; }
   const reac = t.hierro ? reaccionDe('ficha:' + t.id) : null;
   if (reac && reac.error) { avisar(reac.error); return; }
-  escribirFicha({ boton: b, fn: 'marcarSesion', datos: Object.assign({ id: t.id, fecha: f, nota: '' }, reac ? { reaccion: reac } : {}),
+  escribirFicha({ boton: b, fn: 'marcarSesion', datos: Object.assign({ id: t.id, fecha: f, nota: '', sesion: t.sesiones.length + 1 }, reac ? { reaccion: reac } : {}),
     aviso: r => r.completo ? 'Tratamiento completado: ' + t.id + '.' : `Sesión ${(r.sesion && Number(r.sesion.NUMERO)) || t.sesiones.length + 1} de ${t.n} registrada: ${t.id}.`,
     luego: () => { delete PA.fechas[t.id]; delete REAC['ficha:' + t.id]; } });
 }
@@ -5589,10 +5651,15 @@ const DEMO = (() => {
         // además, lo que necesita el formulario de Editar (filaRegistrada).
         registros: registros.filter(r => r.DNI === k).map(r => {
           const ss = sesionesDe(r.ID), f = filaRegistrada(r), control = r.TIPO === 'CONTROL';
-          const estado = r.ANULADO ? 'ANULADO' : control ? 'PROGRAMADO' : ss.length >= f.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO'
+          const estado0 = r.ANULADO ? 'ANULADO' : control ? 'PROGRAMADO' : ss.length >= f.SESIONES ? 'COMPLETO' : ss.length ? 'EN CURSO'
             : r.FECHA_INICIO ? 'PROGRAMADO' : 'COTIZADO';
+          // Como cierreDeRegistroFicha_: sin terminar y con su seguimiento cerrado, CERRADO con el motivo (sin «Lo hizo»).
+          const tc = tarjetas.find(t => t.ID_REGISTRO === r.ID && (t.ESTADO === 'CERRADO' || t.ESTADO === 'FALLECIDO'));
+          const cerrado = !control && tc && (estado0 === 'COTIZADO' || estado0 === 'PROGRAMADO' || estado0 === 'EN CURSO');
+          const estado = cerrado ? 'CERRADO' : estado0;
           return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: f.SESIONES, HECHAS: ss.length,
-            ESTADO: estado, ESTADO_REGISTRO: estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION, NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
+            ESTADO: estado, ESTADO_REGISTRO: estado, CIERRE: cerrado ? (tc.CIERRE || 'FALLECIÓ') : '', FECHA_CIERRE: cerrado ? (tc.FECHA_CIERRE || hoy) : '', NO_VINO: '',
+            MOTIVO_ANULACION: r.MOTIVO_ANULACION, NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
             FECHA_INICIO: f.FECHA_INICIO, EXAMENES: f.EXAMENES, FECHA_RETORNO: f.FECHA_RETORNO,
             sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
         }),
@@ -5634,10 +5701,11 @@ const DEMO = (() => {
     guardarRegistro: x => {
       const quien = exigir(x);
       // Como documentoValido y normDni: se valida lo escrito (8 dígitos, con su cero) y se guarda normalizado.
-      const escrito = norm(x.dni).replace(/[\s.\-]/g, ''), dni = dniDe(x.dni);
-      if (!/^\d{8}$/.test(escrito) && !/^[A-Z0-9]{9,12}$/.test(escrito)) throw new Error('El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).');
-      const nombre = String(x.nombre || '').trim().toUpperCase();
+      const dni = dniDe(x.dni);
+      if (documentoMal(x.dni)) throw new Error(documentoMal(x.dni));
+      const nombre = limpioTexto(x.nombre).toUpperCase();
       if (!nombre) throw new Error('Falta el nombre del paciente.');
+      if (largoMal(nombre, LARGO_NOMBRE, 'El nombre')) throw new Error(largoMal(nombre, LARGO_NOMBRE, 'El nombre'));
       const contacto = String(x.contacto || '').trim();
       if (!contacto) throw new Error('Falta el teléfono o usuario.');
       if (telefonoMal(contacto)) throw new Error(telefonoMal(contacto));
@@ -5828,7 +5896,7 @@ const DEMO = (() => {
         && (LIGA_SESION.test(String(g.NOTA || '').trim()) || String(g.FECHA_PROXIMA || '') >= hoy)).forEach(g => {
         g.ANULADO = 'SÍ';
         g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló el registro ' + r.ID + ')';
-        if (String(g.FECHA_HORA).slice(0, 10) === hoy) sumarHecho(g.RESPONSABLE, -1, true);
+        if (String(g.FECHA_HORA).slice(0, 10) === hoy && !LIGA_SESION.test(String(g.NOTA || '').trim())) sumarHecho(g.RESPONSABLE, -1, true);
       });
       return { ok: true };
     },
@@ -5839,6 +5907,11 @@ const DEMO = (() => {
       if (!r) throw new Error('No encontré ese registro. Recargue la página.');
       if (r.ANULADO) throw new Error('Ese registro está anulado.');
       const validas = sesionesDe(r.ID), f = String(x.fecha || '').slice(0, 10);
+      // Como sesionYaNoEsLaSiguiente: la sesión que vio la persona debe ser la siguiente.
+      if (x.sesion !== undefined && x.sesion !== '' && Number(x.sesion) !== validas.length + 1) {
+        const k = Number(x.sesion), sig = validas.length + 1;
+        throw new Error(k < sig ? 'La sesión ' + k + ' ya se registró; recargue.' : 'La sesión ' + k + ' no es la siguiente (es la ' + sig + '); recargue.');
+      }
       if (validas.length >= r.SESIONES) throw new Error('Ese tratamiento ya tiene todas sus sesiones.');
       if (!f) throw new Error('Falta la fecha de la sesión.');
       if (f > hoy) throw new Error('La fecha no puede ser futura.');
@@ -5878,7 +5951,7 @@ const DEMO = (() => {
           ACCION: 'HECHO', MOTIVO: '', NOTA: 'Agendada al marcar la sesión ' + s.NUMERO + ' (' + s.ID + ')', REFERENCIA: r.ID, RESULTADO: 'AGENDÓ CITA',
           FECHA_PROXIMA: prox, TELEFONO: '', ANULADO: '', MOTIVO_ANULACION: '' };
         seguimientos.push(g);
-        sumarHecho(quien, 1, true);
+        // Como hechosHoyPor_: la agenda ligada a la sesión es parte de ella; la meta del día suma 1 (la sesión), no 2.
         Object.assign(t, { ESTADO: 'AGENDADO', AGENDA: 'SESION', FECHA_AGENDA: prox, INTENTO: 0, N_SEGUIMIENTOS: 1, ULTIMO_SEGUIMIENTO: hoy, ATRASO: 0 });
         ubicar(t, 'AGENDADO');
         out.agenda = g;
@@ -5906,7 +5979,7 @@ const DEMO = (() => {
       }).forEach(g => {
           g.ANULADO = 'SÍ';
           g.MOTIVO_ANULACION = String(x.motivo).trim() + ' (se anuló la sesión ' + s.ID + ')';
-          sumarHecho(g.RESPONSABLE, -1, true);
+          if (!LIGA_SESION.test(String(g.NOTA || '').trim())) sumarHecho(g.RESPONSABLE, -1, true);   // la ligada no sumó
         });
       if (fotos[s.ID]) { restaurar(fotos[s.ID]); delete fotos[s.ID]; } else {
         const t = tarjetas.find(y => y.ID_REGISTRO === s.ID_REGISTRO);
@@ -6108,11 +6181,20 @@ const DEMO = (() => {
     if (typeof cargarRegistros === 'function') cargarRegistros();
     return r.ID;
   };
+  // Como el servidor (filasDeOp_): una operación que ya se guardó con ese op devuelve lo de la primera vez, sin volver a escribir.
+  const hechasPorOp = {};
   Object.keys(api).forEach(fn => {
     demo[fn] = (...args) => {
       demo._llamadas[fn] = (demo._llamadas[fn] || 0) + 1;
       demo._ultimo[fn] = clonar(args);
-      const correr = () => { if (demo._fallar[fn]) throw new Error(demo._fallar[fn]); return api[fn](...args); };
+      const op = args[0] && typeof args[0] === 'object' ? String(args[0].op || '') : '';
+      const correr = () => {
+        if (op && hechasPorOp[fn + '|' + op]) return Object.assign(clonar(hechasPorOp[fn + '|' + op]), { repetida: true });
+        if (demo._fallar[fn]) throw new Error(demo._fallar[fn]);
+        const r = api[fn](...args);
+        if (op && r && r.ok !== false) hechasPorOp[fn + '|' + op] = clonar(r);
+        return r;
+      };
       if (!demo._demora[fn]) return correr();
       if (demo._alPedir[fn]) {
         let foto, error;

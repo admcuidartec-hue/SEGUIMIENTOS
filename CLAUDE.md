@@ -50,7 +50,15 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
   DNI, y mira citas, Registro e `INDICACIONES`. Los buscadores comparan con `normBusqueda` (servidor, `Index.html` y DEMO):
   sin tildes, apóstrofos ni puntos, y el guion separa palabras («ohiggins» encuentra a «Ñahui-O'Higgins»).
 - **Documento**: el campo DNI de Registro ya no corta a 12 caracteres en silencio: con más de 12 avisa («El documento tiene 13
-  caracteres: el carné de extranjería va de 9 a 12.») y no deja registrar (`dniLargo`).
+  caracteres: el carné de extranjería va de 9 a 12.») y no deja registrar (`dniLargo`). Un documento escrito que no vale dice
+  **por qué**, con el mismo texto en el servidor, la pantalla y el DEMO (`documentoMal`), en vez de «Falta: DNI»: 7 dígitos;
+  una **Ñ** o una tilde (antes «ÑA1234567» se guardaba como «NA1234567», otro documento: ahora se rechaza); y un número de
+  9 a 12 dígitos que **empieza con 0** («0012345678»), que `normDni` convertiría en otro DNI (12345678): se rechaza y se pide
+  el DNI de 8 dígitos o el carné con sus letras (CE…). `normDni` no cambia (lo ya guardado se sigue emparejando igual).
+- **Textos libres**: el nombre va hasta 120 caracteres y la nota, el motivo, los exámenes y la nota de una reacción hasta 2000
+  (`LARGO_NOMBRE`, `LARGO_TEXTO`, `largoMal_`); el servidor lo rechaza con «El nombre va hasta 120 caracteres (tiene 999).» y
+  la app lo dice antes de enviar (`textoDemasiadoLargo` en `llamar`). `textoLimpio_` quita al guardar los caracteres de
+  control y de dirección (U+0000…, U+200B, U+202E…). La ficha y el panel parten las palabras larguísimas (`overflow-wrap`).
 - **Teléfono**: lo que parece un número (solo dígitos, espacios, +, guiones, puntos y paréntesis) debe dar 9 dígitos con
   `normTelefono` (vale el +51 y el 01 de un fijo de Lima); si no, «El teléfono debe tener 9 dígitos.» y no se guarda
   (`telefonoMal_` al registrar y al editar; `telefonoMal` en la pantalla y el DEMO). Un texto con @ o con letras es un usuario.
@@ -59,7 +67,8 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión, y nunca la de un
   registro anulado. Al anular un registro se anula **en el mismo candado** su agenda viva (`agendaVivaDeRegistro`: la próxima
   sesión agendada al marcar una y un «Agendó cita» que aún no pasó); sus sesiones hechas no se tocan y siguen contando en la
-  meta del día en que se hicieron.
+  meta del día en que se hicieron. La próxima sesión agendada al marcar una **no suma aparte** en la meta del día: es parte de
+  la sesión (`hechosHoyPor_` salta las agendas ligadas con `sesionLigada`).
 - El estado de un registro (cotizado, en curso, completo, anulado) se calcula con `estadoRegistro`; no se guarda.
 - `SEGUIMIENTOS` se escribe por posición: una columna nueva solo se agrega al final (`encabezadoAmpliable`).
 - Sin conexión a WhatsApp: la app muestra los datos y se marca «Seguimiento hecho».
@@ -68,6 +77,35 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
   se guardan en `SEGUIMIENTOS` con `ESPECIALIDAD` = `HIERRO` o `PROCEDIMIENTO` y no cuentan
   en «volvieron tras el seguimiento». Parámetros en `REGLAS`: `CORTE_INDICACIONES_DIAS` (180)
   y `META_RETORNO_PCT` (60).
+
+## Escrituras seguras y rendimiento (23/10/2026, batería de 50 pruebas)
+
+- **Idempotencia (`op`)**: cada acción que escribe (`registrarResultado`, `marcarSesion`, `guardarRegistro`,
+  `registrarContactoEnfermeria`, `darDeAlta` y las cinco anulaciones) lleva un identificador de operación que pone `llamar`
+  (`conOp`). Si la respuesta se pierde y la persona repite lo mismo, va el **mismo** `op` y el servidor devuelve lo de la
+  primera vez (`repetida: true`) sin escribir otra vez (`opDe_`, `filasDeOp_`). Se guarda en una columna **`OP` al final** de
+  `SEGUIMIENTOS`, `SESIONES`, `REGISTROS`, `ALTAS`, `ENFERMERIA` y `BITACORA` (las anulaciones se reconocen por la BITACORA;
+  las filas derivadas llevan `op#agenda`, `op#reaccion`, `op#registro`, `op#1`, `op#s1`…). **Tras publicar, use «Preparar
+  hojas»**: agrega esas seis columnas. Sin ellas el servidor escribe como antes, sin idempotencia (`conOp_`): nunca se niega a
+  escribir por eso, y `exigirColumnas_` acepta la hoja con o sin `OP` (`columnasListas_`).
+- **Todo o nada**: `guardarRegistro` valida todas las filas antes de escribir la primera y, si una falla a mitad (la hoja no
+  responde), anula en el mismo candado lo escrito en esa llamada y responde «… No quedó nada guardado: se deshizo lo escrito.»
+  (`deshacerEscritura_`); el «Aceptó» que crea un registro, igual. Lo anulado no cuenta como posible duplicado al reintentar.
+- **La BITACORA va al final y no tumba la operación**: si falla después de guardar, la respuesta es `ok` con `aviso`
+  («Se guardó, pero no se pudo escribir la BITACORA: …», `bitacora_` + `avisos_`), nunca «No se guardó» habiendo guardado.
+  Con `marcarSesion`, si fallan la reacción o la próxima sesión, la sesión queda y se avisa (`reaccionError`, `agendaError`).
+- **Carreras**: `marcarSesion` recibe la sesión que vio la persona (`sesion: k`) y, dentro del candado, si ya no es la
+  siguiente responde «La sesión k ya se registró; recargue.» (`sesionYaNoEsLaSiguiente`). `guardarRegistro` vuelve a mirar
+  `duplicadoReciente` dentro del candado.
+- **Rendimiento**: con 5000 citas y 1000 registros cada lectura tardaba ~9 s en Node y «No contestó» retenía el candado 8 s.
+  `especialidadesDeMedico_` usa un índice médico → especialidades armado una vez por petición (`indiceEspecialidadesMedico`,
+  `d.espPorMedico` en `derivar_`); Enfermería, uno por sesión (`filasPorSesion_`); y `registrarResultado` valida dentro del
+  candado con las filas del paciente (`soloDelPaciente_`), que dan sus mismas tarjetas (`test/logica-rendimiento.test.js`).
+  Ahora: lecturas de 0,4 a 0,7 s y el candado de «No contestó» ~20 ms en Node.
+- **Lo aceptado que no se realizó** (Indicadores, spec de la Etapa 3 §5.1): un programado sin sesiones que se cerró («No desea
+  realizarse»…) o que no vino pasada la gracia cuenta como «no siguió» / «no realizado» (`marcarNoRealizados`); la ficha lo
+  dice «Cerrado» sin «Lo hizo». **Pagó y no vino**: el «Pagó» de la cotización sigue en el ciclo del programado; si no viene,
+  vuelve a Pago realizado y un segundo «Pagó» se rechaza.
 
 ## «¿Qué pasó?» (Etapa 1)
 
@@ -265,6 +303,9 @@ npm run actualizar       # publica para el equipo conservando la URL, EN LA MISM
 ```
 
 Ese orden importa: hasta que «Preparar hojas» agrega las 5 columnas, `registrarResultado` y `anularResultado` se niegan a escribir (SEGUIMIENTOS se escribe por posición).
+**Desde la versión con idempotencia (23/10/2026), tras publicar use otra vez «Preparar hojas»**: agrega la columna `OP` al final
+de `SEGUIMIENTOS`, `SESIONES`, `REGISTROS`, `ALTAS`, `ENFERMERIA` y `BITACORA`. Mientras falte, todo se guarda igual pero un
+reintento tras una respuesta perdida puede duplicar; «Verificar» lo dice («A SEGUIMIENTOS le falta la columna OP»).
 «Verificar» no muestra `MAX_SEGUIMIENTOS`: hay que mirarlo en la hoja `REGLAS`.
 
 **Probar en @HEAD escribe en el libro real**, el mismo que lee la versión en producción (v3) que usa el equipo.

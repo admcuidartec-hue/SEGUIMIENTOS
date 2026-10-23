@@ -662,7 +662,12 @@ const esperarCol = (pagina, id, col) => pagina.waitForFunction(([id, col]) => {
 }, [id, col]);
 const textoTarjeta = (pagina, id) => pagina.evaluate(id => [...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent.replace(/\s+/g, ' ').trim(), id);
 const llamadas = (pagina, fn) => pagina.evaluate(fn => DEMO._llamadas[fn] || 0, fn);
-const ultimo = (pagina, fn) => pagina.evaluate(fn => DEMO._ultimo[fn][0], fn);
+// Sin el `op` (idempotencia), que es distinto en cada operación: lo prueba aparte «idempotencia: …».
+const ultimo = (pagina, fn) => pagina.evaluate(fn => {
+  const a = DEMO._ultimo[fn][0];
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return a;
+  const o = Object.assign({}, a); delete o.op; return o;
+}, fn);
 const aviso = pagina => pagina.locator('#aviso span').textContent();
 async function abrirPanelDe(pagina, id) {
   await pagina.evaluate(() => { S.verTodo = { 1: true, 5: true, 6: true, 2: true, 3: true, 4: true }; pintarTablero(); });
@@ -822,7 +827,7 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
     await esperarCol(pagina, SOFIA, '3');
     // Como etiquetaDe de Tablero.gs: las sesiones hechas, las que faltan y la próxima.
     assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 2 de 3 · faltan 1 · próxima ~08\/10/);
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', sesion: 2 });
     await abrirPanelDe(pagina, SOFIA);
     assert.match(await pagina.locator('#panel [data-marcar-sesion]').textContent(), /Marcar sesión 3 hecha/);
     await pagina.locator('#panel [data-marcar-sesion]').click();
@@ -1654,7 +1659,32 @@ test('registro: un DNI conocido completa nombre, contacto y doctor y muestra «P
     // Un DNI incompleto quita el aviso.
     await pagina.locator('#rdni').fill('4033');
     await pagina.waitForFunction(() => !document.querySelector('#rcon .conocido'));
-    assert.match(await falta(pagina), /^Falta: DNI/);
+    assert.match(await falta(pagina), /^El DNI debe tener 8 dígitos/, 'dice por qué no vale, como el servidor');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('registro: un documento inválido dice por qué, con el mismo texto que el servidor (7 dígitos, Ñ, ceros de más) y el nombre de 121 letras avisa', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await llenarIndicacion(pagina, { procs: ['AMO'] });
+    const casos = [['1234567', 'El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).'],
+      ['ÑA1234567', 'El documento solo lleva letras de la A a la Z (sin Ñ ni tildes), números, espacios, puntos o guiones.'],
+      ['0012345678', 'El documento 0012345678 empieza con 0 y se confundiría con el DNI 12345678. Si es un DNI, escriba sus 8 dígitos; si es un carné de extranjería, escríbalo con sus letras (p. ej. CE0012345678).']];
+    for (const [dni, msg] of casos) {
+      await pagina.locator('#rdni').fill(dni);
+      await pagina.waitForFunction(m => document.querySelector('#rfalta').textContent === m, msg);
+      assert.equal(await pagina.locator('#rgo').isDisabled(), true, dni);
+      const srv = await pagina.evaluate(d => { try { DEMO.guardarRegistro({ usuario: 'MAGALY', dni: d, nombre: 'X', contacto: '987654321', fecha: S.hoy, doctor: 'Dra. Karen Matos', procedimientos: ['AMO'] }); return ''; } catch (e) { return e.message; } }, dni);
+      assert.equal(srv, msg, 'el DEMO (como el servidor) dice lo mismo');
+    }
+    await pagina.locator('#rdni').fill('40999111');
+    await pagina.locator('#rnom').fill('A'.repeat(121));
+    await pagina.waitForFunction(() => document.querySelector('#rfalta').textContent === 'El nombre va hasta 120 caracteres (tiene 121).');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    // Lo que llega a llamar con un texto de más se rechaza antes de enviar, con el texto del servidor.
+    const r = await pagina.evaluate(async () => { try { await llamar('registrarResultado', { usuario: 'MAGALY', dni: '1', especialidad: 'X', resultado: 'LO PENSARÁ', nota: 'n'.repeat(60000) }); return ''; } catch (e) { return e.message; } });
+    assert.equal(r, 'La nota va hasta 2000 caracteres (tiene 60000).');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -1685,7 +1715,7 @@ test('registro: el carné de extranjería AB123456X se acepta y no pierde las le
   try {
     await pagina.locator('#rdni').fill('AB12');
     assert.equal(await pagina.locator('#rdni').inputValue(), 'AB12');
-    assert.match(await falta(pagina), /^Falta: DNI/);
+    assert.match(await falta(pagina), /^El DNI debe tener 8 dígitos \(o el carné de extranjería, de 9 a 12 caracteres\)\.$/);
     await pagina.locator('#rdni').fill('ab123456x');
     assert.equal(await pagina.locator('#rdni').inputValue(), 'AB123456X');
     await pagina.waitForSelector('#rcon .nuevo');
@@ -2135,6 +2165,28 @@ const textoDe = (pagina, sel) => pagina.locator(sel).evaluateAll(l => l.map(x =>
 const espDe = (pagina, esp) => pagina.locator(`#ficha .esp[data-esp="${esp}"]`);
 const tratDe = (pagina, id) => pagina.locator(`#ficha .trat[data-reg="${id}"]`);
 
+test('pacientes: un registro sin empezar cerrado con «No desea realizarse» dice «Cerrado» con su motivo y no ofrece «Lo hizo»', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    const t = await pagina.evaluate(() => {
+      const c = DEMO.getTablero().columnas.POR_CONTACTAR.find(x => x.ID_REGISTRO && ['COTIZADO', 'PROGRAMADO'].includes(x.ESTADO_REGISTRO));
+      DEMO.registrarResultado({ usuario: 'MAGALY', dni: c.DNI, especialidad: c.ESPECIALIDAD, referencia: c.ID_REGISTRO, resultado: 'NO DESEA REALIZARSE', motivo: 'Por el precio' });
+      const r = DEMO.getPaciente(c.DNI).registros.find(x => x.ID === c.ID_REGISTRO);
+      return { dni: c.DNI, id: c.ID_REGISTRO, estado: r.ESTADO_REGISTRO, cierre: r.CIERRE };
+    });
+    assert.deepEqual([t.estado, t.cierre], ['CERRADO', 'NO DESEA REALIZARSE']);
+    await abrirFicha(pagina, t.dni);
+    const tr = tratDe(pagina, t.id);
+    assert.equal((await tr.locator('.trat-cab .tag').textContent()).trim(), 'Cerrado');
+    assert.match(await tr.textContent(), /Seguimiento cerrado: No desea realizarse \(\d\d\/\d\d\)/);
+    assert.equal(await tr.locator('[data-lohizo]').count(), 0);
+    // Lo mismo con lo que manda el servidor: un programado que no vino dice «· no vino» y sigue ofreciendo «Lo hizo».
+    const linea = await pagina.evaluate(() => lineaEstadoRegistro({ ESTADO_REGISTRO: 'PROGRAMADO', TIPO: 'HIERRO', FECHA_INICIO: '2026-09-12', NO_VINO: '2026-09-12' }));
+    assert.equal(linea, 'Programado el 12/09 · no vino');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('pacientes: el buscador encuentra por nombre y por DNI y se usa con el teclado', async () => {
   const { navegador, pagina, errores } = await abrirPacientes();
   try {
@@ -2471,7 +2523,7 @@ test('pacientes: «Lo hizo» registra la sesión; «Anular sesión» y «Anular 
     const tab = await llamadas(pagina, 'getTablero');
     await r1.locator('[data-lohizo]').click();
     await pagina.waitForFunction(() => /Sesión 2 de 3 registrada/.test(document.querySelector('#aviso span').textContent));
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-09-30', nota: '' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-09-30', nota: '', sesion: 2 });
     assert.equal(await aviso(pagina), 'Sesión 2 de 3 registrada: REG-000001.');
     await pagina.waitForFunction(() => /Sesión 2 · 30\/09\/2026 · Magaly/.test(document.querySelector('#ficha .trat[data-reg="REG-000001"]').textContent));
     let ses = await textoDe(pagina, '#ficha .trat[data-reg="REG-000001"] .ses');
@@ -3650,7 +3702,7 @@ test('En tratamiento: «Próxima sesión» opcional; con fecha, marcar la sesió
     await pfp.fill('2026-10-08');
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', proxima: '2026-10-08' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', sesion: 2, proxima: '2026-10-08' });
     assert.equal(await llamadas(pagina, 'registrarResultado'), 0, 'una sola llamada: marcarSesion');
     await esperarCol(pagina, SOFIA, '2');
     await pagina.waitForFunction(id => /Sesión 3 el jue 08\/10/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
@@ -3679,7 +3731,7 @@ test('En tratamiento: sin «Próxima sesión» todo sigue igual, y en la última
     await abrirPanelDe(pagina, SOFIA);
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', sesion: 2 });
     await esperarCol(pagina, SOFIA, '3');
     await pagina.waitForFunction(id => !S.sinRecargar.has(id), SOFIA);
     await abrirPanelDe(pagina, SOFIA);
@@ -4484,7 +4536,7 @@ test('tablero: médico y especialidad se recuerdan (seg.medico, seg.esp) como ti
   } finally { await c.navegador.close(); }
 });
 
-test('DEMO: anular un registro anula su próxima sesión agendada (deja de contar en la meta); la sesión hecha sigue contando y ya no se anula', async () => {
+test('DEMO: anular un registro anula su próxima sesión agendada; la sesión hecha sigue contando en la meta (la agenda no sumaba) y ya no se anula', async () => {
   const { navegador, pagina, errores } = await abrir();
   try {
     await pagina.waitForFunction(() => S.fase === 'listo');
@@ -4503,8 +4555,8 @@ test('DEMO: anular un registro anula su próxima sesión agendada (deja de conta
       const sigue = Object.values(t.columnas).flat().some(x => x.ID_REGISTRO === id);
       return { suma: m1 - m0, resta: m1 - m2, err, sigue, sesId: ses.sesion.ID };
     });
-    assert.equal(r.suma, 2, 'la sesión y su próxima agendada');
-    assert.equal(r.resta, 1, 'al anular el registro se va la agenda; la sesión hecha sigue contando');
+    assert.equal(r.suma, 1, 'la sesión; su próxima agendada es parte de ella y no suma aparte (hechosHoyPor_)');
+    assert.equal(r.resta, 0, 'al anular el registro se va la agenda; la sesión hecha sigue contando');
     assert.match(r.err, /^El registro REG-\d+ está anulado: sus sesiones ya no se anulan\.$/);
     assert.equal(r.sigue, false);
     assert.deepEqual(errores, []);
@@ -4556,6 +4608,64 @@ test('Registro: un documento de más de 12 caracteres no se corta en silencio: s
     await pagina.locator('#rdni').fill('X12345678901');
     await pagina.locator('#rdni').dispatchEvent('input');
     assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('dos pestañas: «Marcar sesión 3 hecha» desde una pantalla vieja se rechaza («La sesión 3 ya se registró»)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const id = await pagina.evaluate(() => DEMO._registroConSesiones());
+    // Otra pestaña marca la sesión 3 (la que esta pantalla también ofrece) antes que esta.
+    const otra = await pagina.evaluate(id => DEMO.marcarSesion({ usuario: 'ANA', id, fecha: S.hoy, sesion: 3 }).sesion.NUMERO, id);
+    assert.equal(otra, 3);
+    const msg = await pagina.evaluate(id => { try { DEMO.marcarSesion({ usuario: 'MAGALY', id, fecha: S.hoy, sesion: 3 }); return 'guardó'; } catch (e) { return e.message; } }, id);
+    assert.equal(msg, 'La sesión 3 ya se registró; recargue.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('idempotencia: cada escritura lleva un op; si falla, repetir lo mismo manda el MISMO op y el DEMO no escribe dos veces', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(async () => {
+      const t = DEMO.getTablero().columnas.POR_CONTACTAR.find(x => x.TIPO_SEGUIMIENTO === 'REEVALUACION');
+      const datos = { usuario: 'MAGALY', dni: t.DNI, especialidad: t.ESPECIALIDAD, referencia: '', resultado: 'NO CONTESTÓ' };
+      // 1) La primera llamada «se pierde»: el DEMO guarda pero la app recibe un error de red.
+      DEMO._fallar.registrarResultado = '';
+      const real = DEMO.registrarResultado;
+      let ops = [];
+      DEMO.registrarResultado = (x) => { ops.push(x.op); const out = real(x); if (ops.length === 1) throw new Error('NetworkError: Connection failure due to HTTP 0'); return out; };
+      let e1 = '';
+      try { await llamar('registrarResultado', datos); } catch (e) { e1 = e.message; }
+      const r2 = await llamar('registrarResultado', datos);   // la asesora lo repite
+      const r3 = await llamar('registrarResultado', datos);   // y otra vez, después de que salió bien: es otra operación
+      DEMO.registrarResultado = real;
+      return { e1, ops, repetida: r2.repetida === true, r3repetida: !!r3.repetida };
+    });
+    assert.match(r.e1, /NetworkError/);
+    assert.equal(r.ops.length, 3);
+    assert.match(r.ops[0], /^OP-[a-z0-9]+-[a-z0-9]+$/);
+    assert.equal(r.ops[1], r.ops[0], 'el reintento manda el mismo op');
+    assert.equal(r.repetida, true, 'y el DEMO devuelve lo de la primera vez');
+    assert.notEqual(r.ops[2], r.ops[0], 'lo que salió bien suelta su op');
+    assert.equal(r.r3repetida, false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('la ficha y el panel parten las palabras larguísimas (overflow-wrap) en vez de desbordar', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await abrirFicha(pagina, '40111222');
+    await pagina.evaluate(() => { document.querySelector('#ficha .ficha header h2').textContent = 'A'.repeat(1000); });
+    const r = await pagina.evaluate(() => {
+      const h = document.querySelector('#ficha .ficha header h2'), f = document.querySelector('#ficha .ficha');
+      return { wrap: getComputedStyle(h).overflowWrap, ancho: f.scrollWidth <= f.clientWidth + 1, pagina: document.documentElement.scrollWidth <= window.innerWidth };
+    });
+    assert.deepEqual(r, { wrap: 'anywhere', ancho: true, pagina: true });
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

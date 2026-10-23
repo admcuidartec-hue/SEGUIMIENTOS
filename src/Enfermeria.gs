@@ -13,9 +13,24 @@ var RESULTADOS_ENFERMERIA = { 'CONTACTADO': 'CONTACTADO', 'NO CONTESTO': 'NO CON
 var TIPOS_REACCION = { 'NINGUNA': 'NINGUNA', 'INMEDIATA': 'INMEDIATA', 'MEDIATA': 'MEDIATA' };
 var DIAS_PROXIMOS_ENFERMERIA = 7;
 
-/** Las filas de ENFERMERIA de una sesión, sin las anuladas. */
-function filasDeSesion_(enfermeria, idSesion) {
+/**
+ * Las filas de ENFERMERIA de una sesión, sin las anuladas. Con `indice` (filasPorSesion_ de esas mismas filas) no recorre la
+ * hoja entera por cada sesión: con 1000 sesiones y 2000 contactos, eso era casi todo el tiempo de getEnfermeria y getResumen.
+ */
+function filasDeSesion_(enfermeria, idSesion, indice) {
+  if (indice) return (indice[idSesion] || []).slice();
   return (enfermeria || []).filter(function (f) { return !anulado_(f) && textoLimpio_(f.ID_SESION) === idSesion; });
+}
+
+/** { ID_SESION: [filas sin anular, en el orden de la hoja] } en una sola pasada. */
+function filasPorSesion_(enfermeria) {
+  var idx = {};
+  (enfermeria || []).forEach(function (f) {
+    if (anulado_(f)) return;
+    var k = textoLimpio_(f.ID_SESION);
+    (idx[k] = idx[k] || []).push(f);
+  });
+  return idx;
 }
 
 /** Las sesiones vivas de los registros de hierro vivos: [{ r, s }]. */
@@ -35,11 +50,11 @@ function contactosEnfermeria(d) {
   var hoy = d.hoy, reglas = d.reglas || {}, dias = reglas.diasEnfermeria || [1, 3, 5];
   var corte = reglas.corteEnfermeria === undefined ? 10 : reglas.corteEnfermeria;
   var desde = sumarDias(hoy, -corte), hasta = sumarDias(hoy, DIAS_PROXIMOS_ENFERMERIA), muertos = fallecidos(d.seguimientos);
-  var out = [];
+  var out = [], porSesion = filasPorSesion_(d.enfermeria);
   sesionesDeHierro_(d.registros, d.sesiones).forEach(function (x) {
     var r = x.r, s = x.s, dni = normDni(r.DNI);
     if (muertos[dni]) return;
-    var filas = filasDeSesion_(d.enfermeria, s.ID), fechaSes = fechaIso(s.FECHA);
+    var filas = filasDeSesion_(d.enfermeria, s.ID, porSesion), fechaSes = fechaIso(s.FECHA);
     var reacciones = filas.filter(function (f) { return normTexto(f.RESULTADO) === 'CONTACTADO' && normTexto(f.REACCION_TIPO) && normTexto(f.REACCION_TIPO) !== 'NINGUNA'; })
       .sort(function (a, b) { return Number(a.DIA) - Number(b.DIA); })
       .map(function (f) { return { DIA: Number(f.DIA) || 0, TIPO: normTexto(f.REACCION_TIPO), REACCION: textoLimpio_(f.REACCION) }; });
@@ -94,6 +109,7 @@ function validarContactoEnfermeria(p, d) {
   var resultado = RESULTADOS_ENFERMERIA[normTexto(p.resultado)];
   if (!resultado) return no('Elija si contestó o no.');
   var nota = textoLimpio_(p.nota);
+  if (largoMal_(nota, LARGO_TEXTO, 'La nota')) return no(largoMal_(nota, LARGO_TEXTO, 'La nota'));
   var fila = { ID_REGISTRO: c.ID_REGISTRO, ID_SESION: c.ID_SESION, NUMERO_SESION: c.NUMERO_SESION, DNI: c.DNI, DIA: c.DIA, RESULTADO: resultado,
     REACCION_TIPO: '', REACCION: '', NOTA: nota, ENFERMERA: quien, ANULADO: '', MOTIVO_ANULACION: '' };
   if (resultado === 'CONTACTADO') {
@@ -117,6 +133,7 @@ function validarContactoEnfermeria(p, d) {
 function reaccionAplicacion(reaccion, catalogos) {
   if (!reaccion || !reaccion.hubo) return { error: '', fila: null };
   var r = reaccionesDeCatalogo_(reaccion.reacciones, catalogos), nota = textoLimpio_(reaccion.nota);
+  if (largoMal_(nota, LARGO_TEXTO, 'La nota de la reacción')) return { error: largoMal_(nota, LARGO_TEXTO, 'La nota de la reacción'), fila: null };
   if (r.error) return { error: r.error, fila: null };
   if (r.lista.some(esOtra_) && !nota) return { error: 'Escriba cuál fue la reacción en la nota («Otra»).', fila: null };
   return { error: '', fila: { DIA: 0, RESULTADO: 'CONTACTADO', REACCION_TIPO: 'INMEDIATA', REACCION: r.lista.join(' · '), NOTA: nota } };
@@ -137,9 +154,10 @@ function validarAnulacionEnfermeria(id, filas) {
 function cifrasEnfermeria(d) {
   var out = {}, pac = {}, dias = (d.reglas && d.reglas.diasEnfermeria) || [1, 3, 5], hoy = d.hoy;
   function de(k) { return out[k] = out[k] || { REAC_PAC: 0, REAC_INM: 0, REAC_MED: 0, ENF_DEBIDOS: 0, ENF_A_TIEMPO: 0 }; }
+  var porSesion = filasPorSesion_(d.enfermeria);
   sesionesDeHierro_(d.registros, d.sesiones).forEach(function (x) {
     var r = x.r, s = x.s, fechaSes = fechaIso(s.FECHA), k = mesDe(fechaSes) + '|' + (medicoDeRegistro(r, d.catalogos || {}) || 'SIN MÉDICO');
-    var o = de(k), filas = filasDeSesion_(d.enfermeria, s.ID), dni = normDni(r.DNI);
+    var o = de(k), filas = filasDeSesion_(d.enfermeria, s.ID, porSesion), dni = normDni(r.DNI);
     dias.forEach(function (dia) {
       var fecha = sumarDias(fechaSes, dia);
       if (fecha > hoy) return;

@@ -15,54 +15,107 @@ function exigirUsuario_(catalogos, usuario) {
 function exigirMotivo_(p) {
   var m = textoLimpio_(p && p.motivo);
   if (!m) throw new Error('Escriba el motivo de la anulación.');
+  if (largoMal_(m, LARGO_TEXTO, 'El motivo')) throw new Error(largoMal_(m, LARGO_TEXTO, 'El motivo'));
   return m;
 }
 
 /** REGISTROS y ALTAS se escriben por posición: sin sus columnas nuevas, una fila quedaría desalineada. */
 function exigirColumnas_(nombre, columnas) {
-  var plan = encabezadoAmpliable(encabezado_(hoja_(nombre)), columnas);
-  if (plan.error || plan.agregar.length) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+  if (!columnasListas_(encabezado_(hoja_(nombre)), columnas)) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+}
+
+/** ¿El encabezado tiene todas sus columnas, en orden? La OP del final puede faltar: sin ella se escribe sin idempotencia. */
+function columnasListas_(cab, columnas) {
+  var plan = encabezadoAmpliable(cab, columnas.concat([COLUMNA_OP]));
+  return !plan.error && plan.agregar.filter(function (c) { return c !== COLUMNA_OP; }).length === 0;
 }
 
 function guardarRegistro(p) {
-  var d = datos_();
+  var d = datos_(), op = opDe_(p);
+  // El mismo op ya se guardó (se perdió la respuesta): lo de la primera vez, sin el aviso de duplicado ni otra fila.
+  var previo = registroRepetido_(d.registros, d.sesiones, op);
+  if (previo) return limpiarParaEnvio(previo);
   var v = validarRegistro(p, d.catalogos, d.hoy);
   if (v.error) throw new Error(v.error);
-  if (!(p && p.confirmado)) {
-    for (var i = 0; i < v.filas.length; i++) {
-      var dup = duplicadoReciente(d.registros, v.filas[i]);
-      if (dup) return limpiarParaEnvio({ ok: false, duplicado: { ID: dup.ID, FECHA: fechaIso(dup.FECHA), TEXTO: textoRegistro(dup) } });
-    }
-  }
+  var dup = !(p && p.confirmado) && duplicadoDe_(d.registros, v.filas);
+  if (dup) return limpiarParaEnvio(dup);
   var lock = bloquear_();
   try {
     exigirColumnas_('REGISTROS', COLUMNAS_REGISTROS);
-    var ids = leerOpcional_('REGISTROS').map(function (r) { return r.ID; });
-    var ahora = fechaHoraTexto_(new Date()), hechas = [];
+    var registros = leerOpcional_('REGISTROS'), ids = registros.map(function (r) { return r.ID; });
     // Primera sesión ya aplicada (fecha pasada): se marca la sesión 1 de cada registro en este mismo candado.
     var sesiones = v.sesionHecha ? leerSesiones_() : [];
-    v.filas.forEach(function (f) {
+    previo = registroRepetido_(registros, sesiones, op);
+    if (previo) return limpiarParaEnvio(previo);
+    // Otra asesora pudo registrar lo mismo entre la lectura de arriba y el candado: el duplicado se revisa otra vez aquí.
+    dup = !(p && p.confirmado) && duplicadoDe_(registros, v.filas);
+    if (dup) return limpiarParaEnvio(dup);
+    var ahora = fechaHoraTexto_(new Date()), hechas = [], filasSes = [];
+    // Todo se valida antes de escribir la primera fila: un registro de varias filas es todo o nada.
+    v.filas.forEach(function (f, i) {
       f.ID = siguienteId(ids, 'REG');
       ids.push(f.ID);
       f.FECHA_HORA = ahora;
-      anexarObjeto_('REGISTROS', COLUMNAS_REGISTROS, f);
-      bitacora_(f.ASESORA, 'REGISTRO', f.ID + ' · ' + f.DNI + ' · ' + textoRegistro(f));
+      if (op) f.OP = op + '#' + (i + 1);
       f.TEXTO = textoRegistro(f);
       if (v.sesionHecha) {
-        var error = validarSesion(f, sesiones, v.sesionHecha, d.hoy);
+        var error = validarSesion(f, [], v.sesionHecha, d.hoy);
         if (error) throw new Error(error);
-        var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }), 'SES'), FECHA_HORA: ahora, ID_REGISTRO: f.ID, NUMERO: 1,
-          FECHA: v.sesionHecha, ASESORA: f.ASESORA, NOTA: 'Registrada con el tratamiento', ANULADO: '', MOTIVO_ANULACION: '' };
-        anexarObjeto_('SESIONES', COLUMNAS_SESIONES, s);
-        bitacora_(f.ASESORA, 'SESIÓN', f.ID + ' · sesión 1 de ' + (Number(f.SESIONES) || 1) + ' (registrada con el tratamiento)');
-        sesiones.push(s);
-        hechas.push(s);
+        var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }).concat(filasSes.map(function (x) { return x.ID; })), 'SES'),
+          FECHA_HORA: ahora, ID_REGISTRO: f.ID, NUMERO: 1, FECHA: v.sesionHecha, ASESORA: f.ASESORA, NOTA: 'Registrada con el tratamiento',
+          ANULADO: '', MOTIVO_ANULACION: '' };
+        if (op) s.OP = op + '#s' + (i + 1);
+        filasSes.push(s);
       }
     });
-    return limpiarParaEnvio({ ok: true, registros: v.filas, sesiones: hechas });
+    // Si una fila falla a mitad (la hoja no responde), se anula lo que ya se escribió en esta llamada: no queda un AMO sin su
+    // biopsia, ni un registro sin la sesión 1 que se dijo aplicada.
+    var deshacer = [], motivo = 'No se guardó: falló a mitad del registro (se deshizo solo)';
+    try {
+      v.filas.forEach(function (f) {
+        var copia = copia_(f, {}); delete copia.TEXTO;
+        anexarObjeto_('REGISTROS', conOp_('REGISTROS', COLUMNAS_REGISTROS), copia);
+        deshacer.push(function () { marcarAnulado_('REGISTROS', f.ID, motivo); });
+        var s = filasSes.filter(function (x) { return x.ID_REGISTRO === f.ID; })[0];
+        if (s) {
+          anexarObjeto_('SESIONES', conOp_('SESIONES', COLUMNAS_SESIONES), s);
+          deshacer.push(function () { marcarAnulado_('SESIONES', s.ID, motivo); });
+          hechas.push(s);
+        }
+      });
+    } catch (err) {
+      deshacerEscritura_(deshacer, err);
+    }
+    // La BITACORA, después de todo lo guardado: si falla, lo guardado queda y la respuesta lo avisa (bitacora_).
+    v.filas.forEach(function (f) {
+      bitacora_(f.ASESORA, 'REGISTRO', f.ID + ' · ' + f.DNI + ' · ' + f.TEXTO, op);
+      if (hechas.some(function (s) { return s.ID_REGISTRO === f.ID; })) {
+        bitacora_(f.ASESORA, 'SESIÓN', f.ID + ' · sesión 1 de ' + (Number(f.SESIONES) || 1) + ' (registrada con el tratamiento)', op);
+      }
+    });
+    return limpiarParaEnvio(avisos_({ ok: true, registros: v.filas, sesiones: hechas }));
   } finally {
     soltar_(lock);
   }
+}
+
+/** El aviso de posible duplicado de la primera fila que tenga uno (duplicadoReciente), o null. */
+function duplicadoDe_(registros, filas) {
+  for (var i = 0; i < filas.length; i++) {
+    var dup = duplicadoReciente(registros, filas[i]);
+    if (dup) return { ok: false, duplicado: { ID: dup.ID, FECHA: fechaIso(dup.FECHA), TEXTO: textoRegistro(dup) } };
+  }
+  return null;
+}
+
+/** La respuesta de un guardarRegistro que ya se guardó con ese op (filas OP = op#n), o null. */
+function registroRepetido_(registros, sesiones, op) {
+  var filas = filasDeOp_(registros, op);
+  if (!filas.length) return null;
+  var ids = {};
+  filas.forEach(function (f) { ids[f.ID] = 1; });
+  return { ok: true, repetida: true, registros: filas.map(function (f) { return copia_(f, { TEXTO: textoRegistro(f) }); }),
+    sesiones: filasDeOp_(sesiones, op).filter(function (s) { return ids[s.ID_REGISTRO]; }) };
 }
 
 /**
@@ -73,12 +126,18 @@ function guardarRegistro(p) {
  */
 function marcarSesion(p) {
   var d = datos_();
-  var asesora = exigirUsuario_(d.catalogos, p && p.usuario), proxima = textoLimpio_(p && p.proxima);
+  var asesora = exigirUsuario_(d.catalogos, p && p.usuario), proxima = textoLimpio_(p && p.proxima), op = opDe_(p);
   var lock = bloquear_();
   try {
     var sesiones = leerSesiones_(), id = textoLimpio_(p.id);
+    // El mismo op ya se guardó (se perdió la respuesta y la app reintenta): lo de la primera vez, sin marcar otra sesión.
+    var previa = filasDeOp_(sesiones, op).filter(function (x) { return String(x.OP).trim() === op; })[0];
+    if (previa) return limpiarParaEnvio(sesionRepetida_(previa, sesiones, op));
     var r = leerRegistros_().filter(function (x) { return x.ID === id; })[0];
-    var error = validarSesion(r, sesiones, p.fecha, d.hoy);
+    // La sesión que vio la persona (p.sesion): si otra pestaña ya la marcó, no se guarda como la siguiente.
+    var error = r && !anulado_(r) ? sesionYaNoEsLaSiguiente(estadoRegistro(r, sesiones), p.sesion) : '';
+    if (error) throw new Error(error);
+    error = validarSesion(r, sesiones, p.fecha, d.hoy) || largoMal_(p.nota, LARGO_TEXTO, 'La nota');
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
     // «¿Reacción durante la aplicación?»: se valida antes de escribir nada, para no dejar la sesión a medias.
@@ -94,62 +153,82 @@ function marcarSesion(p) {
     var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }), 'SES'), FECHA_HORA: cuando,
       ID_REGISTRO: r.ID, NUMERO: e.hechas + 1, FECHA: fechaIso(p.fecha), ASESORA: asesora, NOTA: textoLimpio_(p.nota),
       ANULADO: '', MOTIVO_ANULACION: '' };
-    anexarObjeto_('SESIONES', COLUMNAS_SESIONES, s);
-    bitacora_(asesora, 'SESIÓN', r.ID + ' · sesión ' + s.NUMERO + ' de ' + e.total);
+    if (op) s.OP = op;
+    anexarObjeto_('SESIONES', conOp_('SESIONES', COLUMNAS_SESIONES), s);
+    bitacora_(asesora, 'SESIÓN', r.ID + ' · sesión ' + s.NUMERO + ' de ' + e.total, op);
     var out = { ok: true, sesion: s, completo: s.NUMERO >= e.total };
+    // La sesión ya está escrita: si la reacción o la agenda fallan, no se lanza (la app creería que nada se guardó y la
+    // marcaría otra vez). Se avisa y se registra aparte.
     if (reac.fila) {
-      var fe = copia_(reac.fila, { ID: siguienteId(leerEnfermeria_().map(function (x) { return x.ID; }), 'ENF'), FECHA_HORA: cuando,
-        ID_REGISTRO: r.ID, ID_SESION: s.ID, NUMERO_SESION: s.NUMERO, DNI: normDni(r.DNI), ENFERMERA: asesora, ANULADO: '', MOTIVO_ANULACION: '' });
-      anexarObjeto_('ENFERMERIA', COLUMNAS_ENFERMERIA, fe);
-      bitacora_(asesora, 'ENFERMERÍA', fe.ID + ' · ' + fe.DNI + ' · sesión ' + s.NUMERO + ' · reacción en la aplicación: ' + fe.REACCION);
-      out.reaccion = fe;
+      try {
+        var fe = copia_(reac.fila, { ID: siguienteId(leerEnfermeria_().map(function (x) { return x.ID; }), 'ENF'), FECHA_HORA: cuando,
+          ID_REGISTRO: r.ID, ID_SESION: s.ID, NUMERO_SESION: s.NUMERO, DNI: normDni(r.DNI), ENFERMERA: asesora, ANULADO: '', MOTIVO_ANULACION: '' });
+        if (op) fe.OP = op + '#reaccion';
+        anexarObjeto_('ENFERMERIA', conOp_('ENFERMERIA', COLUMNAS_ENFERMERIA), fe);
+        bitacora_(asesora, 'ENFERMERÍA', fe.ID + ' · ' + fe.DNI + ' · sesión ' + s.NUMERO + ' · reacción en la aplicación: ' + fe.REACCION, op);
+        out.reaccion = fe;
+      } catch (err) {
+        out.reaccionError = 'La sesión quedó marcada, pero no se pudo guardar la reacción (' + (err && err.message || err) + '): regístrela en Enfermería.';
+      }
     }
     if (proxima) {
       // Misma FECHA_HORA que la sesión: pendientesRegistro cuenta los seguimientos desde que se registró la última sesión.
       var g = copia_(filaProximaSesion(r, s, proxima, asesora), { ID: 'SEG-' + ahora.getTime() + '-' + Math.floor(Math.random() * 1000),
         FECHA_HORA: cuando, ACCION: accionPara('AGENDÓ CITA', true) });
-      // La sesión ya está escrita: si la agenda falla, no se lanza (la app creería que nada se guardó). Se avisa y se agenda aparte.
+      if (op) g.OP = op + '#agenda';
       try {
-        anexarObjeto_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS, g);
-        bitacora_(asesora, 'RESULTADO', g.DNI + ' · ' + g.ESPECIALIDAD + ' · ' + g.RESULTADO + ' · ' + g.REFERENCIA);
+        anexarObjeto_('SEGUIMIENTOS', conOp_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS), g);
+        bitacora_(asesora, 'RESULTADO', g.DNI + ' · ' + g.ESPECIALIDAD + ' · ' + g.RESULTADO + ' · ' + g.REFERENCIA, op);
         out.agenda = g;
       } catch (err) {
         out.agendaError = 'No se pudo agendar la próxima sesión: ' + (err && err.message || err);
       }
     }
-    return limpiarParaEnvio(out);
+    return limpiarParaEnvio(avisos_(out));
   } finally {
     soltar_(lock);
   }
 }
 
+/** La respuesta de un marcarSesion que ya se guardó con ese op: la sesión, y su agenda y su reacción si se escribieron. */
+function sesionRepetida_(previa, sesiones, op) {
+  var r = leerRegistros_().filter(function (x) { return x.ID === previa.ID_REGISTRO; })[0];
+  var out = { ok: true, repetida: true, sesion: previa, completo: !!r && Number(previa.NUMERO) >= estadoRegistro(r, sesiones).total };
+  var g = leerSeguimientos_().filter(function (x) { return !anulado_(x) && String(x.OP || '').trim() === op + '#agenda'; })[0];
+  if (g) out.agenda = g;
+  var fe = leerEnfermeria_().filter(function (x) { return !anulado_(x) && String(x.OP || '').trim() === op + '#reaccion'; })[0];
+  if (fe) out.reaccion = fe;
+  return out;
+}
+
 function anularRegistro(p) {
-  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p);
+  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), op = opDe_(p);
   var lock = bloquear_();
   try {
     var id = textoLimpio_(p.id);
-    marcarAnulado_('REGISTROS', id, motivo);
-    bitacora_(quien, 'ANULAR REGISTRO', id + ' · ' + motivo);
+    if (anulacionRepetida_(function () { marcarAnulado_('REGISTROS', id, motivo); }, op)) return { ok: true, repetida: true };
+    bitacora_(quien, 'ANULAR REGISTRO', id + ' · ' + motivo, op);
     // En el mismo candado, su agenda viva (la próxima sesión agendada, un «Agendó cita» por venir): no queda una cita de un
     // registro que ya no existe, ni cuenta en la meta del día. Sus sesiones hechas no se tocan.
     agendaVivaDeRegistro(id, leerSeguimientos_(), d.hoy).forEach(function (g) {
       marcarAnulado_('SEGUIMIENTOS', g.ID, motivo + ' (se anuló el registro ' + id + ')');
-      bitacora_(quien, 'ANULAR RESULTADO', g.ID + ' · con el registro ' + id);
+      bitacora_(quien, 'ANULAR RESULTADO', g.ID + ' · con el registro ' + id, op);
     });
-    return { ok: true };
+    return avisos_({ ok: true });
   } finally {
     soltar_(lock);
   }
 }
 
 function anularSesion(p) {
-  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p);
+  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), op = opDe_(p);
   var lock = bloquear_();
   try {
     var v = validarAnulacionSesion(textoLimpio_(p.id), leerSesiones_(), leerRegistros_());
+    if (v.error && /ya estaba anulada/.test(v.error) && anulacionHecha_(op)) return { ok: true, repetida: true };
     if (v.error) throw new Error(v.error);
     marcarAnulado_('SESIONES', v.sesion.ID, motivo);
-    bitacora_(quien, 'ANULAR SESIÓN', v.sesion.ID + ' (' + v.sesion.ID_REGISTRO + ') · ' + motivo);
+    bitacora_(quien, 'ANULAR SESIÓN', v.sesion.ID + ' (' + v.sesion.ID_REGISTRO + ') · ' + motivo, op);
     // La próxima sesión que se agendó al marcar esta pertenece a esta: se anula con ella (Deshacer no deja una agenda que miente).
     // También un «Agendó cita» sin liga escrito después de registrarla: agendaba la sesión que le seguía.
     var desde = String(v.sesion.FECHA_HORA || '');
@@ -159,46 +238,65 @@ function anularSesion(p) {
       return ligada ? ligada === v.sesion.ID : !!desde && String(g.FECHA_HORA || '') >= desde;
     }).forEach(function (g) {
       marcarAnulado_('SEGUIMIENTOS', g.ID, motivo + ' (se anuló la sesión ' + v.sesion.ID + ')');
-      bitacora_(quien, 'ANULAR RESULTADO', g.ID + ' · con la sesión ' + v.sesion.ID);
+      bitacora_(quien, 'ANULAR RESULTADO', g.ID + ' · con la sesión ' + v.sesion.ID, op);
     });
-    return { ok: true };
+    return avisos_({ ok: true });
   } finally {
     soltar_(lock);
   }
 }
 
 function darDeAlta(p) {
-  var d = datos_();
+  var d = datos_(), op = opDe_(p);
+  var previa = filasDeOp_(d.altas, op)[0];
+  if (previa) return limpiarParaEnvio({ ok: true, repetida: true, alta: previa });
   var v = validarAlta(p, d.catalogos, d.citas, d.vigentes, d.hoy);
   if (v.error) throw new Error(v.error);
   var lock = bloquear_();
   try {
     exigirColumnas_('ALTAS', COLUMNAS_ALTAS);
     var a = v.alta, altas = leerAltas_();
+    previa = filasDeOp_(altas, op)[0];
+    if (previa) return limpiarParaEnvio({ ok: true, repetida: true, alta: previa });
     // Otra asesora pudo dar la misma alta mientras tanto: se revisa otra vez con la hoja releída dentro del candado.
     if (altasVigentes(altas, d.seguimientos, d.citas, d.reglas, d.hoy)[claveSerie(a.DNI, a.ESPECIALIDAD)]) {
       throw new Error('Ese paciente ya tiene un alta vigente en ' + a.ESPECIALIDAD + '.');
     }
     a.ID = siguienteId(altas.map(function (x) { return x.ID; }), 'ALT');
     a.FECHA_HORA = fechaHoraTexto_(new Date());
-    anexarObjeto_('ALTAS', COLUMNAS_ALTAS, a);
-    bitacora_(a.REGISTRADO_POR, 'ALTA', a.ID + ' · ' + a.DNI + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR);
-    return limpiarParaEnvio({ ok: true, alta: a });
+    if (op) a.OP = op;
+    anexarObjeto_('ALTAS', conOp_('ALTAS', COLUMNAS_ALTAS), a);
+    bitacora_(a.REGISTRADO_POR, 'ALTA', a.ID + ' · ' + a.DNI + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR, op);
+    return limpiarParaEnvio(avisos_({ ok: true, alta: a }));
   } finally {
     soltar_(lock);
   }
 }
 
 function anularAlta(p) {
-  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id);
+  var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id), op = opDe_(p);
   if (id.indexOf('ALT-') !== 0) throw new Error('Esa alta viene de un descarte antiguo; no se puede anular desde aquí.');
   var lock = bloquear_();
   try {
-    marcarAnulado_('ALTAS', id, motivo);
-    bitacora_(quien, 'ANULAR ALTA', id + ' · ' + motivo);
-    return { ok: true };
+    if (anulacionRepetida_(function () { marcarAnulado_('ALTAS', id, motivo); }, op)) return { ok: true, repetida: true };
+    bitacora_(quien, 'ANULAR ALTA', id + ' · ' + motivo, op);
+    return avisos_({ ok: true });
   } finally {
     soltar_(lock);
+  }
+}
+
+/**
+ * Anula con `anular` (marcarAnulado_). Si la fila ya estaba anulada y la BITACORA tiene una anulación con este mismo op, es el
+ * reintento de una anulación que ya se hizo (se perdió la respuesta): devuelve true y no se escribe nada. Si no, el error sigue.
+ */
+function anulacionRepetida_(anular, op) {
+  try {
+    anular();
+    return false;
+  } catch (e) {
+    if (/ya estaba anulad/.test(e && e.message || '') && anulacionHecha_(op)) return true;
+    throw e;
   }
 }
 

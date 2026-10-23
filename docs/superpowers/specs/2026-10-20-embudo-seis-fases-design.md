@@ -152,6 +152,29 @@ seguimiento» se queda como cifra aparte.
   «Igual que agosto». Si el mes anterior no tiene base: «Agosto no tiene datos para comparar.»
 - Igual en el resumen imprimible (página 1).
 
+### 5.1 Lo aceptado que no se realizó (23/10/2026, batería de 50 pruebas, caso 3)
+
+Antes, todo registro que no estaba cotizado contaba como «aceptó»: un hierro programado que el paciente rechazó quedaba
+«en curso» para siempre y una biopsia aceptada que nunca se hizo contaba como «realizada». Ahora un registro **aceptado y sin
+ninguna sesión** (`PROGRAMADO`) cuenta como **no cumplido** («no siguieron» en hierro, «no realizados» en procedimientos)
+cuando su tarjeta (`pendientesRegistro`) dice:
+
+- **Cerrado**: su seguimiento se cerró («No desea realizarse», «Se atiende en otro lugar», sin respuesta, número
+  equivocado o «Falleció»), también si el cierre se registró mientras esperaba su fecha (después del «Aceptó»).
+- **No vino**: la fecha de la primera sesión pasó, más `GRACIA_AGENDA_DIAS`, sin marcarse. Vale aunque haya pagado: lo
+  pagado y no hecho no es un tratamiento realizado. Si después viene y se marca la sesión, pasa a «en curso» o «completó».
+
+Dentro de la gracia sigue «en curso» (hierro) o «realizado» (procedimiento, que no tiene «en curso»). Con una sesión ya
+empezó y cuenta como siempre. `marcarNoRealizados` pone `NO_REALIZADO` (`CERRADO` o `NO VINO`) en la indicación que sale
+del registro, que sigue siendo `ACEPTÓ` para el tablero; `resumenPorMes` no la cuenta como aceptada.
+
+La ficha dice **«Cerrado»** («Seguimiento cerrado: No desea realizarse (10/11)») en vez de «Programado» o «Pendiente» y no
+ofrece «Lo hizo» (para corregir un cierre, primero se anula); un programado que no vino dice «Programado el 12/11 · no vino».
+
+**Pagó y no vino** (caso 6): el «Pagó» de la cotización sigue en el ciclo de un programado hasta su primera sesión. Si no viene,
+vuelve a Pago realizado (no a Por contactar), no se cierra solo y un segundo «Pagó» se rechaza («Ya figura el pago»). Una vez
+empezado, el ciclo de la sesión siguiente ya no lleva ese pago.
+
 ## 6. Pruebas
 
 - `test/logica-pago.test.js` (nuevo): `resultadoDe` y `accionPara` de PAGO, `leerCiclo` (pago, sin cierre automático,

@@ -353,3 +353,89 @@ test('anularSesion: una sesión de un registro anulado no se anula (las hechas s
   assert.throws(() => ctx.anularSesion({ usuario: 'MAGALY', id: 'SES-000001', motivo: 'x' }), /^Error: El registro REG-000008 está anulado: sus sesiones ya no se anulan\.$/);
   assert.deepEqual(escrito.anulados, []);
 });
+
+test('marcarSesion: con la sesión que vio la persona, una 2.ª pestaña que marca la misma se rechaza («ya se registró»)', () => {
+  const R3 = Object.assign({}, REG4, { TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', SESIONES: '3' });
+  const { ctx, escrito } = servidor({}, { REGISTROS: [R3] });
+  ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion: 1 });
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: 1 }), /La sesión 1 ya se registró; recargue\./);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: 3 }), /no es la siguiente \(es la 2\)/);
+  ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: '2' });
+  ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05' });   // sin número (llamada antigua): la siguiente
+  assert.deepEqual(escrito.SESIONES.map(s => s.NUMERO), [1, 2, 3]);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: 3 }), /La sesión 3 ya se registró/);
+});
+
+/* ---- Idempotencia (op), todo o nada y la BITACORA después de guardar (batería de 50, casos 33, 34 y 36) ---- */
+function conOp(extra, hojas) {
+  const S = servidor(extra, hojas);
+  S.ctx.conOp_ = (n, cols) => cols.concat(['OP']);
+  // La BITACORA como filas (con su OP), para que se pueda buscar una anulación ya hecha.
+  S.ctx.bitacora_ = (u, a, d, op) => S.escrito.BITACORA.push({ USUARIO: u, ACCION: a, DETALLE: d, OP: op || '' });
+  S.ctx.marcarAnulado_ = (n, id, motivo) => {
+    assert.equal(S.lock.tomado, 1);
+    const f = (S.escrito[n] || []).concat((hojas || {})[n] || []).find(x => x.ID === id);
+    if (f && S.ctx.anulado_(f)) throw new Error(id + ' ya estaba anulado.');
+    if (f) f.ANULADO = 'SÍ';
+    S.escrito.anulados.push([n, id, motivo]);
+  };
+  return S;
+}
+
+test('guardarRegistro con op: el reintento (respuesta perdida) devuelve lo guardado sin escribir otra vez ni avisar de duplicado', () => {
+  const { ctx, escrito } = conOp();
+  const p = datosReg({ dni: '40999000', procedimiento: '', procedimientos: ['SANGRÍA'], tratamiento: 'HIERRO SACARATO', sesiones: '2', op: 'OP-prueba-1' });
+  const r1 = plano(ctx.guardarRegistro(p));
+  const r2 = plano(ctx.guardarRegistro(p));
+  assert.equal(escrito.REGISTROS.length, 2);
+  assert.deepEqual(escrito.REGISTROS.map(x => x.OP), ['OP-prueba-1#1', 'OP-prueba-1#2']);
+  assert.equal(r2.repetida, true);
+  assert.deepEqual(r2.registros.map(x => [x.ID, x.TEXTO]), r1.registros.map(x => [x.ID, x.TEXTO]));
+  // Otro op (otra pulsación, otro día): sí avisa del duplicado.
+  assert.equal(plano(ctx.guardarRegistro(Object.assign({}, p, { op: 'OP-prueba-2' }))).duplicado.ID, r1.registros[0].ID);
+});
+
+test('guardarRegistro: si falla la 2.ª fila, se anula lo escrito en esa llamada y dice que no quedó nada; el reintento no es «duplicado»', () => {
+  const { ctx, escrito } = conOp();
+  const anexar = ctx.anexarObjeto_;
+  let n = 0;
+  ctx.anexarObjeto_ = (h, cols, o) => { if (h === 'REGISTROS' && ++n === 2) throw new Error('Service Spreadsheets timed out while accessing document.'); return anexar(h, cols, o); };
+  const p = datosReg({ dni: '40999000', procedimiento: '', procedimientos: ['SANGRÍA'], tratamiento: 'HIERRO SACARATO', sesiones: '2', fecha: '2026-10-03', fechaInicio: '2026-10-04' });
+  assert.throws(() => ctx.guardarRegistro(p), /timed out.*No quedó nada guardado: se deshizo lo escrito\./);
+  assert.deepEqual(escrito.anulados.map(a => [a[0], a[1]]), [['SESIONES', 'SES-000001'], ['REGISTROS', 'REG-000001']]);
+  assert.deepEqual(escrito.BITACORA, [], 'sin líneas de lo que se deshizo');
+  const r = plano(ctx.guardarRegistro(p));
+  assert.equal(r.ok, true, 'lo anulado no cuenta como duplicado');
+  assert.deepEqual(r.registros.map(x => x.ID), ['REG-000002', 'REG-000003']);
+  assert.deepEqual(r.sesiones.map(x => x.ID_REGISTRO), ['REG-000002', 'REG-000003']);
+});
+
+test('guardarRegistro: el aviso de duplicado se revisa otra vez dentro del candado (dos registros del mismo AMO a la vez)', () => {
+  const { ctx, escrito } = conOp({ registros: [] }, { REGISTROS: [REG4] });   // lo leído antes del candado aún no tenía REG-000004
+  assert.deepEqual(plano(ctx.guardarRegistro(datosReg())), { ok: false, duplicado: { ID: 'REG-000004', FECHA: '2026-10-01', TEXTO: 'Sangría' } });
+  assert.equal(escrito.REGISTROS.length, 0);
+});
+
+test('si falla solo la BITACORA después de guardar, la respuesta es ok con aviso (nunca «No se guardó» habiendo guardado)', () => {
+  const C = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs']);
+  C.MEMO = {}; C.fechaHoraTexto_ = () => '2026-10-05 10:30'; C.conOp_ = (n, c) => c;
+  C.anexarObjeto_ = () => { throw new Error('Service Spreadsheets timed out.'); };
+  assert.doesNotThrow(() => C.bitacora_('MAGALY', 'RESULTADO', 'x', 'OP-123456'));
+  assert.deepEqual(plano(C.avisos_({ ok: true })), { ok: true, aviso: 'Se guardó, pero no se pudo escribir la BITACORA: Service Spreadsheets timed out.' });
+  C.MEMO = {};
+  assert.deepEqual(plano(C.avisos_({ ok: true })), { ok: true }, 'sin fallos, sin aviso');
+});
+
+test('marcarSesion y las anulaciones con op: el reintento no marca otra sesión ni falla con «ya estaba anulado»', () => {
+  const R3 = Object.assign({}, REG4, { TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', SESIONES: '3' });
+  const { ctx, escrito } = conOp({}, { REGISTROS: [R3] });
+  const a = plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion: 1, op: 'OP-ses-0001' }));
+  const b = plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion: 1, op: 'OP-ses-0001' }));
+  assert.deepEqual([escrito.SESIONES.length, b.repetida, b.sesion.ID, b.completo], [1, true, a.sesion.ID, false]);
+  ctx.anularSesion({ usuario: 'MAGALY', id: a.sesion.ID, motivo: 'Fecha equivocada', op: 'OP-anu-0001' });
+  assert.deepEqual(plano(ctx.anularSesion({ usuario: 'MAGALY', id: a.sesion.ID, motivo: 'Fecha equivocada', op: 'OP-anu-0001' })), { ok: true, repetida: true });
+  assert.throws(() => ctx.anularSesion({ usuario: 'MAGALY', id: a.sesion.ID, motivo: 'x', op: 'OP-anu-0002' }), /ya estaba anulada/);
+  ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error', op: 'OP-anu-0003' });
+  assert.deepEqual(plano(ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error', op: 'OP-anu-0003' })), { ok: true, repetida: true });
+  assert.equal(escrito.anulados.length, 2);
+});

@@ -88,8 +88,24 @@ function indiceDeEncabezado(encabezado) {
   return idx;
 }
 
+/*
+ * Caracteres que no se ven y no deben guardarse: los de control (U+0000…U+001F salvo los espacios, U+007F…U+009F), los de
+ * dirección (U+200E, U+200F, U+202A…U+202E, U+2066…U+2069: U+202E invertía cómo se veía el resto del nombre), el espacio de
+ * ancho cero (U+200B) y la marca U+FEFF. El tabulador y los saltos de línea quedan como espacio. Quedan U+200C y U+200D (emojis).
+ */
+var INVISIBLES_ = /[\u0000-\u0008\u000B\u000E-\u001F\u007F-\u009F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+
 function textoLimpio_(v) {
-  return String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  return String(v == null ? '' : v).replace(INVISIBLES_, '').replace(/\s+/g, ' ').trim();
+}
+
+/** Largos máximos de los textos libres (una celda de Sheets admite 50 000; la pantalla y el servidor avisan antes). */
+var LARGO_NOMBRE = 120, LARGO_TEXTO = 2000;
+
+/** '' si `v` (ya limpio) cabe en `max`; si no, «El nombre va hasta 120 caracteres (tiene 999).». `que` lleva su artículo. */
+function largoMal_(v, max, que) {
+  var n = textoLimpio_(v).length;
+  return n > max ? que + (/^L[ao]s /.test(que) ? ' van' : ' va') + ' hasta ' + max + ' caracteres (tiene ' + n + ').' : '';
 }
 
 /** 'HIERRO CARBOXIMALTOSA' -> 'Hierro carboximaltosa'. */
@@ -1152,7 +1168,8 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
   // Hierro y procedimientos: una vez por paciente, tipo y mes.
   var porDni = realizadasPorDni_(citas), grupos = {}, aceptado = {}, completoDe = {};
   (indicaciones || []).forEach(function (i) {
-    if (i.DNI && i.ESTADO === 'ACEPTÓ') {
+    // Aceptó pero no se realizó (programado rechazado o que no vino, marcarNoRealizados): cuenta como no siguió.
+    if (i.DNI && i.ESTADO === 'ACEPTÓ' && !i.NO_REALIZADO) {
       var a = i.DNI + '|' + i.TIPO;
       if (!aceptado[a] || i.FECHA > aceptado[a]) { aceptado[a] = i.FECHA; completoDe[a] = i.COMPLETO !== 'NO'; }
     }
@@ -1166,7 +1183,7 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
         medico: i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO', acepto: false, completo: false };
     }
     if (i.FECHA < grupos[g].primera) grupos[g].primera = i.FECHA;
-    if (i.ESTADO === 'ACEPTÓ') { grupos[g].acepto = true; if (i.COMPLETO !== 'NO') grupos[g].completo = true; }
+    if (i.ESTADO === 'ACEPTÓ' && !i.NO_REALIZADO) { grupos[g].acepto = true; if (i.COMPLETO !== 'NO') grupos[g].completo = true; }
   });
   Object.keys(grupos).forEach(function (k) {
     var g = grupos[k], clave = g.dni + '|' + g.tipo;

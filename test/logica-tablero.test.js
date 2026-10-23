@@ -102,6 +102,15 @@ test('armarTablero: hechosHoyPor cuenta por persona resultados, sesiones y altas
   assert.deepEqual(tablero({ seguimientos: segs, sesiones, altas }).cifras.hechosHoyPor, { MAGALY: 3, RACHEL: 1 });
 });
 
+test('armarTablero: «Próxima sesión» al marcar suma 1 a la meta del día (la sesión), no 2: su agenda ligada no cuenta aparte', () => {
+  const ses = { ID: 'SES-000007', FECHA_HORA: HOY + ' 09:00', ASESORA: 'RACHEL', ANULADO: '' };
+  const agenda = Object.assign(seg({ dni: '1', fecha: HOY, quien: 'RACHEL' }), { RESULTADO: 'AGENDÓ CITA', REFERENCIA: 'REG-1', ESPECIALIDAD: 'HIERRO',
+    NOTA: 'Agendada al marcar la sesión 2 (SES-000007)', FECHA_PROXIMA: '2026-10-13' });
+  const otra = Object.assign(seg({ dni: '2', fecha: HOY, quien: 'RACHEL' }), { RESULTADO: 'AGENDÓ CITA', FECHA_PROXIMA: '2026-10-13' });
+  const c = tablero({ seguimientos: [agenda, otra], sesiones: [ses] }).cifras;
+  assert.deepEqual([c.hechosHoyPor, c.hechosHoy], [{ RACHEL: 2 }, 1]);
+});
+
 test('armarTablero: nombre en cerrados de fallecidos y en altas sin serie; procedimiento completo «Se hizo el …»', () => {
   const citas = [cita({ dni: '11', fecha: '2026-09-01', nombre: 'ANA PRUEBA UNO' }), cita({ dni: '12', fecha: '2026-09-02', nombre: 'LUIS PRUEBA DOS' })];
   const segs = [seg({ dni: '11', fecha: '2026-10-05', accion: 'DESCARTADO', motivo: 'FALLECIÓ' })];

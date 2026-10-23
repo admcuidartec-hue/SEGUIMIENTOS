@@ -78,6 +78,31 @@ test('pendientesRegistro: un cotizado que pagó → PAGO REALIZADO; al aceptar (
   assert.equal(viejo.ESTADO, 'PAGO REALIZADO', 'no queda ANTIGUO');
 });
 
+test('pendientesRegistro: pagó, aceptó y no vino a su 1.ª sesión → vuelve a PAGO REALIZADO (el pago es del ciclo de la cotización)', () => {
+  const p1 = pago('2026-09-25', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001' });
+  const acepto = res('2026-09-26', 'ACEPTÓ', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001', FECHA_PROXIMA: '2026-09-28' });
+  const r = regi({ FECHA_INICIO: '2026-09-28' });
+  const noVino = pend([r], [p1, acepto])[0];
+  assert.deepEqual([noVino.ESTADO, noVino.FECHA_PAGO, noVino.MOTIVO_PENDIENTE], ['PAGO REALIZADO', '2026-09-25', '']);
+  assert.equal(pend([r], [p1, acepto], '2026-09-29')[0].ESTADO, 'AGENDADO', 'dentro de la gracia sigue en Agendado');
+  // Tres «No contestó» después de la fecha no lo cierran solo: pagó.
+  const nc = ['2026-10-01', '2026-10-02', '2026-10-03'].map(f => res(f, 'NO CONTESTÓ', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001' }));
+  assert.equal(pend([r], [p1, acepto].concat(nc))[0].ESTADO, 'PAGO REALIZADO');
+  // Un cierre explícito sí lo cierra.
+  const cierre = res('2026-10-02', 'NO DESEA REALIZARSE', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001', MOTIVO: 'NO DESEA REALIZARSE' });
+  assert.equal(pend([r], [p1, acepto, cierre])[0].ESTADO, 'CERRADO');
+  // Un «No desea realizarse» mientras esperaba su fecha (antes de FECHA_INICIO, después de aceptar) lo cierra; uno anterior al «Aceptó», no.
+  const antes = res('2026-09-27', 'NO DESEA REALIZARSE', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001', MOTIVO: 'NO DESEA REALIZARSE', FECHA_HORA: '2026-09-27 09:00' });
+  assert.equal(pend([regi({ FECHA_INICIO: '2026-10-20' })], [acepto, antes])[0].ESTADO, 'CERRADO');
+  const previo = res('2026-09-24', 'NO DESEA REALIZARSE', { ESPECIALIDAD: 'HIERRO', REFERENCIA: 'REG-000001', MOTIVO: 'NO DESEA REALIZARSE' });
+  assert.equal(pend([regi({ FECHA_INICIO: '2026-10-20' })], [previo, acepto])[0].ESTADO, 'AGENDADO');
+  // Ya empezado, el pago de la cotización no cuenta para el ciclo de la sesión siguiente.
+  const enCurso = plano(L.pendientesRegistro({ registros: [r], seguimientos: [p1, acepto], citas: [cita({ fecha: '2026-09-01' })], reglas: R, hoy: HOY,
+    sesiones: [{ ID: 'SES-000001', ID_REGISTRO: 'REG-000001', NUMERO: 1, FECHA: '2026-09-28', FECHA_HORA: '2026-09-28 10:00', ANULADO: '' }],
+    telefonos: { '40111222': ['987654321'] }, catalogos: CAT2 }))[0];
+  assert.equal(enCurso.FECHA_PAGO, '');
+});
+
 test('pendientesIndicacion: una cotización del historial que pagó → PAGO REALIZADO', () => {
   const hist = { ID: 'IND-1', FECHA: '2026-09-01', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: '', MEDICO_SOLICITANTE: '', NOMBRE: 'X',
     TELEFONO: '987654321', ESTADO: 'COTIZÓ', DNI: '40111222', EMPAREJAMIENTO: 'AUTOMÁTICO' };

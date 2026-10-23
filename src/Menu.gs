@@ -26,15 +26,21 @@ function hojasBase_() {
     CITAS: COLUMNAS_CITAS,
     PACIENTES: COLUMNAS_PACIENTES,
     INDICACIONES: COLUMNAS_INDICACIONES,
-    SEGUIMIENTOS: COLUMNAS_SEGUIMIENTOS,
-    BITACORA: COLUMNAS_BITACORA,
+    SEGUIMIENTOS: COLUMNAS_SEGUIMIENTOS.concat([COLUMNA_OP]),
+    BITACORA: COLUMNAS_BITACORA.concat([COLUMNA_OP]),
     CONTACTOS_CRM: COLUMNAS_CONTACTOS,
     KPI: ['RETORNO POR COHORTE'],
-    REGISTROS: COLUMNAS_REGISTROS,
-    SESIONES: COLUMNAS_SESIONES,
-    ALTAS: COLUMNAS_ALTAS,
-    ENFERMERIA: COLUMNAS_ENFERMERIA
+    REGISTROS: COLUMNAS_REGISTROS.concat([COLUMNA_OP]),
+    SESIONES: COLUMNAS_SESIONES.concat([COLUMNA_OP]),
+    ALTAS: COLUMNAS_ALTAS.concat([COLUMNA_OP]),
+    ENFERMERIA: COLUMNAS_ENFERMERIA.concat([COLUMNA_OP])
   };
+}
+
+/** Las hojas que se escriben por posición y llevan, al final, la columna OP de la idempotencia (conOp_). */
+function hojasConOp_() {
+  return [['SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS], ['REGISTROS', COLUMNAS_REGISTROS], ['ALTAS', COLUMNAS_ALTAS],
+    ['ENFERMERIA', COLUMNAS_ENFERMERIA], ['SESIONES', COLUMNAS_SESIONES], ['BITACORA', COLUMNAS_BITACORA]];
 }
 
 /** Listas iniciales de la pestaña Registro (diseño §3.4). DOCTOR y DOCTOR_SOFDOC van fila a fila. */
@@ -59,20 +65,11 @@ var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES'
 function ampliarHojas_() {
   var ss = ss_(), cambios = [];
 
-  var sg = ss.getSheetByName('SEGUIMIENTOS');
-  if (sg) {
-    var cabS = encabezado_(sg), plan = encabezadoAmpliable(cabS, COLUMNAS_SEGUIMIENTOS);
-    if (plan.error) cambios.push('✗ SEGUIMIENTOS: ' + plan.error);
-    else if (plan.agregar.length) {
-      sg.getRange(1, cabS.length + 1, 1, plan.agregar.length).setValues([plan.agregar]).setFontWeight('bold');
-      cambios.push('SEGUIMIENTOS: columna ' + plan.agregar.join(', ') + '.');
-    }
-  }
-
-  [['REGISTROS', COLUMNAS_REGISTROS], ['ALTAS', COLUMNAS_ALTAS], ['ENFERMERIA', COLUMNAS_ENFERMERIA]].forEach(function (par) {
+  // Sus columnas nuevas, siempre al final, y después la columna OP (idempotencia: el reintento de una operación no la repite).
+  hojasConOp_().forEach(function (par) {
     var sh = ss.getSheetByName(par[0]);
     if (!sh) return;
-    var cab = encabezado_(sh), plan = encabezadoAmpliable(cab, par[1]);
+    var cab = encabezado_(sh), plan = encabezadoAmpliable(cab, par[1].concat([COLUMNA_OP]));
     if (plan.error) cambios.push('✗ ' + par[0] + ': ' + plan.error);
     else if (plan.agregar.length) {
       sh.getRange(1, cab.length + 1, 1, plan.agregar.length).setValues([plan.agregar]).setFontWeight('bold');
@@ -434,7 +431,7 @@ function verificar() {
   });
   var sgV = ss.getSheetByName('SEGUIMIENTOS');
   if (sgV) {
-    var planV = encabezadoAmpliable(encabezado_(sgV), COLUMNAS_SEGUIMIENTOS);
+    var planV = encabezadoAmpliable(encabezado_(sgV), COLUMNAS_SEGUIMIENTOS.concat([COLUMNA_OP]));
     lineas.push(planV.error ? '✗ SEGUIMIENTOS: ' + planV.error
       : planV.agregar.length ? '✗ A SEGUIMIENTOS le falta la columna ' + planV.agregar.join(', ') + '. Use «Preparar hojas».'
       : '✓ SEGUIMIENTOS tiene todas sus columnas.');

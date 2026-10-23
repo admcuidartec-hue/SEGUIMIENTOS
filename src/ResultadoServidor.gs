@@ -63,7 +63,7 @@ function registrarResultado_(p, opciones) {
     return conTarjeta_(rAlta, claveTarjeta(t));
   }
   if (v.fila.RESULTADO === 'LO HIZO' && t.ID_REGISTRO) {
-    var rSesion = marcarSesion({ usuario: p.usuario, id: t.ID_REGISTRO, fecha: p.fecha, nota: textoLimpio_(p.nota) });
+    var rSesion = marcarSesion({ usuario: p.usuario, id: t.ID_REGISTRO, fecha: p.fecha, nota: textoLimpio_(p.nota), sesion: p.sesion, op: p.op });
     return conTarjeta_(rSesion, claveTarjeta(t));
   }
   var lock = bloquear_(), s;

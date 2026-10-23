@@ -2358,7 +2358,8 @@ async function guardarResultado(clave, resultado, extra) {
   const viaSesion = resultado === 'LO HIZO' && !!p.idRegistro;
   let r;
   try {
-    r = viaSesion ? await llamar('marcarSesion', Object.assign({ usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota }, extra.proxima ? { proxima: extra.proxima } : {},
+    // `sesion`: la que la persona ve («Marcar sesión k hecha»); si otra pestaña ya la marcó, el servidor la rechaza.
+    r = viaSesion ? await llamar('marcarSesion', Object.assign({ usuario: quien, id: p.idRegistro, fecha: extra.fecha || '', nota, sesion: (Number(p.raw.HECHAS) || 0) + 1 }, extra.proxima ? { proxima: extra.proxima } : {},
       extra.reaccion ? { reaccion: extra.reaccion } : {}))
       : await llamar('registrarResultado', payload);
   } catch (e) {
@@ -3778,7 +3779,7 @@ function loHizo(b) {
   if (!f) { avisar('Falta la fecha de la sesión.'); return; }
   const reac = t.hierro ? reaccionDe('ficha:' + t.id) : null;
   if (reac && reac.error) { avisar(reac.error); return; }
-  escribirFicha({ boton: b, fn: 'marcarSesion', datos: Object.assign({ id: t.id, fecha: f, nota: '' }, reac ? { reaccion: reac } : {}),
+  escribirFicha({ boton: b, fn: 'marcarSesion', datos: Object.assign({ id: t.id, fecha: f, nota: '', sesion: t.sesiones.length + 1 }, reac ? { reaccion: reac } : {}),
     aviso: r => r.completo ? 'Tratamiento completado: ' + t.id + '.' : `Sesión ${(r.sesion && Number(r.sesion.NUMERO)) || t.sesiones.length + 1} de ${t.n} registrada: ${t.id}.`,
     luego: () => { delete PA.fechas[t.id]; delete REAC['ficha:' + t.id]; } });
 }
@@ -5846,6 +5847,11 @@ const DEMO = (() => {
       if (!r) throw new Error('No encontré ese registro. Recargue la página.');
       if (r.ANULADO) throw new Error('Ese registro está anulado.');
       const validas = sesionesDe(r.ID), f = String(x.fecha || '').slice(0, 10);
+      // Como sesionYaNoEsLaSiguiente: la sesión que vio la persona debe ser la siguiente.
+      if (x.sesion !== undefined && x.sesion !== '' && Number(x.sesion) !== validas.length + 1) {
+        const k = Number(x.sesion), sig = validas.length + 1;
+        throw new Error(k < sig ? 'La sesión ' + k + ' ya se registró; recargue.' : 'La sesión ' + k + ' no es la siguiente (es la ' + sig + '); recargue.');
+      }
       if (validas.length >= r.SESIONES) throw new Error('Ese tratamiento ya tiene todas sus sesiones.');
       if (!f) throw new Error('Falta la fecha de la sesión.');
       if (f > hoy) throw new Error('La fecha no puede ser futura.');

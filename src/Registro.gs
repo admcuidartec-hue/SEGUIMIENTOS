@@ -284,6 +284,17 @@ function validarSesion(r, sesiones, fecha, hoy) {
 }
 
 /**
+ * `vista` es el número de sesión que la persona vio en pantalla («Marcar sesión k hecha»). Si ya no es la siguiente (otra
+ * pestaña la marcó, o se anuló una), se rechaza en vez de guardarla como otra: '' si vale o si no se envió (llamadas antiguas).
+ */
+function sesionYaNoEsLaSiguiente(e, vista) {
+  if (vista === undefined || vista === null || vista === '') return '';
+  var k = Number(vista), sig = e.hechas + 1;
+  if (!(k >= 1) || k === sig) return '';
+  return k < sig ? 'La sesión ' + k + ' ya se registró; recargue.' : 'La sesión ' + k + ' no es la siguiente (es la ' + sig + '); recargue.';
+}
+
+/**
  * «Próxima sesión» al marcar una: después de la sesión que se marca, no antes de hoy y hasta 180 días; nunca en la última (no hay próxima).
  * `e` es el estado ANTES de marcar. '' si vale, o el mensaje.
  */

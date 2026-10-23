@@ -822,7 +822,7 @@ test('panel: cada resultado mueve la tarjeta a la columna que dice el servidor',
     await esperarCol(pagina, SOFIA, '3');
     // Como etiquetaDe de Tablero.gs: las sesiones hechas, las que faltan y la próxima.
     assert.match(await textoTarjeta(pagina, SOFIA), /Sesión 2 de 3 · faltan 1 · próxima ~08\/10/);
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', sesion: 2 });
     await abrirPanelDe(pagina, SOFIA);
     assert.match(await pagina.locator('#panel [data-marcar-sesion]').textContent(), /Marcar sesión 3 hecha/);
     await pagina.locator('#panel [data-marcar-sesion]').click();
@@ -2493,7 +2493,7 @@ test('pacientes: «Lo hizo» registra la sesión; «Anular sesión» y «Anular 
     const tab = await llamadas(pagina, 'getTablero');
     await r1.locator('[data-lohizo]').click();
     await pagina.waitForFunction(() => /Sesión 2 de 3 registrada/.test(document.querySelector('#aviso span').textContent));
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-09-30', nota: '' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-09-30', nota: '', sesion: 2 });
     assert.equal(await aviso(pagina), 'Sesión 2 de 3 registrada: REG-000001.');
     await pagina.waitForFunction(() => /Sesión 2 · 30\/09\/2026 · Magaly/.test(document.querySelector('#ficha .trat[data-reg="REG-000001"]').textContent));
     let ses = await textoDe(pagina, '#ficha .trat[data-reg="REG-000001"] .ses');
@@ -3672,7 +3672,7 @@ test('En tratamiento: «Próxima sesión» opcional; con fecha, marcar la sesió
     await pfp.fill('2026-10-08');
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', proxima: '2026-10-08' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', sesion: 2, proxima: '2026-10-08' });
     assert.equal(await llamadas(pagina, 'registrarResultado'), 0, 'una sola llamada: marcarSesion');
     await esperarCol(pagina, SOFIA, '2');
     await pagina.waitForFunction(id => /Sesión 3 el jue 08\/10/.test([...document.querySelectorAll('#tablero [data-card]')].find(e => e.dataset.card === id).textContent), SOFIA);
@@ -3701,7 +3701,7 @@ test('En tratamiento: sin «Próxima sesión» todo sigue igual, y en la última
     await abrirPanelDe(pagina, SOFIA);
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await esperarEstable(pagina);
-    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '' });
+    assert.deepEqual(await ultimo(pagina, 'marcarSesion'), { usuario: 'MAGALY', id: SOFIA, fecha: '2026-10-01', nota: '', sesion: 2 });
     await esperarCol(pagina, SOFIA, '3');
     await pagina.waitForFunction(id => !S.sinRecargar.has(id), SOFIA);
     await abrirPanelDe(pagina, SOFIA);
@@ -4578,6 +4578,20 @@ test('Registro: un documento de más de 12 caracteres no se corta en silencio: s
     await pagina.locator('#rdni').fill('X12345678901');
     await pagina.locator('#rdni').dispatchEvent('input');
     assert.equal(await pagina.locator('#rgo').isDisabled(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('dos pestañas: «Marcar sesión 3 hecha» desde una pantalla vieja se rechaza («La sesión 3 ya se registró»)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const id = await pagina.evaluate(() => DEMO._registroConSesiones());
+    // Otra pestaña marca la sesión 3 (la que esta pantalla también ofrece) antes que esta.
+    const otra = await pagina.evaluate(id => DEMO.marcarSesion({ usuario: 'ANA', id, fecha: S.hoy, sesion: 3 }).sesion.NUMERO, id);
+    assert.equal(otra, 3);
+    const msg = await pagina.evaluate(id => { try { DEMO.marcarSesion({ usuario: 'MAGALY', id, fecha: S.hoy, sesion: 3 }); return 'guardó'; } catch (e) { return e.message; } }, id);
+    assert.equal(msg, 'La sesión 3 ya se registró; recargue.');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

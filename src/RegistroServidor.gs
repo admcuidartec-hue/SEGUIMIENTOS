@@ -78,7 +78,10 @@ function marcarSesion(p) {
   try {
     var sesiones = leerSesiones_(), id = textoLimpio_(p.id);
     var r = leerRegistros_().filter(function (x) { return x.ID === id; })[0];
-    var error = validarSesion(r, sesiones, p.fecha, d.hoy);
+    // La sesión que vio la persona (p.sesion): si otra pestaña ya la marcó, no se guarda como la siguiente.
+    var error = r && !anulado_(r) ? sesionYaNoEsLaSiguiente(estadoRegistro(r, sesiones), p.sesion) : '';
+    if (error) throw new Error(error);
+    error = validarSesion(r, sesiones, p.fecha, d.hoy);
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
     // «¿Reacción durante la aplicación?»: se valida antes de escribir nada, para no dejar la sesión a medias.

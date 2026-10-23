@@ -353,3 +353,15 @@ test('anularSesion: una sesión de un registro anulado no se anula (las hechas s
   assert.throws(() => ctx.anularSesion({ usuario: 'MAGALY', id: 'SES-000001', motivo: 'x' }), /^Error: El registro REG-000008 está anulado: sus sesiones ya no se anulan\.$/);
   assert.deepEqual(escrito.anulados, []);
 });
+
+test('marcarSesion: con la sesión que vio la persona, una 2.ª pestaña que marca la misma se rechaza («ya se registró»)', () => {
+  const R3 = Object.assign({}, REG4, { TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', SESIONES: '3' });
+  const { ctx, escrito } = servidor({}, { REGISTROS: [R3] });
+  ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion: 1 });
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: 1 }), /La sesión 1 ya se registró; recargue\./);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: 3 }), /no es la siguiente \(es la 2\)/);
+  ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: '2' });
+  ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05' });   // sin número (llamada antigua): la siguiente
+  assert.deepEqual(escrito.SESIONES.map(s => s.NUMERO), [1, 2, 3]);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-05', sesion: 3 }), /La sesión 3 ya se registró/);
+});

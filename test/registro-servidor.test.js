@@ -468,3 +468,15 @@ test('guardarRegistro: si no puede anular lo que quedó a medias de un intento a
   assert.throws(() => ctx.guardarRegistro(p), /quedó a medias.*revise Registrados/);
   assert.equal(escrito.REGISTROS.length, 0);
 });
+
+test('con «Falleció» vigente, el servidor rechaza un registro nuevo y marcar sesión; anulado el fallecimiento, deja (caso 38)', () => {
+  const muerto = { ID: 'SEG-9', FECHA_HORA: '2026-10-02 10:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'DESCARTADO', RESULTADO: 'FALLECIÓ', MOTIVO: 'FALLECIÓ' };
+  const { ctx, escrito } = servidor({ seguimientos: [muerto] }, { REGISTROS: [REG4] });
+  const msg = /figura como fallecido desde el 02\/10\/2026: para registrar, primero anule «Falleció» en su ficha\./;
+  assert.throws(() => ctx.guardarRegistro(datosReg({ confirmado: true })), msg);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04' }), msg);
+  assert.deepEqual([escrito.REGISTROS.length, escrito.SESIONES.length], [0, 0]);
+  const vivo = servidor({ seguimientos: [Object.assign({}, muerto, { ANULADO: 'SÍ' })].filter(s => !s.ANULADO) }, { REGISTROS: [REG4] });
+  assert.equal(plano(vivo.ctx.guardarRegistro(datosReg({ confirmado: true }))).ok, true);
+  assert.equal(plano(vivo.ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04' })).ok, true);
+});

@@ -3099,6 +3099,12 @@ function primeraSesionHecha() {
     : `<i class="ph ph-calendar-check"></i>Quedará programada para el ${esc(dm(v))}.`;
   return pasada;
 }
+/** Como mensajeFallecido (Registro.gs): con «Falleció» vigente no se registra ni se marca sesión hasta anularlo. */
+function mensajeFallecido(muerto) {
+  if (!muerto) return '';
+  const f = String(muerto.fecha || '').slice(0, 10);
+  return 'Este paciente figura como fallecido' + (/^\d{4}-\d{2}-\d{2}$/.test(f) ? ' desde el ' + dmy(f) : '') + ': para registrar, primero anule «Falleció» en su ficha.';
+}
 function validarRegistro() {
   const b = $('#rgo');
   if (!b) return;
@@ -3110,10 +3116,11 @@ function validarRegistro() {
   const largo = esDecision() ? dniLargo(dniEscrito) : (dniEscrito ? documentoMal(dniEscrito) : '')
     || (!esDecision() && $('#rnom') ? largoMal($('#rnom').value, LARGO_NOMBRE, 'El nombre') : '')
     || (RG.modo === 'control' && $('#rexamenes') ? largoMal($('#rexamenes').value, LARGO_TEXTO, 'Los exámenes') : '');
-  const mal = largo || (f.length ? '' : fechaMalRegistro());
+  const muerto = !esDecision() && RG.pac ? mensajeFallecido(RG.pac.fallecido) : '';
+  const mal = largo || muerto || (f.length ? '' : fechaMalRegistro());
   b.disabled = f.length > 0 || !!mal || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
-  $('#rfalta').textContent = largo || (f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
+  $('#rfalta').textContent = largo || muerto || (f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
     : RG.modo === 'indicacion' ? (n === 1 ? `Se creará 1 registro${conSesion}.` : `Se crearán ${n} registros${conSesion}.`)
     : RG.modo === 'control' ? 'Volverá con sus resultados en la fecha de retorno.'
     : d.pideFecha ? (faltaRetorno() ? 'Elija la fecha de retorno.' : 'Lo esperamos en la fecha de retorno.')
@@ -5719,6 +5726,7 @@ const DEMO = (() => {
       // Como documentoValido y normDni: se valida lo escrito (8 dígitos, con su cero) y se guarda normalizado.
       const dni = dniDe(x.dni);
       if (documentoMal(x.dni)) throw new Error(documentoMal(x.dni));
+      if (muertos[dni]) throw new Error(mensajeFallecido(muertos[dni]));
       const nombre = limpioTexto(x.nombre).toUpperCase();
       if (!nombre) throw new Error('Falta el nombre del paciente.');
       if (largoMal(nombre, LARGO_NOMBRE, 'El nombre')) throw new Error(largoMal(nombre, LARGO_NOMBRE, 'El nombre'));
@@ -5922,6 +5930,7 @@ const DEMO = (() => {
       const r = regPorId(String(x.id || '').trim());
       if (!r) throw new Error('No encontré ese registro. Recargue la página.');
       if (r.ANULADO) throw new Error('Ese registro está anulado.');
+      if (muertos[dniDe(r.DNI)]) throw new Error(mensajeFallecido(muertos[dniDe(r.DNI)]));
       const validas = sesionesDe(r.ID), f = String(x.fecha || '').slice(0, 10);
       // Como sesionYaNoEsLaSiguiente: la sesión que vio la persona debe ser la siguiente.
       if (x.sesion !== undefined && x.sesion !== '' && Number(x.sesion) !== validas.length + 1) {

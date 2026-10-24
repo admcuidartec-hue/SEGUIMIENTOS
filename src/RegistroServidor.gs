@@ -38,6 +38,8 @@ function guardarRegistro(p) {
   var previo = registroRepetido_(d.registros, d.sesiones, op, v.error ? null : v);
   if (previo && !previo.incompleto) return limpiarParaEnvio(previo);
   if (v.error) throw new Error(v.error);
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos)[normDni(v.filas[0] && v.filas[0].DNI)]);
+  if (muerto) throw new Error(muerto);
   var dup = !(p && p.confirmado) && duplicadoDe_(sinOp_(d.registros, op), v.filas);
   if (dup) return limpiarParaEnvio(dup);
   var lock = bloquear_();
@@ -164,6 +166,8 @@ function marcarSesion(p) {
     var previa = filasDeOp_(sesiones, op).filter(function (x) { return String(x.OP).trim() === op; })[0];
     if (previa) return limpiarParaEnvio(sesionRepetida_(previa, sesiones, op));
     var r = leerRegistros_().filter(function (x) { return x.ID === id; })[0];
+    var muerto = r ? mensajeFallecido(fallecidos(d.seguimientos)[normDni(r.DNI)]) : '';
+    if (muerto) throw new Error(muerto);
     // La sesión que vio la persona (p.sesion): si otra pestaña ya la marcó, no se guarda como la siguiente.
     var error = r && !anulado_(r) ? sesionYaNoEsLaSiguiente(estadoRegistro(r, sesiones), p.sesion) : '';
     if (error) throw new Error(error);

@@ -810,3 +810,14 @@ function revisarCatalogos(c) {
   return lineas.length ? lineas : ['✓ Catálogos de Registro: ' + c.doctores.length + ' doctores, ' + c.procedimientos.length +
     ' procedimientos, ' + c.tratamientos.length + ' tratamientos.'];
 }
+
+/**
+ * Con «Falleció» vigente (fallecidos) no se registra nada nuevo del paciente ni se marca su sesión: la pantalla ya lo avisa y
+ * el servidor lo rechaza, salvo que antes se anule el fallecimiento. `muerto`: { fecha, quien } o null. '' si no hay problema.
+ */
+function mensajeFallecido(muerto) {
+  if (!muerto) return '';
+  var f = fechaIso(muerto.fecha);
+  return 'Este paciente figura como fallecido' + (f ? ' desde el ' + f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4) : '') +
+    ': para registrar, primero anule «Falleció» en su ficha.';
+}

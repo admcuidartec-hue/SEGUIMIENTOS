@@ -1689,7 +1689,7 @@ test('registro: un documento inválido dice por qué, con el mismo texto que el 
   } finally { await navegador.close(); }
 });
 
-test('registro: un DNI de fallecido muestra el aviso y deja registrar', async () => {
+test('registro: un DNI de fallecido muestra el aviso y no deja registrar hasta anular «Falleció» (el servidor lo rechaza)', async () => {
   const { navegador, pagina, errores } = await abrirRegistro();
   try {
     await pagina.locator('#rdni').fill('41999000');
@@ -1697,15 +1697,11 @@ test('registro: un DNI de fallecido muestra el aviso y deja registrar', async ()
     assert.match(await pagina.locator('#rcon .fallecido').textContent(), /Este paciente figura como fallecido el 24\/09\/2026 \(Ana\)/);
     assert.match(await pagina.locator('#rcon .conocido').textContent(), /Paciente conocido · última consulta 02\/07\/2026 con Dr\. Cabanillas/);
     await llenarIndicacion(pagina, { procs: ['SANGRÍA'] });
-    assert.equal(await pagina.locator('#rgo').isDisabled(), false, 'el aviso no bloquea');
-    assert.equal(await falta(pagina), 'Se creará 1 registro.');
-    await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000023"]');
-    assert.equal(await aviso(pagina), 'Registro guardado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000023');
-    const p = await ultimo(pagina, 'guardarRegistro');
-    assert.equal(p.dni, '41999000');
-    assert.equal(p.contacto, '933999000', 'el teléfono va sin espacios');
-    assert.equal(p.doctor, 'Dr. Elí Cabanillas');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true, 'con «Falleció» vigente no se registra');
+    assert.equal(await falta(pagina), 'Este paciente figura como fallecido desde el 24/09/2026: para registrar, primero anule «Falleció» en su ficha.');
+    // El DEMO, como el servidor, rechaza el registro y la sesión de un fallecido.
+    const e = await pagina.evaluate(() => { try { DEMO.guardarRegistro({ usuario: 'MAGALY', dni: '41999000', nombre: 'X', contacto: '987654321', fecha: S.hoy, doctor: 'Dr. Elí Cabanillas', procedimientos: ['SANGRÍA'] }); return ''; } catch (x) { return x.message; } });
+    assert.match(e, /figura como fallecido desde el 24\/09\/2026/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

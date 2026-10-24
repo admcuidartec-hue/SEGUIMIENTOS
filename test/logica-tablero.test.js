@@ -161,3 +161,33 @@ test('armarTablero: la tarjeta de un registro por reevaluar reemplaza la reevalu
   const tab2 = plano(L.armarTablero({ reglas: R2, hoy: '2026-10-09', pacientes: [reev], pendientes: [antes], citas: [], seguimientos: [], telefonos: {} }));
   assert.deepEqual(tab2.columnas.POR_CONTACTAR.map(t => t.CLAVE), ['40111222|HEMATOLOGÍA']);
 });
+
+test('consulta que llega tarde de SOFDOC: la consulta realizada cierra el ciclo aunque haya seguimientos posteriores (caso 27)', () => {
+  // «No contestó» el 05/10, vino el 12/10 (SOFDOC lo trae el 21/10) y otro «No contestó» el 20/10, hecho sin saberlo.
+  const citas = [cita({ dni: '27', fecha: '2026-08-20' }), cita({ dni: '27', fecha: '2026-10-12' })];
+  const nc = f => Object.assign(seg({ dni: '27', fecha: f, accion: 'HECHO' }), { RESULTADO: 'NO CONTESTÓ', ID: 'S-27-' + f });
+  const segs = [nc('2026-10-05'), nc('2026-10-20')];
+  const pacientes = plano(L.armarPacientes(citas, [], segs, R, '2026-10-21', [], {}, {}, {}));
+  assert.equal(pacientes[0].ESTADO, 'RECUPERADO', 'el «No contestó» del 20/10 no abre un ciclo nuevo (volvió tras el del 05/10)');
+  assert.equal(pacientes[0].N_SEGUIMIENTOS, 0);
+  const t = plano(L.armarTablero({ pacientes, pendientes: [], seguimientos: segs, citas, vigentes: {}, reglas: R, hoy: '2026-10-21' }));
+  const deA = [];
+  Object.keys(t.columnas).forEach(c => t.columnas[c].forEach(x => { if (x.DNI === '27') deA.push([c, x.ETIQUETA]); }));
+  assert.deepEqual(deA, [['COMPLETADO', 'Volvió el 12/10']]);
+});
+
+test('armarTablero: ninguna CLAVE en más de una franja; gana la fase más avanzada', () => {
+  const citas = [cita({ dni: '9', fecha: '2026-08-01' }), cita({ dni: '9', fecha: '2026-10-02' })];
+  const segs = [seg({ dni: '9', fecha: '2026-09-20' })];
+  // Una reevaluación que (por datos contradictorios) llega como Contactado y que además volvió este mes.
+  const t = tablero({ citas, seguimientos: segs,
+    pacientes: [pac({ DNI: '9', ESTADO: 'AGENDADO', N_SEGUIMIENTOS: 1, AGENDA: 'REINTENTAR', FECHA_AGENDA: '2026-10-20', INTENTO: 1 }), pac({ DNI: '3' })],
+    pendientes: [reg(), reg({ ESTADO: 'AGENDADO', AGENDA: 'SESION', FECHA_AGENDA: '2026-10-09' })] });
+  const vistas = {};
+  Object.keys(t.columnas).forEach(c => t.columnas[c].forEach(x => { (vistas[x.CLAVE] = vistas[x.CLAVE] || []).push(c); }));
+  Object.keys(vistas).forEach(k => assert.equal(vistas[k].length, 1, k + ' en ' + vistas[k].join(' y ')));
+  assert.deepEqual(vistas['9|HEMATOLOGÍA'], ['COMPLETADO']);
+  assert.deepEqual(vistas['REG-000001'], ['EN_TRATAMIENTO']);
+  assert.equal(t.cifras.contactados, 0);
+  assert.equal(t.cifras.agendados, 0);
+});

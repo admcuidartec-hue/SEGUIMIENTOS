@@ -349,7 +349,9 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
     return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0;
   });
   if (lista.length) out.ultimoSeguimiento = fechaIso(lista[lista.length - 1].FECHA_HORA);
-  var posteriores = lista.filter(function (s) { return fechaIso(s.FECHA_HORA) > ultima; });
+  // Un ciclo nuevo solo empieza cuando vuelve a tocar (la fecha esperada). Lo registrado entre la última consulta y esa
+  // fecha se hizo sin saber de la consulta (SOFDOC la trajo tarde): la consulta realizada ya cerró ese ciclo (caso 27).
+  var posteriores = lista.filter(function (s) { var f = fechaIso(s.FECHA_HORA); return f > ultima && f >= out.esperada; });
   var c = leerCiclo(posteriores, reglas, hoy);
   out.intentos = c.intentos;
   out.pago = c.pago;

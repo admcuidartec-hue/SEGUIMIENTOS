@@ -4669,3 +4669,25 @@ test('la ficha y el panel parten las palabras larguísimas (overflow-wrap) en ve
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('indicadores: una fecha mal escrita en la hoja (mes «31/02/2») no se ofrece ni se abre (caso 60)', async () => {
+  const navegador = await chromium.launch();
+  try {
+    const pagina = await (await navegador.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+    const errores = [];
+    pagina.on('pageerror', e => errores.push(e.message));
+    await pagina.addInitScript(() => localStorage.setItem('seg.usuario', 'MAGALY'));
+    await pagina.goto('file://' + ARCHIVO, { waitUntil: 'domcontentloaded' });
+    await pagina.waitForFunction(() => typeof S !== 'undefined' && !!S.boot, null, { timeout: 10000 });
+    await pagina.evaluate(() => {
+      const real = DEMO.getResumen;
+      DEMO.getResumen = (...a) => { const r = real(...a); r.filas = r.filas.concat([Object.assign({}, r.filas[0], { MES: '31/02/2' }), Object.assign({}, r.filas[0], { MES: '2026-13' })]); return r; };
+    });
+    await pagina.locator('[data-sec="indicadores"]:visible').first().click();
+    await pagina.waitForSelector('#ipanel[data-tab] section', { timeout: 10000 });
+    assert.equal(await pagina.locator('#imes').textContent(), 'setiembre 2026');
+    assert.equal(await pagina.locator('#mant').isDisabled(), false, 'se puede ir a otros meses');
+    assert.equal(await pagina.locator('#ipanel .barras [data-mes="31/02/2"]').count(), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

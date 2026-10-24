@@ -37,10 +37,27 @@ function normTelefono(v) {
   return d.length >= 7 ? d : '';
 }
 
-/** 'yyyy-MM-dd' tomado del inicio del texto; '' si no empieza por una fecha ISO. */
+/** 'yyyy-MM-dd' tomado del inicio del texto; '' si no empieza por una fecha ISO que exista (no «2026-02-31»). */
 function fechaIso(v) {
   var m = String(v == null ? '' : v).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? m[1] + '-' + m[2] + '-' + m[3] : '';
+  if (!m) return '';
+  var a = Number(m[1]), mes = Number(m[2]), dia = Number(m[3]);
+  if (mes < 1 || mes > 12 || dia < 1 || dia > new Date(Date.UTC(a, mes, 0)).getUTCDate()) return '';
+  return m[1] + '-' + m[2] + '-' + m[3];
+}
+
+/**
+ * Las fechas leídas de una hoja, en yyyy-mm-dd o vacías: una celda escrita a mano («31/02/2026», «ayer») no llega a
+ * ningún cálculo (caso 60). Las de fecha y hora conservan la hora si empiezan por una fecha válida.
+ */
+function normalizarFechas(filas, columnas, columnasHora) {
+  (filas || []).forEach(function (o) {
+    Object.keys(o).forEach(function (c) {
+      if ((columnas || {})[c]) o[c] = fechaIso(o[c]);
+      else if ((columnasHora || {})[c] && !fechaIso(o[c])) o[c] = '';
+    });
+  });
+  return filas;
 }
 
 function diaUtc_(iso) {
@@ -48,7 +65,9 @@ function diaUtc_(iso) {
   return Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 }
 
+/** Días de una fecha a otra; 0 si alguna no es una fecha válida (nunca NaN en una etiqueta). */
 function diasEntre(desde, hasta) {
+  if (!fechaIso(desde) || !fechaIso(hasta)) return 0;
   return Math.round((diaUtc_(hasta) - diaUtc_(desde)) / 86400000);
 }
 
@@ -57,8 +76,9 @@ function sumarDias(iso, n) {
   return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
 }
 
+/** 'yyyy-mm' de una fecha válida; '' si no lo es (nunca un mes basura como «31/02/2»). */
 function mesDe(iso) {
-  return String(iso || '').slice(0, 7);
+  return fechaIso(iso).slice(0, 7);
 }
 /* ==========================================================================
    CITAS DE SOFDOC
@@ -297,6 +317,7 @@ function porFecha(a, b) {
 function armarSeries(citas) {
   var s = {};
   (citas || []).forEach(function (c) {
+    if (!fechaIso(c.FECHA)) return;   // una cita sin fecha válida no se puede ubicar en la serie
     var k = claveSerie(c.DNI, c.ESPECIALIDAD);
     if (!s[k]) s[k] = { clave: k, dni: c.DNI, especialidad: c.ESPECIALIDAD, nombre: c.NOMBRE, realizadas: [], agendadas: [] };
     var e = normTexto(c.ESTADO);
@@ -686,7 +707,7 @@ function telefonosPorDni(indicaciones, contactos, seguimientos) {
 function pendientesPorDni(indicaciones) {
   var aceptado = {}, out = {};
   (indicaciones || []).forEach(function (i) {
-    if (!i.DNI || i.ESTADO !== 'ACEPTÓ') return;
+    if (!i.DNI || i.ESTADO !== 'ACEPTÓ' || !fechaIso(i.FECHA)) return;
     var k = i.DNI + '|' + i.TIPO;
     if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
   });
@@ -767,13 +788,13 @@ var TIPOS_INDICACION = { HIERRO: 1, PROCEDIMIENTO: 1 };
 function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, contactos, usuarios) {
   var aceptado = {}, grupos = {};
   (indicaciones || []).forEach(function (i) {
-    if (!i.DNI || i.ESTADO !== 'ACEPTÓ') return;
+    if (!i.DNI || i.ESTADO !== 'ACEPTÓ' || !fechaIso(i.FECHA)) return;
     var k = i.DNI + '|' + i.TIPO;
     if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
   });
   (indicaciones || []).forEach(function (i) {
     if (i.ORIGEN === 'REGISTROS') return;
-    if (!i.DNI || !i.FECHA || i.ESTADO !== 'COTIZÓ' || !TIPOS_INDICACION[i.TIPO]) return;
+    if (!i.DNI || !fechaIso(i.FECHA) || i.ESTADO !== 'COTIZÓ' || !TIPOS_INDICACION[i.TIPO]) return;
     var k = i.DNI + '|' + i.TIPO;
     if (aceptado[k] && aceptado[k] >= i.FECHA) return;
     var g = grupos[k] = grupos[k] || { dni: i.DNI, tipo: i.TIPO, fecha: '', detalles: [], nombre: i.NOMBRE, solicitante: '' };
@@ -1142,6 +1163,7 @@ var CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CON
 function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
   var acc = {};
   function fila(mes, medico) {
+    if (!mes) return {};   // sin fecha válida no cuenta en ningún mes
     var k = mes + '|' + medico;
     if (!acc[k]) {
       acc[k] = { MES: mes, MEDICO: medico };
@@ -1177,7 +1199,7 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
     }
   });
   (indicaciones || []).forEach(function (i) {
-    if (!i.FECHA || i.EN_ESPERA === 'SÍ') return;
+    if (!mesDe(i.FECHA) || i.EN_ESPERA === 'SÍ') return;
     var g = [i.DNI || i.ID, i.TIPO, mesDe(i.FECHA)].join('|');
     if (!grupos[g]) {
       var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;

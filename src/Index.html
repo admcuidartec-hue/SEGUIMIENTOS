@@ -1290,9 +1290,10 @@ function tarjetaHtml(p) {
     + `<div class="t1"><b>${esc(nombreDe(p))}</b><span class="tag t-${p.t}">${esc(tag)}</span></div><div class="t2">${esc(sub)}</div>${prog}${etq}<div class="t3">${pie}</div></article>`;
 }
 
+const MES_VALIDO = /^\d{4}-(0[1-9]|1[0-2])$/;   // un mes basura de una celda mal escrita («31/02/2») nunca se ofrece
 /** Opciones del filtro de mes: los meses que traen las tarjetas, del más reciente al más antiguo. Un mes recordado que ya no existe se ignora. */
 function opcionesMes() {
-  const meses = [...new Set(S.pacientes.map(p => p.raw.MES).filter(Boolean))].sort().reverse();
+  const meses = [...new Set(S.pacientes.map(p => p.raw.MES).filter(m => MES_VALIDO.test(String(m || ''))))].sort().reverse();
   if (S.mes && !meses.includes(S.mes)) S.mes = '';
   const sel = $('#fmes'), html = '<option value="">Todos los meses</option>' + meses.map(m => `<option value="${esc(m)}">${esc(nombreMes(m))}</option>`).join('');
   if (sel.innerHTML !== html) sel.innerHTML = html;
@@ -4145,7 +4146,7 @@ const IND = {
 };
 
 /** Los meses de getResumen, de más antiguo a más reciente (los del Resumen del mes y sus barras). */
-const mesesResumen = () => [...new Set(((S.resumen && S.resumen.filas) || []).map(f => f.MES).filter(Boolean))].sort();
+const mesesResumen = () => [...new Set(((S.resumen && S.resumen.filas) || []).map(f => f.MES).filter(m => MES_VALIDO.test(String(m || ''))))].sort();
 /**
  * Los meses que recorre ‹ ›: los de getResumen y los de getKpi (primera consulta, procedimientos, seguimientos,
  * campañas), para que «Solo {mes}» llegue a todo mes con datos.
@@ -4154,7 +4155,7 @@ const mesesInd = () => {
   const v = new Set(mesesResumen()), k = S.kpi || {};
   (k.cohortes || []).forEach(r => { if (r.COHORTE) v.add(String(r.COHORTE)); });
   ['indicaciones', 'recuperacion', 'campanas'].forEach(c => (k[c] || []).forEach(r => { if (r.MES) v.add(String(r.MES)); }));
-  return [...v].filter(m => /^\d{4}-\d{2}$/.test(m)).sort();
+  return [...v].filter(m => MES_VALIDO.test(m)).sort();
 };
 function medicosInd() {
   const v = new Set((S.resumen && S.resumen.medicos) || []);

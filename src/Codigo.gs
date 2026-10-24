@@ -257,13 +257,14 @@ function catalogos_() {
 }
 
 function leerCitas_() {
-  var citas = leerObjetos_('CITAS');
+  // Una cita sin fecha válida (escrita a mano: «mañana») no se puede ubicar: se ignora (caso 60).
+  var citas = fechas_(leerObjetos_('CITAS')).filter(function (c) { return c.FECHA; });
   citas.forEach(function (c) { c.DNI = normDni(c.DNI); });
   return citas;
 }
 
 function leerIndicaciones_() {
-  var inds = leerObjetos_('INDICACIONES');
+  var inds = fechas_(leerObjetos_('INDICACIONES'));
   inds.forEach(function (i) {
     i.DNI = normDni(i.DNI);
     i.TIPO = normTexto(i.TIPO);
@@ -273,7 +274,7 @@ function leerIndicaciones_() {
 }
 
 function leerSeguimientos_() {
-  var segs = leerObjetos_('SEGUIMIENTOS');
+  var segs = fechas_(leerObjetos_('SEGUIMIENTOS'));
   segs.forEach(function (s) { s.DNI = normDni(s.DNI); });
   return segs;
 }
@@ -281,9 +282,14 @@ function leerSeguimientos_() {
 /** CONTACTOS_CRM puede no existir todavía (antes de la primera actualización con CRM). */
 function leerContactos_() {
   if (!ss_().getSheetByName('CONTACTOS_CRM')) return [];
-  var cs = leerObjetos_('CONTACTOS_CRM');
+  var cs = fechas_(leerObjetos_('CONTACTOS_CRM'));
   cs.forEach(function (c) { c.DNI = normDni(c.DNI); c.DNI_PACIENTE = normDni(c.DNI_PACIENTE); });
   return cs;
+}
+
+/** Toda fecha leída de una hoja pasa por fechaIso: lo escrito a mano que no es una fecha queda vacío (normalizarFechas). */
+function fechas_(filas) {
+  return normalizarFechas(filas, COLUMNAS_FECHA, COLUMNAS_FECHA_HORA);
 }
 
 /** Una hoja que puede no existir todavía (antes de «Preparar hojas»): vacía en vez de error. */
@@ -292,17 +298,17 @@ function leerOpcional_(nombre) {
 }
 
 function leerRegistros_() {
-  var r = leerOpcional_('REGISTROS');
+  var r = fechas_(leerOpcional_('REGISTROS'));
   r.forEach(function (x) { x.DNI = normDni(x.DNI); x.TIPO = normTexto(x.TIPO); });
   return r;
 }
 
 function leerSesiones_() {
-  return leerOpcional_('SESIONES');
+  return fechas_(leerOpcional_('SESIONES'));
 }
 
 function leerAltas_() {
-  var a = leerOpcional_('ALTAS');
+  var a = fechas_(leerOpcional_('ALTAS'));
   a.forEach(function (x) { x.DNI = normDni(x.DNI); });
   return a;
 }

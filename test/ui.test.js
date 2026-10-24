@@ -4709,3 +4709,22 @@ test('el buscador del tablero muestra el foco (borde del acento), en claro y en 
     } finally { await navegador.close(); }
   }
 });
+
+test('el «aviso» del servidor (BITACORA caída tras guardar) se muestra aparte, sin tapar el aviso de guardado ni bloquear', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.evaluate(() => {
+      const real = DEMO.guardarRegistro;
+      DEMO.guardarRegistro = (...a) => Object.assign(real(...a), { aviso: 'Se guardó, pero no se pudo escribir la BITACORA: Service Spreadsheets timed out.' });
+    });
+    await pagina.locator('#rdni').fill('45678902');
+    await llenarIndicacion(pagina, { nombre: 'Prueba Aviso', contacto: '987 111 334', doctor: 'Dra. Karen Matos', procs: ['SANGRÍA'] });
+    assert.equal(await falta(pagina), 'Se creará 1 registro.');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#aviso-srv.ver');
+    assert.equal(await pagina.locator('#aviso-srv span').textContent(), 'Se guardó, pero no se pudo escribir la BITACORA: Service Spreadsheets timed out.');
+    assert.equal(await pagina.locator('#aviso-srv').getAttribute('role'), 'status');
+    assert.match(await aviso(pagina), /^Registro guardado: Sangría/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

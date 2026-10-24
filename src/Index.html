@@ -94,6 +94,8 @@ html.con-vt .vista{animation:none}
 /* Aviso (transición y no keyframes, para poder interrumpirlo) */
 .aviso{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);opacity:0;pointer-events:none;transition:transform .3s var(--ease-out),opacity .3s ease;z-index:60;display:flex;align-items:center;gap:10px;width:max-content;max-width:calc(100% - 28px);padding:6px 6px 6px 16px;min-height:44px;background:var(--toast);color:var(--toast-ink);border-radius:10px;box-shadow:var(--shadow);font-weight:500}
 .aviso.ver{transform:translate(-50%,0);opacity:1;pointer-events:auto}
+/* El «aviso» del servidor (algo secundario falló tras guardar): encima del aviso de guardado, sin taparlo. */
+.aviso-srv{bottom:84px;border-left:4px solid var(--warn)}
 .aviso button{height:44px;padding:0 12px;border:0;background:transparent;color:var(--toast-ink);font-weight:600;text-decoration:underline;text-underline-offset:3px}
 
 /* Controles comunes del tablero */
@@ -736,6 +738,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
   .side{display:none}.topmovil{display:flex}.navmovil{display:grid}
   main{padding:18px 14px 96px}h1{font-size:23px}
   .aviso{bottom:80px}
+  .aviso-srv{bottom:140px}
   .buscar{width:100%}.atajos,.kbd{display:none}
   .filtros .relleno{display:none}
   .col{grid-template-columns:minmax(0,1fr)}.f-cab{border-right:0;border-bottom:1px solid var(--line);padding:12px 14px}
@@ -866,6 +869,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 <div class="velo" id="velo"></div>
 <aside class="panel" id="panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="panel-t"></aside>
 <div class="aviso" id="aviso" role="status" aria-live="polite"><span></span><button type="button" hidden></button></div>
+<div class="aviso aviso-srv" id="aviso-srv" role="status" aria-live="polite"><span></span></div>
 
 <script>
 /* ============ Utilidades ============ */
@@ -946,7 +950,8 @@ function llamar(fn, ...args0) {
   const largo = ESCRIBEN_CON_OP[fn] || fn === 'editarRegistro' ? textoDemasiadoLargo(args0[0]) : '';
   if (largo) return Promise.reject(new Error(largo));
   const { args, clave } = conOp(fn, args0);
-  const listo = r => { if (clave) OPS.delete(clave); return r; };
+  // Se guardó pero algo secundario falló (la BITACORA): la respuesta trae `aviso` y se muestra aparte, sin bloquear.
+  const listo = r => { if (clave) OPS.delete(clave); if (r && typeof r.aviso === 'string' && r.aviso) avisoServidor(r.aviso); return r; };
   if (EN_APPS_SCRIPT) {
     return new Promise((res, rej) => google.script.run
       .withSuccessHandler(res)
@@ -1129,6 +1134,14 @@ function avisar(texto, accion) {
   a.classList.add('ver');
   clearTimeout(avisar.t);
   avisar.t = setTimeout(() => { a.classList.remove('ver'); avisar.accion = null; }, accion ? 8000 : 3500);
+}
+/** El `aviso` de una escritura que se guardó con algo secundario caído (bitacora_ + avisos_ del servidor). Dura 8 segundos. */
+function avisoServidor(texto) {
+  const a = $('#aviso-srv');
+  a.querySelector('span').textContent = texto;
+  a.classList.add('ver');
+  clearTimeout(avisoServidor.t);
+  avisoServidor.t = setTimeout(() => a.classList.remove('ver'), 8000);
 }
 $('#aviso button').addEventListener('click', () => {
   const ac = avisar.accion;

@@ -76,3 +76,12 @@ test('diasEntre con una fecha inválida da 0, no NaN', () => {
   assert.equal(L.diasEntre('', HOY), 0);
   assert.equal(L.diasEntre('2026-10-13', HOY), 10);
 });
+
+test('kpiIndicaciones y kpiRecuperacion: sin fecha válida no hay fila (ni MES vacío)', () => {
+  const inds = [{ ID: 'I1', DNI: '5', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO', ESTADO: 'COTIZÓ', FECHA: '31/02/2026' },
+    { ID: 'I2', DNI: '5', TIPO: 'HIERRO', ESTADO: 'COTIZÓ', FECHA: '2026-10-01' }];
+  assert.deepEqual(plano(L.kpiIndicaciones(inds, [])).map(f => f.MES), ['2026-10']);
+  const segs = [{ ID: 'S1', FECHA_HORA: '', DNI: '5', ESPECIALIDAD: 'HEMATOLOGÍA', ACCION: 'HECHO' },
+    { ID: 'S2', FECHA_HORA: '2026-10-05 10:00', DNI: '5', ESPECIALIDAD: 'HEMATOLOGÍA', ACCION: 'HECHO' }];
+  assert.deepEqual(plano(L.kpiRecuperacion(segs, [cita({ dni: '5', fecha: '2026-09-01' })], HOY)).map(f => f.MES), ['2026-10']);
+});

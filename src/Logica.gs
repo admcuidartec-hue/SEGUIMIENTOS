@@ -1045,7 +1045,7 @@ function ultimaAntesDe_(lista, fecha) {
 function kpiIndicaciones(indicaciones, citas) {
   var porDni = realizadasPorDni_(citas), acc = {};
   (indicaciones || []).forEach(function (i) {
-    if (i.EN_ESPERA === 'SÍ') return;
+    if (i.EN_ESPERA === 'SÍ' || !mesDe(i.FECHA)) return;   // sin fecha válida no cuenta en ningún mes
     var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
     var medico = i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO';
     var clave = [mesDe(i.FECHA), i.TIPO, i.DETALLE, medico].join('|');
@@ -1070,6 +1070,7 @@ function kpiRecuperacion(seguimientos, citas, hoy) {
     .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; })
     .forEach(function (s) {
       var f = fechaIso(s.FECHA_HORA);
+      if (!f) return;   // un seguimiento sin fecha (FECHA_HORA vacía) no se puede ubicar en un mes
       var serie = series[claveSerie(s.DNI, s.ESPECIALIDAD)];
       var previa = serie ? ultimaAntesDe_(serie.realizadas, f) : null;
       var ciclo = claveSerie(s.DNI, s.ESPECIALIDAD) + '|' + (previa ? previa.FECHA : '');
@@ -1106,7 +1107,7 @@ function kpiMotivos(seguimientos) {
 function primerasConsultas_(citas) {
   var p = {};
   (citas || []).forEach(function (c) {
-    if (normTexto(c.ESTADO) !== 'REALIZADO') return;
+    if (normTexto(c.ESTADO) !== 'REALIZADO' || !fechaIso(c.FECHA)) return;
     if (!p[c.DNI] || c.FECHA < p[c.DNI].FECHA) p[c.DNI] = c;
   });
   return p;

@@ -369,11 +369,11 @@ function doGet() {
 function bootstrap() {
   var d = datos_(), esp = {}, med = {};
   d.pacientes.forEach(function (p) {
-    if (p.ESPECIALIDAD) esp[p.ESPECIALIDAD] = 1;
+    if (p.ESPECIALIDAD) esp[p.ESPECIALIDAD] = (esp[p.ESPECIALIDAD] || 0) + 1;
     if (p.MEDICO_ULTIMO) med[p.MEDICO_ULTIMO] = 1;
   });
   d.pendientes.forEach(function (p) {
-    if (p.ESPECIALIDAD_CONSULTA) esp[p.ESPECIALIDAD_CONSULTA] = 1;
+    if (p.ESPECIALIDAD_CONSULTA) esp[p.ESPECIALIDAD_CONSULTA] = (esp[p.ESPECIALIDAD_CONSULTA] || 0) + 1;
     if (p.MEDICO_ULTIMO) med[p.MEDICO_ULTIMO] = 1;
   });
   return limpiarParaEnvio({
@@ -381,7 +381,8 @@ function bootstrap() {
     usuarios: d.catalogos.usuarios,
     motivos: d.catalogos.motivos,
     resultados: ORDEN_RESULTADOS,
-    especialidades: Object.keys(esp).sort(),
+    // La misma especialidad con y sin tilde sale una vez, con la forma más usada (el filtro compara con normTexto).
+    especialidades: formasMasFrecuentes(esp),
     medicos: Object.keys(med).sort(),
     doctores: d.catalogos.doctores,
     procedimientos: d.catalogos.procedimientos,

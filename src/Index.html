@@ -1026,7 +1026,8 @@ function adaptarBoot(b) {
     usuarios: (b.usuarios || []).map(u => ({ v: u, l: nombreBonito(u), rol: /^DRA?\b/.test(norm(u)) ? 'Médico' : 'Asesora', med: medicoDeUsuario(u, b.medicos) })),
     medicos: (b.medicos || []).map(m => ({ k: m, full: m, short: medicoCorto(m) })),
     doctores: b.doctores || [],
-    especialidades: b.especialidades || [],
+    // Una por normTexto (el servidor ya manda la forma más usada): nunca «Hematología» y «Hematologia» a la vez.
+    especialidades: (b.especialidades || []).filter((e, i, l) => l.findIndex(x => norm(x) === norm(e)) === i),
     procedimientos: b.procedimientos || [],
     tratamientos: b.tratamientos || [],
     marcas: b.marcas || {},
@@ -1376,7 +1377,7 @@ function iniciarTablero() {
   // Médico y especialidad recordados, solo si siguen en la lista; al médico que usa la app, proponerMedico le pone el suyo.
   const med = LS.get('seg.medico'), esp = LS.get('seg.esp');
   S.medico = S.boot.medicos.some(m => m.k === med) ? med : '';
-  S.esp = S.boot.especialidades.includes(esp) ? esp : '';
+  S.esp = (esp && S.boot.especialidades.find(e => norm(e) === norm(esp))) || '';   // «HEMATOLOGIA» recordada = «HEMATOLOGÍA»
   proponerMedico();
   $('#fmed').innerHTML = '<option value="">Todos los médicos</option>'
     + S.boot.medicos.map(m => `<option value="${esc(m.k)}" title="${esc(m.full)}">${esc(m.short)}</option>`).join('');

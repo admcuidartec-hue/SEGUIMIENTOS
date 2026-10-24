@@ -306,6 +306,24 @@ var REACCIONES_INICIALES = ['Náuseas', 'Vómitos', 'Cefalea', 'Mareo', 'Dolor e
    como reevaluación de hematología.
    ========================================================================== */
 
+/**
+ * { forma: veces } → una forma por normTexto (la misma especialidad con y sin tilde es una sola), la más usada; si empatan,
+ * la que lleva tilde. Ordenadas por normTexto. Para el filtro de especialidad del tablero (bootstrap).
+ */
+function formasMasFrecuentes(cuentas) {
+  var veces = {}, mejor = {};
+  var tildes = function (t) { return (t.match(/[^\x00-\x7F]/g) || []).length; };
+  Object.keys(cuentas || {}).forEach(function (f) {
+    var forma = String(f).trim();
+    if (normTexto(forma)) veces[forma] = (veces[forma] || 0) + (Number(cuentas[f]) || 0);
+  });
+  Object.keys(veces).forEach(function (forma) {
+    var k = normTexto(forma), m = mejor[k], n = veces[forma];
+    if (!m || n > m.n || (n === m.n && tildes(forma) > tildes(m.forma))) mejor[k] = { forma: forma, n: n };
+  });
+  return Object.keys(mejor).sort().map(function (k) { return mejor[k].forma; });
+}
+
 function claveSerie(dni, especialidad) {
   return dni + '|' + normTexto(especialidad);
 }

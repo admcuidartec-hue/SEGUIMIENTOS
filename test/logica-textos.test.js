@@ -43,3 +43,10 @@ test('textoLimpio_ quita caracteres de control y de dirección (U+202E y similar
   assert.equal(L.textoLimpio_('Ñahui-O\'Higgins'), 'Ñahui-O\'Higgins');
   assert.equal(plano(L.validarRegistro(reg({ nombre: 'Rosa‮ Bell\u0000' }), CAT, '2026-10-05').filas)[0].NOMBRE, 'ROSA BELL');
 });
+
+test('formasMasFrecuentes: la misma especialidad con y sin tilde sale una vez, con la forma más usada', () => {
+  const { cargar, plano } = require('./cargar');
+  const L2 = cargar();
+  assert.deepEqual(plano(L2.formasMasFrecuentes({ 'HEMATOLOGÍA': 5, 'HEMATOLOGIA': 2, 'Hematología ': 1, 'REUMATOLOGIA': 3, 'REUMATOLOGÍA': 3, 'NUTRICIÓN': 1 })),
+    ['HEMATOLOGÍA', 'NUTRICIÓN', 'REUMATOLOGÍA']);
+});

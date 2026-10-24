@@ -4691,3 +4691,21 @@ test('indicadores: una fecha mal escrita en la hoja (mes «31/02/2») no se ofre
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('el buscador del tablero muestra el foco (borde del acento), en claro y en oscuro (caso 53)', async () => {
+  for (const colorScheme of ['light', 'dark']) {
+    const { navegador, pagina, errores } = await abrir({ colorScheme, guardado: { 'seg.modo': colorScheme === 'dark' ? 'oscuro' : 'claro' } });
+    try {
+      await pagina.waitForFunction(() => S.fase === 'listo');
+      const borde = () => pagina.evaluate(() => { const c = getComputedStyle(document.querySelector('#q').closest('.buscar')); return [c.borderTopColor, c.boxShadow]; });
+      const acento = await pagina.evaluate(() => { const d = document.createElement('i'); d.style.color = 'var(--accent)'; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; });
+      const antes = await borde();
+      await pagina.keyboard.press('/');
+      assert.equal(await pagina.evaluate(() => document.activeElement.id), 'q');
+      const despues = await borde();
+      assert.notDeepEqual(despues, antes, colorScheme + ': el foco cambia el buscador');
+      assert.equal(despues[0], acento, colorScheme + ': borde del color de acento');
+      assert.deepEqual(errores, []);
+    } finally { await navegador.close(); }
+  }
+});

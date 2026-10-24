@@ -126,6 +126,8 @@ html.con-vt .vista{animation:none}
 .buscar{display:flex;align-items:center;gap:8px;height:44px;padding:0 6px 0 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);width:300px;max-width:100%;color:var(--muted)}
 .buscar>i{font-size:17px}
 .buscar input{flex:1;min-width:0;height:100%;border:0;background:none;outline:none;font-size:14px;color:var(--ink)}
+/* El campo no dibuja su propio outline: el foco se ve en el recuadro entero, como en Pacientes (caso 53). */
+.buscar:focus-within{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .enlace{border:0;padding:0;background:none;color:var(--accent);font:inherit;text-decoration:underline;text-underline-offset:2px;min-height:24px}
 .enlace:hover{color:var(--accent-hover)}
 .cerrados{margin-top:12px;padding:14px 18px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}

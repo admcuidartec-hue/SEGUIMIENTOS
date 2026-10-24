@@ -37,12 +37,14 @@ function normTelefono(v) {
   return d.length >= 7 ? d : '';
 }
 
+var DIAS_MES_ = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 /** 'yyyy-MM-dd' tomado del inicio del texto; '' si no empieza por una fecha ISO que exista (no «2026-02-31»). */
 function fechaIso(v) {
   var m = String(v == null ? '' : v).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (!m) return '';
   var a = Number(m[1]), mes = Number(m[2]), dia = Number(m[3]);
-  if (mes < 1 || mes > 12 || dia < 1 || dia > new Date(Date.UTC(a, mes, 0)).getUTCDate()) return '';
+  if (mes < 1 || mes > 12 || dia < 1 || dia > (mes === 2 && a % 4 === 0 && (a % 100 !== 0 || a % 400 === 0) ? 29 : DIAS_MES_[mes - 1])) return '';
   return m[1] + '-' + m[2] + '-' + m[3];
 }
 
@@ -67,8 +69,8 @@ function diaUtc_(iso) {
 
 /** Días de una fecha a otra; 0 si alguna no es una fecha válida (nunca NaN en una etiqueta). */
 function diasEntre(desde, hasta) {
-  if (!fechaIso(desde) || !fechaIso(hasta)) return 0;
-  return Math.round((diaUtc_(hasta) - diaUtc_(desde)) / 86400000);
+  var n = Math.round((diaUtc_(hasta) - diaUtc_(desde)) / 86400000);
+  return n === n ? n : 0;   // NaN (una fecha que no es yyyy-mm-dd) → 0
 }
 
 function sumarDias(iso, n) {

@@ -3506,7 +3506,7 @@ function adaptarFicha(r) {
       const e = String(x.ESTADO_REGISTRO || x.ESTADO || ''), control = x.TIPO === 'CONTROL';
       // fila: la forma de getRegistros, para el formulario de Editar (formEdicion).
       return { id: String(x.ID || ''), titulo: x.TEXTO || '', f: isoDe(x.FECHA), med: x.DOCTOR || '', quien: nombreBonito(x.ASESORA), n: Number(x.SESIONES) || 0,
-        estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO',
+        estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO', cerrado: e === 'CERRADO',
         abierto: e === 'COTIZADO' || e === 'EN CURSO' || (e === 'PROGRAMADO' && !control), anulable: e !== 'ANULADO' && e !== 'COMPLETO',
         linea: lineaEstadoRegistro(x), fila: Object.assign({}, x, { FECHA: isoDe(x.FECHA), FECHA_INICIO: isoDe(x.FECHA_INICIO), FECHA_RETORNO: isoDe(x.FECHA_RETORNO) }),
         motivo: x.MOTIVO_ANULACION || '',
@@ -3738,7 +3738,8 @@ function htmlTrat(t) {
           + `<input type="date" class="ctl mono" data-fecha-ses="${esc(t.id)}" value="${esc(f)}" min="${esc(ultima)}" max="${esc(S.hoy)}" aria-label="Fecha de la sesión ${i + 1}">`
           + `<button type="button" class="btn btn-p" data-lohizo="${esc(t.id)}">Lo hizo</button></span>`
           + (t.hierro ? htmlReac('ficha:' + t.id) : '') + '</li>';
-      } else ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span></li>`;
+      } else if (!t.cerrado) ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span></li>`;
+      // Cerrado («No desea realizarse», no vino): las sesiones que faltan ya no están pendientes; solo se listan las hechas.
     }
     ses += (PA.sesAnuladas[t.id] || []).map(a => `<li class="ses anulada"><i class="ph ph-x-circle"></i><span class="tx">Sesión ${esc(a.numero)} · <span class="mono">${esc(dmy(a.f))}</span> · ${esc(a.quien)}</span> · anulada: ${esc(a.motivo)}</li>`).join('');
   }

@@ -2176,6 +2176,8 @@ test('pacientes: un registro sin empezar cerrado con «No desea realizarse» dic
     assert.equal((await tr.locator('.trat-cab .tag').textContent()).trim(), 'Cerrado');
     assert.match(await tr.textContent(), /Seguimiento cerrado: No desea realizarse \(\d\d\/\d\d\)/);
     assert.equal(await tr.locator('[data-lohizo]').count(), 0);
+    assert.equal(await tr.locator('.ses.pend').count(), 0, 'un registro cerrado no lista «Sesión 1 · pendiente»');
+    assert.doesNotMatch(await tr.textContent(), /· pendiente/);
     // Lo mismo con lo que manda el servidor: un programado que no vino dice «· no vino» y sigue ofreciendo «Lo hizo».
     const linea = await pagina.evaluate(() => lineaEstadoRegistro({ ESTADO_REGISTRO: 'PROGRAMADO', TIPO: 'HIERRO', FECHA_INICIO: '2026-09-12', NO_VINO: '2026-09-12' }));
     assert.equal(linea, 'Programado el 12/09 · no vino');

@@ -13,6 +13,7 @@ function exigirUsuario_(catalogos, usuario) {
 }
 
 function exigirMotivo_(p) {
+  if (largoMal_(p && p.motivo, LARGO_TEXTO, 'El motivo')) throw new Error(largoMal_(p.motivo, LARGO_TEXTO, 'El motivo'));
   var m = textoLimpio_(p && p.motivo);
   if (!m) throw new Error('Escriba el motivo de la anulación.');
   if (largoMal_(m, LARGO_TEXTO, 'El motivo')) throw new Error(largoMal_(m, LARGO_TEXTO, 'El motivo'));

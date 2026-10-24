@@ -5935,6 +5935,9 @@ const DEMO = (() => {
       if (muertos[dniDe(r.DNI)]) throw new Error(mensajeFallecido(muertos[dniDe(r.DNI)]));
       const validas = sesionesDe(r.ID), f = String(x.fecha || '').slice(0, 10);
       // Como sesionYaNoEsLaSiguiente: la sesión que vio la persona debe ser la siguiente.
+      if (x.sesion !== undefined && x.sesion !== null && x.sesion !== '' && ((typeof x.sesion !== 'number' && typeof x.sesion !== 'string') || !/^\d+$/.test(String(x.sesion).trim()) || Number(x.sesion) < 1)) {
+        throw new Error('El número de sesión no es válido; recargue.');
+      }
       if (x.sesion !== undefined && x.sesion !== '' && Number(x.sesion) !== validas.length + 1) {
         const k = Number(x.sesion), sig = validas.length + 1;
         throw new Error(k < sig ? 'La sesión ' + k + ' ya se registró; recargue.' : 'La sesión ' + k + ' no es la siguiente (es la ' + sig + '); recargue.');

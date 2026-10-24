@@ -122,8 +122,12 @@ function textoLimpio_(v) {
 /** Largos máximos de los textos libres (una celda de Sheets admite 50 000; la pantalla y el servidor avisan antes). */
 var LARGO_NOMBRE = 120, LARGO_TEXTO = 2000;
 
-/** '' si `v` (ya limpio) cabe en `max`; si no, «El nombre va hasta 120 caracteres (tiene 999).». `que` lleva su artículo. */
+/**
+ * '' si `v` cabe en `max`; si no, «El nombre va hasta 120 caracteres (tiene 999).». `que` lleva su artículo. Un objeto o un
+ * arreglo (una llamada manipulada) se rechaza, «La nota debe ser un texto.», en vez de guardarse como «[object Object]».
+ */
 function largoMal_(v, max, que) {
+  if (v !== null && v !== undefined && typeof v !== 'string' && typeof v !== 'number') return que + ' debe ser un texto.';
   var n = textoLimpio_(v).length;
   return n > max ? que + (/^L[ao]s /.test(que) ? ' van' : ' va') + ' hasta ' + max + ' caracteres (tiene ' + n + ').' : '';
 }

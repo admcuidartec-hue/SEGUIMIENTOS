@@ -318,8 +318,12 @@ function validarSesion(r, sesiones, fecha, hoy) {
  */
 function sesionYaNoEsLaSiguiente(e, vista) {
   if (vista === undefined || vista === null || vista === '') return '';
+  // Un número ilegible («dos», 1.5, un arreglo) se rechaza: aceptarlo desactivaba esta protección (caso 58).
+  if ((typeof vista !== 'number' && typeof vista !== 'string') || !/^\d+$/.test(String(vista).trim()) || Number(vista) < 1) {
+    return 'El número de sesión no es válido; recargue.';
+  }
   var k = Number(vista), sig = e.hechas + 1;
-  if (!(k >= 1) || k === sig) return '';
+  if (k === sig) return '';
   return k < sig ? 'La sesión ' + k + ' ya se registró; recargue.' : 'La sesión ' + k + ' no es la siguiente (es la ' + sig + '); recargue.';
 }
 

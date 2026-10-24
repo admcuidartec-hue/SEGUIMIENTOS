@@ -480,3 +480,19 @@ test('con «Falleció» vigente, el servidor rechaza un registro nuevo y marcar 
   assert.equal(plano(vivo.ctx.guardarRegistro(datosReg({ confirmado: true }))).ok, true);
   assert.equal(plano(vivo.ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04' })).ok, true);
 });
+
+test('tipos incorrectos se rechazan en vez de convertirse: motivo o nota objeto, número de sesión no entero (caso 58)', () => {
+  const { ctx, escrito } = servidor({}, { REGISTROS: [Object.assign({}, REG4, { SESIONES: '3' })] });
+  assert.throws(() => ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: { a: 1 } }), /El motivo debe ser un texto\./);
+  assert.throws(() => ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: ['x'] }), /El motivo debe ser un texto\./);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', nota: { x: 1 } }), /La nota debe ser un texto\./);
+  for (const sesion of ['dos', 1.5, [1], { k: 1 }, '0', -1]) {
+    assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion }), /El número de sesión no es válido; recargue\./, String(sesion));
+  }
+  assert.deepEqual([escrito.SESIONES.length, escrito.anulados.length], [0, 0]);
+  assert.equal(plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion: '1' })).ok, true, '«1» como texto vale');
+  const L = cargar();
+  assert.equal(L.largoMal_({ a: 1 }, 2000, 'La nota'), 'La nota debe ser un texto.');
+  assert.equal(L.largoMal_(12, 2000, 'La nota'), '');
+  assert.equal(L.largoMal_(null, 2000, 'La nota'), '');
+});

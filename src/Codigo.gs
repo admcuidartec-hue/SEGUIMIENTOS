@@ -349,7 +349,8 @@ function derivar_(d) {
   d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos, d.usuarios);
   d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.usuarios)
     .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
-      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios, espPorMedico: d.espPorMedico }));
+      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios, espPorMedico: d.espPorMedico,
+      vigentes: d.vigentes }));
   // Lo aceptado que no se realizó (cerrado o «No vino» sin ninguna sesión) cuenta como no realizado en Indicadores.
   marcarNoRealizados(d.indicacionesTodas, d.pendientes, d.reglas, d.hoy);
   return d;
@@ -439,7 +440,7 @@ function getPaciente(dni) {
       // ESTADO_REGISTRO y las fechas pintan la línea de estado; NOMBRE…FECHA_RETORNO, el formulario de Editar (como filaRegistrada_).
       return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: normTexto(r.TIPO), TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
         SESIONES: e.total, HECHAS: e.hechas, ESTADO: f.estado, ESTADO_REGISTRO: f.estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '',
-        CIERRE: f.cierre, FECHA_CIERRE: f.fechaCierre, NO_VINO: f.noVino,
+        CIERRE: f.cierre, FECHA_CIERRE: f.fechaCierre, NO_VINO: f.noVino, SIN_REEVALUACION: f.sinReevaluacion,
         NOMBRE: r.NOMBRE || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
         FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '',
         sesiones: sesionesDe_(r.ID, d.sesiones).map(function (s) {
@@ -477,9 +478,11 @@ function getPaciente(dni) {
  * Un programado que no vino pasada la gracia sigue PROGRAMADO, con NO_VINO = su fecha. Lo calcula la tarjeta (pendientesRegistro).
  */
 function cierreDeRegistroFicha_(d, r, e) {
-  var out = { estado: e.estado, cierre: '', fechaCierre: '', noVino: '' };
-  if (e.estado === 'ANULADO' || e.estado === 'COMPLETO' || normTexto(r.TIPO) === 'CONTROL') return out;
+  var out = { estado: e.estado, cierre: '', fechaCierre: '', noVino: '', sinReevaluacion: '' };
   var t = (d.pendientes || []).filter(function (x) { return x.ID_REGISTRO === r.ID; })[0];
+  // Completo con alta definitiva posterior: la ficha dice «Sin reevaluación: alta definitiva del …» (caso 39).
+  if (e.estado === 'COMPLETO' && t) out.sinReevaluacion = t.SIN_REEVALUACION || '';
+  if (e.estado === 'ANULADO' || e.estado === 'COMPLETO' || normTexto(r.TIPO) === 'CONTROL') return out;
   if (!t) return out;
   if (t.ESTADO === 'CERRADO' || t.ESTADO === 'FALLECIDO') {
     out.estado = 'CERRADO';

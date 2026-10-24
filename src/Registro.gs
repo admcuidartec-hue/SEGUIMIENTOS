@@ -433,6 +433,21 @@ function especialidadDelRegistro_(espDoc, realizadas, hasta) {
   return ultima ? ultima.ESPECIALIDAD : '';
 }
 
+/**
+ * Alta definitiva que deja un tratamiento sin reevaluación (caso 39, decidido el 24/10/2026): el alta vigente (`vigentes`, de
+ * altasVigentes) de la serie a la que se une su reevaluación, con DECISION = ALTA (o 6 meses / 1 año sin fecha de retorno, que
+ * se leen como alta simple) y FECHA posterior a la del registro. Un alta anterior o del mismo día no lo afecta: el tratamiento
+ * es una indicación nueva. La fecha del alta, o ''.
+ */
+function altaSinReevaluacion_(vigentes, dni, especialidad, fechaRegistro) {
+  var a = especialidad ? (vigentes || {})[claveSerie(dni, especialidad)] : null;
+  if (!a || anulado_(a)) return '';
+  var dec = decisionDe_(a);
+  if (dec.meses && !fechaIso(a.FECHA_RETORNO)) dec = DECISIONES.ALTA;
+  var f = fechaIso(a.FECHA);
+  return dec.nombre === 'ALTA' && f && f > fechaIso(fechaRegistro) ? f : '';
+}
+
 function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; }
 
 /**
@@ -502,6 +517,8 @@ function pendientesRegistro(d) {
       : e.estado === 'COMPLETO' ? realizadas.filter(function (x) {
         return x.FECHA > e.ultima && (!espSerie || normTexto(x.ESPECIALIDAD) === normTexto(espSerie));
       })[0] : null;
+    // Con un alta definitiva posterior al registro en su especialidad, al completarse no hay «Por reevaluar».
+    var sinReev = e.estado === 'COMPLETO' && !control ? altaSinReevaluacion_(d.vigentes, dni, espSerie, r.FECHA) : '';
     if (muertos[dni]) estado = 'FALLECIDO';
     else if (cierre) estado = 'CERRADO';
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
@@ -519,7 +536,7 @@ function pendientesRegistro(d) {
       else { motivo = 'NO VINO'; falta = e.inicio; if (diasEntre(falta, hoy) > reglas.corteIndicaciones) estado = 'ANTIGUO'; }
     } else if (e.estado === 'COMPLETO') {
       // Un «por reevaluar» muy viejo no se muestra: al publicar no debe caer una avalancha de tarjetas.
-      estado = hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';
+      estado = sinReev ? 'COMPLETADO' : hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';
     }
     else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
@@ -558,7 +575,8 @@ function pendientesRegistro(d) {
       FECHA_AGENDA: agenda ? agenda.fecha : '',
       INTENTO: agenda ? agenda.intento : 0,
       MOTIVO_PENDIENTE: motivo,
-      FECHA_REEVALUAR: reevaluar,
+      FECHA_REEVALUAR: sinReev ? '' : reevaluar,
+      SIN_REEVALUACION: sinReev,
       VOLVIO: volvio,
       EXAMENES: textoLimpio_(r.EXAMENES),
       FECHA_INICIO: e.inicio,

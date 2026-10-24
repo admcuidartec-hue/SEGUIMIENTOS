@@ -4726,3 +4726,25 @@ test('el «aviso» del servidor (BITACORA caída tras guardar) se muestra aparte
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('alta definitiva después de un hierro completo: sale de «Por reevaluar» y la ficha dice «Sin reevaluación»; anulada, vuelve (caso 39)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(() => {
+      const enCol = () => { const t = DEMO.getTablero(); return Object.keys(t.columnas).filter(c => t.columnas[c].some(x => x.CLAVE === 'REG-000022')); };
+      const antes = enCol();
+      const a = DEMO.darDeAlta({ usuario: 'MAGALY', dni: '43666777', especialidad: 'HEMATOLOGÍA', doctor: 'Dr. Elí Cabanillas', fecha: S.hoy, decision: 'ALTA' });
+      const despues = enCol();
+      const linea = lineaEstadoRegistro(DEMO.getPaciente('43666777').registros.find(x => x.ID === 'REG-000022'));
+      DEMO.anularAlta({ usuario: 'MAGALY', id: a.alta.ID, motivo: 'Error' });
+      return { antes, despues, linea, anulada: enCol(), lineaAnulada: lineaEstadoRegistro(DEMO.getPaciente('43666777').registros.find(x => x.ID === 'REG-000022')) };
+    });
+    assert.deepEqual(r.antes, ['POR_CONTACTAR'], 'el hierro completo de Beatriz está «Por reevaluar»');
+    assert.deepEqual(r.despues, [], 'con el alta definitiva ya no se reevalúa (completó en agosto: fuera del tablero)');
+    assert.equal(r.linea, 'Completo · Sin reevaluación: alta definitiva del 01/10/2026');
+    assert.deepEqual(r.anulada, ['POR_CONTACTAR']);
+    assert.equal(r.lineaAnulada, 'Completo');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

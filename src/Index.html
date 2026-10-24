@@ -3447,7 +3447,8 @@ function lineaEstadoRegistro(x) {
   if (e === 'CERRADO') return 'Seguimiento cerrado' + (x.CIERRE ? ': ' + frase(x.CIERRE) : '') + (x.FECHA_CIERRE ? ' (' + dm(x.FECHA_CIERRE) + ')' : '');
   if (e === 'PROGRAMADO') return 'Programado el ' + dm(x.FECHA_INICIO) + (x.NO_VINO ? ' · no vino' : '');
   if (e === 'EN CURSO') return `Sesión ${Number(x.HECHAS) || 0} de ${Number(x.SESIONES) || 0}`;
-  return e === 'COMPLETO' ? 'Completo' : e === 'COTIZADO' ? 'Cotizado' : '';
+  if (e === 'COMPLETO') return 'Completo' + (x.SIN_REEVALUACION ? ' · Sin reevaluación: alta definitiva del ' + dmy(String(x.SIN_REEVALUACION).slice(0, 10)) : '');
+  return e === 'COTIZADO' ? 'Cotizado' : '';
 }
 const isoDe = v => String(v || '').slice(0, 10);
 
@@ -4941,6 +4942,7 @@ async function arrancar() {
    ========================================================================== */
 const DEMO = (() => {
   const hoy = '2026-10-01';
+  let demoListo = false;   // altaSinReevaluacion mira las altas y las citas, que se declaran más abajo
   const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS', 'ENFERMERA PRUEBA'];   // nombres inventados
   const reglas = { espera: 15, maxSeguimientos: 3, graciaAgenda: 2, diasEntreSesiones: 7, esperaCotizacion: 7, metaRetorno: 60, metaTratamiento: 95, metaDiaria: 15,
     postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
@@ -5019,15 +5021,17 @@ const DEMO = (() => {
     const enCurso = estadoReg === 'EN CURSO', dias = Math.max(0, entre(enCurso ? ultima : reevaluar || r.FECHA, hoy));
     const tel = normTel(r.CONTACTO), usuario = tel.length === 9 ? '' : r.CONTACTO;
     const d = doctorDe(r.DOCTOR);
+    // Como altaSinReevaluacion_ (Registro.gs): un alta definitiva posterior al registro en su especialidad lo deja sin reevaluación.
+    const sinReev = estadoReg === 'COMPLETO' && r.TIPO !== 'CONTROL' && demoListo ? altaSinReevaluacion(r, especialidadDe(d && d.sofdoc ? d.sofdoc : '')) : '';
     let estado = 'PENDIENTE';
-    if (estadoReg === 'COMPLETO') estado = reevaluar && reevaluar <= hoy ? 'POR REEVALUAR' : 'COMPLETADO';
+    if (estadoReg === 'COMPLETO') estado = !sinReev && reevaluar && reevaluar <= hoy ? 'POR REEVALUAR' : 'COMPLETADO';
     else if (dias < (enCurso ? reglas.diasEntreSesiones : reglas.esperaCotizacion)) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     return Object.assign({ ID_REGISTRO: r.ID, DNI: r.DNI, ESPECIALIDAD: r.TIPO, TIPO_SEGUIMIENTO: r.TIPO, NOMBRE: r.NOMBRE,
       TELEFONOS: tel.length === 9 ? tel : '', USUARIO: usuario, MEDICO_ULTIMO: d && d.sofdoc ? d.sofdoc : r.DOCTOR,
       ESPECIALIDAD_CONSULTA: especialidadDe(d && d.sofdoc ? d.sofdoc : ''), FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase(r.DETALLE) : '', MARCA: r.TIPO === 'HIERRO' ? frase(r.MARCA) : '',
       SESIONES: r.SESIONES, HECHAS: hechas, ULTIMA_SESION: ultima, ULTIMA_SESION_ID: hechas ? ss[hechas - 1].ID : '', DIAS: dias, ULTIMA_CITA: r.FECHA, N_SEGUIMIENTOS: 0,
-      ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg, FECHA_REEVALUAR: reevaluar,
+      ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg, FECHA_REEVALUAR: sinReev ? '' : reevaluar, SIN_REEVALUACION: sinReev,
       FECHA_INICIO: r.TIPO === 'CONTROL' ? r.FECHA_RETORNO || '' : r.FECHA_INICIO || '',
       ATRASO: enCurso && estado === 'PENDIENTE' ? dias - reglas.diasEntreSesiones : 0,
       CIERRE: '', FECHA_CIERRE: '', AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 }, o || {});
@@ -5363,10 +5367,11 @@ const DEMO = (() => {
   /* ---- Tras una sesión: la tarjeta del registro, como la recalcula el servidor ---- */
   function trasSesion(t, r) {
     const nueva = reg(r);
-    ['HECHAS', 'ULTIMA_SESION', 'ULTIMA_SESION_ID', 'DIAS', 'ESTADO', 'ESTADO_REGISTRO', 'ATRASO'].forEach(k => { t[k] = nueva[k]; });
+    ['HECHAS', 'ULTIMA_SESION', 'ULTIMA_SESION_ID', 'DIAS', 'ESTADO', 'ESTADO_REGISTRO', 'ATRASO', 'FECHA_REEVALUAR', 'SIN_REEVALUACION'].forEach(k => { t[k] = nueva[k]; });
     Object.assign(t, { N_SEGUIMIENTOS: 0, ULTIMO_SEGUIMIENTO: '', AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 });
     if (t.ESTADO_REGISTRO === 'COMPLETO') {
-      ubicar(t, 'COMPLETADO', t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm(t.ULTIMA_SESION) : 'Completó el tratamiento', t.ULTIMA_SESION);
+      ubicar(t, 'COMPLETADO', t.SIN_REEVALUACION ? 'Completó el ' + dm(t.ULTIMA_SESION) + ' · alta definitiva del ' + dm(t.SIN_REEVALUACION)
+        : t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm(t.ULTIMA_SESION) : 'Completó el tratamiento', t.ULTIMA_SESION);
     } else ubicar(t, t.ESTADO === 'EN TRATAMIENTO' ? 'EN_TRATAMIENTO' : t.ESTADO === 'PENDIENTE' ? 'POR_CONTACTAR' : '');
   }
 
@@ -5549,6 +5554,14 @@ const DEMO = (() => {
         FECHA_AVISO: d.meses ? mas(ret, -reglas.avisoAltaControl) : '', ESTADO_ALTA: estado, FECHA_VOLVIO: fv };
     });
   };
+  /** Como altaSinReevaluacion_: el alta vigente ALTA (o 6 meses / 1 año sin retorno) de su especialidad, posterior al registro. */
+  function altaSinReevaluacion(r, esp) {
+    const a = vigente(r.DNI, esp);
+    if (!a) return '';
+    let d = decisionDe(a);
+    if (d.meses && !a.FECHA_RETORNO) d = DECISIONES.ALTA;
+    return d.nombre === 'ALTA' && a.FECHA > r.FECHA ? a.FECHA : '';
+  }
   const vigente = (dni, esp) => {
     const a = ultimaDe(altas.filter(x => !x.ANULADO && x.DNI === dni && mismo(x.ESPECIALIDAD, esp)
       && !citas.some(c => c.DNI === dni && mismo(c.ESPECIALIDAD, esp) && c.ESTADO === 'REALIZADO' && c.FECHA > x.FECHA)));
@@ -5566,6 +5579,7 @@ const DEMO = (() => {
     VOLVIO: DIAS ? 1 : 0, DIAS: DIAS || '', FECHA_RETORNO: FECHA_RETORNO || '' });
   const cam = (MES, MEDICO, CANAL, CAMPANA, NUEVOS, EN_CURSO, VOLVIERON) => ({ MES, MEDICO, CANAL, CAMPANA, NUEVOS, EN_CURSO, VOLVIERON });
 
+  demoListo = true;
   const api = {
     bootstrap: () => ({
       hoy, usuarios, motivos, resultados: ORDEN_RESULTADOS,
@@ -5684,6 +5698,7 @@ const DEMO = (() => {
           const estado = cerrado ? 'CERRADO' : estado0;
           return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: f.SESIONES, HECHAS: ss.length,
             ESTADO: estado, ESTADO_REGISTRO: estado, CIERRE: cerrado ? (tc.CIERRE || 'FALLECIÓ') : '', FECHA_CIERRE: cerrado ? (tc.FECHA_CIERRE || hoy) : '', NO_VINO: '',
+            SIN_REEVALUACION: estado === 'COMPLETO' ? reg(r).SIN_REEVALUACION : '',
             MOTIVO_ANULACION: r.MOTIVO_ANULACION, NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
             FECHA_INICIO: f.FECHA_INICIO, EXAMENES: f.EXAMENES, FECHA_RETORNO: f.FECHA_RETORNO,
             sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
@@ -6057,6 +6072,14 @@ const DEMO = (() => {
       if (s) s.ESTADO = 'ALTA';
       if (!t) tarjetas.push(t = s || reev({ DNI: dni, ESPECIALIDAD: esp, NOMBRE: hechas[0].NOMBRE, ULTIMA_CITA: hechas[hechas.length - 1].FECHA, ESTADO: 'ALTA' }));
       ubicar(t, f.slice(0, 7) === hoy.slice(0, 7) ? 'COMPLETADO' : '', (dec.meses ? dec.texto : 'Alta médica') + ' · ' + doc.doctor, f);
+      // Alta definitiva: el tratamiento completo de esa especialidad, registrado antes, ya no vuelve como «Por reevaluar».
+      tarjetas.filter(y => y.ID_REGISTRO && y.DNI === dni && y.ESTADO_REGISTRO === 'COMPLETO').forEach(y => {
+        const n = reg(regPorId(y.ID_REGISTRO));
+        if (n.SIN_REEVALUACION) {
+          Object.assign(y, { ESTADO: n.ESTADO, FECHA_REEVALUAR: '', SIN_REEVALUACION: n.SIN_REEVALUACION });
+          ubicar(y, y.ULTIMA_SESION.slice(0, 7) === hoy.slice(0, 7) ? 'COMPLETADO' : '', 'Completó el ' + dm(y.ULTIMA_SESION) + ' · alta definitiva del ' + dm(n.SIN_REEVALUACION), y.ULTIMA_SESION);
+        }
+      });
       return { ok: true, alta: a };
     },
 

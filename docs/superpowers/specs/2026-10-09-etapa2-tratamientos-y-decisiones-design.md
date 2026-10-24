@@ -129,6 +129,15 @@ Sin columnas nuevas. Dos resultados más en `RESULTADOS` (`Resultados.gs`):
 ### 3.3 Decisión del médico
 
 - `ALTA`: como hoy.
+- **Alta definitiva y tratamiento en curso** (decidido el 24/10/2026, caso 39 de la batería de 60): un `ALTA` vigente (no anulado;
+  o un 6 meses / 1 año sin fecha de retorno, que se lee como alta simple) en la especialidad a la que se une la reevaluación de un
+  tratamiento, con `FECHA` **posterior** a la `FECHA` del registro, deja ese tratamiento **sin reevaluación**
+  (`altaSinReevaluacion_`): sus sesiones pendientes siguen igual (En tratamiento, Agendado, «Sesión k atrasada», Enfermería
+  1/3/5) y, al completarse, queda Completado («Completó el dd/mm · alta definitiva del dd/mm», `FECHA_REEVALUAR` vacío,
+  `SIN_REEVALUACION` = fecha del alta) y nunca pasa a «Por reevaluar» ni tapa la reevaluación. La ficha dice «Completo ·
+  Sin reevaluación: alta definitiva del dd/mm/aaaa». Un alta anterior o del mismo día que el registro no lo afecta (el
+  tratamiento es una indicación nueva); `ALTA 6 MESES`, `ALTA 1 AÑO` y `NUEVA REEVALUACION` no cambian nada; si el alta se
+  anula (o deja de estar vigente porque el paciente volvió a consulta), la reevaluación vuelve a aplicar.
 - `ALTA 6 MESES` y `ALTA 1 AÑO`: fuera del tablero hasta `FECHA_RETORNO` − `AVISO_ALTA_CONTROL_DIAS`. Desde ese día,
   en **Por contactar**: «Control de alta a 6 meses · el dd/mm» (o «a 1 año»).
 - `NUEVA REEVALUACION`: la serie toma `FECHA_RETORNO` como fecha esperada y vence a esa fecha + la diferencia

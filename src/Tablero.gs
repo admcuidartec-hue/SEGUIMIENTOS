@@ -143,6 +143,7 @@ function armarTablero(d) {
     if (t.ESTADO === 'COMPLETADO') {
       var f = t.VOLVIO || (t.ULTIMA_SESION && t.ESTADO_REGISTRO === 'COMPLETO' ? t.ULTIMA_SESION : t.FECHA_LOHIZO);
       var etq = t.VOLVIO ? 'Volvió el ' + dm_(t.VOLVIO)
+        : t.ESTADO_REGISTRO === 'COMPLETO' && t.SIN_REEVALUACION ? 'Completó el ' + dm_(t.ULTIMA_SESION) + ' · alta definitiva del ' + dm_(t.SIN_REEVALUACION)
         : t.ESTADO_REGISTRO === 'COMPLETO' ? (t.FECHA_REEVALUAR ? 'Completó el ' + dm_(t.ULTIMA_SESION) + ' · reevaluar el ' + dm_(t.FECHA_REEVALUAR)
           : (t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm_(f) : 'Completó el tratamiento'))
         : 'Lo hizo el ' + dm_(f);

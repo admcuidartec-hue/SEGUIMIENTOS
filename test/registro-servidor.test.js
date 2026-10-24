@@ -439,3 +439,60 @@ test('marcarSesion y las anulaciones con op: el reintento no marca otra sesión 
   assert.deepEqual(plano(ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error', op: 'OP-anu-0003' })), { ok: true, repetida: true });
   assert.equal(escrito.anulados.length, 2);
 });
+
+test('guardarRegistro: tras un doble fallo (falla la 2.ª fila y deshacer la 1.ª), el reintento con el mismo op no dice «guardado» a medias: anula lo vivo y escribe todo (caso 6)', () => {
+  const { ctx, escrito } = conOp();
+  const anexar = ctx.anexarObjeto_, anular = ctx.marcarAnulado_;
+  let n = 0, fallarDeshacer = true;
+  ctx.anexarObjeto_ = (h, cols, o) => { if (h === 'REGISTROS' && ++n === 2) throw new Error('Service Spreadsheets timed out.'); return anexar(h, cols, o); };
+  ctx.marcarAnulado_ = (h, id, m) => { if (fallarDeshacer && h === 'REGISTROS') throw new Error('Service Spreadsheets timed out.'); return anular(h, id, m); };
+  const p = datosReg({ dni: '40999000', procedimiento: '', procedimientos: ['SANGRÍA'], tratamiento: 'HIERRO SACARATO', sesiones: '2', op: 'OP-doble-1' });
+  assert.throws(() => ctx.guardarRegistro(p), /Además no se pudo deshacer todo/);
+  assert.deepEqual(escrito.REGISTROS.filter(r => !ctx.anulado_(r)).map(r => [r.ID, r.OP]), [['REG-000001', 'OP-doble-1#1']], 'quedó viva la 1.ª');
+  fallarDeshacer = false;
+  const r = plano(ctx.guardarRegistro(p));
+  assert.equal(r.ok, true);
+  assert.notEqual(r.repetida, true, 'no es «repetida»: la primera vez quedó a medias');
+  assert.deepEqual(r.registros.map(x => x.ID), ['REG-000002', 'REG-000003']);
+  assert.deepEqual(escrito.REGISTROS.filter(x => !ctx.anulado_(x)).map(x => [x.ID, x.OP]), [['REG-000002', 'OP-doble-1#1'], ['REG-000003', 'OP-doble-1#2']]);
+  assert.ok(escrito.anulados.some(a => a[0] === 'REGISTROS' && a[1] === 'REG-000001'), 'lo que quedó vivo del intento anterior se anula');
+  // Y el siguiente reintento (respuesta perdida) ya sí es «repetida» con todo.
+  const r3 = plano(ctx.guardarRegistro(p));
+  assert.deepEqual([r3.repetida, r3.registros.map(x => x.ID)], [true, ['REG-000002', 'REG-000003']]);
+});
+
+test('guardarRegistro: si no puede anular lo que quedó a medias de un intento anterior, rechaza con un mensaje claro (caso 6)', () => {
+  const { ctx, escrito } = conOp({}, { REGISTROS: [Object.assign({}, REG4, { ID: 'REG-000007', DNI: '40999000', OP: 'OP-doble-2#1' })] });
+  ctx.marcarAnulado_ = () => { throw new Error('Service Spreadsheets timed out.'); };
+  const p = datosReg({ dni: '40999000', procedimiento: '', procedimientos: ['SANGRÍA'], tratamiento: 'HIERRO SACARATO', sesiones: '2', op: 'OP-doble-2' });
+  assert.throws(() => ctx.guardarRegistro(p), /quedó a medias.*revise Registrados/);
+  assert.equal(escrito.REGISTROS.length, 0);
+});
+
+test('con «Falleció» vigente, el servidor rechaza un registro nuevo y marcar sesión; anulado el fallecimiento, deja (caso 38)', () => {
+  const muerto = { ID: 'SEG-9', FECHA_HORA: '2026-10-02 10:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESPONSABLE: 'RACHEL', ACCION: 'DESCARTADO', RESULTADO: 'FALLECIÓ', MOTIVO: 'FALLECIÓ' };
+  const { ctx, escrito } = servidor({ seguimientos: [muerto] }, { REGISTROS: [REG4] });
+  const msg = /figura como fallecido desde el 02\/10\/2026: para registrar, primero anule «Falleció» en su ficha\./;
+  assert.throws(() => ctx.guardarRegistro(datosReg({ confirmado: true })), msg);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04' }), msg);
+  assert.deepEqual([escrito.REGISTROS.length, escrito.SESIONES.length], [0, 0]);
+  const vivo = servidor({ seguimientos: [Object.assign({}, muerto, { ANULADO: 'SÍ' })].filter(s => !s.ANULADO) }, { REGISTROS: [REG4] });
+  assert.equal(plano(vivo.ctx.guardarRegistro(datosReg({ confirmado: true }))).ok, true);
+  assert.equal(plano(vivo.ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04' })).ok, true);
+});
+
+test('tipos incorrectos se rechazan en vez de convertirse: motivo o nota objeto, número de sesión no entero (caso 58)', () => {
+  const { ctx, escrito } = servidor({}, { REGISTROS: [Object.assign({}, REG4, { SESIONES: '3' })] });
+  assert.throws(() => ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: { a: 1 } }), /El motivo debe ser un texto\./);
+  assert.throws(() => ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: ['x'] }), /El motivo debe ser un texto\./);
+  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', nota: { x: 1 } }), /La nota debe ser un texto\./);
+  for (const sesion of ['dos', 1.5, [1], { k: 1 }, '0', -1]) {
+    assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion }), /El número de sesión no es válido; recargue\./, String(sesion));
+  }
+  assert.deepEqual([escrito.SESIONES.length, escrito.anulados.length], [0, 0]);
+  assert.equal(plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000004', fecha: '2026-10-04', sesion: '1' })).ok, true, '«1» como texto vale');
+  const L = cargar();
+  assert.equal(L.largoMal_({ a: 1 }, 2000, 'La nota'), 'La nota debe ser un texto.');
+  assert.equal(L.largoMal_(12, 2000, 'La nota'), '');
+  assert.equal(L.largoMal_(null, 2000, 'La nota'), '');
+});

@@ -109,7 +109,7 @@ function validarContactoEnfermeria(p, d) {
   var resultado = RESULTADOS_ENFERMERIA[normTexto(p.resultado)];
   if (!resultado) return no('Elija si contestó o no.');
   var nota = textoLimpio_(p.nota);
-  if (largoMal_(nota, LARGO_TEXTO, 'La nota')) return no(largoMal_(nota, LARGO_TEXTO, 'La nota'));
+  if (largoMal_(p.nota, LARGO_TEXTO, 'La nota')) return no(largoMal_(p.nota, LARGO_TEXTO, 'La nota'));
   var fila = { ID_REGISTRO: c.ID_REGISTRO, ID_SESION: c.ID_SESION, NUMERO_SESION: c.NUMERO_SESION, DNI: c.DNI, DIA: c.DIA, RESULTADO: resultado,
     REACCION_TIPO: '', REACCION: '', NOTA: nota, ENFERMERA: quien, ANULADO: '', MOTIVO_ANULACION: '' };
   if (resultado === 'CONTACTADO') {
@@ -133,7 +133,7 @@ function validarContactoEnfermeria(p, d) {
 function reaccionAplicacion(reaccion, catalogos) {
   if (!reaccion || !reaccion.hubo) return { error: '', fila: null };
   var r = reaccionesDeCatalogo_(reaccion.reacciones, catalogos), nota = textoLimpio_(reaccion.nota);
-  if (largoMal_(nota, LARGO_TEXTO, 'La nota de la reacción')) return { error: largoMal_(nota, LARGO_TEXTO, 'La nota de la reacción'), fila: null };
+  if (largoMal_(reaccion.nota, LARGO_TEXTO, 'La nota de la reacción')) return { error: largoMal_(reaccion.nota, LARGO_TEXTO, 'La nota de la reacción'), fila: null };
   if (r.error) return { error: r.error, fila: null };
   if (r.lista.some(esOtra_) && !nota) return { error: 'Escriba cuál fue la reacción en la nota («Otra»).', fila: null };
   return { error: '', fila: { DIA: 0, RESULTADO: 'CONTACTADO', REACCION_TIPO: 'INMEDIATA', REACCION: r.lista.join(' · '), NOTA: nota } };

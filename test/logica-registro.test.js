@@ -796,3 +796,41 @@ test('contacto: lo que parece un teléfono debe dar 9 dígitos (con +51 o el 01 
   assert.equal(v('99974033'), 'El teléfono debe tener 9 dígitos.');
   assert.equal(v('@rosa'), '');
 });
+
+test('alta definitiva después del registro: las sesiones siguen y, al completarse, no hay «Por reevaluar» (caso 39)', () => {
+  const r = REGH({ FECHA_INICIO: '2026-10-02' }), citas = [cita({ fecha: '2026-09-20' })];
+  const alta = o => Object.assign({ ID: 'ALT-000001', FECHA: '2026-10-05', FECHA_HORA: '2026-10-05 11:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA',
+    DOCTOR: 'Dra. Karen Matos', DECISION: 'ALTA', FECHA_RETORNO: '', ANULADO: '' }, o);
+  const conAlta = (ses, hoy, altas) => filaH(Object.assign(dReg([r], ses, citas, hoy), { vigentes: L.altasVigentes(altas, [], citas, reglas(L), hoy) }));
+  // En curso: sigue su ritmo (sesión atrasada → Por contactar, como siempre).
+  const enCurso = conAlta([SES(1, '2026-10-02')], '2026-10-20', [alta()]);
+  assert.deepEqual([enCurso.ESTADO, enCurso.ESTADO_REGISTRO], ['PENDIENTE', 'EN CURSO']);
+  // Completo: Completado, sin fecha de reevaluar, y a los 30 días sigue Completado (no «Por reevaluar»).
+  const ses = [SES(1, '2026-10-02'), SES(2, '2026-10-09')];
+  const fin = conAlta(ses, '2026-10-20', [alta()]);
+  assert.deepEqual([fin.ESTADO, fin.FECHA_REEVALUAR, fin.SIN_REEVALUACION], ['COMPLETADO', '', '2026-10-05']);
+  const despues = conAlta(ses, '2026-11-20', [alta()]);
+  assert.deepEqual([despues.ESTADO, despues.FECHA_REEVALUAR, despues.SIN_REEVALUACION], ['COMPLETADO', '', '2026-10-05']);
+  // Un alta anterior a la fecha del registro no lo afecta: el tratamiento es una indicación nueva.
+  assert.equal(conAlta(ses, '2026-11-20', [alta({ FECHA: '2026-09-25' })]).ESTADO, 'POR REEVALUAR');
+  // Ni el alta del mismo día del registro.
+  assert.equal(conAlta(ses, '2026-11-20', [alta({ FECHA: '2026-10-01' })]).ESTADO, 'POR REEVALUAR');
+  // Las altas a 6 meses / 1 año y la nueva reevaluación no cambian nada.
+  assert.equal(conAlta(ses, '2026-11-20', [alta({ DECISION: 'ALTA 6 MESES', FECHA_RETORNO: '2027-04-05' })]).ESTADO, 'POR REEVALUAR');
+  assert.equal(conAlta(ses, '2026-11-20', [alta({ DECISION: 'NUEVA REEVALUACION', FECHA_RETORNO: '2027-01-05' })]).ESTADO, 'POR REEVALUAR');
+  // Anulada, la reevaluación vuelve a aplicar.
+  const anulada = conAlta(ses, '2026-11-20', [alta({ ANULADO: 'SÍ' })]);
+  assert.deepEqual([anulada.ESTADO, anulada.SIN_REEVALUACION], ['POR REEVALUAR', '']);
+  // El alta de otra especialidad no la tapa.
+  const otra = [cita({ fecha: '2026-09-20' }), cita({ fecha: '2026-09-21', esp: 'REUMATOLOGÍA', medico: 'Dr. OTRO MEDICO' })];
+  assert.equal(filaH(Object.assign(dReg([r], ses, otra, '2026-11-20'), { vigentes: L.altasVigentes([alta({ ESPECIALIDAD: 'REUMATOLOGÍA' })], [], otra, reglas(L), '2026-11-20') })).ESTADO, 'POR REEVALUAR');
+});
+
+test('armarTablero: un completo con alta definitiva no tapa la reevaluación ni sale como «Por reevaluar» (caso 39)', () => {
+  const t = L.armarTablero({ pacientes: [], seguimientos: [], citas: [], vigentes: {}, reglas: reglas(L), hoy: '2026-11-20',
+    pendientes: [{ ID_REGISTRO: 'REG-000010', DNI: '40111222', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', ESTADO: 'COMPLETADO', ESTADO_REGISTRO: 'COMPLETO',
+      ULTIMA_SESION: '2026-11-09', FECHA_REEVALUAR: '', SIN_REEVALUACION: '2026-10-05', SESIONES: 2, HECHAS: 2, ESPECIALIDAD_CONSULTA: 'HEMATOLOGÍA' }] });
+  const c = plano(t.columnas);
+  assert.deepEqual(c.POR_CONTACTAR, []);
+  assert.deepEqual(c.COMPLETADO.map(x => [x.CLAVE, x.ETIQUETA]), [['REG-000010', 'Completó el 09/11 · alta definitiva del 05/10']]);
+});

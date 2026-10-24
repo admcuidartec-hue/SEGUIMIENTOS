@@ -37,10 +37,29 @@ function normTelefono(v) {
   return d.length >= 7 ? d : '';
 }
 
-/** 'yyyy-MM-dd' tomado del inicio del texto; '' si no empieza por una fecha ISO. */
+var DIAS_MES_ = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+/** 'yyyy-MM-dd' tomado del inicio del texto; '' si no empieza por una fecha ISO que exista (no «2026-02-31»). */
 function fechaIso(v) {
   var m = String(v == null ? '' : v).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
-  return m ? m[1] + '-' + m[2] + '-' + m[3] : '';
+  if (!m) return '';
+  var a = Number(m[1]), mes = Number(m[2]), dia = Number(m[3]);
+  if (mes < 1 || mes > 12 || dia < 1 || dia > (mes === 2 && a % 4 === 0 && (a % 100 !== 0 || a % 400 === 0) ? 29 : DIAS_MES_[mes - 1])) return '';
+  return m[1] + '-' + m[2] + '-' + m[3];
+}
+
+/**
+ * Las fechas leídas de una hoja, en yyyy-mm-dd o vacías: una celda escrita a mano («31/02/2026», «ayer») no llega a
+ * ningún cálculo (caso 60). Las de fecha y hora conservan la hora si empiezan por una fecha válida.
+ */
+function normalizarFechas(filas, columnas, columnasHora) {
+  (filas || []).forEach(function (o) {
+    Object.keys(o).forEach(function (c) {
+      if ((columnas || {})[c]) o[c] = fechaIso(o[c]);
+      else if ((columnasHora || {})[c] && !fechaIso(o[c])) o[c] = '';
+    });
+  });
+  return filas;
 }
 
 function diaUtc_(iso) {
@@ -48,8 +67,10 @@ function diaUtc_(iso) {
   return Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
 }
 
+/** Días de una fecha a otra; 0 si alguna no es una fecha válida (nunca NaN en una etiqueta). */
 function diasEntre(desde, hasta) {
-  return Math.round((diaUtc_(hasta) - diaUtc_(desde)) / 86400000);
+  var n = Math.round((diaUtc_(hasta) - diaUtc_(desde)) / 86400000);
+  return n === n ? n : 0;   // NaN (una fecha que no es yyyy-mm-dd) → 0
 }
 
 function sumarDias(iso, n) {
@@ -57,8 +78,9 @@ function sumarDias(iso, n) {
   return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
 }
 
+/** 'yyyy-mm' de una fecha válida; '' si no lo es (nunca un mes basura como «31/02/2»). */
 function mesDe(iso) {
-  return String(iso || '').slice(0, 7);
+  return fechaIso(iso).slice(0, 7);
 }
 /* ==========================================================================
    CITAS DE SOFDOC
@@ -102,8 +124,12 @@ function textoLimpio_(v) {
 /** Largos máximos de los textos libres (una celda de Sheets admite 50 000; la pantalla y el servidor avisan antes). */
 var LARGO_NOMBRE = 120, LARGO_TEXTO = 2000;
 
-/** '' si `v` (ya limpio) cabe en `max`; si no, «El nombre va hasta 120 caracteres (tiene 999).». `que` lleva su artículo. */
+/**
+ * '' si `v` cabe en `max`; si no, «El nombre va hasta 120 caracteres (tiene 999).». `que` lleva su artículo. Un objeto o un
+ * arreglo (una llamada manipulada) se rechaza, «La nota debe ser un texto.», en vez de guardarse como «[object Object]».
+ */
 function largoMal_(v, max, que) {
+  if (v !== null && v !== undefined && typeof v !== 'string' && typeof v !== 'number') return que + ' debe ser un texto.';
   var n = textoLimpio_(v).length;
   return n > max ? que + (/^L[ao]s /.test(que) ? ' van' : ' va') + ' hasta ' + max + ' caracteres (tiene ' + n + ').' : '';
 }
@@ -286,6 +312,24 @@ var REACCIONES_INICIALES = ['Náuseas', 'Vómitos', 'Cefalea', 'Mareo', 'Dolor e
    como reevaluación de hematología.
    ========================================================================== */
 
+/**
+ * { forma: veces } → una forma por normTexto (la misma especialidad con y sin tilde es una sola), la más usada; si empatan,
+ * la que lleva tilde. Ordenadas por normTexto. Para el filtro de especialidad del tablero (bootstrap).
+ */
+function formasMasFrecuentes(cuentas) {
+  var veces = {}, mejor = {};
+  var tildes = function (t) { return (t.match(/[^\x00-\x7F]/g) || []).length; };
+  Object.keys(cuentas || {}).forEach(function (f) {
+    var forma = String(f).trim();
+    if (normTexto(forma)) veces[forma] = (veces[forma] || 0) + (Number(cuentas[f]) || 0);
+  });
+  Object.keys(veces).forEach(function (forma) {
+    var k = normTexto(forma), m = mejor[k], n = veces[forma];
+    if (!m || n > m.n || (n === m.n && tildes(forma) > tildes(m.forma))) mejor[k] = { forma: forma, n: n };
+  });
+  return Object.keys(mejor).sort().map(function (k) { return mejor[k].forma; });
+}
+
 function claveSerie(dni, especialidad) {
   return dni + '|' + normTexto(especialidad);
 }
@@ -297,6 +341,7 @@ function porFecha(a, b) {
 function armarSeries(citas) {
   var s = {};
   (citas || []).forEach(function (c) {
+    if (!fechaIso(c.FECHA)) return;   // una cita sin fecha válida no se puede ubicar en la serie
     var k = claveSerie(c.DNI, c.ESPECIALIDAD);
     if (!s[k]) s[k] = { clave: k, dni: c.DNI, especialidad: c.ESPECIALIDAD, nombre: c.NOMBRE, realizadas: [], agendadas: [] };
     var e = normTexto(c.ESTADO);
@@ -349,7 +394,9 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
     return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0;
   });
   if (lista.length) out.ultimoSeguimiento = fechaIso(lista[lista.length - 1].FECHA_HORA);
-  var posteriores = lista.filter(function (s) { return fechaIso(s.FECHA_HORA) > ultima; });
+  // Un ciclo nuevo solo empieza cuando vuelve a tocar (la fecha esperada). Lo registrado entre la última consulta y esa
+  // fecha se hizo sin saber de la consulta (SOFDOC la trajo tarde): la consulta realizada ya cerró ese ciclo (caso 27).
+  var posteriores = lista.filter(function (s) { var f = fechaIso(s.FECHA_HORA); return f > ultima && f >= out.esperada; });
   var c = leerCiclo(posteriores, reglas, hoy);
   out.intentos = c.intentos;
   out.pago = c.pago;
@@ -684,7 +731,7 @@ function telefonosPorDni(indicaciones, contactos, seguimientos) {
 function pendientesPorDni(indicaciones) {
   var aceptado = {}, out = {};
   (indicaciones || []).forEach(function (i) {
-    if (!i.DNI || i.ESTADO !== 'ACEPTÓ') return;
+    if (!i.DNI || i.ESTADO !== 'ACEPTÓ' || !fechaIso(i.FECHA)) return;
     var k = i.DNI + '|' + i.TIPO;
     if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
   });
@@ -765,13 +812,13 @@ var TIPOS_INDICACION = { HIERRO: 1, PROCEDIMIENTO: 1 };
 function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, contactos, usuarios) {
   var aceptado = {}, grupos = {};
   (indicaciones || []).forEach(function (i) {
-    if (!i.DNI || i.ESTADO !== 'ACEPTÓ') return;
+    if (!i.DNI || i.ESTADO !== 'ACEPTÓ' || !fechaIso(i.FECHA)) return;
     var k = i.DNI + '|' + i.TIPO;
     if (!aceptado[k] || i.FECHA > aceptado[k]) aceptado[k] = i.FECHA;
   });
   (indicaciones || []).forEach(function (i) {
     if (i.ORIGEN === 'REGISTROS') return;
-    if (!i.DNI || !i.FECHA || i.ESTADO !== 'COTIZÓ' || !TIPOS_INDICACION[i.TIPO]) return;
+    if (!i.DNI || !fechaIso(i.FECHA) || i.ESTADO !== 'COTIZÓ' || !TIPOS_INDICACION[i.TIPO]) return;
     var k = i.DNI + '|' + i.TIPO;
     if (aceptado[k] && aceptado[k] >= i.FECHA) return;
     var g = grupos[k] = grupos[k] || { dni: i.DNI, tipo: i.TIPO, fecha: '', detalles: [], nombre: i.NOMBRE, solicitante: '' };
@@ -998,7 +1045,7 @@ function ultimaAntesDe_(lista, fecha) {
 function kpiIndicaciones(indicaciones, citas) {
   var porDni = realizadasPorDni_(citas), acc = {};
   (indicaciones || []).forEach(function (i) {
-    if (i.EN_ESPERA === 'SÍ') return;
+    if (i.EN_ESPERA === 'SÍ' || !mesDe(i.FECHA)) return;   // sin fecha válida no cuenta en ningún mes
     var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
     var medico = i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO';
     var clave = [mesDe(i.FECHA), i.TIPO, i.DETALLE, medico].join('|');
@@ -1023,6 +1070,7 @@ function kpiRecuperacion(seguimientos, citas, hoy) {
     .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; })
     .forEach(function (s) {
       var f = fechaIso(s.FECHA_HORA);
+      if (!f) return;   // un seguimiento sin fecha (FECHA_HORA vacía) no se puede ubicar en un mes
       var serie = series[claveSerie(s.DNI, s.ESPECIALIDAD)];
       var previa = serie ? ultimaAntesDe_(serie.realizadas, f) : null;
       var ciclo = claveSerie(s.DNI, s.ESPECIALIDAD) + '|' + (previa ? previa.FECHA : '');
@@ -1059,7 +1107,7 @@ function kpiMotivos(seguimientos) {
 function primerasConsultas_(citas) {
   var p = {};
   (citas || []).forEach(function (c) {
-    if (normTexto(c.ESTADO) !== 'REALIZADO') return;
+    if (normTexto(c.ESTADO) !== 'REALIZADO' || !fechaIso(c.FECHA)) return;
     if (!p[c.DNI] || c.FECHA < p[c.DNI].FECHA) p[c.DNI] = c;
   });
   return p;
@@ -1140,6 +1188,7 @@ var CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CON
 function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
   var acc = {};
   function fila(mes, medico) {
+    if (!mes) return {};   // sin fecha válida no cuenta en ningún mes
     var k = mes + '|' + medico;
     if (!acc[k]) {
       acc[k] = { MES: mes, MEDICO: medico };
@@ -1175,7 +1224,7 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
     }
   });
   (indicaciones || []).forEach(function (i) {
-    if (!i.FECHA || i.EN_ESPERA === 'SÍ') return;
+    if (!mesDe(i.FECHA) || i.EN_ESPERA === 'SÍ') return;
     var g = [i.DNI || i.ID, i.TIPO, mesDe(i.FECHA)].join('|');
     if (!grupos[g]) {
       var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;

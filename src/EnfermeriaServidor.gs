@@ -7,7 +7,7 @@
    ========================================================================== */
 
 function leerEnfermeria_() {
-  var f = leerOpcional_('ENFERMERIA');
+  var f = fechas_(leerOpcional_('ENFERMERIA'));
   f.forEach(function (x) { x.DNI = normDni(x.DNI); });
   return f;
 }

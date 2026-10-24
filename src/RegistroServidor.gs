@@ -13,6 +13,7 @@ function exigirUsuario_(catalogos, usuario) {
 }
 
 function exigirMotivo_(p) {
+  if (largoMal_(p && p.motivo, LARGO_TEXTO, 'El motivo')) throw new Error(largoMal_(p.motivo, LARGO_TEXTO, 'El motivo'));
   var m = textoLimpio_(p && p.motivo);
   if (!m) throw new Error('Escriba el motivo de la anulación.');
   if (largoMal_(m, LARGO_TEXTO, 'El motivo')) throw new Error(largoMal_(m, LARGO_TEXTO, 'El motivo'));
@@ -32,12 +33,15 @@ function columnasListas_(cab, columnas) {
 
 function guardarRegistro(p) {
   var d = datos_(), op = opDe_(p);
-  // El mismo op ya se guardó (se perdió la respuesta): lo de la primera vez, sin el aviso de duplicado ni otra fila.
-  var previo = registroRepetido_(d.registros, d.sesiones, op);
-  if (previo) return limpiarParaEnvio(previo);
   var v = validarRegistro(p, d.catalogos, d.hoy);
+  // El mismo op ya se guardó (se perdió la respuesta): lo de la primera vez, sin el aviso de duplicado ni otra fila.
+  // Si quedó a medias (falló una fila y también deshacerlo), no cuenta como hecho: se rehace dentro del candado (caso 6).
+  var previo = registroRepetido_(d.registros, d.sesiones, op, v.error ? null : v);
+  if (previo && !previo.incompleto) return limpiarParaEnvio(previo);
   if (v.error) throw new Error(v.error);
-  var dup = !(p && p.confirmado) && duplicadoDe_(d.registros, v.filas);
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos)[normDni(v.filas[0] && v.filas[0].DNI)]);
+  if (muerto) throw new Error(muerto);
+  var dup = !(p && p.confirmado) && duplicadoDe_(sinOp_(d.registros, op), v.filas);
   if (dup) return limpiarParaEnvio(dup);
   var lock = bloquear_();
   try {
@@ -45,10 +49,11 @@ function guardarRegistro(p) {
     var registros = leerOpcional_('REGISTROS'), ids = registros.map(function (r) { return r.ID; });
     // Primera sesión ya aplicada (fecha pasada): se marca la sesión 1 de cada registro en este mismo candado.
     var sesiones = v.sesionHecha ? leerSesiones_() : [];
-    previo = registroRepetido_(registros, sesiones, op);
-    if (previo) return limpiarParaEnvio(previo);
+    previo = registroRepetido_(registros, sesiones, op, v);
+    if (previo && !previo.incompleto) return limpiarParaEnvio(previo);
+    if (previo) anularIncompleto_(previo);
     // Otra asesora pudo registrar lo mismo entre la lectura de arriba y el candado: el duplicado se revisa otra vez aquí.
-    dup = !(p && p.confirmado) && duplicadoDe_(registros, v.filas);
+    dup = !(p && p.confirmado) && duplicadoDe_(sinOp_(registros, op), v.filas);
     if (dup) return limpiarParaEnvio(dup);
     var ahora = fechaHoraTexto_(new Date()), hechas = [], filasSes = [];
     // Todo se valida antes de escribir la primera fila: un registro de varias filas es todo o nada.
@@ -108,14 +113,42 @@ function duplicadoDe_(registros, filas) {
   return null;
 }
 
-/** La respuesta de un guardarRegistro que ya se guardó con ese op (filas OP = op#n), o null. */
-function registroRepetido_(registros, sesiones, op) {
+/**
+ * La respuesta de un guardarRegistro que ya se guardó con ese op (filas OP = op#n), o null. Con `v` (lo que pide este
+ * reintento, validarRegistro): si quedan vivas menos filas (o sesiones 1) de las que pide, la primera vez quedó a medias
+ * (falló una fila y también deshacerla) y la respuesta lleva `incompleto`: nunca se dice «guardado» con datos a medias.
+ */
+function registroRepetido_(registros, sesiones, op, v) {
   var filas = filasDeOp_(registros, op);
   if (!filas.length) return null;
   var ids = {};
   filas.forEach(function (f) { ids[f.ID] = 1; });
+  var ses = filasDeOp_(sesiones, op).filter(function (s) { return ids[s.ID_REGISTRO]; });
+  if (v && v.filas && (filas.length < v.filas.length || (v.sesionHecha && ses.length < v.filas.length))) {
+    return { incompleto: true, registros: filas, sesiones: ses };
+  }
   return { ok: true, repetida: true, registros: filas.map(function (f) { return copia_(f, { TEXTO: textoRegistro(f) }); }),
-    sesiones: filasDeOp_(sesiones, op).filter(function (s) { return ids[s.ID_REGISTRO]; }) };
+    sesiones: ses };
+}
+
+/** Las filas que no son de ese op (para el aviso de duplicado: lo que quedó a medias de este mismo op no es otro registro). */
+function sinOp_(filas, op) {
+  if (!op) return filas || [];
+  var mias = {};
+  filasDeOp_(filas, op).forEach(function (f) { mias[f.ID] = 1; });
+  return (filas || []).filter(function (f) { return !mias[f.ID]; });
+}
+
+/** Anula, con el candado tomado, lo que quedó vivo de un intento anterior a medias; si no puede, rechaza sin escribir nada. */
+function anularIncompleto_(previo) {
+  var motivo = 'Se rehízo: el intento anterior quedó a medias';
+  try {
+    previo.sesiones.forEach(function (s) { marcarAnulado_('SESIONES', s.ID, motivo); });
+    previo.registros.forEach(function (f) { marcarAnulado_('REGISTROS', f.ID, motivo); });
+  } catch (e) {
+    throw new Error('No se guardó: un intento anterior de este registro quedó a medias (' + previo.registros.map(function (f) { return f.ID; }).join(', ') +
+      ') y no se pudo anular: revise Registrados y anule lo que haya quedado antes de registrar otra vez.');
+  }
 }
 
 /**
@@ -134,6 +167,8 @@ function marcarSesion(p) {
     var previa = filasDeOp_(sesiones, op).filter(function (x) { return String(x.OP).trim() === op; })[0];
     if (previa) return limpiarParaEnvio(sesionRepetida_(previa, sesiones, op));
     var r = leerRegistros_().filter(function (x) { return x.ID === id; })[0];
+    var muerto = r ? mensajeFallecido(fallecidos(d.seguimientos)[normDni(r.DNI)]) : '';
+    if (muerto) throw new Error(muerto);
     // La sesión que vio la persona (p.sesion): si otra pestaña ya la marcó, no se guarda como la siguiente.
     var error = r && !anulado_(r) ? sesionYaNoEsLaSiguiente(estadoRegistro(r, sesiones), p.sesion) : '';
     if (error) throw new Error(error);

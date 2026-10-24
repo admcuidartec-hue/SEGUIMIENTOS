@@ -107,6 +107,27 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
   dice «Cerrado» sin «Lo hizo». **Pagó y no vino**: el «Pagó» de la cotización sigue en el ciclo del programado; si no viene,
   vuelve a Pago realizado y un segundo «Pagó» se rechaza.
 
+## Correcciones de la batería de 60 pruebas (24/10/2026)
+
+- **Consulta que SOFDOC trae tarde** (caso 27): en `estadoDeSerie` un ciclo nuevo empieza solo en la fecha esperada de la
+  última consulta; un seguimiento entre la consulta y esa fecha se hizo sin saber de ella y no abre «Reintentar» (Contactado).
+  `armarTablero` deja **cada CLAVE en una sola franja**, la más avanzada (Completado gana a Contactado).
+- **Fechas escritas a mano** (caso 60): `fechaIso` rechaza las que no existen (2026-02-31); `mesDe` solo da el mes de una fecha
+  válida; `diasEntre` da 0 (nunca NaN) si alguna no lo es. Los lectores (`leerCitas_`, `leerIndicaciones_`, `leerSeguimientos_`,
+  `leerRegistros_`, `leerSesiones_`, `leerAltas_`, `leerEnfermeria_`, `leerContactos_`) pasan por `fechas_` → `normalizarFechas`:
+  lo que no es una fecha queda vacío y una cita sin fecha se ignora. Indicadores y el filtro de mes solo ofrecen meses `yyyy-mm`.
+- **Registro a medias** (caso 6): si un `op` tiene vivas menos filas (o sesiones 1) de las que pide el reintento, no cuenta
+  como hecho: dentro del candado se anula lo que quedó («Se rehízo: el intento anterior quedó a medias») y se escribe todo
+  (`registroRepetido_` con `incompleto`, `anularIncompleto_`); si no se puede anular, se rechaza pidiendo revisar Registrados.
+- **Fallecido** (caso 38): con «Falleció» vigente, `guardarRegistro` y `marcarSesion` se rechazan con «Este paciente figura como
+  fallecido desde el …: para registrar, primero anule «Falleció» en su ficha.» (`mensajeFallecido`, igual en la pantalla y el DEMO).
+- **Tipos** (caso 58): `largoMal_` rechaza un objeto o arreglo («La nota debe ser un texto.»); `sesionYaNoEsLaSiguiente` rechaza
+  un número de sesión que no sea entero positivo («El número de sesión no es válido; recargue.»).
+- El `aviso` de una escritura (BITACORA caída tras guardar) se muestra en `#aviso-srv`, encima del aviso de guardado.
+- El filtro de especialidad agrupa por `normTexto` y muestra la forma más usada (`formasMasFrecuentes` en `bootstrap`).
+- La ficha de un registro «Cerrado» solo lista las sesiones hechas. El buscador del tablero muestra el foco (`.buscar:focus-within`).
+- **Alta definitiva y tratamiento en curso** (caso 39, decidido el 24/10/2026): ver «Etapa 2», «Las cuatro decisiones del médico».
+
 ## «¿Qué pasó?» (Etapa 1)
 
 - La lista de resultados vive en `RESULTADOS` (`src/Resultados.gs`), no en `CATALOGOS`.
@@ -197,7 +218,11 @@ En un paso con fecha o motivo, Enter confirma.
 - **Las cuatro decisiones del médico** (`ALTAS.DECISION`, `DECISIONES` en `Registro.gs`): `ALTA` (definitiva); `ALTA 6 MESES` y
   `ALTA 1 AÑO` (la fecha de retorno se calcula: fecha del alta + 6 o 12 meses; el paciente sigue de alta y vuelve a «Por contactar»
   `AVISO_ALTA_CONTROL_DIAS` días antes: ese día la serie ya está vencida, `estadoDeSerie` pone `vence` = `esperada`); `NUEVA REEVALUACION` (el médico da la fecha de retorno, de mañana a dos años; no deja el alta vigente).
-  Una alta a 6 meses o 1 año sin fecha de retorno se trata como alta simple. Se registran en Registro → Decisión del médico o en la ficha
+  Una alta a 6 meses o 1 año sin fecha de retorno se trata como alta simple. **Un `ALTA` definitiva vigente en la especialidad de la reevaluación de un tratamiento, con fecha
+  posterior a la del registro, lo deja sin reevaluación** (`altaSinReevaluacion_`): las sesiones siguen igual, pero al completarse
+  queda Completado («Completó el dd/mm · alta definitiva del dd/mm», `SIN_REEVALUACION`) sin «Por reevaluar»; la ficha dice
+  «Sin reevaluación: alta definitiva del dd/mm/aaaa». Un alta anterior o del mismo día no lo afecta; 6 meses, 1 año y nueva
+  reevaluación no cambian nada; anulada el alta, vuelve la reevaluación. Se registran en Registro → Decisión del médico o en la ficha
   («Decisión del médico…»); el mensaje sin doctor dice «Elija el doctor.» solo en la nueva reevaluación.
   En la ficha, «Altas médicas» muestra la decisión, «vuelve el …» y cuándo vuelve a «Por contactar», con el estado que calcula
   `altasParaFicha` (vigente, pendiente de su retorno, cerrada porque volvió —solo con una consulta realizada después—, reemplazada o anulada).

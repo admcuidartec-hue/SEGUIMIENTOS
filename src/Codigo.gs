@@ -257,13 +257,14 @@ function catalogos_() {
 }
 
 function leerCitas_() {
-  var citas = leerObjetos_('CITAS');
+  // Una cita sin fecha válida (escrita a mano: «mañana») no se puede ubicar: se ignora (caso 60).
+  var citas = fechas_(leerObjetos_('CITAS')).filter(function (c) { return c.FECHA; });
   citas.forEach(function (c) { c.DNI = normDni(c.DNI); });
   return citas;
 }
 
 function leerIndicaciones_() {
-  var inds = leerObjetos_('INDICACIONES');
+  var inds = fechas_(leerObjetos_('INDICACIONES'));
   inds.forEach(function (i) {
     i.DNI = normDni(i.DNI);
     i.TIPO = normTexto(i.TIPO);
@@ -273,7 +274,7 @@ function leerIndicaciones_() {
 }
 
 function leerSeguimientos_() {
-  var segs = leerObjetos_('SEGUIMIENTOS');
+  var segs = fechas_(leerObjetos_('SEGUIMIENTOS'));
   segs.forEach(function (s) { s.DNI = normDni(s.DNI); });
   return segs;
 }
@@ -281,9 +282,14 @@ function leerSeguimientos_() {
 /** CONTACTOS_CRM puede no existir todavía (antes de la primera actualización con CRM). */
 function leerContactos_() {
   if (!ss_().getSheetByName('CONTACTOS_CRM')) return [];
-  var cs = leerObjetos_('CONTACTOS_CRM');
+  var cs = fechas_(leerObjetos_('CONTACTOS_CRM'));
   cs.forEach(function (c) { c.DNI = normDni(c.DNI); c.DNI_PACIENTE = normDni(c.DNI_PACIENTE); });
   return cs;
+}
+
+/** Toda fecha leída de una hoja pasa por fechaIso: lo escrito a mano que no es una fecha queda vacío (normalizarFechas). */
+function fechas_(filas) {
+  return normalizarFechas(filas, COLUMNAS_FECHA, COLUMNAS_FECHA_HORA);
 }
 
 /** Una hoja que puede no existir todavía (antes de «Preparar hojas»): vacía en vez de error. */
@@ -292,17 +298,17 @@ function leerOpcional_(nombre) {
 }
 
 function leerRegistros_() {
-  var r = leerOpcional_('REGISTROS');
+  var r = fechas_(leerOpcional_('REGISTROS'));
   r.forEach(function (x) { x.DNI = normDni(x.DNI); x.TIPO = normTexto(x.TIPO); });
   return r;
 }
 
 function leerSesiones_() {
-  return leerOpcional_('SESIONES');
+  return fechas_(leerOpcional_('SESIONES'));
 }
 
 function leerAltas_() {
-  var a = leerOpcional_('ALTAS');
+  var a = fechas_(leerOpcional_('ALTAS'));
   a.forEach(function (x) { x.DNI = normDni(x.DNI); });
   return a;
 }
@@ -343,7 +349,8 @@ function derivar_(d) {
   d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos, d.usuarios);
   d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.usuarios)
     .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
-      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios, espPorMedico: d.espPorMedico }));
+      reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios, espPorMedico: d.espPorMedico,
+      vigentes: d.vigentes }));
   // Lo aceptado que no se realizó (cerrado o «No vino» sin ninguna sesión) cuenta como no realizado en Indicadores.
   marcarNoRealizados(d.indicacionesTodas, d.pendientes, d.reglas, d.hoy);
   return d;
@@ -363,11 +370,11 @@ function doGet() {
 function bootstrap() {
   var d = datos_(), esp = {}, med = {};
   d.pacientes.forEach(function (p) {
-    if (p.ESPECIALIDAD) esp[p.ESPECIALIDAD] = 1;
+    if (p.ESPECIALIDAD) esp[p.ESPECIALIDAD] = (esp[p.ESPECIALIDAD] || 0) + 1;
     if (p.MEDICO_ULTIMO) med[p.MEDICO_ULTIMO] = 1;
   });
   d.pendientes.forEach(function (p) {
-    if (p.ESPECIALIDAD_CONSULTA) esp[p.ESPECIALIDAD_CONSULTA] = 1;
+    if (p.ESPECIALIDAD_CONSULTA) esp[p.ESPECIALIDAD_CONSULTA] = (esp[p.ESPECIALIDAD_CONSULTA] || 0) + 1;
     if (p.MEDICO_ULTIMO) med[p.MEDICO_ULTIMO] = 1;
   });
   return limpiarParaEnvio({
@@ -375,7 +382,8 @@ function bootstrap() {
     usuarios: d.catalogos.usuarios,
     motivos: d.catalogos.motivos,
     resultados: ORDEN_RESULTADOS,
-    especialidades: Object.keys(esp).sort(),
+    // La misma especialidad con y sin tilde sale una vez, con la forma más usada (el filtro compara con normTexto).
+    especialidades: formasMasFrecuentes(esp),
     medicos: Object.keys(med).sort(),
     doctores: d.catalogos.doctores,
     procedimientos: d.catalogos.procedimientos,
@@ -432,7 +440,7 @@ function getPaciente(dni) {
       // ESTADO_REGISTRO y las fechas pintan la línea de estado; NOMBRE…FECHA_RETORNO, el formulario de Editar (como filaRegistrada_).
       return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: normTexto(r.TIPO), TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
         SESIONES: e.total, HECHAS: e.hechas, ESTADO: f.estado, ESTADO_REGISTRO: f.estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '',
-        CIERRE: f.cierre, FECHA_CIERRE: f.fechaCierre, NO_VINO: f.noVino,
+        CIERRE: f.cierre, FECHA_CIERRE: f.fechaCierre, NO_VINO: f.noVino, SIN_REEVALUACION: f.sinReevaluacion,
         NOMBRE: r.NOMBRE || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
         FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '',
         sesiones: sesionesDe_(r.ID, d.sesiones).map(function (s) {
@@ -470,9 +478,11 @@ function getPaciente(dni) {
  * Un programado que no vino pasada la gracia sigue PROGRAMADO, con NO_VINO = su fecha. Lo calcula la tarjeta (pendientesRegistro).
  */
 function cierreDeRegistroFicha_(d, r, e) {
-  var out = { estado: e.estado, cierre: '', fechaCierre: '', noVino: '' };
-  if (e.estado === 'ANULADO' || e.estado === 'COMPLETO' || normTexto(r.TIPO) === 'CONTROL') return out;
+  var out = { estado: e.estado, cierre: '', fechaCierre: '', noVino: '', sinReevaluacion: '' };
   var t = (d.pendientes || []).filter(function (x) { return x.ID_REGISTRO === r.ID; })[0];
+  // Completo con alta definitiva posterior: la ficha dice «Sin reevaluación: alta definitiva del …» (caso 39).
+  if (e.estado === 'COMPLETO' && t) out.sinReevaluacion = t.SIN_REEVALUACION || '';
+  if (e.estado === 'ANULADO' || e.estado === 'COMPLETO' || normTexto(r.TIPO) === 'CONTROL') return out;
   if (!t) return out;
   if (t.ESTADO === 'CERRADO' || t.ESTADO === 'FALLECIDO') {
     out.estado = 'CERRADO';

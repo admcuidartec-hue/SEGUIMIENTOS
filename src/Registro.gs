@@ -318,8 +318,12 @@ function validarSesion(r, sesiones, fecha, hoy) {
  */
 function sesionYaNoEsLaSiguiente(e, vista) {
   if (vista === undefined || vista === null || vista === '') return '';
+  // Un número ilegible («dos», 1.5, un arreglo) se rechaza: aceptarlo desactivaba esta protección (caso 58).
+  if ((typeof vista !== 'number' && typeof vista !== 'string') || !/^\d+$/.test(String(vista).trim()) || Number(vista) < 1) {
+    return 'El número de sesión no es válido; recargue.';
+  }
   var k = Number(vista), sig = e.hechas + 1;
-  if (!(k >= 1) || k === sig) return '';
+  if (k === sig) return '';
   return k < sig ? 'La sesión ' + k + ' ya se registró; recargue.' : 'La sesión ' + k + ' no es la siguiente (es la ' + sig + '); recargue.';
 }
 
@@ -429,6 +433,21 @@ function especialidadDelRegistro_(espDoc, realizadas, hasta) {
   return ultima ? ultima.ESPECIALIDAD : '';
 }
 
+/**
+ * Alta definitiva que deja un tratamiento sin reevaluación (caso 39, decidido el 24/10/2026): el alta vigente (`vigentes`, de
+ * altasVigentes) de la serie a la que se une su reevaluación, con DECISION = ALTA (o 6 meses / 1 año sin fecha de retorno, que
+ * se leen como alta simple) y FECHA posterior a la del registro. Un alta anterior o del mismo día no lo afecta: el tratamiento
+ * es una indicación nueva. La fecha del alta, o ''.
+ */
+function altaSinReevaluacion_(vigentes, dni, especialidad, fechaRegistro) {
+  var a = especialidad ? (vigentes || {})[claveSerie(dni, especialidad)] : null;
+  if (!a || anulado_(a)) return '';
+  var dec = decisionDe_(a);
+  if (dec.meses && !fechaIso(a.FECHA_RETORNO)) dec = DECISIONES.ALTA;
+  var f = fechaIso(a.FECHA);
+  return dec.nombre === 'ALTA' && f && f > fechaIso(fechaRegistro) ? f : '';
+}
+
 function porFechaHora_(a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; }
 
 /**
@@ -498,6 +517,8 @@ function pendientesRegistro(d) {
       : e.estado === 'COMPLETO' ? realizadas.filter(function (x) {
         return x.FECHA > e.ultima && (!espSerie || normTexto(x.ESPECIALIDAD) === normTexto(espSerie));
       })[0] : null;
+    // Con un alta definitiva posterior al registro en su especialidad, al completarse no hay «Por reevaluar».
+    var sinReev = e.estado === 'COMPLETO' && !control ? altaSinReevaluacion_(d.vigentes, dni, espSerie, r.FECHA) : '';
     if (muertos[dni]) estado = 'FALLECIDO';
     else if (cierre) estado = 'CERRADO';
     else if (sc) { estado = 'CERRADO'; cierre = { motivo: 'NÚMERO EQUIVOCADO', fecha: sc }; }
@@ -515,7 +536,7 @@ function pendientesRegistro(d) {
       else { motivo = 'NO VINO'; falta = e.inicio; if (diasEntre(falta, hoy) > reglas.corteIndicaciones) estado = 'ANTIGUO'; }
     } else if (e.estado === 'COMPLETO') {
       // Un «por reevaluar» muy viejo no se muestra: al publicar no debe caer una avalancha de tarjetas.
-      estado = hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';
+      estado = sinReev ? 'COMPLETADO' : hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';
     }
     else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
@@ -554,7 +575,8 @@ function pendientesRegistro(d) {
       FECHA_AGENDA: agenda ? agenda.fecha : '',
       INTENTO: agenda ? agenda.intento : 0,
       MOTIVO_PENDIENTE: motivo,
-      FECHA_REEVALUAR: reevaluar,
+      FECHA_REEVALUAR: sinReev ? '' : reevaluar,
+      SIN_REEVALUACION: sinReev,
       VOLVIO: volvio,
       EXAMENES: textoLimpio_(r.EXAMENES),
       FECHA_INICIO: e.inicio,
@@ -809,4 +831,15 @@ function revisarCatalogos(c) {
   if (enLista_(c.motivos, 'ALTA MÉDICA')) lineas.push('✗ «ALTA MÉDICA» sigue en MOTIVOS_DESCARTE: ahora el alta se registra con «Dar de alta». Use «Preparar hojas».');
   return lineas.length ? lineas : ['✓ Catálogos de Registro: ' + c.doctores.length + ' doctores, ' + c.procedimientos.length +
     ' procedimientos, ' + c.tratamientos.length + ' tratamientos.'];
+}
+
+/**
+ * Con «Falleció» vigente (fallecidos) no se registra nada nuevo del paciente ni se marca su sesión: la pantalla ya lo avisa y
+ * el servidor lo rechaza, salvo que antes se anule el fallecimiento. `muerto`: { fecha, quien } o null. '' si no hay problema.
+ */
+function mensajeFallecido(muerto) {
+  if (!muerto) return '';
+  var f = fechaIso(muerto.fecha);
+  return 'Este paciente figura como fallecido' + (f ? ' desde el ' + f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4) : '') +
+    ': para registrar, primero anule «Falleció» en su ficha.';
 }

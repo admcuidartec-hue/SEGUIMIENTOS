@@ -1689,7 +1689,7 @@ test('registro: un documento inválido dice por qué, con el mismo texto que el 
   } finally { await navegador.close(); }
 });
 
-test('registro: un DNI de fallecido muestra el aviso y deja registrar', async () => {
+test('registro: un DNI de fallecido muestra el aviso y no deja registrar hasta anular «Falleció» (el servidor lo rechaza)', async () => {
   const { navegador, pagina, errores } = await abrirRegistro();
   try {
     await pagina.locator('#rdni').fill('41999000');
@@ -1697,15 +1697,11 @@ test('registro: un DNI de fallecido muestra el aviso y deja registrar', async ()
     assert.match(await pagina.locator('#rcon .fallecido').textContent(), /Este paciente figura como fallecido el 24\/09\/2026 \(Ana\)/);
     assert.match(await pagina.locator('#rcon .conocido').textContent(), /Paciente conocido · última consulta 02\/07\/2026 con Dr\. Cabanillas/);
     await llenarIndicacion(pagina, { procs: ['SANGRÍA'] });
-    assert.equal(await pagina.locator('#rgo').isDisabled(), false, 'el aviso no bloquea');
-    assert.equal(await falta(pagina), 'Se creará 1 registro.');
-    await pagina.locator('#rgo').click();
-    await pagina.waitForSelector('#rlista li[data-reg="REG-000023"]');
-    assert.equal(await aviso(pagina), 'Registro guardado: Sangría · Rosa Amelia Cárdenas Ríos · REG-000023');
-    const p = await ultimo(pagina, 'guardarRegistro');
-    assert.equal(p.dni, '41999000');
-    assert.equal(p.contacto, '933999000', 'el teléfono va sin espacios');
-    assert.equal(p.doctor, 'Dr. Elí Cabanillas');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true, 'con «Falleció» vigente no se registra');
+    assert.equal(await falta(pagina), 'Este paciente figura como fallecido desde el 24/09/2026: para registrar, primero anule «Falleció» en su ficha.');
+    // El DEMO, como el servidor, rechaza el registro y la sesión de un fallecido.
+    const e = await pagina.evaluate(() => { try { DEMO.guardarRegistro({ usuario: 'MAGALY', dni: '41999000', nombre: 'X', contacto: '987654321', fecha: S.hoy, doctor: 'Dr. Elí Cabanillas', procedimientos: ['SANGRÍA'] }); return ''; } catch (x) { return x.message; } });
+    assert.match(e, /figura como fallecido desde el 24\/09\/2026/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -2180,6 +2176,8 @@ test('pacientes: un registro sin empezar cerrado con «No desea realizarse» dic
     assert.equal((await tr.locator('.trat-cab .tag').textContent()).trim(), 'Cerrado');
     assert.match(await tr.textContent(), /Seguimiento cerrado: No desea realizarse \(\d\d\/\d\d\)/);
     assert.equal(await tr.locator('[data-lohizo]').count(), 0);
+    assert.equal(await tr.locator('.ses.pend').count(), 0, 'un registro cerrado no lista «Sesión 1 · pendiente»');
+    assert.doesNotMatch(await tr.textContent(), /· pendiente/);
     // Lo mismo con lo que manda el servidor: un programado que no vino dice «· no vino» y sigue ofreciendo «Lo hizo».
     const linea = await pagina.evaluate(() => lineaEstadoRegistro({ ESTADO_REGISTRO: 'PROGRAMADO', TIPO: 'HIERRO', FECHA_INICIO: '2026-09-12', NO_VINO: '2026-09-12' }));
     assert.equal(linea, 'Programado el 12/09 · no vino');
@@ -4666,6 +4664,87 @@ test('la ficha y el panel parten las palabras larguísimas (overflow-wrap) en ve
       return { wrap: getComputedStyle(h).overflowWrap, ancho: f.scrollWidth <= f.clientWidth + 1, pagina: document.documentElement.scrollWidth <= window.innerWidth };
     });
     assert.deepEqual(r, { wrap: 'anywhere', ancho: true, pagina: true });
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('indicadores: una fecha mal escrita en la hoja (mes «31/02/2») no se ofrece ni se abre (caso 60)', async () => {
+  const navegador = await chromium.launch();
+  try {
+    const pagina = await (await navegador.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+    const errores = [];
+    pagina.on('pageerror', e => errores.push(e.message));
+    await pagina.addInitScript(() => localStorage.setItem('seg.usuario', 'MAGALY'));
+    await pagina.goto('file://' + ARCHIVO, { waitUntil: 'domcontentloaded' });
+    await pagina.waitForFunction(() => typeof S !== 'undefined' && !!S.boot, null, { timeout: 10000 });
+    await pagina.evaluate(() => {
+      const real = DEMO.getResumen;
+      DEMO.getResumen = (...a) => { const r = real(...a); r.filas = r.filas.concat([Object.assign({}, r.filas[0], { MES: '31/02/2' }), Object.assign({}, r.filas[0], { MES: '2026-13' })]); return r; };
+    });
+    await pagina.locator('[data-sec="indicadores"]:visible').first().click();
+    await pagina.waitForSelector('#ipanel[data-tab] section', { timeout: 10000 });
+    assert.equal(await pagina.locator('#imes').textContent(), 'setiembre 2026');
+    assert.equal(await pagina.locator('#mant').isDisabled(), false, 'se puede ir a otros meses');
+    assert.equal(await pagina.locator('#ipanel .barras [data-mes="31/02/2"]').count(), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('el buscador del tablero muestra el foco (borde del acento), en claro y en oscuro (caso 53)', async () => {
+  for (const colorScheme of ['light', 'dark']) {
+    const { navegador, pagina, errores } = await abrir({ colorScheme, guardado: { 'seg.modo': colorScheme === 'dark' ? 'oscuro' : 'claro' } });
+    try {
+      await pagina.waitForFunction(() => S.fase === 'listo');
+      const borde = () => pagina.evaluate(() => { const c = getComputedStyle(document.querySelector('#q').closest('.buscar')); return [c.borderTopColor, c.boxShadow]; });
+      const acento = await pagina.evaluate(() => { const d = document.createElement('i'); d.style.color = 'var(--accent)'; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; });
+      const antes = await borde();
+      await pagina.keyboard.press('/');
+      assert.equal(await pagina.evaluate(() => document.activeElement.id), 'q');
+      const despues = await borde();
+      assert.notDeepEqual(despues, antes, colorScheme + ': el foco cambia el buscador');
+      assert.equal(despues[0], acento, colorScheme + ': borde del color de acento');
+      assert.deepEqual(errores, []);
+    } finally { await navegador.close(); }
+  }
+});
+
+test('el «aviso» del servidor (BITACORA caída tras guardar) se muestra aparte, sin tapar el aviso de guardado ni bloquear', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.evaluate(() => {
+      const real = DEMO.guardarRegistro;
+      DEMO.guardarRegistro = (...a) => Object.assign(real(...a), { aviso: 'Se guardó, pero no se pudo escribir la BITACORA: Service Spreadsheets timed out.' });
+    });
+    await pagina.locator('#rdni').fill('45678902');
+    await llenarIndicacion(pagina, { nombre: 'Prueba Aviso', contacto: '987 111 334', doctor: 'Dra. Karen Matos', procs: ['SANGRÍA'] });
+    assert.equal(await falta(pagina), 'Se creará 1 registro.');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForSelector('#aviso-srv.ver');
+    assert.equal(await pagina.locator('#aviso-srv span').textContent(), 'Se guardó, pero no se pudo escribir la BITACORA: Service Spreadsheets timed out.');
+    assert.equal(await pagina.locator('#aviso-srv').getAttribute('role'), 'status');
+    assert.match(await aviso(pagina), /^Registro guardado: Sangría/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('alta definitiva después de un hierro completo: sale de «Por reevaluar» y la ficha dice «Sin reevaluación»; anulada, vuelve (caso 39)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    const r = await pagina.evaluate(() => {
+      const enCol = () => { const t = DEMO.getTablero(); return Object.keys(t.columnas).filter(c => t.columnas[c].some(x => x.CLAVE === 'REG-000022')); };
+      const antes = enCol();
+      const a = DEMO.darDeAlta({ usuario: 'MAGALY', dni: '43666777', especialidad: 'HEMATOLOGÍA', doctor: 'Dr. Elí Cabanillas', fecha: S.hoy, decision: 'ALTA' });
+      const despues = enCol();
+      const linea = lineaEstadoRegistro(DEMO.getPaciente('43666777').registros.find(x => x.ID === 'REG-000022'));
+      DEMO.anularAlta({ usuario: 'MAGALY', id: a.alta.ID, motivo: 'Error' });
+      return { antes, despues, linea, anulada: enCol(), lineaAnulada: lineaEstadoRegistro(DEMO.getPaciente('43666777').registros.find(x => x.ID === 'REG-000022')) };
+    });
+    assert.deepEqual(r.antes, ['POR_CONTACTAR'], 'el hierro completo de Beatriz está «Por reevaluar»');
+    assert.deepEqual(r.despues, [], 'con el alta definitiva ya no se reevalúa (completó en agosto: fuera del tablero)');
+    assert.equal(r.linea, 'Completo · Sin reevaluación: alta definitiva del 01/10/2026');
+    assert.deepEqual(r.anulada, ['POR_CONTACTAR']);
+    assert.equal(r.lineaAnulada, 'Completo');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

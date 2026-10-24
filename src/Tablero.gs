@@ -143,6 +143,7 @@ function armarTablero(d) {
     if (t.ESTADO === 'COMPLETADO') {
       var f = t.VOLVIO || (t.ULTIMA_SESION && t.ESTADO_REGISTRO === 'COMPLETO' ? t.ULTIMA_SESION : t.FECHA_LOHIZO);
       var etq = t.VOLVIO ? 'Volvió el ' + dm_(t.VOLVIO)
+        : t.ESTADO_REGISTRO === 'COMPLETO' && t.SIN_REEVALUACION ? 'Completó el ' + dm_(t.ULTIMA_SESION) + ' · alta definitiva del ' + dm_(t.SIN_REEVALUACION)
         : t.ESTADO_REGISTRO === 'COMPLETO' ? (t.FECHA_REEVALUAR ? 'Completó el ' + dm_(t.ULTIMA_SESION) + ' · reevaluar el ' + dm_(t.FECHA_REEVALUAR)
           : (t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? 'Se hizo el ' + dm_(f) : 'Completó el tratamiento'))
         : 'Lo hizo el ' + dm_(f);
@@ -189,6 +190,21 @@ function armarTablero(d) {
   });
   Object.keys(porClave).forEach(function (k) { deduped.push(porClave[k]); });
   col.COMPLETADO = deduped;
+
+  // Una tarjeta, una franja: si por datos contradictorios (una consulta que SOFDOC trajo tarde, un seguimiento hecho sin
+  // saberlo) la misma CLAVE cae en dos franjas, queda en la más avanzada, la del hecho real (Completado gana a Contactado).
+  var fase = {};
+  COLUMNAS_TABLERO.forEach(function (c, i) {
+    col[c].forEach(function (t) { if (fase[t.CLAVE] === undefined || i > fase[t.CLAVE]) fase[t.CLAVE] = i; });
+  });
+  COLUMNAS_TABLERO.forEach(function (c, i) {
+    var vistas = {};
+    col[c] = col[c].filter(function (t) {
+      if (fase[t.CLAVE] !== i || vistas[t.CLAVE]) return false;
+      vistas[t.CLAVE] = 1;
+      return true;
+    });
+  });
 
   var asc = function (a, b) { return a.FECHA_CLAVE < b.FECHA_CLAVE ? -1 : a.FECHA_CLAVE > b.FECHA_CLAVE ? 1 : 0; };
   col.CONTACTADO.sort(asc);

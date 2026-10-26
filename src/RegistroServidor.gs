@@ -310,8 +310,12 @@ function darDeAlta(p) {
     if (altasVigentes(altas, d.seguimientos, d.citas, d.reglas, d.hoy)[claveSerie(a.DNI, a.ESPECIALIDAD)]) {
       throw new Error('Ese paciente ya tiene un alta vigente en ' + a.ESPECIALIDAD + '.');
     }
+    // Dos decisiones del mismo día y especialidad (p. ej. una «Nueva reevaluación», que no deja alta vigente, y otra que entra a
+    // la vez desde la ficha): la segunda se rechaza. Para cambiar la decisión del día, se anula la primera (caso 41).
+    var ahora = fechaHoraTexto_(new Date());
+    if (decisionDeHoy(altas, a.DNI, a.ESPECIALIDAD, ahora, op)) throw new Error(MENSAJE_DECISION_DE_HOY);
     a.ID = siguienteId(altas.map(function (x) { return x.ID; }), 'ALT');
-    a.FECHA_HORA = fechaHoraTexto_(new Date());
+    a.FECHA_HORA = ahora;
     if (op) a.OP = op;
     anexarObjeto_('ALTAS', conOp_('ALTAS', COLUMNAS_ALTAS), a);
     bitacora_(a.REGISTRADO_POR, 'ALTA', a.ID + ' · ' + a.DNI + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR, op);

@@ -616,6 +616,30 @@ var DECISIONES = {
   'ALTA 1 ANO': { nombre: 'ALTA 1 AÑO', texto: 'Alta con reevaluación a 1 año', meses: 12, tipo: '1 AÑO' },
   'NUEVA REEVALUACION': { nombre: 'NUEVA REEVALUACION', texto: 'Nueva reevaluación', meses: 0, pideFecha: true, tipo: 'REEVALUACION' }
 };
+var MENSAJE_DECISION_DE_HOY = 'Ya se registró una decisión hoy para esta especialidad; anúlela para cambiarla.';
+
+/** Minutos de una carrera: dos decisiones del mismo paciente y especialidad con menos que esto entre sí chocaron. */
+var VENTANA_DECISION_MIN = 2;
+
+function minutoDe_(fh) {
+  var m = String(fh || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 60000 : NaN;
+}
+
+/**
+ * La decisión viva de ese paciente y especialidad registrada con otro op en los últimos VENTANA_DECISION_MIN minutos (FECHA_HORA,
+ * que va al minuto) antes de `ahora` ('yyyy-mm-dd HH:mm'), o null. Es la carrera del caso 41: el médico desde la ficha y una
+ * asesora desde Registro a la vez. Una decisión posterior (otra consulta, otro rato) no choca: la reemplaza (decisionPosterior_).
+ */
+function decisionDeHoy(altas, dni, especialidad, ahora, op) {
+  var k = normDni(dni), e = normTexto(especialidad), t = minutoDe_(ahora);
+  return (altas || []).filter(function (x) {
+    var d = t - minutoDe_(x.FECHA_HORA);
+    return !anulado_(x) && normDni(x.DNI) === k && normTexto(x.ESPECIALIDAD) === e && d >= 0 && d <= VENTANA_DECISION_MIN &&
+      (!op || String(x.OP || '').trim() !== op);
+  })[0] || null;
+}
+
 function decisionDe_(a) { return DECISIONES[normTexto(a && a.DECISION) || 'ALTA'] || DECISIONES.ALTA; }
 /**
  * Topes de fecha «hasta un año» y «hasta dos años» desde hoy: por calendario (la misma fecha del año siguiente o de dentro de

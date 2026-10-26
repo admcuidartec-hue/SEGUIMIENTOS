@@ -530,3 +530,20 @@ test('con «Falleció» vigente también se rechazan la decisión del médico, E
   ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error' });
   assert.deepEqual([escrito.ALTAS.length, escrito.anulados.length, lock.tomado], [0, 1, 0]);
 });
+
+test('darDeAlta: una segunda decisión del mismo día y especialidad se rechaza dentro del candado, aunque la primera no deje alta vigente (caso 41)', () => {
+  const nr = { ID: 'ALT-000001', FECHA_HORA: '2026-10-05 10:29', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dra. Karen Matos',
+    REGISTRADO_POR: 'ANA', DECISION: 'NUEVA REEVALUACION', FECHA_RETORNO: '2026-12-05', ANULADO: '', OP: 'OP-otra-0001' };
+  const { ctx, escrito } = servidor({}, { ALTAS: [nr] });   // lo leído antes del candado aún no la tenía (carrera)
+  ctx.leerAltas_ = () => [nr];
+  const p = { usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05', decision: 'ALTA 1 AÑO', op: 'OP-mia-0001' };
+  assert.throws(() => ctx.darDeAlta(p), /^Error: Ya se registró una decisión hoy para esta especialidad; anúlela para cambiarla\.$/);
+  assert.equal(escrito.ALTAS.length, 0);
+  // Anulada la primera, sí.
+  nr.ANULADO = 'SÍ';
+  assert.equal(plano(ctx.darDeAlta(p)).ok, true);
+  // Otra especialidad, sí.
+  const { ctx: c2 } = servidor({}, {});
+  c2.leerAltas_ = () => [Object.assign({}, nr, { ANULADO: '', ESPECIALIDAD: 'REUMATOLOGÍA' })];
+  assert.equal(plano(c2.darDeAlta(p)).ok, true);
+});

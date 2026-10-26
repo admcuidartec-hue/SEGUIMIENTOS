@@ -468,6 +468,8 @@ function getPaciente(dni) {
       // ESTADO_REGISTRO y las fechas pintan la línea de estado; NOMBRE…FECHA_RETORNO, el formulario de Editar (como filaRegistrada_).
       return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: normTexto(r.TIPO), TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
         SESIONES: e.total, HECHAS: e.hechas, ESTADO: f.estado, ESTADO_REGISTRO: f.estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '',
+        // Anulado al deshacer un fallo: la ficha muestra la sesión que haya quedado viva, con «Anular sesión» (caso 7).
+        POR_FALLO: anuladoPorFallo(r),
         CIERRE: f.cierre, FECHA_CIERRE: f.fechaCierre, NO_VINO: f.noVino, SIN_REEVALUACION: f.sinReevaluacion,
         NOMBRE: r.NOMBRE || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
         FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '',

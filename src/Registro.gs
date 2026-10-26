@@ -368,11 +368,30 @@ function sesionLigada(s) {
  * Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. Con `registros`, tampoco la de
  * un registro anulado: ya no está en ninguna lista, y sus sesiones hechas siguen contando en la meta del día en que se hicieron.
  */
+/**
+ * ¿Se anuló este registro al DESHACER un fallo? (deshacerEscritura_ y anularIncompleto_ ponen esos motivos): ese registro nunca
+ * llegó a existir, así que una sesión suya que quedó viva (falló también anularla) no cuenta en la meta y sí se puede anular
+ * (caso 7 de la batería de 80). Un registro anulado a mano conserva sus sesiones hechas, que siguen contando.
+ */
+function anuladoPorFallo(r) {
+  return !!r && anulado_(r) && /^(No se guardó|Se rehízo)/.test(textoLimpio_(r.MOTIVO_ANULACION));
+}
+
+/** Las sesiones vivas de registros anulados al deshacer un fallo (anuladoPorFallo): «Verificar» las lista. */
+function sesionesDeRegistrosDeshechos(registros, sesiones) {
+  var porFallo = {};
+  (registros || []).forEach(function (r) { if (anuladoPorFallo(r)) porFallo[r.ID] = r; });
+  return (sesiones || []).filter(function (s) { return !anulado_(s) && porFallo[s.ID_REGISTRO]; }).map(function (s) {
+    return { ID: s.ID, ID_REGISTRO: s.ID_REGISTRO, DNI: normDni(porFallo[s.ID_REGISTRO].DNI) };
+  });
+}
+
 function validarAnulacionSesion(id, sesiones, registros) {
   var s = (sesiones || []).filter(function (x) { return x.ID === id; })[0];
   if (!s) return { error: 'No encontré la sesión ' + id + '.', sesion: null };
   if (anulado_(s)) return { error: 'La sesión ' + id + ' ya estaba anulada.', sesion: null };
   var r = (registros || []).filter(function (x) { return x.ID === s.ID_REGISTRO; })[0];
+  if (anuladoPorFallo(r)) return { error: '', sesion: s };
   if (r && anulado_(r)) return { error: 'El registro ' + r.ID + ' está anulado: sus sesiones ya no se anulan.', sesion: null };
   var propias = sesionesDe_(s.ID_REGISTRO, sesiones);
   if (propias[propias.length - 1].ID !== id) return { error: 'Solo se puede anular la última sesión del tratamiento.', sesion: null };

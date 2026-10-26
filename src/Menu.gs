@@ -439,6 +439,13 @@ function verificar() {
     if (s) lineasEncabezado(par[0], revisarEncabezado(encabezadoCrudo_(s), par[2] ? par[1] : par[1].concat([COLUMNA_OP])))
       .forEach(function (l) { lineas.push(l); });
   });
+  // Lo que quedó vivo de un registro que se deshizo por un fallo (y falló también deshacerlo): se anula en la ficha (caso 7).
+  if (ss.getSheetByName('REGISTROS') && ss.getSheetByName('SESIONES')) {
+    var restos = sesionesDeRegistrosDeshechos(leerRegistros_(), leerSesiones_());
+    if (restos.length) lineas.push('✗ SESIONES: ' + (restos.length === 1 ? 'quedó viva 1 sesión' : 'quedaron vivas ' + restos.length + ' sesiones') +
+      ' de registros que se deshicieron por un fallo (' + restos.map(function (s) { return s.ID + ' de ' + s.ID_REGISTRO + ', DNI ' + s.DNI; }).join('; ') +
+      '): no cuentan en la meta; anúlelas en la ficha del paciente («Anular sesión»).');
+  }
   var sgV = ss.getSheetByName('SEGUIMIENTOS');
   if (sgV) {
     var ra = resumenAntiguos(leerSeguimientos_());

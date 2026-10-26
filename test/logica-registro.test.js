@@ -125,6 +125,24 @@ test('validarAnulacionSesion: solo la última sesión válida de su registro', (
   assert.match(L.validarAnulacionSesion('SES-000002', [ses(1, '2026-09-25'), ses(2, '2026-10-01', { ANULADO: 'SÍ' })]).error, /ya estaba anulada/);
 });
 
+test('validarAnulacionSesion: la sesión que quedó viva de un registro anulado AL DESHACER un fallo sí se anula (caso 7 de la batería de 80)', () => {
+  const s = [ses(1, '2026-09-25')];
+  const porFallo = reg({ ANULADO: 'SÍ', MOTIVO_ANULACION: 'No se guardó: falló a mitad del registro (se deshizo solo)' });
+  assert.equal(L.validarAnulacionSesion('SES-000001', s, [porFallo]).error, '');
+  assert.equal(L.anuladoPorFallo(porFallo), true);
+  assert.equal(L.anuladoPorFallo(reg({ ANULADO: 'SÍ', MOTIVO_ANULACION: 'Se rehízo: el intento anterior quedó a medias' })), true);
+  const aMano = reg({ ANULADO: 'SÍ', MOTIVO_ANULACION: 'Paciente equivocado' });
+  assert.equal(L.anuladoPorFallo(aMano), false);
+  assert.match(L.validarAnulacionSesion('SES-000001', s, [aMano]).error, /está anulado: sus sesiones ya no se anulan/);
+});
+
+test('sesionesDeRegistrosDeshechos: las sesiones vivas de registros anulados al deshacer un fallo («Verificar» las lista)', () => {
+  const regs = [reg({ ANULADO: 'SÍ', MOTIVO_ANULACION: 'No se guardó: falló a mitad del registro (se deshizo solo)', DNI: '40111222' }),
+    reg({ ID: 'REG-000002', ANULADO: 'SÍ', MOTIVO_ANULACION: 'Paciente equivocado' })];
+  const s = [ses(1, '2026-09-25'), ses(2, '2026-09-26', { ID_REGISTRO: 'REG-000002' }), ses(3, '2026-09-27', { ANULADO: 'SÍ' })];
+  assert.deepEqual(plano(L.sesionesDeRegistrosDeshechos(regs, s)), [{ ID: 'SES-000001', ID_REGISTRO: 'REG-000001', DNI: '40111222' }]);
+});
+
 const CAT2 = L.catalogosDesdeFilas(['USUARIOS', 'DOCTOR', 'DOCTOR_SOFDOC'], [['MAGALY', 'Dr. Elí Cabanillas', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA']]);
 const pend = (registros, sesiones, seguimientos, hoy) => plano(L.pendientesRegistro({
   registros, sesiones: sesiones || [], seguimientos: seguimientos || [], citas: [cita({ fecha: '2026-09-01' })], reglas: reglas(L),

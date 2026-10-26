@@ -455,6 +455,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .ses.pend>i{color:var(--muted)}
 .ses.anulada{color:var(--muted)}
 .ses.anulada .tx{text-decoration:line-through}
+.ses.resto>i{color:var(--warn)}
 .ses .lohizo{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
 .ses .lohizo .ctl,.ses .lohizo .btn{height:40px}
 .ses .motivo,.altas .motivo{flex-basis:100%}
@@ -3510,7 +3511,7 @@ function adaptarFicha(r) {
         estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO', cerrado: e === 'CERRADO',
         abierto: e === 'COTIZADO' || e === 'EN CURSO' || (e === 'PROGRAMADO' && !control), anulable: e !== 'ANULADO' && e !== 'COMPLETO',
         linea: lineaEstadoRegistro(x), fila: Object.assign({}, x, { FECHA: isoDe(x.FECHA), FECHA_INICIO: isoDe(x.FECHA_INICIO), FECHA_RETORNO: isoDe(x.FECHA_RETORNO) }),
-        motivo: x.MOTIVO_ANULACION || '',
+        motivo: x.MOTIVO_ANULACION || '', porFallo: x.POR_FALLO === true,
         sesiones: (x.sesiones || []).map(s => ({ id: String(s.ID || ''), numero: Number(s.NUMERO) || 0, f: isoDe(s.FECHA), quien: nombreBonito(s.ASESORA) }))
           .sort((a, b) => a.numero - b.numero),
         hierro: norm(x.TIPO) === 'HIERRO',
@@ -3743,6 +3744,10 @@ function htmlTrat(t) {
       // Cerrado («No desea realizarse», no vino): las sesiones que faltan ya no están pendientes; solo se listan las hechas.
     }
     ses += (PA.sesAnuladas[t.id] || []).map(a => `<li class="ses anulada"><i class="ph ph-x-circle"></i><span class="tx">Sesión ${esc(a.numero)} · <span class="mono">${esc(dmy(a.f))}</span> · ${esc(a.quien)}</span> · anulada: ${esc(a.motivo)}</li>`).join('');
+  } else if (t.porFallo) {
+    // Un registro que se deshizo por un fallo y del que quedó viva una sesión (falló también anularla): se ve y se anula aquí (caso 7).
+    ses = t.sesiones.map(s => `<li class="ses resto"><i class="ph ph-warning"></i><span class="tx">Sesión ${s.numero} · <span class="mono">${esc(dmy(s.f))}</span> · ${esc(s.quien)} · quedó viva al deshacer el registro: anúlela</span>`
+      + (!anulandoAqui('sesion', s.id) ? ` <button type="button" class="enlace" data-anular-ses="${esc(s.id)}">Anular sesión</button>` : '') + motivoAqui('sesion', s.id) + '</li>').join('');
   }
   return `<div class="trat" data-reg="${esc(t.id)}"><div class="trat-cab"><b>${esc(t.titulo)}</b> <span class="tag ${t.tono}">${esc(t.estado)}</span></div>`
     + `<span class="trat-meta">${esc(t.id)} · ${esc(dmy(t.f))} · ${esc(t.med)} · registró ${esc(t.quien)}${t.anulado ? ' · anulado' + (t.motivo ? ': ' + esc(t.motivo) : '') : ''}</span>`
@@ -5700,7 +5705,7 @@ const DEMO = (() => {
           return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: f.SESIONES, HECHAS: ss.length,
             ESTADO: estado, ESTADO_REGISTRO: estado, CIERRE: cerrado ? (tc.CIERRE || 'FALLECIÓ') : '', FECHA_CIERRE: cerrado ? (tc.FECHA_CIERRE || hoy) : '', NO_VINO: '',
             SIN_REEVALUACION: estado === 'COMPLETO' ? reg(r).SIN_REEVALUACION : '',
-            MOTIVO_ANULACION: r.MOTIVO_ANULACION, NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
+            MOTIVO_ANULACION: r.MOTIVO_ANULACION, POR_FALLO: !!r.ANULADO && /^(No se guardó|Se rehízo)/.test(String(r.MOTIVO_ANULACION || '').trim()), NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
             FECHA_INICIO: f.FECHA_INICIO, EXAMENES: f.EXAMENES, FECHA_RETORNO: f.FECHA_RETORNO,
             sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
         }),
@@ -6011,9 +6016,11 @@ const DEMO = (() => {
       if (!s) throw new Error('No encontré la sesión ' + x.id + '.');
       if (s.ANULADO) throw new Error('La sesión ' + s.ID + ' ya estaba anulada.');
       const delReg = regPorId(s.ID_REGISTRO);
-      if (delReg && delReg.ANULADO) throw new Error('El registro ' + delReg.ID + ' está anulado: sus sesiones ya no se anulan.');
+      // Como validarAnulacionSesion: la de un registro anulado al deshacer un fallo (anuladoPorFallo) sí se anula.
+      const porFallo = delReg && delReg.ANULADO && /^(No se guardó|Se rehízo)/.test(String(delReg.MOTIVO_ANULACION || '').trim());
+      if (delReg && delReg.ANULADO && !porFallo) throw new Error('El registro ' + delReg.ID + ' está anulado: sus sesiones ya no se anulan.');
       const propias = sesionesDe(s.ID_REGISTRO);
-      if (propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
+      if (!porFallo && propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
       s.ANULADO = 'SÍ';
       s.MOTIVO_ANULACION = String(x.motivo).trim();
       // Como anularSesion: la próxima que se agendó al marcar esta sesión se anula con ella, y también un «Agendó cita» sin liga

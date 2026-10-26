@@ -376,7 +376,7 @@ function conOp(extra, hojas) {
     assert.equal(S.lock.tomado, 1);
     const f = (S.escrito[n] || []).concat((hojas || {})[n] || []).find(x => x.ID === id);
     if (f && S.ctx.anulado_(f)) throw new Error(id + ' ya estaba anulado.');
-    if (f) f.ANULADO = 'SÍ';
+    if (f) { f.ANULADO = 'SÍ'; f.MOTIVO_ANULACION = motivo; }
     S.escrito.anulados.push([n, id, motivo]);
   };
   return S;
@@ -438,6 +438,23 @@ test('marcarSesion y las anulaciones con op: el reintento no marca otra sesión 
   ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error', op: 'OP-anu-0003' });
   assert.deepEqual(plano(ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error', op: 'OP-anu-0003' })), { ok: true, repetida: true });
   assert.equal(escrito.anulados.length, 2);
+});
+
+test('guardarRegistro: si al deshacer falla la anulación de una SESIÓN, el reintento con el mismo op la anula (caso 7 de la batería de 80)', () => {
+  const { ctx, escrito } = conOp();
+  const anexar = ctx.anexarObjeto_, anular = ctx.marcarAnulado_;
+  let n = 0, fallarDeshacer = true;
+  ctx.anexarObjeto_ = (h, cols, o) => { if (h === 'REGISTROS' && ++n === 2) throw new Error('Service Spreadsheets timed out.'); return anexar(h, cols, o); };
+  ctx.marcarAnulado_ = (h, id, m) => { if (fallarDeshacer && h === 'SESIONES') throw new Error('Service Spreadsheets timed out.'); return anular(h, id, m); };
+  ctx.leerSesiones_ = () => escrito.SESIONES;
+  const p = datosReg({ dni: '40999000', procedimiento: '', tratamiento: 'HIERRO SACARATO', procedimientos: ['SANGRÍA'], sesiones: '2', fecha: '2026-10-03', fechaInicio: '2026-10-03', op: 'OP-huerfana-1' });
+  assert.throws(() => ctx.guardarRegistro(p), /Además no se pudo deshacer todo/);
+  assert.deepEqual(escrito.SESIONES.filter(s => !ctx.anulado_(s)).map(s => s.ID_REGISTRO), ['REG-000001'], 'quedó viva la sesión de un registro anulado');
+  fallarDeshacer = false;
+  const r = plano(ctx.guardarRegistro(p));
+  assert.equal(r.ok, true);
+  assert.ok(escrito.anulados.some(a => a[0] === 'SESIONES' && a[1] === 'SES-000001'), 'el reintento anula la sesión que quedó');
+  assert.deepEqual(escrito.SESIONES.filter(s => !ctx.anulado_(s)).map(s => s.ID_REGISTRO), ['REG-000002', 'REG-000003']);
 });
 
 test('guardarRegistro: tras un doble fallo (falla la 2.ª fila y deshacer la 1.ª), el reintento con el mismo op no dice «guardado» a medias: anula lo vivo y escribe todo (caso 6)', () => {

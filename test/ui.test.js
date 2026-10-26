@@ -2512,6 +2512,23 @@ test('pacientes: «Decisión del médico…» con 6 meses avisa cuándo vuelve; 
   } finally { await navegador.close(); }
 });
 
+test('pacientes: la sesión que quedó viva de un registro anulado al deshacer un fallo se ve en la ficha y se anula (caso 7)', async () => {
+  const { navegador, pagina, errores } = await abrirPacientes();
+  try {
+    await pagina.evaluate(() => llamar('anularRegistro', { usuario: 'MAGALY', id: 'REG-000001', motivo: 'No se guardó: falló a mitad del registro (se deshizo solo)' }));
+    await abrirFicha(pagina, '40111222');
+    const r1 = tratDe(pagina, 'REG-000001');
+    assert.match(await r1.locator('.ses.resto').textContent(), /Sesión 1 · 10\/09\/2026 · Magaly · quedó viva al deshacer el registro/);
+    await r1.locator('[data-anular-ses]').click();
+    await pagina.locator('#fmotivo').fill('Resto de un registro que falló');
+    await pagina.locator('#ficha [data-confirmar-anular]').click();
+    await pagina.waitForFunction(() => !document.querySelector('#ficha .trat[data-reg="REG-000001"] .ses.resto'));
+    assert.equal((await ultimo(pagina, 'anularSesion')).motivo, 'Resto de un registro que falló');
+    assert.match(await aviso(pagina), /^Anulado: SES-/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('pacientes: «Lo hizo» registra la sesión; «Anular sesión» y «Anular registro» piden motivo', async () => {
   const { navegador, pagina, errores } = await abrirPacientes();
   try {

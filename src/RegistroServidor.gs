@@ -124,12 +124,17 @@ function duplicadoDe_(registros, filas) {
  */
 function registroRepetido_(registros, sesiones, op, v) {
   var filas = filasDeOp_(registros, op);
-  if (!filas.length) return null;
   var ids = {};
   filas.forEach(function (f) { ids[f.ID] = 1; });
   var ses = filasDeOp_(sesiones, op).filter(function (s) { return ids[s.ID_REGISTRO]; });
-  if (v && v.filas && (filas.length < v.filas.length || (v.sesionHecha && ses.length < v.filas.length))) {
-    return { incompleto: true, registros: filas, sesiones: ses };
+  // Una sesión viva de este op cuyo registro ya está anulado (al deshacer falló anularla): también es «a medias» y se anula al
+  // rehacer, aunque no quede ningún registro vivo (caso 7 de la batería de 80).
+  var porFallo = {};
+  (registros || []).forEach(function (r) { if (anuladoPorFallo(r)) porFallo[r.ID] = 1; });
+  var huerfanas = filasDeOp_(sesiones, op).filter(function (s) { return !ids[s.ID_REGISTRO] && porFallo[s.ID_REGISTRO]; });
+  if (!filas.length && !huerfanas.length) return null;
+  if (huerfanas.length || (v && v.filas && (filas.length < v.filas.length || (v.sesionHecha && ses.length < v.filas.length)))) {
+    return { incompleto: true, registros: filas, sesiones: ses.concat(huerfanas) };
   }
   return { ok: true, repetida: true, registros: filas.map(function (f) { return copia_(f, { TEXTO: textoRegistro(f) }); }),
     sesiones: ses };
@@ -150,7 +155,7 @@ function anularIncompleto_(previo) {
     previo.sesiones.forEach(function (s) { marcarAnulado_('SESIONES', s.ID, motivo); });
     previo.registros.forEach(function (f) { marcarAnulado_('REGISTROS', f.ID, motivo); });
   } catch (e) {
-    throw new Error('No se guardó: un intento anterior de este registro quedó a medias (' + previo.registros.map(function (f) { return f.ID; }).join(', ') +
+    throw new Error('No se guardó: un intento anterior de este registro quedó a medias (' + previo.registros.concat(previo.sesiones).map(function (f) { return f.ID; }).join(', ') +
       ') y no se pudo anular: revise Registrados y anule lo que haya quedado antes de registrar otra vez.');
   }
 }

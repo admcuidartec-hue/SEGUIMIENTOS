@@ -127,7 +127,10 @@ function hechosHoyPor_(d) {
   function sumar(quien) { quien = textoLimpio_(quien); if (quien) out[quien] = (out[quien] || 0) + 1; }
   // La agenda que se escribe al marcar una sesión con «Próxima sesión» (sesionLigada) es parte de esa sesión: no suma aparte.
   (d.seguimientos || []).forEach(function (s) { var r = resultadoDe(s); if (r && r.fecha === hoy && !sesionLigada(s)) sumar(s.RESPONSABLE); });
-  (d.sesiones || []).forEach(function (s) { if (!anulado_(s) && fechaIso(s.FECHA_HORA) === hoy) sumar(s.ASESORA); });
+  // La sesión que quedó viva de un registro anulado al deshacer un fallo (anuladoPorFallo) no se hizo: no suma.
+  var deshechos = {};
+  (d.registros || []).forEach(function (r) { if (anuladoPorFallo(r)) deshechos[r.ID] = 1; });
+  (d.sesiones || []).forEach(function (s) { if (!anulado_(s) && !deshechos[s.ID_REGISTRO] && fechaIso(s.FECHA_HORA) === hoy) sumar(s.ASESORA); });
   (d.altas || []).forEach(function (a) { if (!anulado_(a) && fechaIso(a.FECHA_HORA) === hoy) sumar(a.REGISTRADO_POR); });
   return out;
 }

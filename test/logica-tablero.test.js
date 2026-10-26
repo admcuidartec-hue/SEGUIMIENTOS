@@ -102,6 +102,14 @@ test('armarTablero: hechosHoyPor cuenta por persona resultados, sesiones y altas
   assert.deepEqual(tablero({ seguimientos: segs, sesiones, altas }).cifras.hechosHoyPor, { MAGALY: 3, RACHEL: 1 });
 });
 
+test('armarTablero: la sesión que quedó viva de un registro anulado al deshacer un fallo no suma en la meta (caso 7)', () => {
+  const regs = [{ ID: 'REG-1', DNI: '1', TIPO: 'HIERRO', ANULADO: 'SÍ', MOTIVO_ANULACION: 'No se guardó: falló a mitad del registro (se deshizo solo)' },
+    { ID: 'REG-2', DNI: '2', TIPO: 'HIERRO', ANULADO: 'SÍ', MOTIVO_ANULACION: 'Paciente equivocado' }];
+  const sesiones = [{ ID: 'SES-1', ID_REGISTRO: 'REG-1', FECHA_HORA: HOY + ' 09:00', ASESORA: 'ANA', ANULADO: '' },
+    { ID: 'SES-2', ID_REGISTRO: 'REG-2', FECHA_HORA: HOY + ' 09:10', ASESORA: 'ANA', ANULADO: '' }];
+  assert.deepEqual(tablero({ registros: regs, sesiones }).cifras.hechosHoyPor, { ANA: 1 }, 'la de un registro anulado a mano sigue contando');
+});
+
 test('armarTablero: «Próxima sesión» al marcar suma 1 a la meta del día (la sesión), no 2: su agenda ligada no cuenta aparte', () => {
   const ses = { ID: 'SES-000007', FECHA_HORA: HOY + ' 09:00', ASESORA: 'RACHEL', ANULADO: '' };
   const agenda = Object.assign(seg({ dni: '1', fecha: HOY, quien: 'RACHEL' }), { RESULTADO: 'AGENDÓ CITA', REFERENCIA: 'REG-1', ESPECIALIDAD: 'HIERRO',

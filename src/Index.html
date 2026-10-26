@@ -3119,7 +3119,8 @@ function validarRegistro() {
   const largo = esDecision() ? dniLargo(dniEscrito) : (dniEscrito ? documentoMal(dniEscrito) : '')
     || (!esDecision() && $('#rnom') ? largoMal($('#rnom').value, LARGO_NOMBRE, 'El nombre') : '')
     || (RG.modo === 'control' && $('#rexamenes') ? largoMal($('#rexamenes').value, LARGO_TEXTO, 'Los exámenes') : '');
-  const muerto = !esDecision() && RG.pac ? mensajeFallecido(RG.pac.fallecido) : '';
+  // Con «Falleció» vigente tampoco se registra una decisión del médico (el servidor la rechaza con el mismo texto).
+  const muerto = RG.pac ? mensajeFallecido(RG.pac.fallecido) : '';
   const mal = largo || muerto || (f.length ? '' : fechaMalRegistro());
   b.disabled = f.length > 0 || !!mal || RG.enviando;
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
@@ -3503,7 +3504,7 @@ function adaptarFicha(r) {
       return { esp: s.ESPECIALIDAD, estado: NOMBRE_ESTADO[s.ESTADO] || frase(s.ESTADO), tono: s.ESTADO === 'ALTA' ? 'e-alta' : esBueno(s) ? 'e-ok' : 'e-mal',
         perfil: perfilDe(s), pend: s.PENDIENTE || '', consultas: propias, ultima: hechas.length ? hechas[hechas.length - 1].f : '',
         esperada: esperada && !SIN_ESPERA[s.ESTADO] ? { f: esperada, vence: isoDe(s.VENCE), pasada: esperada <= S.hoy } : null,
-        puedeAlta: s.ESTADO !== 'ALTA' && !conAlta, medico: s.MEDICO_ULTIMO || '' };
+        puedeAlta: s.ESTADO !== 'ALTA' && !conAlta && !r.fallecido, medico: s.MEDICO_ULTIMO || '' };
     }),
     trats: (r.registros || []).map(x => {
       const e = String(x.ESTADO_REGISTRO || x.ESTADO || ''), control = x.TIPO === 'CONTROL';
@@ -3512,7 +3513,7 @@ function adaptarFicha(r) {
         estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO', cerrado: e === 'CERRADO',
         abierto: e === 'COTIZADO' || e === 'EN CURSO' || (e === 'PROGRAMADO' && !control), anulable: e !== 'ANULADO' && e !== 'COMPLETO',
         linea: lineaEstadoRegistro(x), fila: Object.assign({}, x, { FECHA: isoDe(x.FECHA), FECHA_INICIO: isoDe(x.FECHA_INICIO), FECHA_RETORNO: isoDe(x.FECHA_RETORNO) }),
-        motivo: x.MOTIVO_ANULACION || '', porFallo: x.POR_FALLO === true,
+        motivo: x.MOTIVO_ANULACION || '', porFallo: x.POR_FALLO === true, editable: !r.fallecido,
         sesiones: (x.sesiones || []).map(s => ({ id: String(s.ID || ''), numero: Number(s.NUMERO) || 0, f: isoDe(s.FECHA), quien: nombreBonito(s.ASESORA) }))
           .sort((a, b) => a.numero - b.numero),
         hierro: norm(x.TIPO) === 'HIERRO',
@@ -3759,7 +3760,7 @@ function htmlTrat(t) {
       + ` · ${esc(f.contestado ? (f.tipo && f.tipo !== 'NINGUNA' ? (TIPO_REAC[f.tipo] || f.tipo).toLowerCase() + ': ' + f.reaccion : 'sin reacción') : 'no contestó')}`
       + `${f.nota ? ' · ' + esc(f.nota) : ''} · <span class="mono">${esc(f.cuando)}</span> · ${esc(f.quien)}${f.anulado && f.motivo ? ' · anulado: ' + esc(f.motivo) : ''}</li>`).join('') + '</ul></div>' : '')
     + (editando ? formEdicion(t.fila, { borrador: PA.borrador, guardando: PA.enVuelo === 'editarRegistro' }) : '')
-    + (!t.anulado && !editando ? '<div class="trat-acc">' + `<button type="button" class="enlace" data-editar-ficha="${esc(t.id)}">Editar</button>`
+    + (!t.anulado && !editando ? '<div class="trat-acc">' + (t.editable ? `<button type="button" class="enlace" data-editar-ficha="${esc(t.id)}">Editar</button>` : '')
       + (t.anulable && !anulandoAqui('registro', t.id) ? `<button type="button" class="enlace" data-anular-reg="${esc(t.id)}">Anular registro</button>` : '')
       + (t.anulable ? motivoAqui('registro', t.id) : '') + '</div>' : '')
     + '</div>';
@@ -5848,6 +5849,8 @@ const DEMO = (() => {
       exigir(x);
       const r = regPorId(String((x && x.id) || '').trim());
       if (!r) throw new Error('No encontré ese registro. Recargue la página.');
+      // Como editarRegistro: con «Falleció» vigente no se edita (sí se anula).
+      if (muertos[dniDe(r.DNI)]) throw new Error(mensajeFallecido(muertos[dniDe(r.DNI)]));
       if (r.ANULADO) throw new Error('Ese registro está anulado.');
       const control = r.TIPO === 'CONTROL', hechas = sesionesDe(r.ID).length, cambios = (x && x.cambios) || {}, out = {};
       const COL = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
@@ -6046,6 +6049,7 @@ const DEMO = (() => {
       const quien = exigir(x);
       const dni = dniDe(x.dni), hechas = citas.filter(c => c.DNI === dni && c.ESTADO === 'REALIZADO' && mismo(c.ESPECIALIDAD, x.especialidad));
       if (!dni) throw new Error('Falta el DNI del paciente.');
+      if (muertos[dni]) throw new Error(mensajeFallecido(muertos[dni]));   // como darDeAlta
       if (!hechas.length) throw new Error('Ese paciente no tiene consultas realizadas en ' + String(x.especialidad || '').toUpperCase() + '.');
       const doc = doctorDe(x.doctor);
       if (!doc) throw new Error('Elija el doctor que da el alta.');
@@ -6112,6 +6116,7 @@ const DEMO = (() => {
       exigir(x);
       const dni = dniDe(x.dni);
       if (!dni) throw new Error('Falta el DNI.');
+      if (muertos[dni]) throw new Error(mensajeFallecido(muertos[dni]));   // como confirmarEmparejamiento
       const i = porConfirmar.find(y => y.ID === x.id);
       if (!i) throw new Error('No encontré la indicación ' + x.id + '.');
       porConfirmar = porConfirmar.filter(y => y !== i);
@@ -6129,6 +6134,7 @@ const DEMO = (() => {
       exigir(x);
       const dni = dniDe(x.dni).replace(/\s/g, '');
       if (!dni) throw new Error('Escriba el DNI del paciente.');
+      if (muertos[dniDe(dni)]) throw new Error(mensajeFallecido(muertos[dniDe(dni)]));   // como asignarDniIndicacion
       const i = sinCandidato.find(y => y.ID === x.id);
       if (!i) throw new Error('La indicación ' + x.id + ' ya tiene paciente.');
       if (!citas.some(c => c.DNI === dni) && !registros.some(r => r.DNI === dni && r.ANULADO !== 'SÍ')) {

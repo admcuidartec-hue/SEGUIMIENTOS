@@ -513,3 +513,20 @@ test('tipos incorrectos se rechazan en vez de convertirse: motivo o nota objeto,
   assert.equal(L.largoMal_(12, 2000, 'La nota'), '');
   assert.equal(L.largoMal_(null, 2000, 'La nota'), '');
 });
+
+test('con «Falleció» vigente también se rechazan la decisión del médico, Editar y asignar DNI (con el mismo mensaje); anular sí se puede', () => {
+  const muerto = { ID: 'SEG-9', FECHA_HORA: '2026-10-01 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'FALLECIÓ', ACCION: 'DESCARTADO', MOTIVO: 'FALLECIÓ', ANULADO: '' };
+  const { ctx, escrito, lock } = servidor({ seguimientos: [muerto], indicaciones: [] }, { REGISTROS: [REG4] });
+  const MSG = /^Error: Este paciente figura como fallecido desde el 01\/10\/2026: para registrar, primero anule «Falleció» en su ficha\.$/;
+  assert.throws(() => ctx.darDeAlta({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05', decision: 'ALTA 6 MESES' }), MSG);
+  ctx.leerRegistros_ = () => [REG4];
+  ctx.leerSesiones_ = () => [];
+  ctx.actualizarCeldas_ = () => { throw new Error('no debía escribir'); };
+  assert.throws(() => ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { contacto: '912000111' } }), MSG);
+  const sh = hojaIndicaciones();
+  ctx.hoja_ = () => sh;
+  assert.throws(() => ctx.asignarDniIndicacion({ usuario: 'MAGALY', id: 'IND-0120', dni: '40111222' }), MSG);
+  assert.deepEqual(sh.v[1].slice(4), ['', 'SIN CANDIDATO']);
+  ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error' });
+  assert.deepEqual([escrito.ALTAS.length, escrito.anulados.length, lock.tomado], [0, 1, 0]);
+});

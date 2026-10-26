@@ -557,6 +557,8 @@ function asignarDniIndicacion(p) {
   }
   var dni = normDni(p.dni);
   if (!dni) throw new Error('Escriba el DNI del paciente.');
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos || [])[dni]);
+  if (muerto) throw new Error(muerto);
   var conocidos = {};
   (d.citas || []).forEach(function (c) { if (c.DNI) conocidos[c.DNI] = 1; });
   (d.registros || []).forEach(function (r) { if (r.DNI && !anulado_(r)) conocidos[normDni(r.DNI)] = 1; });
@@ -594,6 +596,8 @@ function confirmarEmparejamiento(p) {
   }
   var dni = normDni(p.dni);
   if (!dni) throw new Error('Falta el DNI.');
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos || [])[dni]);
+  if (muerto) throw new Error(muerto);
   var lock = bloquear_();
   try {
     var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();

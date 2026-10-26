@@ -297,6 +297,9 @@ function darDeAlta(p) {
   if (previa) return limpiarParaEnvio({ ok: true, repetida: true, alta: previa });
   var v = validarAlta(p, d.catalogos, d.citas, d.vigentes, d.hoy);
   if (v.error) throw new Error(v.error);
+  // Con «Falleció» vigente no se registra una decisión del médico (un alta a 6 meses de un fallecido quedaba vigente).
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos)[normDni(v.alta.DNI)]);
+  if (muerto) throw new Error(muerto);
   var lock = bloquear_();
   try {
     exigirColumnas_('ALTAS', COLUMNAS_ALTAS);
@@ -388,6 +391,8 @@ function editarRegistro(p) {
     // Se valida con la hoja releída: otra asesora pudo anularlo o marcar una sesión entretanto.
     var sesiones = leerSesiones_();
     var r = leerRegistros_().filter(function (x) { return x.ID === id; })[0];
+    var muerto = r ? mensajeFallecido(fallecidos(d.seguimientos)[normDni(r.DNI)]) : '';
+    if (muerto) throw new Error(muerto);
     var v = validarEdicionRegistro(r, p.cambios, sesiones, d.catalogos, d.hoy);
     if (v.error) throw new Error(v.error);
     var cols = Object.keys(v.cambios);

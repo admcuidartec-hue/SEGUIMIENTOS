@@ -1716,6 +1716,20 @@ test('registro: un DNI de fallecido muestra el aviso y no deja registrar hasta a
     // El DEMO, como el servidor, rechaza el registro y la sesión de un fallecido.
     const e = await pagina.evaluate(() => { try { DEMO.guardarRegistro({ usuario: 'MAGALY', dni: '41999000', nombre: 'X', contacto: '987654321', fecha: S.hoy, doctor: 'Dr. Elí Cabanillas', procedimientos: ['SANGRÍA'] }); return ''; } catch (x) { return x.message; } });
     assert.match(e, /figura como fallecido desde el 24\/09\/2026/);
+    // También la decisión del médico, Editar y asignar DNI (con el mismo texto); y la ficha no los ofrece.
+    const otros = await pagina.evaluate(() => ['darDeAlta', 'asignarDniIndicacion'].map(fn => {
+      try { DEMO[fn]({ usuario: 'MAGALY', dni: '41999000', especialidad: 'HEMATOLOGÍA', doctor: 'Dr. Elí Cabanillas', fecha: S.hoy, id: 'IND-X' }); return ''; } catch (x) { return x.message; }
+    }));
+    otros.forEach(m => assert.match(m, /^Este paciente figura como fallecido desde el 24\/09\/2026/));
+    await pagina.locator('#rseg [data-rtab="decision"]').click();
+    await pagina.locator('#adni').fill('41999000');
+    await pagina.waitForSelector('#acon .fallecido');
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true, 'tampoco la decisión del médico');
+    assert.match(await falta(pagina), /^Este paciente figura como fallecido/);
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await pagina.waitForSelector('#pq', { state: 'visible' });
+    await abrirFicha(pagina, '41999000');
+    assert.equal(await pagina.locator('#ficha [data-decision], #ficha [data-editar-ficha]').count(), 0);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

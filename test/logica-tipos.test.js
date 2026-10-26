@@ -134,6 +134,14 @@ test('kpiRecuperacion no cuenta los seguimientos de hierro ni de procedimientos'
   assert.equal(r[0].ESPECIALIDAD, 'HEMATOLOGÍA');
 });
 
+test('kpiRecuperacion no cuenta los seguimientos de un Control ni ninguno ligado a un registro (REFERENCIA)', () => {
+  const citas = [cita({ fecha: '2026-07-01' }), cita({ fecha: '2026-09-20' })];
+  const segs = [Object.assign(seg({ fecha: '2026-09-01', esp: 'CONTROL' }), { REFERENCIA: 'REG-000003' }),
+    Object.assign(seg({ fecha: '2026-09-02' }), { REFERENCIA: 'REG-000004' }), seg({ fecha: '2026-09-03' })];
+  const r = plano(L.kpiRecuperacion(segs, citas, HOY));
+  assert.deepEqual(r.map(x => [x.ESPECIALIDAD, x.VOLVIO]), [['HEMATOLOGÍA', 1]]);
+});
+
 test('pendientesIndicacion: una cotización con fecha futura (error de tipeo) cuenta con 0 días', () => {
   const p = pend([], [ind({ FECHA: '2027-08-05' })]);
   assert.equal(p[0].DIAS, 0);

@@ -1138,7 +1138,12 @@ function kpiIndicaciones(indicaciones, citas) {
  */
 function kpiRecuperacion(seguimientos, citas, hoy) {
   var series = armarSeries(citas), vistos = {}, out = [];
-  (seguimientos || []).filter(function (s) { return normTexto(s.ACCION) === 'HECHO' && !TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)]; })
+  // Solo los seguimientos de una reevaluación: ni hierro ni procedimiento, ni un Control (ESPECIALIDAD «CONTROL») ni nada ligado
+  // a un registro (REFERENCIA): esos no tienen serie de consultas y nunca «vuelven» (caso 13 de la batería de 80).
+  (seguimientos || []).filter(function (s) {
+    return normTexto(s.ACCION) === 'HECHO' && !TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)] && normTexto(s.ESPECIALIDAD) !== 'CONTROL' &&
+      !textoLimpio_(s.REFERENCIA);
+  })
     .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; })
     .forEach(function (s) {
       var f = fechaIso(s.FECHA_HORA);

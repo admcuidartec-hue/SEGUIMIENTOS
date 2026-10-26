@@ -2,7 +2,8 @@
 
 Plataforma para no perder pacientes que no volvieron a su reevaluación, del **Centro
 Hematológico del Perú**. Es Apps Script incrustado en el libro madre **BD SOFDOC SEGUIMIENTOS**.
-La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
+La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administración y Marketing entran solo para ver
+(ver «Roles»). El médico **no** usa la plataforma: comunica sus decisiones y ellas las registran.
 
 - Libro madre: `1L8fY-NXWE1agakIPEdqoLnLry0-lvYr0Z-9JfsfGxRM`
 - Base de hierro (solo para la importación única): `1FrJ9oXyeHLLABqLcSA2VyXry-x_ZeFow6LsSACeJw8o`
@@ -128,6 +129,37 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - El filtro de especialidad agrupa por `normTexto` y muestra la forma más usada (`formasMasFrecuentes` en `bootstrap`).
 - La ficha de un registro «Cerrado» solo lista las sesiones hechas. El buscador del tablero muestra el foco (`.buscar:focus-within`).
 - **Alta definitiva y tratamiento en curso** (caso 39, decidido el 24/10/2026): ver «Etapa 2», «Las cuatro decisiones del médico».
+
+## Roles (26/10/2026)
+
+El médico ya no usa la plataforma: comunica sus decisiones a las admisionistas y a la enfermera, y las registran ellas
+(Registro → Decisión del médico, o «Decisión del médico…» en la ficha). Ningún usuario recibe filtros ni pantallas especiales
+por su nombre (se quitaron el filtro propuesto del médico y su entrada directa a Indicadores). Los médicos siguen siendo
+`DOCTOR`/`MÉDICO` de citas y registros. La enfermera y las admisionistas **no comparten funciones**.
+
+| Rol | Quién (`CATALOGOS`) | Pantallas | Escribe |
+|---|---|---|---|
+| Admisión | `USUARIOS` (Magaly, Ana, Rachel) | Tablero, Registro, Pacientes, Indicadores | Todo menos Enfermería: resultados, registros, sesiones, Editar, decisiones del médico, anulaciones, asignar DNI |
+| Enfermería | `USUARIOS_ENFERMERIA` (LISET) | Enfermería (entra directo) y Pacientes (ficha en solo lectura) | Solo `registrarContactoEnfermeria`, `anularContactoEnfermeria` y la «Aplicación» (DIA 0) |
+| Solo consulta | `USUARIOS_CONSULTA` (ADMINISTRACION, MARKETING) | Todas, con la nota «Usuario de solo consulta»; sin meta del día | Nada |
+
+- **Basta con estar en su columna** para aparecer en «¿Quién es usted?» (`catalogosDesdeFilas` une `USUARIOS`,
+  `USUARIOS_ENFERMERIA` y `USUARIOS_CONSULTA`); si alguien está en dos, consulta gana a enfermería y enfermería a admisión
+  (`rolDe`, comparación normalizada). `bootstrap().roles` manda el rol de cada usuario.
+- **Servidor**: cada función que escribe comprueba el rol **antes de leer o escribir nada** (tampoco la BITACORA): `exigirRol_` →
+  `errorDeRol`: «Esta acción es de admisión.», «Esta acción es de enfermería.» o «Usuario de solo consulta: no puede modificar
+  datos.». `test/logica-roles.test.js` recorre las 15 funciones × los tres roles.
+- **`marcarSesion` y la reacción** (decidido el 26/10/2026): marcar es de admisión; una `reaccion` que llegue (una pestaña vieja)
+  **se ignora** —la sesión se guarda— y la respuesta lo avisa en `reaccionError`. La reacción la registra la enfermera.
+- **Pantalla**: el menú y la entrada salen del rol (`aplicarRol`, `SECCIONES_ROL`); los botones que escriben se deshabilitan donde
+  el rol no escribe (`puedeEscribirAqui`, `ESCRITURA`, con un `MutationObserver`); sin arrastrar tarjetas ni atajos 1 a 4 y X;
+  `llamar` rechaza antes de enviar con el texto del servidor. Los Indicadores siguen con las cifras de Enfermería.
+- **DEMO**: ADMINISTRACION y MARKETING de solo consulta y ENFERMERA PRUEBA enfermera; sus funciones comprueban el rol.
+- **Publicar los roles**: `npm run subir` → «Preparar hojas» (agrega a `CATALOGOS` `USUARIOS_CONSULTA` con ADMINISTRACION y
+  MARKETING, y `USUARIOS_ENFERMERIA` vacía; si ya existen no las toca) → **a mano en `CATALOGOS`**: poner a LISET en
+  `USUARIOS_ENFERMERIA` y **quitar «DR. ELI CABANILLAS» de `USUARIOS`** → «Verificar» → probar en el `@HEAD` con una
+  admisionista, la enfermera y ADMINISTRACION → `npm run actualizar`. Hasta poner a LISET en su columna, Enfermería no deja
+  escribir a nadie (todos serían admisión).
 
 ## Correcciones de la batería de 80 pruebas (26/10/2026)
 
@@ -334,12 +366,15 @@ Pedido de Liset (Enfermería). Especificación: `docs/superpowers/specs/2026-10-
 - **Pantalla «Enfermería»** (menú y barra del celular): vencidos (el más antiguo primero), hoy y próximos 7 días (plegable).
   «Ya me contacté» abre en la misma fila: ¿reacción? No / Inmediata / Mediata, cuáles (chips) y nota (obligatoria con «Otra»).
   «No contestó» guarda directo. Todo con «Deshacer» (`anularContactoEnfermeria`, solo `ENF-…`).
-- **Al marcar una sesión de hierro** (tablero y ficha): «¿Reacción durante la aplicación?» opcional; `marcarSesion({ reaccion })`
-  la guarda en el mismo candado como fila `ENFERMERIA` con `DIA = 0` e `INMEDIATA`.
+- **Reacción durante la aplicación** (desde el 26/10/2026, ver «Roles»): ya no se pregunta al marcar la sesión. Cada sesión de
+  hierro de los últimos `ENFERMERIA_CORTE_DIAS` trae en Enfermería su fila «Aplicación · sesión k del dd/mm» (`DIA = 0`,
+  `APLICACION`), arriba en Vencidos/Hoy, donde la enfermera registra No o Sí + reacciones (`INMEDIATA`); sin «No contestó».
+  Se guarda en `ENFERMERIA` con `DIA = 0`, como antes; las filas DIA 0 ya guardadas se leen igual y la dejan cumplida.
 - **Ficha**: bajo cada tratamiento de hierro, su historial de Enfermería. **Indicadores**: la tarjeta de hierro suma
   «Reacciones: n pacientes (inmediatas x, mediatas y)» y «Contactos de enfermería a tiempo: p %» (campos `REAC_*` y `ENF_*`
   al final de `CAMPOS_RESUMEN`, por mes de la sesión).
-- La enfermera elige su nombre en «¿Quién es usted?»: hay que **agregarlo a `CATALOGOS.USUARIOS`** (no se escribe en el código).
+- La enfermera elige su nombre en «¿Quién es usted?»: hay que **ponerla en `CATALOGOS.USUARIOS_ENFERMERIA`** (LISET; no se
+  escribe en el código). Ver «Roles».
 - **Publicar**: `npm run subir` → «Preparar hojas» (crea `ENFERMERIA`, agrega `REACCIONES` a `CATALOGOS` y
   `ENFERMERIA_DIAS` y `ENFERMERIA_CORTE_DIAS` a `REGLAS`) → «Verificar» (debe listar `ENFERMERIA`) → agregar a la enfermera en
   `USUARIOS` → en el `@HEAD`, con el paciente de prueba: registrar un hierro con la primera sesión de ayer, ver sus contactos,

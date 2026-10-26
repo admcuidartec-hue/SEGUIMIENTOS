@@ -5057,8 +5057,9 @@ const DEMO = (() => {
       if (t.PROXIMA_AGENDADA) return 'Cita el ' + diaCorto(t.PROXIMA_AGENDADA);
       return '';
     }
+    // Sin fecha válida de la última sesión, sin «próxima» (como etiquetaDe de Tablero.gs: nunca NaN).
     if (t.COLUMNA === 'EN_TRATAMIENTO') return 'Sesión ' + t.HECHAS + ' de ' + t.SESIONES + ' · faltan ' + (Number(t.SESIONES) - Number(t.HECHAS))
-      + ' · próxima ~' + dm(mas(t.ULTIMA_SESION, reglas.diasEntreSesiones));
+      + (/^\d{4}-\d{2}-\d{2}$/.test(String(t.ULTIMA_SESION || '')) ? ' · próxima ~' + dm(mas(t.ULTIMA_SESION, reglas.diasEntreSesiones)) : '');
     return t.ETIQUETA || '';
   }
   /** Pone la tarjeta en `columna` (o la saca del tablero con ''), con CLAVE, ETIQUETA y FECHA_CLAVE como tarjeta_(). */

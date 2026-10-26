@@ -291,7 +291,10 @@ function estadoRegistro(r, sesiones) {
   var propias = sesionesDe_(r.ID, sesiones);
   var control = normTexto(r.TIPO) === 'CONTROL';
   var total = control ? 0 : Math.max(1, Number(r.SESIONES) || 1);
-  var ultima = propias.length ? fechaIso(propias[propias.length - 1].FECHA) : '';
+  // La «última» es la fecha válida más reciente: una sesión con la fecha ilegible (escrita a mano) cuenta como hecha, pero no
+  // da la fecha de la próxima ni del «Por reevaluar» (caso 6 de la batería de 80).
+  var ultima = '';
+  propias.forEach(function (s) { var f = fechaIso(s.FECHA); if (f && f > ultima) ultima = f; });
   var inicio = fechaIso(control ? r.FECHA_RETORNO : r.FECHA_INICIO) || '';
   var estado = anulado_(r) ? 'ANULADO' : control ? 'PROGRAMADO' : propias.length >= total ? 'COMPLETO' : propias.length ? 'EN CURSO'
     : inicio ? 'PROGRAMADO' : 'COTIZADO';

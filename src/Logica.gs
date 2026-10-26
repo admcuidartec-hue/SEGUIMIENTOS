@@ -73,8 +73,10 @@ function diasEntre(desde, hasta) {
   return n === n ? n : 0;   // NaN (una fecha que no es yyyy-mm-dd) → 0
 }
 
+/** La fecha `n` días después; '' si `iso` está vacía o no es una fecha (nunca «NaN-aN-aN» en una etiqueta: caso 6 de la batería de 80). */
 function sumarDias(iso, n) {
   var d = new Date(diaUtc_(iso) + n * 86400000);
+  if (!iso || isNaN(d.getTime())) return '';
   return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
 }
 

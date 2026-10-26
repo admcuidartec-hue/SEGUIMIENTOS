@@ -85,3 +85,29 @@ test('kpiIndicaciones y kpiRecuperacion: sin fecha válida no hay fila (ni MES v
     { ID: 'S2', FECHA_HORA: '2026-10-05 10:00', DNI: '5', ESPECIALIDAD: 'HEMATOLOGÍA', ACCION: 'HECHO' }];
   assert.deepEqual(plano(L.kpiRecuperacion(segs, [cita({ dni: '5', fecha: '2026-09-01' })], HOY)).map(f => f.MES), ['2026-10']);
 });
+
+test('sumarDias con una fecha vacía o ilegible da «», nunca «NaN-aN-aN» (caso 6 de la batería de 80)', () => {
+  assert.equal(L.sumarDias('', 7), '');
+  assert.equal(L.sumarDias('31/02/2026', 7), '');
+  assert.equal(L.sumarDias(undefined, 7), '');
+  assert.equal(L.sumarDias('2026-10-01', 7), '2026-10-08');
+});
+
+test('estadoRegistro: una sesión sin fecha válida cuenta como hecha pero no como «última»', () => {
+  const r = { ID: 'REG-1', TIPO: 'HIERRO', SESIONES: 3, FECHA: '2026-10-01' };
+  const ses = [{ ID: 'S1', ID_REGISTRO: 'REG-1', NUMERO: 1, FECHA: '2026-10-02' }, { ID: 'S2', ID_REGISTRO: 'REG-1', NUMERO: 2, FECHA: '' }];
+  const e = plano(L.estadoRegistro(r, ses));
+  assert.deepEqual([e.hechas, e.ultima, e.estado], [2, '2026-10-02', 'EN CURSO']);
+  assert.equal(L.estadoRegistro(r, [ses[1]]).ultima, '');
+});
+
+test('tablero: un tratamiento cuya única sesión no tiene fecha válida no lleva NaN en la etiqueta ni en FECHA_CLAVE', () => {
+  const t = { ID_REGISTRO: 'REG-1', DNI: '5', ESPECIALIDAD: 'HIERRO', TIPO_SEGUIMIENTO: 'HIERRO', HECHAS: 1, SESIONES: 3, ULTIMA_SESION: '' };
+  const x = plano(L.tarjeta_(t, 'EN_TRATAMIENTO', reglas(L), HOY, L.sumarDias('', 7)));
+  assert.equal(x.ETIQUETA, 'Sesión 1 de 3 · faltan 2');
+  assert.equal(x.FECHA_CLAVE, '');
+  // Salvaguarda general: ninguna ETIQUETA ni FECHA_CLAVE con NaN sale del servidor.
+  const y = plano(L.tarjeta_(t, 'AGENDADO', reglas(L), HOY, 'NaN-aN-aN', 'Sesión 2 · el NaN/aN · intento 1'));
+  assert.deepEqual([y.ETIQUETA, y.FECHA_CLAVE], ['Sesión 2 · intento 1', '']);
+  assert.equal(L.diaCorto_(''), '');
+});

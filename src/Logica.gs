@@ -110,6 +110,78 @@ function indiceDeEncabezado(encabezado) {
   return idx;
 }
 
+/* ---------- Encabezados escritos o movidos a mano (batería de 80 pruebas, casos 49 y 50) ---------- */
+
+/** El nombre de una columna como lo compara el código: sin espacios de más, en mayúsculas y sin tildes («fecha», « FECHA » → FECHA). */
+function normColumna(c) { return normTexto(c); }
+
+/**
+ * Cómo está el encabezado `cab` (la fila 1, tal como está escrita) frente a las `columnas` que espera el código:
+ * `grafia` (la misma columna escrita de otra forma), `movidas` (las que están en otro orden que el esperado), `faltan`,
+ * `repetidas` (la misma columna dos veces), `extra` (las que el código no conoce) y `posicion` (columna → índice, la primera).
+ * La app lee y escribe por NOMBRE (normColumna), así que grafía y orden no rompen nada; faltan y repetidas, sí.
+ */
+function revisarEncabezado(cab, columnas) {
+  var esperadas = {}, posicion = {}, grafia = [], extra = [], repetidas = [], orden = [];
+  (columnas || []).forEach(function (c) { esperadas[normColumna(c)] = c; });
+  (cab || []).forEach(function (c, j) {
+    var crudo = String(c == null ? '' : c), n = normColumna(crudo);
+    if (!n) return;
+    if (!(n in esperadas)) { extra.push(crudo.trim()); return; }
+    if (n in posicion) { if (repetidas.indexOf(n) < 0) repetidas.push(n); return; }
+    posicion[n] = j;
+    orden.push(n);
+    if (crudo !== esperadas[n]) grafia.push({ escrita: crudo, esperada: esperadas[n] });
+  });
+  var faltan = (columnas || []).filter(function (c) { return !(normColumna(c) in posicion); });
+  var enOrden = (columnas || []).map(normColumna).filter(function (n) { return n in posicion; });
+  var movidas = orden.filter(function (n, i) { return enOrden[i] !== n; });
+  return { grafia: grafia, movidas: movidas, faltan: faltan, repetidas: repetidas, extra: extra, posicion: posicion };
+}
+
+/** «le falta la columna A» / «le faltan las columnas A, B». */
+function listaColumnas_(l) { return (l.length === 1 ? 'le falta la columna ' : 'le faltan las columnas ') + l.join(', '); }
+
+/**
+ * Por qué no se puede escribir una fila en la hoja `nombre` con esta revisión (revisarEncabezado), o '' si se puede. La columna OP
+ * puede faltar (se escribe sin idempotencia); las movidas y las de otra grafía no impiden nada: se escribe por nombre.
+ */
+function errorEncabezado(nombre, rev) {
+  if (rev.repetidas.length) {
+    return 'La hoja ' + nombre + ' tiene ' + (rev.repetidas.length === 1 ? 'la columna ' + rev.repetidas[0] + ' repetida' : 'repetidas las columnas ' + rev.repetidas.join(', ')) +
+      ': la app no sabe en cuál escribir. Use «Verificar» y deje una sola.';
+  }
+  var faltan = rev.faltan.filter(function (c) { return c !== 'OP'; });
+  if (!faltan.length) return '';
+  if (rev.extra.length) {
+    return 'La hoja ' + nombre + ' tiene columnas renombradas o que la app no reconoce (falta ' + faltan.join(', ') + '; está «' +
+      rev.extra.join('», «') + '»): use «Verificar» y corrija el encabezado.';
+  }
+  return 'Falta preparar las hojas: a ' + nombre + ' ' + listaColumnas_(faltan) + '. En el Sheets, menú Seguimientos → Preparar hojas.';
+}
+
+/** Lo que «Verificar» (y «Preparar hojas») dicen del encabezado de una hoja. Sin nada que decir: «✓ … tiene todas sus columnas.» */
+function lineasEncabezado(nombre, rev) {
+  var l = [];
+  if (rev.repetidas.length) l.push('✗ ' + nombre + ': ' + (rev.repetidas.length === 1 ? 'la columna ' + rev.repetidas[0] + ' está repetida' :
+    'están repetidas las columnas ' + rev.repetidas.join(', ')) + ': la app no escribe en esta hoja hasta que quede una sola.');
+  if (rev.faltan.length && rev.extra.length) {
+    l.push('✗ ' + nombre + ': el encabezado no coincide: falta ' + rev.faltan.join(', ') + ' y la app no reconoce «' + rev.extra.join('», «') +
+      '». Si es la misma columna, corrija su nombre en la fila 1 («Preparar hojas» no lo arregla).');
+  } else if (rev.faltan.length) {
+    l.push('✗ A ' + nombre + ' ' + listaColumnas_(rev.faltan) + '. Use «Preparar hojas».');
+  } else if (rev.extra.length) {
+    l.push('ℹ ' + nombre + ': columnas propias que la app no usa: «' + rev.extra.join('», «') + '».');
+  }
+  if (rev.grafia.length) l.push('⚠ ' + nombre + ': el encabezado no coincide en la grafía: ' + rev.grafia.map(function (g) {
+    return '«' + g.escrita + '» (se espera «' + g.esperada + '»)';
+  }).join(', ') + '. Se lee y se escribe igual, pero conviene corregirlo.');
+  if (rev.movidas.length) l.push('⚠ ' + nombre + ': columnas cambiadas de lugar (' + rev.movidas.join(', ') +
+    '). La app las lee y escribe por su nombre, así que no se pierde nada; conviene devolverlas a su orden.');
+  if (!l.length) l.push('✓ ' + nombre + ' tiene todas sus columnas.');
+  return l;
+}
+
 /*
  * Caracteres que no se ven y no deben guardarse: los de control (U+0000…U+001F salvo los espacios, U+007F…U+009F), los de
  * dirección (U+200E, U+200F, U+202A…U+202E, U+2066…U+2069: U+202E invertía cómo se veía el resto del nombre), el espacio de

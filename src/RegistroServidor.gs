@@ -20,15 +20,18 @@ function exigirMotivo_(p) {
   return m;
 }
 
-/** REGISTROS y ALTAS se escriben por posición: sin sus columnas nuevas, una fila quedaría desalineada. */
+/**
+ * Antes de escribir nada: la hoja tiene todas sus columnas (en cualquier orden y grafía: anexarObjeto_ escribe por nombre) y
+ * ninguna repetida. Si no, el mensaje dice qué falta (errorEncabezado). La OP puede faltar: sin ella se escribe sin idempotencia.
+ */
 function exigirColumnas_(nombre, columnas) {
-  if (!columnasListas_(encabezado_(hoja_(nombre)), columnas)) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+  var error = errorEncabezado(nombre, revisarEncabezado(columnasDeHoja_(nombre), columnas));
+  if (error) throw new Error(error);
 }
 
-/** ¿El encabezado tiene todas sus columnas, en orden? La OP del final puede faltar: sin ella se escribe sin idempotencia. */
+/** ¿Se puede escribir con este encabezado? (todas las columnas, en cualquier orden; la OP puede faltar). */
 function columnasListas_(cab, columnas) {
-  var plan = encabezadoAmpliable(cab, columnas.concat([COLUMNA_OP]));
-  return !plan.error && plan.agregar.filter(function (c) { return c !== COLUMNA_OP; }).length === 0;
+  return !errorEncabezado('', revisarEncabezado(cab, columnas));
 }
 
 function guardarRegistro(p) {
@@ -46,6 +49,7 @@ function guardarRegistro(p) {
   var lock = bloquear_();
   try {
     exigirColumnas_('REGISTROS', COLUMNAS_REGISTROS);
+    if (v.sesionHecha) exigirColumnas_('SESIONES', COLUMNAS_SESIONES);
     var registros = leerOpcional_('REGISTROS'), ids = registros.map(function (r) { return r.ID; });
     // Primera sesión ya aplicada (fecha pasada): se marca la sesión 1 de cada registro en este mismo candado.
     var sesiones = v.sesionHecha ? leerSesiones_() : [];
@@ -184,6 +188,7 @@ function marcarSesion(p) {
       if (error) throw new Error(error);
       exigirHojaPreparada_();   // antes de escribir nada: SEGUIMIENTOS se escribe por posición
     }
+    exigirColumnas_('SESIONES', COLUMNAS_SESIONES);   // antes de escribir nada (caso 50)
     var ahora = new Date(), cuando = fechaHoraTexto_(ahora);
     var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }), 'SES'), FECHA_HORA: cuando,
       ID_REGISTRO: r.ID, NUMERO: e.hechas + 1, FECHA: fechaIso(p.fecha), ASESORA: asesora, NOTA: textoLimpio_(p.nota),
@@ -338,7 +343,7 @@ function anulacionRepetida_(anular, op) {
 /** Marca ANULADO = SÍ y el motivo en la fila de ese ID. Solo esas dos celdas: no pisa nada más. */
 function marcarAnulado_(nombre, id, motivo) {
   var sh = hoja_(nombre), v = sh.getDataRange().getValues();
-  var cab = v[0].map(function (c) { return String(c).trim(); });
+  var cab = v[0].map(normColumna);
   var cId = cab.indexOf('ID'), cA = cab.indexOf('ANULADO'), cM = cab.indexOf('MOTIVO_ANULACION');
   if (cId < 0 || cA < 0 || cM < 0) throw new Error('A la hoja ' + nombre + ' le faltan las columnas ID, ANULADO o MOTIVO_ANULACION.');
   for (var i = 1; i < v.length; i++) {
@@ -354,7 +359,7 @@ function marcarAnulado_(nombre, id, motivo) {
 /** Escribe solo las celdas pedidas de la fila con ese ID. Nada más de la fila cambia. */
 function actualizarCeldas_(nombre, id, cambios) {
   var sh = hoja_(nombre), v = sh.getDataRange().getValues();
-  var cab = v[0].map(function (c) { return String(c).trim(); }), cId = cab.indexOf('ID'), cA = cab.indexOf('ANULADO');
+  var cab = v[0].map(normColumna), cId = cab.indexOf('ID'), cA = cab.indexOf('ANULADO');
   for (var i = 1; i < v.length; i++) {
     if (String(v[i][cId]).trim() !== id) continue;
     if (cA >= 0 && normTexto(v[i][cA]) === 'SI') throw new Error(id + ' está anulado.');

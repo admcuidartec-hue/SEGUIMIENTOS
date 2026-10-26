@@ -32,9 +32,9 @@ function soloDelPaciente_(d, dni) {
     altas: (d.altas || []).filter(suyo), enfermeria: (d.enfermeria || []).filter(suyo) };
 }
 
-/** Guarda contra la ventana de publicación: SEGUIMIENTOS se escribe por posición y necesita sus columnas nuevas. */
+/** Guarda contra la ventana de publicación: SEGUIMIENTOS necesita sus columnas nuevas (exigirColumnas_). */
 function exigirHojaPreparada_() {
-  if (!columnasListas_(encabezado_(hoja_('SEGUIMIENTOS')), COLUMNAS_SEGUIMIENTOS)) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+  exigirColumnas_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS);
 }
 
 /** Tras una escritura delegada, la tarjeta recalculada (o '' si salió del tablero), para que la app confirme el movimiento. */

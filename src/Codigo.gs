@@ -88,6 +88,20 @@ function encabezado_(sh) {
   return cab;
 }
 
+/** La fila 1 tal como está escrita (sin recortar: «Verificar» avisa de « FECHA »), sin las celdas vacías del final. */
+function encabezadoCrudo_(sh) {
+  var cab = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (c) { return c === null || c === undefined ? '' : String(c); });
+  while (cab.length && !cab[cab.length - 1].trim()) cab.pop();
+  return cab;
+}
+
+/** El encabezado crudo de `nombre`, leído una vez por petición (anexarObjeto_ escribe por nombre y lo necesita en cada fila). */
+function columnasDeHoja_(nombre) {
+  MEMO.cab = MEMO.cab || {};
+  if (!MEMO.cab[nombre]) MEMO.cab[nombre] = encabezadoCrudo_(hoja_(nombre));
+  return MEMO.cab[nombre];
+}
+
 /** Una hoja que se escribe por posición solo se amplía al final, y solo si lo que ya tiene coincide. */
 function encabezadoAmpliable(cab, columnas) {
   for (var i = 0; i < cab.length; i++) {
@@ -117,12 +131,13 @@ function leerObjetos_(nombre) {
   var sh = hoja_(nombre), alto = sh.getLastRow(), ancho = sh.getLastColumn();
   if (alto < 2 || ancho < 1) return [];
   var datos = sh.getRange(1, 1, alto, ancho).getValues();
-  var cab = datos[0].map(function (c) { return String(c).trim(); });
+  // Por nombre normalizado: «fecha», « FECHA » y «Fécha» son FECHA (caso 49); si una columna está dos veces, vale la primera.
+  var cab = datos[0].map(normColumna);
   return datos.slice(1)
     .filter(function (f) { return f.some(function (c) { return c !== '' && c !== null; }); })
     .map(function (f) {
       var o = {};
-      cab.forEach(function (c, i) { if (c) o[c] = celdaATexto_(f[i], c); });
+      cab.forEach(function (c, i) { if (c && !(c in o)) o[c] = celdaATexto_(f[i], c); });
       return o;
     });
 }
@@ -148,8 +163,20 @@ function escribirObjetos_(nombre, columnas, objetos) {
   SpreadsheetApp.flush();
 }
 
+/**
+ * Agrega una fila POR NOMBRE de columna (caso 50): cada valor va bajo la columna que se llama así en la fila 1, esté donde esté y
+ * escrita como esté («fecha» = FECHA). Si falta una columna o está repetida, se niega sin escribir (errorEncabezado); una columna
+ * que la app no conoce queda vacía. Nunca deja un valor bajo otro encabezado.
+ */
 function anexarObjeto_(nombre, columnas, objeto) {
-  hoja_(nombre).appendRow(columnas.map(function (c) { return celdaParaHoja_(objeto[c], c); }));
+  var cab = columnasDeHoja_(nombre), rev = revisarEncabezado(cab, columnas), error = errorEncabezado(nombre, rev);
+  if (error) throw new Error(error);
+  var nuestras = {};
+  columnas.forEach(function (c) { nuestras[normColumna(c)] = c; });
+  hoja_(nombre).appendRow(cab.map(function (c, j) {
+    var k = nuestras[normColumna(c)];
+    return k && rev.posicion[normColumna(c)] === j ? celdaParaHoja_(objeto[k], k) : '';
+  }));
 }
 
 /**
@@ -207,7 +234,8 @@ function conOp_(nombre, columnas) {
   MEMO.conOp = MEMO.conOp || {};
   if (!(nombre in MEMO.conOp)) {
     var tiene = false;
-    try { var cab = encabezado_(hoja_(nombre)); tiene = cab.length === columnas.length + 1 && cab[columnas.length] === COLUMNA_OP; } catch (e) { tiene = false; }
+    // Por nombre: la OP puede estar en otro lugar o escrita en minúscula (anexarObjeto_ escribe por nombre).
+    try { tiene = columnasDeHoja_(nombre).map(normColumna).indexOf(COLUMNA_OP) >= 0; } catch (e) { tiene = false; }
     MEMO.conOp[nombre] = tiene;
   }
   return MEMO.conOp[nombre] ? columnas.concat([COLUMNA_OP]) : columnas;
@@ -533,7 +561,7 @@ function asignarDniIndicacion(p) {
   var lock = bloquear_();
   try {
     var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();
-    var cab = datos[0].map(function (c) { return String(c).trim(); });
+    var cab = datos[0].map(normColumna);
     var r = buscarFilaParaAsignar(datos[0], datos.slice(1), p.id, dni, conocidos);
     if (r.error) throw new Error(r.error);
     sh.getRange(r.fila + 2, cab.indexOf('DNI') + 1).setNumberFormat('@').setValue(dni);
@@ -567,7 +595,7 @@ function confirmarEmparejamiento(p) {
   var lock = bloquear_();
   try {
     var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();
-    var cab = datos[0].map(function (c) { return String(c).trim(); });
+    var cab = datos[0].map(normColumna);
     var cDni = cab.indexOf('DNI'), cEm = cab.indexOf('EMPAREJAMIENTO');
     var r = buscarFilaParaConfirmar(datos[0], datos.slice(1), p.id, dni, construirIndiceNombres(d.citas));
     if (r.error) throw new Error(r.error);

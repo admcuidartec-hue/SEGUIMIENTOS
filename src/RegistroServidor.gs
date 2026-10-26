@@ -35,6 +35,7 @@ function columnasListas_(cab, columnas) {
 }
 
 function guardarRegistro(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), op = opDe_(p);
   var v = validarRegistro(p, d.catalogos, d.hoy);
   // El mismo op ya se guardó (se perdió la respuesta): lo de la primera vez, sin el aviso de duplicado ni otra fila.
@@ -167,6 +168,7 @@ function anularIncompleto_(previo) {
  * anula con ella su agenda.
  */
 function marcarSesion(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_();
   var asesora = exigirUsuario_(d.catalogos, p && p.usuario), proxima = textoLimpio_(p && p.proxima), op = opDe_(p);
   var lock = bloquear_();
@@ -184,10 +186,10 @@ function marcarSesion(p) {
     error = validarSesion(r, sesiones, p.fecha, d.hoy) || largoMal_(p.nota, LARGO_TEXTO, 'La nota');
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
-    // «¿Reacción durante la aplicación?»: se valida antes de escribir nada, para no dejar la sesión a medias.
-    var reac = normTexto(r.TIPO) === 'HIERRO' ? reaccionAplicacion(p.reaccion, d.catalogos) : { error: '', fila: null };
-    if (reac.error) throw new Error(reac.error);
-    if (reac.fila) exigirColumnas_('ENFERMERIA', COLUMNAS_ENFERMERIA);
+    // La reacción durante la aplicación ya no se registra al marcar la sesión (26/10/2026): marcar es de admisión y la reacción, de
+    // la enfermera, en su fila «Aplicación» (DIA 0) de Enfermería. Una `reaccion` que llegue (una pestaña vieja) se ignora y se avisa.
+    var reac = { error: '', fila: null };
+    var reaccionIgnorada = !!(p.reaccion && p.reaccion.hubo);
     if (proxima) {
       error = validarProximaSesion(e, p.fecha, proxima, d.hoy);
       if (error) throw new Error(error);
@@ -202,6 +204,7 @@ function marcarSesion(p) {
     anexarObjeto_('SESIONES', conOp_('SESIONES', COLUMNAS_SESIONES), s);
     bitacora_(asesora, 'SESIÓN', r.ID + ' · sesión ' + s.NUMERO + ' de ' + e.total, op);
     var out = { ok: true, sesion: s, completo: s.NUMERO >= e.total };
+    if (reaccionIgnorada) out.reaccionError = 'La sesión quedó marcada; la reacción durante la aplicación la registra Enfermería (fila «Aplicación» de la sesión ' + s.NUMERO + ').';
     // La sesión ya está escrita: si la reacción o la agenda fallan, no se lanza (la app creería que nada se guardó y la
     // marcaría otra vez). Se avisa y se registra aparte.
     if (reac.fila) {
@@ -247,6 +250,7 @@ function sesionRepetida_(previa, sesiones, op) {
 }
 
 function anularRegistro(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), op = opDe_(p);
   var lock = bloquear_();
   try {
@@ -266,6 +270,7 @@ function anularRegistro(p) {
 }
 
 function anularSesion(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), op = opDe_(p);
   var lock = bloquear_();
   try {
@@ -292,6 +297,7 @@ function anularSesion(p) {
 }
 
 function darDeAlta(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), op = opDe_(p);
   var previa = filasDeOp_(d.altas, op)[0];
   if (previa) return limpiarParaEnvio({ ok: true, repetida: true, alta: previa });
@@ -326,6 +332,7 @@ function darDeAlta(p) {
 }
 
 function anularAlta(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id), op = opDe_(p);
   if (id.indexOf('ALT-') !== 0) throw new Error('Esa alta viene de un descarte antiguo; no se puede anular desde aquí.');
   var lock = bloquear_();
@@ -388,6 +395,7 @@ function actualizarCeldas_(nombre, id, cambios) {
 }
 
 function editarRegistro(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), id = textoLimpio_(p && p.id);
   var lock = bloquear_();
   try {

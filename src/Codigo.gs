@@ -408,6 +408,8 @@ function bootstrap() {
   return limpiarParaEnvio({
     hoy: d.hoy,
     usuarios: d.catalogos.usuarios,
+    // El rol de cada usuario (ADMISION, ENFERMERIA o CONSULTA): la app arma el menú y deshabilita lo que no le toca.
+    roles: (function () { var r = {}; d.catalogos.usuarios.forEach(function (u) { r[u] = rolDe(d.catalogos, u); }); return r; })(),
     motivos: d.catalogos.motivos,
     resultados: ORDEN_RESULTADOS,
     // La misma especialidad con y sin tilde sale una vez, con la forma más usada (el filtro compara con normTexto).
@@ -551,6 +553,7 @@ function buscar(texto) {
  * un DNI que ya esté en SOFDOC o en Registro.
  */
 function asignarDniIndicacion(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_();
   if (!p || d.catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {
     throw new Error('Elija quién es usted en el selector de arriba.');
@@ -577,10 +580,20 @@ function asignarDniIndicacion(p) {
   }
 }
 
+/**
+ * Roles (26/10/2026): cada función que escribe lo comprueba ANTES de leer o escribir nada (tampoco la BITACORA): las de
+ * Enfermería son de la enfermera, las demás de admisión, y un usuario de solo consulta no escribe (errorDeRol, rolDe).
+ */
+function exigirRol_(p, rol) {
+  var e = errorDeRol(datos_().catalogos, p && p.usuario, rol);
+  if (e) throw new Error(e);
+}
+
 /** Envoltorios de la app anterior: «Hecho» es un «no contestó»; «Descartar» cierra con el motivo elegido. */
-function marcarSeguimiento(p) { return registrarResultado(copia_(p || {}, { resultado: 'NO CONTESTÓ' })); }
+function marcarSeguimiento(p) { exigirRol_(p, 'ADMISION'); return registrarResultado(copia_(p || {}, { resultado: 'NO CONTESTÓ' })); }
 
 function descartar(p) {
+  exigirRol_(p, 'ADMISION');
   var r = RESULTADOS[normTexto(p && p.motivo)];
   var cierre = r && r.grupo === 'CIERRE' && r.pide !== 'DOCTOR';
   var q = cierre ? { resultado: r.nombre, motivo: r.nombre }
@@ -590,6 +603,7 @@ function descartar(p) {
 }
 
 function confirmarEmparejamiento(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_();
   if (!p || d.catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {
     throw new Error('Elija quién es usted en el selector de arriba.');

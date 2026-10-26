@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { cargar, plano } = require('./cargar');
 const { cita, reglas } = require('./fixtures');
 
-const CAT = { usuarios: ['MAGALY', 'ENFERMERA PRUEBA'], motivos: [], alias: {}, doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: 'Dra. KAREN DIANA MATOS PEÑA' }],
+const CAT = { usuarios: ['MAGALY', 'ENFERMERA PRUEBA'], enfermeria: ['ENFERMERA PRUEBA'], consulta: [], motivos: [], alias: {}, doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: 'Dra. KAREN DIANA MATOS PEÑA' }],
   procedimientos: ['SANGRÍA'], tratamientos: ['HIERRO SACARATO'], marcas: {}, reacciones: ['Náuseas', 'Cefalea', 'Otra'] };
 const REG1 = { ID: 'REG-000001', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10-01', ASESORA: 'MAGALY', DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ROSA QUISPE',
   DNI: '40111222', CONTACTO: '987654321', TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', MARCA: '', SESIONES: '3', ANULADO: '' };
@@ -61,7 +61,7 @@ test('guardarRegistro con la primera sesión pasada: crea el registro y marca la
 test('getEnfermeria: los contactos pendientes en orden de llamada y el catálogo de reacciones', () => {
   const { ctx } = servidor();
   const r = plano(ctx.getEnfermeria());
-  assert.deepEqual(r.contactos.map(c => [c.CLAVE, c.GRUPO]), [['SES-000001|1', 'VENCIDO'], ['SES-000001|3', 'PROXIMO'], ['SES-000001|5', 'PROXIMO']]);
+  assert.deepEqual(r.contactos.map(c => [c.CLAVE, c.GRUPO]), [['SES-000001|0', 'VENCIDO'], ['SES-000001|1', 'VENCIDO'], ['SES-000001|3', 'PROXIMO'], ['SES-000001|5', 'PROXIMO']]);
   assert.deepEqual(r.reacciones, ['Náuseas', 'Cefalea', 'Otra']);
   assert.equal(r.hoy, '2026-10-05');
 });
@@ -78,8 +78,8 @@ test('registrarContactoEnfermeria: valida, escribe ENF-… con candado y bitáco
     ['ENF-000001', '2026-10-05 10:30', 'SES-000001', 1, 'CONTACTADO', 'MEDIATA', 'Cefalea', 'ENFERMERA PRUEBA']);
   assert.deepEqual(escrito.BITACORA[0].slice(0, 2), ['ENFERMERA PRUEBA', 'ENFERMERÍA']);
   assert.equal(r.fila.ID, 'ENF-000001');
-  assert.deepEqual(r.contactos.map(c => c.CLAVE), ['SES-000001|3', 'SES-000001|5']);
-  assert.deepEqual(r.contactos[0].REACCIONES, [{ DIA: 1, TIPO: 'MEDIATA', REACCION: 'Cefalea' }]);
+  assert.deepEqual(r.contactos.map(c => c.CLAVE), ['SES-000001|0', 'SES-000001|3', 'SES-000001|5']);
+  assert.deepEqual(r.contactos[1].REACCIONES, [{ DIA: 1, TIPO: 'MEDIATA', REACCION: 'Cefalea' }]);
   // Un segundo «contactado» del mismo día ya no se acepta (se relee dentro del candado).
   assert.throws(() => ctx.registrarContactoEnfermeria({ usuario: 'ENFERMERA PRUEBA', clave: 'SES-000001|1', resultado: 'CONTACTADO', reaccionTipo: 'NINGUNA' }),
     /ya no está en la lista/);
@@ -97,19 +97,22 @@ test('anularContactoEnfermeria: solo ENF-…, con motivo y candado', () => {
   assert.deepEqual(escrito.anulados, [['ENFERMERIA', 'ENF-000001', 'Deshecho al momento']]);
 });
 
-test('marcarSesion con reacción durante la aplicación: la sesión y la fila de ENFERMERIA (DIA 0) en el mismo candado', () => {
+test('marcarSesion (admisión) ya no guarda la reacción durante la aplicación: la registra la enfermera en su fila «Aplicación» (DIA 0)', () => {
   const { ctx, escrito } = servidor();
-  assert.throws(() => ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-10-05', reaccion: { hubo: true, reacciones: ['Otra'] } }), /Escriba cuál fue la reacción/);
-  assert.equal(escrito.SESIONES.length, 0, 'una reacción inválida no deja la sesión a medias');
   const r = plano(ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-10-05', reaccion: { hubo: true, reacciones: ['Náuseas'] } }));
   assert.equal(r.sesion.ID, 'SES-000002');
-  assert.deepEqual(escrito.ENFERMERIA.map(f => [f.ID_SESION, f.NUMERO_SESION, f.DIA, f.REACCION_TIPO, f.REACCION, f.ENFERMERA]),
-    [['SES-000002', 2, 0, 'INMEDIATA', 'Náuseas', 'MAGALY']]);
-  assert.equal(r.reaccion.ID, 'ENF-000001');
-  // Sin reacción, como siempre.
-  const s = servidor();
-  s.ctx.marcarSesion({ usuario: 'MAGALY', id: 'REG-000001', fecha: '2026-10-05', reaccion: { hubo: false } });
-  assert.deepEqual([s.escrito.SESIONES.length, s.escrito.ENFERMERIA.length], [1, 0]);
+  assert.equal(escrito.ENFERMERIA.length, 0);
+  assert.match(r.reaccionError, /la registra Enfermería/);
+  // La enfermera la ve en su lista como «Aplicación · sesión 2» (DIA 0, hoy) y la registra: No o Sí (INMEDIATA).
+  const e = servidor({ SESIONES: [SES1, Object.assign({}, SES1, { ID: 'SES-000002', NUMERO: '2', FECHA: '2026-10-05', FECHA_HORA: '2026-10-05 10:00' })] });
+  const lista = plano(e.ctx.getEnfermeria()).contactos;
+  const ap = lista.find(c => c.CLAVE === 'SES-000002|0');
+  assert.deepEqual([ap.DIA, ap.FECHA, ap.GRUPO, ap.APLICACION], [0, '2026-10-05', 'HOY', true]);
+  assert.throws(() => e.ctx.registrarContactoEnfermeria({ usuario: 'ENFERMERA PRUEBA', clave: 'SES-000002|0', resultado: 'NO CONTESTO' }), /En la aplicación no hay llamada/);
+  assert.throws(() => e.ctx.registrarContactoEnfermeria({ usuario: 'ENFERMERA PRUEBA', clave: 'SES-000002|0', resultado: 'CONTACTADO', reaccionTipo: 'MEDIATA', reacciones: ['Náuseas'] }), /inmediata/);
+  const g = plano(e.ctx.registrarContactoEnfermeria({ usuario: 'ENFERMERA PRUEBA', clave: 'SES-000002|0', resultado: 'CONTACTADO', reaccionTipo: 'INMEDIATA', reacciones: ['Náuseas'] }));
+  assert.deepEqual([g.fila.DIA, g.fila.REACCION_TIPO, g.fila.REACCION, g.fila.ENFERMERA], [0, 'INMEDIATA', 'Náuseas', 'ENFERMERA PRUEBA']);
+  assert.equal(g.contactos.some(c => c.CLAVE === 'SES-000002|0'), false, 'registrada, sale de la lista');
 });
 
 test('getPaciente trae las filas de Enfermería del DNI; getResumen suma las cifras de Enfermería', () => {

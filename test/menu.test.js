@@ -203,7 +203,10 @@ test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita A
   const cambios = [...ctx.ampliarHojas_()];
   assert.deepEqual(seg.v[0].slice(8), ['REFERENCIA', 'RESULTADO', 'FECHA_PROXIMA', 'TELEFONO', 'ANULADO', 'MOTIVO_ANULACION', 'OP']);
   assert.deepEqual(seg.v[1].slice(0, 8), ['S-1', '', '1', 'H', 'M', 'HECHO', '', 'n'], 'no toca las filas');
-  assert.deepEqual(cat.v[0], ['USUARIOS', 'MOTIVOS_DESCARTE', 'DOCTOR', 'DOCTOR_SOFDOC', 'PROCEDIMIENTOS', 'TRATAMIENTOS', 'MARCAS', 'REACCIONES']);
+  assert.deepEqual(cat.v[0], ['USUARIOS', 'MOTIVOS_DESCARTE', 'DOCTOR', 'DOCTOR_SOFDOC', 'PROCEDIMIENTOS', 'TRATAMIENTOS', 'MARCAS', 'REACCIONES',
+    'USUARIOS_CONSULTA', 'USUARIOS_ENFERMERIA']);
+  assert.deepEqual(cat.v.slice(1, 3).map(f => f[8]), ['ADMINISTRACION', 'MARKETING'], 'solo consulta: los dos de siempre');
+  assert.equal(cat.v.slice(1).every(f => !f[9]), true, 'USUARIOS_ENFERMERIA, vacía: la enfermera se pone a mano');
   assert.deepEqual(cat.v.slice(1, 15).map(f => f[7]), plano(ctx.REACCIONES_INICIALES), 'Enfermería: el catálogo de reacciones');
   assert.equal(cat.v[1][2], 'Dr. Elí Cabanillas');
   assert.equal(cat.v[6][3], '', 'el particular sin nombre SOFDOC');

@@ -84,6 +84,7 @@ function resultadoRepetido_(d, dni, op, segs, registros) {
 
 /** `opciones` es interno (no viene de la app): { motivo } conserva el motivo original de una pestaña vieja. */
 function registrarResultado_(p, opciones) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), dni = normDni(p && p.dni), op = opDe_(p);
   // El mismo op ya se guardó (la respuesta se perdió y la app reintenta): lo de la primera vez, antes de validar nada.
   var repetido = resultadoRepetido_(d, dni, op, d.seguimientosTodos);
@@ -175,6 +176,7 @@ function registrarResultado_(p, opciones) {
 }
 
 function anularResultado(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id), op = opDe_(p);
   if (id.indexOf('SEG-') !== 0) throw new Error('Aquí solo se anulan resultados de seguimiento (SEG-…).');
   var lock = bloquear_();

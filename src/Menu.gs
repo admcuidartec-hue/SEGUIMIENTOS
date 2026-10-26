@@ -53,7 +53,11 @@ var CATALOGO_REGISTRO_INICIAL = {
   TRATAMIENTOS: ['HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA'],
   MARCAS: ['HIERRO CARBOXIMALTOSA | FERINJECT', 'HIERRO CARBOXIMALTOSA | LIKFER', 'HIERRO DERISOMALTOSA | MONOFER'],
   // Enfermería: las reacciones que se eligen al registrar un contacto o una sesión (REACCIONES_INICIALES en Logica.gs).
-  REACCIONES: REACCIONES_INICIALES
+  REACCIONES: REACCIONES_INICIALES,
+  // Roles (26/10/2026): quien está aquí entra solo para ver; quien está en USUARIOS_ENFERMERIA es la enfermera (se pone a mano:
+  // ningún nombre real en el código). El resto de USUARIOS son admisionistas.
+  USUARIOS_CONSULTA: ['ADMINISTRACION', 'MARKETING'],
+  USUARIOS_ENFERMERIA: []
 };
 
 var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
@@ -91,7 +95,7 @@ function ampliarHojas_() {
     faltan.forEach(function (c) {
       var col = encabezado_(ct).length + 1, valores = CATALOGO_REGISTRO_INICIAL[c];
       ct.getRange(1, col, 1, 1).setValues([[c]]).setFontWeight('bold');
-      ct.getRange(2, col, valores.length, 1).setValues(valores.map(function (x) { return [x]; }));
+      if (valores.length) ct.getRange(2, col, valores.length, 1).setValues(valores.map(function (x) { return [x]; }));
     });
     if (faltan.length) cambios.push('CATALOGOS: columnas ' + faltan.join(', ') + '.');
     var cM = encabezado_(ct).map(normColumna).indexOf('MOTIVOS_DESCARTE');

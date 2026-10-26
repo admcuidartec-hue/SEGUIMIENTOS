@@ -28,6 +28,7 @@ function filaEnfermeria_(fila, filas) {
 }
 
 function registrarContactoEnfermeria(p) {
+  exigirRol_(p, 'ENFERMERIA');
   var d = datos_(), op = opDe_(p);
   // El mismo op ya se guardó (se perdió la respuesta): lo de la primera vez, sin otro contacto.
   var previa = filasDeOp_(d.enfermeria, op)[0];
@@ -56,6 +57,7 @@ function registrarContactoEnfermeria(p) {
 }
 
 function anularContactoEnfermeria(p) {
+  exigirRol_(p, 'ENFERMERIA');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id), op = opDe_(p);
   if (id.indexOf('ENF-') !== 0) throw new Error('Aquí solo se anulan contactos de Enfermería (ENF-…).');
   var lock = bloquear_();

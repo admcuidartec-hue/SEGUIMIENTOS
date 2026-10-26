@@ -352,10 +352,13 @@ function plazoDe(reglas, especialidad) {
  */
 function catalogosDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
-  var out = { usuarios: [], motivos: [], alias: {}, doctores: [], procedimientos: [], tratamientos: [], marcas: {}, reacciones: [] };
+  var out = { usuarios: [], motivos: [], alias: {}, doctores: [], procedimientos: [], tratamientos: [], marcas: {}, reacciones: [],
+    consulta: [], enfermeria: [] };
   function celda(f, k) { return idx[k] === undefined ? '' : textoLimpio_(f[idx[k]]); }
   (filas || []).forEach(function (f) {
     var u = celda(f, 'USUARIOS'), m = celda(f, 'MOTIVOS_DESCARTE');
+    if (celda(f, 'USUARIOS_CONSULTA')) out.consulta.push(celda(f, 'USUARIOS_CONSULTA'));
+    if (celda(f, 'USUARIOS_ENFERMERIA')) out.enfermeria.push(celda(f, 'USUARIOS_ENFERMERIA'));
     var a = celda(f, 'MEDICO_ALIAS'), n = celda(f, 'MEDICO_NOMBRE');
     if (u) out.usuarios.push(u);
     if (m) out.motivos.push(m);
@@ -372,7 +375,34 @@ function catalogosDesdeFilas(encabezado, filas) {
   });
   // Sin la columna REACCIONES (antes de «Preparar hojas»), la lista inicial de Enfermería.
   if (!out.reacciones.length) out.reacciones = REACCIONES_INICIALES.slice();
+  // La enfermera y los de solo consulta también se eligen en «¿Quién es usted?»: basta con estar en su columna.
+  out.enfermeria.concat(out.consulta).forEach(function (u) {
+    if (!out.usuarios.some(function (x) { return normTexto(x) === normTexto(u); })) out.usuarios.push(u);
+  });
   return out;
+}
+
+/* ---------- Roles (26/10/2026): admisión, enfermería y solo consulta ---------- */
+
+var MENSAJES_ROL = { CONSULTA: 'Usuario de solo consulta: no puede modificar datos.', ADMISION: 'Esta acción es de admisión.',
+  ENFERMERIA: 'Esta acción es de enfermería.' };
+
+/**
+ * El rol de `usuario`: CONSULTA si está en CATALOGOS.USUARIOS_CONSULTA, ENFERMERIA si está en USUARIOS_ENFERMERIA, ADMISION si es
+ * cualquier otro usuario del catálogo, y '' si no está. Comparación normalizada (normTexto). Consulta gana a enfermería.
+ */
+function rolDe(catalogos, usuario) {
+  var n = normTexto(usuario), c = catalogos || {};
+  var en = function (l) { return (l || []).some(function (x) { return normTexto(x) === n; }); };
+  if (!n || !en(c.usuarios)) return '';
+  return en(c.consulta) ? 'CONSULTA' : en(c.enfermeria) ? 'ENFERMERIA' : 'ADMISION';
+}
+
+/** Por qué `usuario` no puede hacer una acción del rol `pedido` ('ADMISION' o 'ENFERMERIA'), o ''. Quien no está, '' (otro mensaje). */
+function errorDeRol(catalogos, usuario, pedido) {
+  var r = rolDe(catalogos, usuario);
+  if (!r || r === pedido) return '';
+  return r === 'CONSULTA' ? MENSAJES_ROL.CONSULTA : MENSAJES_ROL[pedido];
 }
 
 /** Reacciones que registra Enfermería; «Preparar hojas» las siembra en CATALOGOS.REACCIONES. */

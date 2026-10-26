@@ -211,6 +211,8 @@ html.con-vt .vista{animation:none}
 .btn-s{background:var(--surface);color:var(--ink);border:1px solid var(--line-2);font-weight:500}
 .btn-s:hover{border-color:var(--accent)}
 .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+/* Lo que el rol no puede usar no se muestra: un botón deshabilitado por rol (data-sl) se veía igual que uno activo. */
+[data-sl]{display:none!important}
 .campo{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)}
 .campo input,.campo select,.campo textarea{height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-size:15px}
 .campo input[type="date"]{font-family:var(--mono)}

@@ -213,6 +213,9 @@ html.con-vt .vista{animation:none}
 .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
 /* Lo que el rol no puede usar no se muestra: un botón deshabilitado por rol (data-sl) se veía igual que uno activo. */
 [data-sl]{display:none!important}
+/* Y lo que solo acompaña a esos botones: «¿Qué pasó?» y la nota del panel (consulta), la fecha de «Lo hizo» (consulta y enfermería). */
+html[data-rol="consulta"] #panel .que-paso,html[data-rol="consulta"] #panel .nota-resp,
+html[data-rol="consulta"] .lohizo,html[data-rol="enfermeria"] .lohizo{display:none!important}
 .campo{display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--muted)}
 .campo input,.campo select,.campo textarea{height:44px;padding:0 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-size:15px}
 .campo input[type="date"]{font-family:var(--mono)}
@@ -2072,7 +2075,7 @@ function contactosHtml(p) {
 function quePasoHtml(p) {
   if (p.col === 4) return `<p class="ok-cerrado"><i class="ph-fill ph-check-circle"></i><span><b>Seguimiento cerrado.</b> ${esc(p.fin)}</span></p>`;
   if (P.paso) return htmlPaso(p);
-  return '<section><h3 class="grande">¿Qué pasó?</h3>'
+  return '<section class="que-paso"><h3 class="grande">¿Qué pasó?</h3>'
     + (conSesion(p) ? sesionesHtml(p) : `<div class="acc">${accDe(p).map((a, i) => `<button type="button" data-acc="${a.k}"${P.contacto && (a.k === 'nocontesto' || a.k === 'pensara') ? ' class="sugerido"' : ''}><i class="${a.i}"></i><span>${a.l}</span><span class="kbd">${i + 1}</span></button>`).join('')}</div>`)
     + '<h3>Cerrar el seguimiento <span class="kbd">X</span></h3>'
     + `<div class="acc cierra${P.cierre ? ' resaltado' : ''}">${cierresDe(p).map(c => `<button type="button" data-acc="${c.k}"><i class="${c.i}"></i><span>${c.l}</span></button>`).join('')}</div></section>`;
@@ -2171,7 +2174,7 @@ function pintarPanel() {
     + `<p class="alerta${tono ? ' ' + tono : ''}">${esc(alerta)}</p>${pend}${yaEscrito(p)}</section>`
     + `<section><h3>Contacto</h3>${contactosHtml(p)}</section>`
     + quePasoHtml(p)
-    + (p.col !== 4 ? `<label class="campo">Nota (opcional)<textarea id="nota" rows="2" placeholder="Se guarda con la respuesta">${esc(P.nota)}</textarea></label>` : '')
+    + (p.col !== 4 ? `<label class="campo nota-resp">Nota (opcional)<textarea id="nota" rows="2" placeholder="Se guarda con la respuesta">${esc(P.nota)}</textarea></label>` : '')
     + '<section><h3>Historia</h3><div id="p-hist"></div></section>'
     + `<button type="button" class="ver-ficha" data-ficha="${esc(p.dni)}">Ver ficha completa<i class="ph ph-arrow-right"></i></button>`
     + '</div>';

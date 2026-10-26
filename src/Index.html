@@ -3316,6 +3316,9 @@ function formEdicion(x, ed) {
 function fechaMalEdicion(x, borrador) {
   const c = cambiosEdicion(x, borrador || {}), hoy = S.hoy;
   if ('contacto' in c && telefonoMal(c.contacto)) return telefonoMal(c.contacto);
+  // Como validarEdicionRegistro: el total no baja de las sesiones ya hechas (el mismo texto que el servidor).
+  const hechas = Number(x.HECHAS) || 0;
+  if ('sesiones' in c && c.sesiones < hechas) return 'Ya hizo ' + hechas + ' sesiones: el total no puede ser menor.';
   if ('fecha' in c) { if (!c.fecha) return 'Falta la fecha.'; if (c.fecha > hoy) return 'La fecha no puede ser futura.'; }
   if (c.fechaInicio && (c.fechaInicio < hoy || c.fechaInicio > masDias(hoy, 180))) return 'La fecha de la primera sesión va de hoy a 180 días.';
   if ('fechaRetorno' in c) {

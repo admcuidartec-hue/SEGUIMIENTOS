@@ -2157,16 +2157,19 @@ test('registro: Editar sin cambios avisa «No hay cambios.» y no llama al servi
   } finally { await navegador.close(); }
 });
 
-test('registro: Editar no deja bajar las sesiones de las hechas (el servidor lo rechaza y el formulario sigue abierto)', async () => {
+test('registro: Editar no deja bajar las sesiones de las hechas («Guardar» deshabilitado con el texto del servidor; el servidor lo rechaza igual)', async () => {
   const { navegador, pagina, errores } = await abrirRegistro();
   try {
     const id = await pagina.evaluate(() => DEMO._registroConSesiones());
     await pagina.locator(`#rlista [data-editar="${id}"]`).click();
     await pagina.locator('#rlista [data-campo="sesiones"]').fill('1');
-    await pagina.locator('#rlista [data-guardar-edicion]').click();
-    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
-    assert.match(await aviso(pagina), /Ya hizo 2 sesiones/);
-    assert.equal(await pagina.locator('#rlista [data-campo="sesiones"]').inputValue(), '1');
+    assert.equal(await pagina.locator('#rlista [data-guardar-edicion]').isDisabled(), true);
+    assert.equal((await pagina.locator('#rlista .aviso-edicion').textContent()).trim(), 'Ya hizo 2 sesiones: el total no puede ser menor.');
+    assert.equal(await llamadas(pagina, 'editarRegistro'), 0);
+    const e = await pagina.evaluate(async id => { try { await llamar('editarRegistro', { usuario: 'MAGALY', id, cambios: { sesiones: 1 } }); return ''; } catch (x) { return x.message; } }, id);
+    assert.match(e, /Ya hizo 2 sesiones/);
+    await pagina.locator('#rlista [data-campo="sesiones"]').fill('2');
+    assert.equal(await pagina.locator('#rlista .aviso-edicion').textContent(), '');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

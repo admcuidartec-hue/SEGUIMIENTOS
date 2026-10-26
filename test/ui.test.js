@@ -4839,6 +4839,7 @@ test('solo consulta: ve todas las pantallas con la nota «Usuario de solo consul
     await abrirPanelDe(pagina, LUIS);
     const acc = await pagina.locator('#panel [data-acc]').evaluateAll(l => l.map(b => b.disabled));
     assert.ok(acc.length > 0 && acc.every(Boolean), 'todas las acciones deshabilitadas');
+    assert.equal(await pagina.locator('#panel [data-acc]').evaluateAll(l => l.filter(x => x.offsetParent !== null).length), 0, 'y no se muestran');
     await pagina.keyboard.press('Escape');
     await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
     await pagina.keyboard.press('1');
@@ -4893,6 +4894,7 @@ test('enfermera: solo Enfermería y Pacientes, entra directo a Enfermería y ve 
     const ficha = await pagina.locator('#ficha [data-lohizo], #ficha [data-anular-ses], #ficha [data-anular-reg], #ficha [data-editar-ficha], #ficha [data-decision], #ficha [data-anular]')
       .evaluateAll(l => l.map(b => b.disabled));
     assert.ok(ficha.length > 0 && ficha.every(Boolean), 'la ficha en solo lectura');
+    assert.equal(await pagina.locator('#ficha [data-editar-ficha], #ficha [data-anular-reg], #ficha [data-decision]').evaluateAll(l => l.filter(b => b.offsetParent !== null).length), 0, 'los botones que no puede usar no se muestran');
     const e = await pagina.evaluate(() => llamar('marcarSesion', { usuario: 'ENFERMERA PRUEBA', id: 'REG-000001', fecha: S.hoy }).then(() => '', x => x.message));
     assert.equal(e, 'Esta acción es de admisión.');
     assert.equal(await pagina.locator('#metadia').isVisible(), false);

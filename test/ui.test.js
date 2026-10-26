@@ -79,7 +79,7 @@ test('«¿Quién es usted?» arranca vacío, sin usuario por omisión', async ()
     assert.equal(await pagina.locator('.topmovil .js-usuario').inputValue(), '');
     const opciones = await pagina.locator('.side .js-usuario option').evaluateAll(l => l.map(o => [o.value, o.textContent]));
     assert.deepEqual(opciones, [['', '— Elija —'], ['MAGALY', 'Magaly'], ['ANA', 'Ana'], ['RACHEL', 'Rachel'],
-      ['ENFERMERA PRUEBA', 'Enfermera Prueba']], 'el médico ya no es usuario (26/10/2026)');
+      ['ENFERMERA PRUEBA', 'Enfermera Prueba'], ['ADMINISTRACION', 'Administracion'], ['MARKETING', 'Marketing']], 'el médico ya no es usuario (26/10/2026); los de solo consulta, sí');
     assert.equal(await pagina.evaluate(() => exigirUsuario()), false);
     assert.equal(await pagina.locator('#aviso span').textContent(), 'Elija quién es usted.');
     // Los dos selectores se sincronizan y el elegido se recuerda en seg.usuario.
@@ -178,7 +178,9 @@ test('adaptadores: adaptarBoot, nombreBonito, telBonito y medicoCorto', async ()
     }));
     assert.deepEqual(Object.keys(r.boot).sort(),
       ['doctores', 'especialidades', 'hoy', 'marcas', 'medicos', 'procedimientos', 'reacciones', 'reglas', 'tratamientos', 'usuarios']);
-    assert.deepEqual(r.boot.usuarios[0], { v: 'MAGALY', l: 'Magaly' });
+    assert.deepEqual(r.boot.usuarios[0], { v: 'MAGALY', l: 'Magaly', rol: 'ADMISION' });
+    assert.deepEqual(r.boot.usuarios.filter(u => u.rol !== 'ADMISION').map(u => [u.v, u.rol]),
+      [['ENFERMERA PRUEBA', 'ENFERMERIA'], ['ADMINISTRACION', 'CONSULTA'], ['MARKETING', 'CONSULTA']]);
     assert.equal(r.boot.usuarios.some(u => /^DRA?\b/.test(u.v)), false, 'el médico ya no es usuario');
     assert.deepEqual(r.boot.medicos.find(m => m.k === 'Dra. ALEJANDRA LA TORRE MATUK'),
       { k: 'Dra. ALEJANDRA LA TORRE MATUK', full: 'Dra. ALEJANDRA LA TORRE MATUK', short: 'Dra. La Torre' });
@@ -2860,7 +2862,7 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     assert.deepEqual(await pagina.locator('#ipanel .cifras > div').evaluateAll(l => l.map(d => d.textContent.replace(/\s+/g, ' ').trim())),
       ['6 seguimientos hechos', '4 volvieron tras el seguimiento (67 %)', '8 días en volver, en la mitad de los casos']);
     assert.deepEqual(await filasDe(pagina, '[data-tabla="asesora"]'), [
-      ['Magaly', '3', '5', '67 % (2/3)'], ['Ana', '1', '—', '0 % (0/1)'], ['Dr. Eli Cabanillas', '1', '9', '100 % (1/1)'], ['Rachel', '1', '12', '100 % (1/1)']]);
+      ['Magaly', '3', '5', '67 % (2/3)'], ['Ana', '2', '9', '50 % (1/2)'], ['Rachel', '1', '12', '100 % (1/1)']]);
     assert.deepEqual((await filasDe(pagina, '[data-tabla="mes"]')).map(f => f[0]), ['julio 2026', 'agosto 2026', 'setiembre 2026']);
 
     // 6. Motivos de cierre, con la nota (D5).
@@ -3286,6 +3288,8 @@ test('celular 390 px: ninguna pantalla ni el panel con un nombre largo tienen sc
   const { navegador, pagina, errores } = await abrirTablero({ viewport: { width: 390, height: 844 } });
   try {
     const ancho = () => pagina.evaluate(() => document.documentElement.scrollWidth);
+    // Solo consulta ve todas las pantallas (con su nota arriba); cada rol ve solo las suyas.
+    await pagina.evaluate(() => elegirUsuario('ADMINISTRACION'));
     for (const sec of SECCIONES) {
       await pagina.locator(`.navmovil [data-sec="${sec}"]`).click();
       await pagina.waitForSelector(`#v-${sec}`, { state: 'visible' });
@@ -3293,6 +3297,7 @@ test('celular 390 px: ninguna pantalla ni el panel con un nombre largo tienen sc
       if (sec === 'pacientes') { await pagina.evaluate(() => abrirFicha('40333444')); await pagina.waitForFunction(() => PA.estado === 'listo'); }
       assert.ok(await ancho() <= 390, `${sec}: ${await ancho()}`);
     }
+    await pagina.evaluate(() => elegirUsuario('MAGALY'));
     await pagina.locator('.navmovil [data-sec="tablero"]').click();
     await pagina.waitForSelector('#v-tablero', { state: 'visible' });
     await pagina.evaluate(n => { S.pacientes.find(p => p.id === '40444555|HEMATOLOGÍA').n = n; pintarTablero(); }, LARGO);
@@ -4043,10 +4048,14 @@ test('Enfermería: contactos a los días 1, 3 y 5 de cada sesión de hierro, en 
   try {
     const f = await filasEnf(pagina);
     assert.deepEqual(f.map(x => [x.clave, x.grupo]), [
-      ['SES-000003|5', 'VENCIDO'], ['SES-000002|1', 'VENCIDO'], ['SES-000004|1', 'VENCIDO'],
+      ['SES-000003|0', 'VENCIDO'], ['SES-000003|5', 'VENCIDO'], ['SES-000002|0', 'VENCIDO'], ['SES-000002|1', 'VENCIDO'], ['SES-000004|1', 'VENCIDO'],
       ['SES-000002|3', 'HOY'], ['SES-000004|3', 'PROXIMO'], ['SES-000002|5', 'PROXIMO'], ['SES-000004|5', 'PROXIMO']],
-      'las sesiones de hace más de 10 días no aparecen; los días 1 y 3 de Carlos ya están cumplidos');
-    const carlos = f[0].texto;
+      'las sesiones de hace más de 10 días no aparecen; los días 1 y 3 de Carlos ya están cumplidos; la «Aplicación» (DIA 0) de la sesión 2 de Carlos ya se registró');
+    // DIA 0: «Aplicación · sesión k del dd/mm», con «Registrar» y sin «No contestó».
+    assert.match(f[0].texto, /Aplicación · sesión 1 del 22\/09/);
+    assert.equal(await pagina.locator('#enf-cuerpo [data-enf="SES-000003|0"] [data-enf-nc]').count(), 0);
+    assert.match(await pagina.locator('#enf-cuerpo [data-enf="SES-000003|0"] [data-enf-ya]').textContent(), /Registrar/);
+    const carlos = f[1].texto;
     assert.match(carlos, /Carlos Enrique Núñez León/);
     assert.match(carlos, /Hierro derisomaltosa · Monofer/);
     assert.match(carlos, /Sesión 1 de 2 · aplicada el 22\/09/);
@@ -4054,10 +4063,10 @@ test('Enfermería: contactos a los días 1, 3 y 5 de cada sesión de hierro, en 
     assert.match(carlos, /Día 1: mediata · Cefalea/, 'la reacción de un contacto anterior de esa sesión');
     assert.match(carlos, /No contestó 1 vez/);
     assert.match(carlos, /987 333 444/);
-    assert.match(f[2].texto, /En la aplicación: inmediata · Náuseas/);
-    assert.match(f[3].texto, /Día 3 · toca hoy/);
+    assert.match(f[4].texto, /En la aplicación: inmediata · Náuseas/);
+    assert.match(f[5].texto, /Día 3 · toca hoy/);
     assert.equal(await pagina.locator('#enf-cuerpo details[data-grupo-enf="PROXIMO"]').getAttribute('open'), null, 'Próximos va plegado');
-    assert.match(await pagina.locator('#enf-sub').textContent(), /^4 contactos por hacer hoy/);
+    assert.match(await pagina.locator('#enf-sub').textContent(), /^6 contactos por hacer hoy/);
     assert.ok(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -4123,27 +4132,32 @@ test('Enfermería: «No contestó» guarda sin preguntar y deja la fila con «No
   } finally { await navegador.close(); }
 });
 
-test('Enfermería: marcar una sesión de hierro con «¿Reacción durante la aplicación?» guarda la reacción y crea sus contactos', async () => {
+test('Enfermería: la admisionista marca la sesión (sin preguntar la reacción) y la enfermera registra la «Aplicación» en su lista', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
     await abrirPanelDe(pagina, SOFIA);
-    assert.ok(await pagina.locator('#panel .reac-aplic').isVisible());
-    assert.equal(await pagina.locator('#panel .reac-aplic [data-ra="no"]').getAttribute('aria-pressed'), 'true', 'por omisión, no');
-    await pagina.locator('#panel .reac-aplic [data-ra="si"]').click();
-    await pagina.locator('#panel [data-marcar-sesion]').click();
-    assert.equal(await aviso(pagina), 'Elija al menos una reacción.');
-    await pagina.locator('#panel .reac-aplic [data-ra-reac="Mareo"]').click();
+    assert.equal(await pagina.locator('#panel .reac-aplic').count(), 0, 'marcar la sesión ya no pregunta la reacción');
     await pagina.locator('#panel [data-marcar-sesion]').click();
     await pagina.waitForFunction(() => DEMO._llamadas.marcarSesion > 0);
-    assert.deepEqual((await ultimo(pagina, 'marcarSesion')).reaccion, { hubo: true, reacciones: ['Mareo'], nota: '' });
+    assert.equal((await ultimo(pagina, 'marcarSesion')).reaccion, undefined);
     await esperarEstable(pagina);
-    // La sesión nueva ya tiene sus contactos, con la reacción de la aplicación.
-    await pagina.locator('.menu [data-sec="enfermeria"]').click();
+    assert.equal(await pagina.locator('.menu [data-sec="enfermeria"]').isVisible(), false, 'la admisionista no tiene Enfermería');
+    // La enfermera: entra directo a Enfermería; la sesión nueva trae su «Aplicación» (DIA 0) y sus contactos.
+    await pagina.evaluate(() => elegirUsuario('ENFERMERA PRUEBA'));
+    await pagina.waitForFunction(() => S.seccion === 'enfermeria');
     await pagina.waitForSelector('#enf-cuerpo .enf');
     const f = await filasEnf(pagina);
-    const nueva = f.find(x => /Sofía/.test(x.texto) && /Sesión 2 de 3/.test(x.texto));
-    assert.ok(nueva, 'la sesión 2 de Sofía tiene sus contactos');
-    assert.match(nueva.texto, /En la aplicación: inmediata · Mareo/);
+    const ap = f.find(x => /Sofía/.test(x.texto) && /Aplicación · sesión 2/.test(x.texto));
+    assert.ok(ap, 'la «Aplicación» de la sesión 2 de Sofía');
+    await pagina.locator(`#enf-cuerpo [data-enf="${ap.clave}"] [data-enf-ya]`).click();
+    assert.deepEqual(await pagina.locator(`#enf-cuerpo [data-enf="${ap.clave}"] [data-enf-tipo]`).allTextContents(), ['No', 'Sí']);
+    await pagina.locator(`#enf-cuerpo [data-enf="${ap.clave}"] [data-enf-tipo="INMEDIATA"]`).click();
+    await pagina.locator(`#enf-cuerpo [data-enf="${ap.clave}"] [data-enf-reac="Mareo"]`).click();
+    await pagina.locator(`#enf-cuerpo [data-enf="${ap.clave}"] [data-enf-guardar]`).click();
+    await pagina.waitForFunction(() => /reacción inmediata: Mareo/.test(document.querySelector('#aviso span').textContent));
+    const u = await ultimo(pagina, 'registrarContactoEnfermeria');
+    assert.deepEqual([u.usuario, u.clave, u.reaccionTipo, u.reacciones], ['ENFERMERA PRUEBA', ap.clave, 'INMEDIATA', ['Mareo']]);
+    await pagina.waitForFunction(() => { const t = [...document.querySelectorAll('#enf-cuerpo [data-enf]')].map(x => x.textContent).join(' '); return /En la aplicación: inmediata · Mareo/.test(t); });
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -4807,6 +4821,95 @@ test('alta definitiva después de un hierro completo: sale de «Por reevaluar» 
     assert.equal(r.linea, 'Completo · Sin reevaluación: alta definitiva del 01/10/2026');
     assert.deepEqual(r.anulada, ['POR_CONTACTAR']);
     assert.equal(r.lineaAnulada, 'Completo');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ============ Roles (26/10/2026): admisión, enfermería y solo consulta ============ */
+
+test('solo consulta: ve todas las pantallas con la nota «Usuario de solo consulta», sin meta, y nada que escriba funciona', async () => {
+  const { navegador, pagina, errores } = await abrirTablero({ guardado: { 'seg.usuario': 'ADMINISTRACION' } });
+  try {
+    const menu = await pagina.locator('.menu [data-sec]').evaluateAll(l => l.filter(b => !b.hidden).map(b => b.dataset.sec));
+    assert.deepEqual(menu, ['tablero', 'registro', 'pacientes', 'indicadores', 'enfermeria']);
+    assert.equal(await pagina.locator('#solo-consulta').isVisible(), true);
+    assert.match(await pagina.locator('#solo-consulta').textContent(), /Usuario de solo consulta/);
+    assert.equal(await pagina.locator('#metadia').isVisible(), false, 'sin meta del día');
+    // El panel se abre para ver, pero «¿Qué pasó?» está deshabilitado; los atajos 1 a 4 y X no escriben.
+    await abrirPanelDe(pagina, LUIS);
+    const acc = await pagina.locator('#panel [data-acc]').evaluateAll(l => l.map(b => b.disabled));
+    assert.ok(acc.length > 0 && acc.every(Boolean), 'todas las acciones deshabilitadas');
+    await pagina.keyboard.press('Escape');
+    await pagina.locator(`#tablero [data-card="${LUIS}"]`).focus();
+    await pagina.keyboard.press('1');
+    await pagina.keyboard.press('x');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0);
+    assert.equal(await aviso(pagina), 'Usuario de solo consulta: no puede modificar datos.');
+    // Ni por la API de la pantalla: llamar lo rechaza con el mismo texto del servidor.
+    const e = await pagina.evaluate(() => llamar('registrarResultado', { usuario: 'ADMINISTRACION', dni: '40444555', especialidad: 'HEMATOLOGÍA', resultado: 'NO CONTESTÓ' }).then(() => '', x => x.message));
+    assert.equal(e, 'Usuario de solo consulta: no puede modificar datos.');
+    assert.equal(await pagina.evaluate(() => { try { DEMO.marcarSesion({ usuario: 'MARKETING', id: 'REG-000002', fecha: S.hoy }); return ''; } catch (x) { return x.message; } }),
+      'Usuario de solo consulta: no puede modificar datos.');
+    // Arrastrar una tarjeta no abre ningún paso.
+    const c = await pagina.locator(`#tablero [data-card="${LUIS}"]`).boundingBox();
+    await pagina.mouse.move(c.x + 20, c.y + 20); await pagina.mouse.down(); await pagina.mouse.move(c.x + 20, c.y + 300, { steps: 8 }); await pagina.mouse.up();
+    assert.equal(await pagina.evaluate(() => !!seleccion.panel), false);
+    // Registro: «Registrar» deshabilitado aunque el formulario esté completo.
+    await pagina.locator('.menu [data-sec="registro"]').click();
+    await pagina.locator('#rdni').fill('47001003');
+    await llenarIndicacion(pagina, { nombre: 'Prueba Consulta', contacto: '987001003', doctor: 'Dra. Karen Matos', procs: ['SANGRÍA'] });
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true);
+    // Ficha y Enfermería: se ven; sus botones de escribir, deshabilitados.
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await abrirFicha(pagina, '40111222');
+    const ficha = await pagina.locator('#ficha [data-lohizo], #ficha [data-anular-ses], #ficha [data-anular-reg], #ficha [data-editar-ficha]').evaluateAll(l => l.map(b => b.disabled));
+    assert.ok(ficha.length > 0 && ficha.every(Boolean));
+    await pagina.locator('.menu [data-sec="enfermeria"]').click();
+    await pagina.waitForSelector('#enf-cuerpo .enf');
+    const enf = await pagina.locator('#enf-cuerpo [data-enf-ya], #enf-cuerpo [data-enf-nc]').evaluateAll(l => l.map(b => b.disabled));
+    assert.ok(enf.length > 0 && enf.every(Boolean));
+    await pagina.locator('.menu [data-sec="indicadores"]').click();
+    await pagina.waitForSelector('#ipanel[data-tab] section');
+    assert.equal(await llamadas(pagina, 'marcarSesion') + await llamadas(pagina, 'guardarRegistro') + await llamadas(pagina, 'registrarContactoEnfermeria'), 1, 'solo la llamada directa al DEMO, que lo rechazó');
+    // En oscuro la nota usa los tokens (no un color escrito a mano).
+    await pagina.locator('.side .js-tema').click();
+    assert.equal(await pagina.locator('#solo-consulta').evaluate(e => getComputedStyle(e).backgroundColor), 'rgb(24, 33, 58)');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('enfermera: solo Enfermería y Pacientes, entra directo a Enfermería y ve la ficha en solo lectura', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'ENFERMERA PRUEBA' } });
+  try {
+    await pagina.waitForFunction(() => S.fase === 'listo' && S.seccion === 'enfermeria');
+    const menu = await pagina.locator('.menu [data-sec]').evaluateAll(l => l.filter(b => !b.hidden).map(b => b.dataset.sec));
+    assert.deepEqual(menu, ['pacientes', 'enfermeria']);
+    await pagina.waitForSelector('#enf-cuerpo .enf');
+    assert.equal(await pagina.locator('#enf-cuerpo [data-enf-ya]').first().isDisabled(), false, 'en Enfermería escribe');
+    await pagina.evaluate(() => ir('tablero'));
+    assert.equal(await pagina.evaluate(() => S.seccion), 'enfermeria', 'el Tablero no es suyo');
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await abrirFicha(pagina, '40111222');
+    const ficha = await pagina.locator('#ficha [data-lohizo], #ficha [data-anular-ses], #ficha [data-anular-reg], #ficha [data-editar-ficha], #ficha [data-decision], #ficha [data-anular]')
+      .evaluateAll(l => l.map(b => b.disabled));
+    assert.ok(ficha.length > 0 && ficha.every(Boolean), 'la ficha en solo lectura');
+    const e = await pagina.evaluate(() => llamar('marcarSesion', { usuario: 'ENFERMERA PRUEBA', id: 'REG-000001', fecha: S.hoy }).then(() => '', x => x.message));
+    assert.equal(e, 'Esta acción es de admisión.');
+    assert.equal(await pagina.locator('#metadia').isVisible(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('admisionista: sin Enfermería en el menú; las funciones de Enfermería se rechazan', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const menu = await pagina.locator('.menu [data-sec]').evaluateAll(l => l.filter(b => !b.hidden).map(b => b.dataset.sec));
+    assert.deepEqual(menu, ['tablero', 'registro', 'pacientes', 'indicadores']);
+    assert.equal(await pagina.locator('#solo-consulta').isVisible(), false);
+    const e = await pagina.evaluate(() => llamar('registrarContactoEnfermeria', { usuario: 'MAGALY', clave: 'SES-000002|1', resultado: 'NO CONTESTO' }).then(() => '', x => x.message));
+    assert.equal(e, 'Esta acción es de enfermería.');
+    assert.equal(await pagina.evaluate(() => { try { DEMO.anularContactoEnfermeria({ usuario: 'ANA', id: 'ENF-000001', motivo: 'x' }); return ''; } catch (x) { return x.message; } }),
+      'Esta acción es de enfermería.');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

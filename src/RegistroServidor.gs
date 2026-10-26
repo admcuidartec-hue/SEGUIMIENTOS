@@ -20,18 +20,22 @@ function exigirMotivo_(p) {
   return m;
 }
 
-/** REGISTROS y ALTAS se escriben por posición: sin sus columnas nuevas, una fila quedaría desalineada. */
+/**
+ * Antes de escribir nada: la hoja tiene todas sus columnas (en cualquier orden y grafía: anexarObjeto_ escribe por nombre) y
+ * ninguna repetida. Si no, el mensaje dice qué falta (errorEncabezado). La OP puede faltar: sin ella se escribe sin idempotencia.
+ */
 function exigirColumnas_(nombre, columnas) {
-  if (!columnasListas_(encabezado_(hoja_(nombre)), columnas)) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+  var error = errorEncabezado(nombre, revisarEncabezado(columnasDeHoja_(nombre), columnas));
+  if (error) throw new Error(error);
 }
 
-/** ¿El encabezado tiene todas sus columnas, en orden? La OP del final puede faltar: sin ella se escribe sin idempotencia. */
+/** ¿Se puede escribir con este encabezado? (todas las columnas, en cualquier orden; la OP puede faltar). */
 function columnasListas_(cab, columnas) {
-  var plan = encabezadoAmpliable(cab, columnas.concat([COLUMNA_OP]));
-  return !plan.error && plan.agregar.filter(function (c) { return c !== COLUMNA_OP; }).length === 0;
+  return !errorEncabezado('', revisarEncabezado(cab, columnas));
 }
 
 function guardarRegistro(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), op = opDe_(p);
   var v = validarRegistro(p, d.catalogos, d.hoy);
   // El mismo op ya se guardó (se perdió la respuesta): lo de la primera vez, sin el aviso de duplicado ni otra fila.
@@ -46,6 +50,7 @@ function guardarRegistro(p) {
   var lock = bloquear_();
   try {
     exigirColumnas_('REGISTROS', COLUMNAS_REGISTROS);
+    if (v.sesionHecha) exigirColumnas_('SESIONES', COLUMNAS_SESIONES);
     var registros = leerOpcional_('REGISTROS'), ids = registros.map(function (r) { return r.ID; });
     // Primera sesión ya aplicada (fecha pasada): se marca la sesión 1 de cada registro en este mismo candado.
     var sesiones = v.sesionHecha ? leerSesiones_() : [];
@@ -120,12 +125,17 @@ function duplicadoDe_(registros, filas) {
  */
 function registroRepetido_(registros, sesiones, op, v) {
   var filas = filasDeOp_(registros, op);
-  if (!filas.length) return null;
   var ids = {};
   filas.forEach(function (f) { ids[f.ID] = 1; });
   var ses = filasDeOp_(sesiones, op).filter(function (s) { return ids[s.ID_REGISTRO]; });
-  if (v && v.filas && (filas.length < v.filas.length || (v.sesionHecha && ses.length < v.filas.length))) {
-    return { incompleto: true, registros: filas, sesiones: ses };
+  // Una sesión viva de este op cuyo registro ya está anulado (al deshacer falló anularla): también es «a medias» y se anula al
+  // rehacer, aunque no quede ningún registro vivo (caso 7 de la batería de 80).
+  var porFallo = {};
+  (registros || []).forEach(function (r) { if (anuladoPorFallo(r)) porFallo[r.ID] = 1; });
+  var huerfanas = filasDeOp_(sesiones, op).filter(function (s) { return !ids[s.ID_REGISTRO] && porFallo[s.ID_REGISTRO]; });
+  if (!filas.length && !huerfanas.length) return null;
+  if (huerfanas.length || (v && v.filas && (filas.length < v.filas.length || (v.sesionHecha && ses.length < v.filas.length)))) {
+    return { incompleto: true, registros: filas, sesiones: ses.concat(huerfanas) };
   }
   return { ok: true, repetida: true, registros: filas.map(function (f) { return copia_(f, { TEXTO: textoRegistro(f) }); }),
     sesiones: ses };
@@ -146,7 +156,7 @@ function anularIncompleto_(previo) {
     previo.sesiones.forEach(function (s) { marcarAnulado_('SESIONES', s.ID, motivo); });
     previo.registros.forEach(function (f) { marcarAnulado_('REGISTROS', f.ID, motivo); });
   } catch (e) {
-    throw new Error('No se guardó: un intento anterior de este registro quedó a medias (' + previo.registros.map(function (f) { return f.ID; }).join(', ') +
+    throw new Error('No se guardó: un intento anterior de este registro quedó a medias (' + previo.registros.concat(previo.sesiones).map(function (f) { return f.ID; }).join(', ') +
       ') y no se pudo anular: revise Registrados y anule lo que haya quedado antes de registrar otra vez.');
   }
 }
@@ -158,6 +168,7 @@ function anularIncompleto_(previo) {
  * anula con ella su agenda.
  */
 function marcarSesion(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_();
   var asesora = exigirUsuario_(d.catalogos, p && p.usuario), proxima = textoLimpio_(p && p.proxima), op = opDe_(p);
   var lock = bloquear_();
@@ -175,15 +186,16 @@ function marcarSesion(p) {
     error = validarSesion(r, sesiones, p.fecha, d.hoy) || largoMal_(p.nota, LARGO_TEXTO, 'La nota');
     if (error) throw new Error(error);
     var e = estadoRegistro(r, sesiones);
-    // «¿Reacción durante la aplicación?»: se valida antes de escribir nada, para no dejar la sesión a medias.
-    var reac = normTexto(r.TIPO) === 'HIERRO' ? reaccionAplicacion(p.reaccion, d.catalogos) : { error: '', fila: null };
-    if (reac.error) throw new Error(reac.error);
-    if (reac.fila) exigirColumnas_('ENFERMERIA', COLUMNAS_ENFERMERIA);
+    // La reacción durante la aplicación ya no se registra al marcar la sesión (26/10/2026): marcar es de admisión y la reacción, de
+    // la enfermera, en su fila «Aplicación» (DIA 0) de Enfermería. Una `reaccion` que llegue (una pestaña vieja) se ignora y se avisa.
+    var reac = { error: '', fila: null };
+    var reaccionIgnorada = !!(p.reaccion && p.reaccion.hubo);
     if (proxima) {
       error = validarProximaSesion(e, p.fecha, proxima, d.hoy);
       if (error) throw new Error(error);
       exigirHojaPreparada_();   // antes de escribir nada: SEGUIMIENTOS se escribe por posición
     }
+    exigirColumnas_('SESIONES', COLUMNAS_SESIONES);   // antes de escribir nada (caso 50)
     var ahora = new Date(), cuando = fechaHoraTexto_(ahora);
     var s = { ID: siguienteId(sesiones.map(function (x) { return x.ID; }), 'SES'), FECHA_HORA: cuando,
       ID_REGISTRO: r.ID, NUMERO: e.hechas + 1, FECHA: fechaIso(p.fecha), ASESORA: asesora, NOTA: textoLimpio_(p.nota),
@@ -192,6 +204,7 @@ function marcarSesion(p) {
     anexarObjeto_('SESIONES', conOp_('SESIONES', COLUMNAS_SESIONES), s);
     bitacora_(asesora, 'SESIÓN', r.ID + ' · sesión ' + s.NUMERO + ' de ' + e.total, op);
     var out = { ok: true, sesion: s, completo: s.NUMERO >= e.total };
+    if (reaccionIgnorada) out.reaccionError = 'La sesión quedó marcada; la reacción durante la aplicación la registra Enfermería (fila «Aplicación» de la sesión ' + s.NUMERO + ').';
     // La sesión ya está escrita: si la reacción o la agenda fallan, no se lanza (la app creería que nada se guardó y la
     // marcaría otra vez). Se avisa y se registra aparte.
     if (reac.fila) {
@@ -237,6 +250,7 @@ function sesionRepetida_(previa, sesiones, op) {
 }
 
 function anularRegistro(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), op = opDe_(p);
   var lock = bloquear_();
   try {
@@ -256,6 +270,7 @@ function anularRegistro(p) {
 }
 
 function anularSesion(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), op = opDe_(p);
   var lock = bloquear_();
   try {
@@ -282,11 +297,15 @@ function anularSesion(p) {
 }
 
 function darDeAlta(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), op = opDe_(p);
   var previa = filasDeOp_(d.altas, op)[0];
   if (previa) return limpiarParaEnvio({ ok: true, repetida: true, alta: previa });
   var v = validarAlta(p, d.catalogos, d.citas, d.vigentes, d.hoy);
   if (v.error) throw new Error(v.error);
+  // Con «Falleció» vigente no se registra una decisión del médico (un alta a 6 meses de un fallecido quedaba vigente).
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos)[normDni(v.alta.DNI)]);
+  if (muerto) throw new Error(muerto);
   var lock = bloquear_();
   try {
     exigirColumnas_('ALTAS', COLUMNAS_ALTAS);
@@ -297,8 +316,12 @@ function darDeAlta(p) {
     if (altasVigentes(altas, d.seguimientos, d.citas, d.reglas, d.hoy)[claveSerie(a.DNI, a.ESPECIALIDAD)]) {
       throw new Error('Ese paciente ya tiene un alta vigente en ' + a.ESPECIALIDAD + '.');
     }
+    // Dos decisiones del mismo día y especialidad (p. ej. una «Nueva reevaluación», que no deja alta vigente, y otra que entra a
+    // la vez desde la ficha): la segunda se rechaza. Para cambiar la decisión del día, se anula la primera (caso 41).
+    var ahora = fechaHoraTexto_(new Date());
+    if (decisionDeHoy(altas, a.DNI, a.ESPECIALIDAD, ahora, op)) throw new Error(MENSAJE_DECISION_DE_HOY);
     a.ID = siguienteId(altas.map(function (x) { return x.ID; }), 'ALT');
-    a.FECHA_HORA = fechaHoraTexto_(new Date());
+    a.FECHA_HORA = ahora;
     if (op) a.OP = op;
     anexarObjeto_('ALTAS', conOp_('ALTAS', COLUMNAS_ALTAS), a);
     bitacora_(a.REGISTRADO_POR, 'ALTA', a.ID + ' · ' + a.DNI + ' · ' + a.ESPECIALIDAD + ' · ' + a.DOCTOR, op);
@@ -309,6 +332,7 @@ function darDeAlta(p) {
 }
 
 function anularAlta(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id), op = opDe_(p);
   if (id.indexOf('ALT-') !== 0) throw new Error('Esa alta viene de un descarte antiguo; no se puede anular desde aquí.');
   var lock = bloquear_();
@@ -338,7 +362,7 @@ function anulacionRepetida_(anular, op) {
 /** Marca ANULADO = SÍ y el motivo en la fila de ese ID. Solo esas dos celdas: no pisa nada más. */
 function marcarAnulado_(nombre, id, motivo) {
   var sh = hoja_(nombre), v = sh.getDataRange().getValues();
-  var cab = v[0].map(function (c) { return String(c).trim(); });
+  var cab = v[0].map(normColumna);
   var cId = cab.indexOf('ID'), cA = cab.indexOf('ANULADO'), cM = cab.indexOf('MOTIVO_ANULACION');
   if (cId < 0 || cA < 0 || cM < 0) throw new Error('A la hoja ' + nombre + ' le faltan las columnas ID, ANULADO o MOTIVO_ANULACION.');
   for (var i = 1; i < v.length; i++) {
@@ -354,7 +378,7 @@ function marcarAnulado_(nombre, id, motivo) {
 /** Escribe solo las celdas pedidas de la fila con ese ID. Nada más de la fila cambia. */
 function actualizarCeldas_(nombre, id, cambios) {
   var sh = hoja_(nombre), v = sh.getDataRange().getValues();
-  var cab = v[0].map(function (c) { return String(c).trim(); }), cId = cab.indexOf('ID'), cA = cab.indexOf('ANULADO');
+  var cab = v[0].map(normColumna), cId = cab.indexOf('ID'), cA = cab.indexOf('ANULADO');
   for (var i = 1; i < v.length; i++) {
     if (String(v[i][cId]).trim() !== id) continue;
     if (cA >= 0 && normTexto(v[i][cA]) === 'SI') throw new Error(id + ' está anulado.');
@@ -371,6 +395,7 @@ function actualizarCeldas_(nombre, id, cambios) {
 }
 
 function editarRegistro(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), id = textoLimpio_(p && p.id);
   var lock = bloquear_();
   try {
@@ -378,6 +403,8 @@ function editarRegistro(p) {
     // Se valida con la hoja releída: otra asesora pudo anularlo o marcar una sesión entretanto.
     var sesiones = leerSesiones_();
     var r = leerRegistros_().filter(function (x) { return x.ID === id; })[0];
+    var muerto = r ? mensajeFallecido(fallecidos(d.seguimientos)[normDni(r.DNI)]) : '';
+    if (muerto) throw new Error(muerto);
     var v = validarEdicionRegistro(r, p.cambios, sesiones, d.catalogos, d.hoy);
     if (v.error) throw new Error(v.error);
     var cols = Object.keys(v.cambios);

@@ -88,6 +88,20 @@ function encabezado_(sh) {
   return cab;
 }
 
+/** La fila 1 tal como está escrita (sin recortar: «Verificar» avisa de « FECHA »), sin las celdas vacías del final. */
+function encabezadoCrudo_(sh) {
+  var cab = sh.getRange(1, 1, 1, Math.max(1, sh.getLastColumn())).getValues()[0].map(function (c) { return c === null || c === undefined ? '' : String(c); });
+  while (cab.length && !cab[cab.length - 1].trim()) cab.pop();
+  return cab;
+}
+
+/** El encabezado crudo de `nombre`, leído una vez por petición (anexarObjeto_ escribe por nombre y lo necesita en cada fila). */
+function columnasDeHoja_(nombre) {
+  MEMO.cab = MEMO.cab || {};
+  if (!MEMO.cab[nombre]) MEMO.cab[nombre] = encabezadoCrudo_(hoja_(nombre));
+  return MEMO.cab[nombre];
+}
+
 /** Una hoja que se escribe por posición solo se amplía al final, y solo si lo que ya tiene coincide. */
 function encabezadoAmpliable(cab, columnas) {
   for (var i = 0; i < cab.length; i++) {
@@ -117,12 +131,13 @@ function leerObjetos_(nombre) {
   var sh = hoja_(nombre), alto = sh.getLastRow(), ancho = sh.getLastColumn();
   if (alto < 2 || ancho < 1) return [];
   var datos = sh.getRange(1, 1, alto, ancho).getValues();
-  var cab = datos[0].map(function (c) { return String(c).trim(); });
+  // Por nombre normalizado: «fecha», « FECHA » y «Fécha» son FECHA (caso 49); si una columna está dos veces, vale la primera.
+  var cab = datos[0].map(normColumna);
   return datos.slice(1)
     .filter(function (f) { return f.some(function (c) { return c !== '' && c !== null; }); })
     .map(function (f) {
       var o = {};
-      cab.forEach(function (c, i) { if (c) o[c] = celdaATexto_(f[i], c); });
+      cab.forEach(function (c, i) { if (c && !(c in o)) o[c] = celdaATexto_(f[i], c); });
       return o;
     });
 }
@@ -148,8 +163,20 @@ function escribirObjetos_(nombre, columnas, objetos) {
   SpreadsheetApp.flush();
 }
 
+/**
+ * Agrega una fila POR NOMBRE de columna (caso 50): cada valor va bajo la columna que se llama así en la fila 1, esté donde esté y
+ * escrita como esté («fecha» = FECHA). Si falta una columna o está repetida, se niega sin escribir (errorEncabezado); una columna
+ * que la app no conoce queda vacía. Nunca deja un valor bajo otro encabezado.
+ */
 function anexarObjeto_(nombre, columnas, objeto) {
-  hoja_(nombre).appendRow(columnas.map(function (c) { return celdaParaHoja_(objeto[c], c); }));
+  var cab = columnasDeHoja_(nombre), rev = revisarEncabezado(cab, columnas), error = errorEncabezado(nombre, rev);
+  if (error) throw new Error(error);
+  var nuestras = {};
+  columnas.forEach(function (c) { nuestras[normColumna(c)] = c; });
+  hoja_(nombre).appendRow(cab.map(function (c, j) {
+    var k = nuestras[normColumna(c)];
+    return k && rev.posicion[normColumna(c)] === j ? celdaParaHoja_(objeto[k], k) : '';
+  }));
 }
 
 /**
@@ -207,7 +234,8 @@ function conOp_(nombre, columnas) {
   MEMO.conOp = MEMO.conOp || {};
   if (!(nombre in MEMO.conOp)) {
     var tiene = false;
-    try { var cab = encabezado_(hoja_(nombre)); tiene = cab.length === columnas.length + 1 && cab[columnas.length] === COLUMNA_OP; } catch (e) { tiene = false; }
+    // Por nombre: la OP puede estar en otro lugar o escrita en minúscula (anexarObjeto_ escribe por nombre).
+    try { tiene = columnasDeHoja_(nombre).map(normColumna).indexOf(COLUMNA_OP) >= 0; } catch (e) { tiene = false; }
     MEMO.conOp[nombre] = tiene;
   }
   return MEMO.conOp[nombre] ? columnas.concat([COLUMNA_OP]) : columnas;
@@ -380,6 +408,8 @@ function bootstrap() {
   return limpiarParaEnvio({
     hoy: d.hoy,
     usuarios: d.catalogos.usuarios,
+    // El rol de cada usuario (ADMISION, ENFERMERIA o CONSULTA): la app arma el menú y deshabilita lo que no le toca.
+    roles: (function () { var r = {}; d.catalogos.usuarios.forEach(function (u) { r[u] = rolDe(d.catalogos, u); }); return r; })(),
     motivos: d.catalogos.motivos,
     resultados: ORDEN_RESULTADOS,
     // La misma especialidad con y sin tilde sale una vez, con la forma más usada (el filtro compara con normTexto).
@@ -440,6 +470,8 @@ function getPaciente(dni) {
       // ESTADO_REGISTRO y las fechas pintan la línea de estado; NOMBRE…FECHA_RETORNO, el formulario de Editar (como filaRegistrada_).
       return { ID: r.ID, FECHA: fechaIso(r.FECHA), TIPO: normTexto(r.TIPO), TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA,
         SESIONES: e.total, HECHAS: e.hechas, ESTADO: f.estado, ESTADO_REGISTRO: f.estado, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '',
+        // Anulado al deshacer un fallo: la ficha muestra la sesión que haya quedado viva, con «Anular sesión» (caso 7).
+        POR_FALLO: anuladoPorFallo(r),
         CIERRE: f.cierre, FECHA_CIERRE: f.fechaCierre, NO_VINO: f.noVino, SIN_REEVALUACION: f.sinReevaluacion,
         NOMBRE: r.NOMBRE || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
         FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '',
@@ -521,19 +553,22 @@ function buscar(texto) {
  * un DNI que ya esté en SOFDOC o en Registro.
  */
 function asignarDniIndicacion(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_();
   if (!p || d.catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {
     throw new Error('Elija quién es usted en el selector de arriba.');
   }
   var dni = normDni(p.dni);
   if (!dni) throw new Error('Escriba el DNI del paciente.');
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos || [])[dni]);
+  if (muerto) throw new Error(muerto);
   var conocidos = {};
   (d.citas || []).forEach(function (c) { if (c.DNI) conocidos[c.DNI] = 1; });
   (d.registros || []).forEach(function (r) { if (r.DNI && !anulado_(r)) conocidos[normDni(r.DNI)] = 1; });
   var lock = bloquear_();
   try {
     var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();
-    var cab = datos[0].map(function (c) { return String(c).trim(); });
+    var cab = datos[0].map(normColumna);
     var r = buscarFilaParaAsignar(datos[0], datos.slice(1), p.id, dni, conocidos);
     if (r.error) throw new Error(r.error);
     sh.getRange(r.fila + 2, cab.indexOf('DNI') + 1).setNumberFormat('@').setValue(dni);
@@ -545,10 +580,20 @@ function asignarDniIndicacion(p) {
   }
 }
 
+/**
+ * Roles (26/10/2026): cada función que escribe lo comprueba ANTES de leer o escribir nada (tampoco la BITACORA): las de
+ * Enfermería son de la enfermera, las demás de admisión, y un usuario de solo consulta no escribe (errorDeRol, rolDe).
+ */
+function exigirRol_(p, rol) {
+  var e = errorDeRol(datos_().catalogos, p && p.usuario, rol);
+  if (e) throw new Error(e);
+}
+
 /** Envoltorios de la app anterior: «Hecho» es un «no contestó»; «Descartar» cierra con el motivo elegido. */
-function marcarSeguimiento(p) { return registrarResultado(copia_(p || {}, { resultado: 'NO CONTESTÓ' })); }
+function marcarSeguimiento(p) { exigirRol_(p, 'ADMISION'); return registrarResultado(copia_(p || {}, { resultado: 'NO CONTESTÓ' })); }
 
 function descartar(p) {
+  exigirRol_(p, 'ADMISION');
   var r = RESULTADOS[normTexto(p && p.motivo)];
   var cierre = r && r.grupo === 'CIERRE' && r.pide !== 'DOCTOR';
   var q = cierre ? { resultado: r.nombre, motivo: r.nombre }
@@ -558,16 +603,19 @@ function descartar(p) {
 }
 
 function confirmarEmparejamiento(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_();
   if (!p || d.catalogos.usuarios.map(normTexto).indexOf(normTexto(p.usuario)) < 0) {
     throw new Error('Elija quién es usted en el selector de arriba.');
   }
   var dni = normDni(p.dni);
   if (!dni) throw new Error('Falta el DNI.');
+  var muerto = mensajeFallecido(fallecidos(d.seguimientos || [])[dni]);
+  if (muerto) throw new Error(muerto);
   var lock = bloquear_();
   try {
     var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();
-    var cab = datos[0].map(function (c) { return String(c).trim(); });
+    var cab = datos[0].map(normColumna);
     var cDni = cab.indexOf('DNI'), cEm = cab.indexOf('EMPAREJAMIENTO');
     var r = buscarFilaParaConfirmar(datos[0], datos.slice(1), p.id, dni, construirIndiceNombres(d.citas));
     if (r.error) throw new Error(r.error);

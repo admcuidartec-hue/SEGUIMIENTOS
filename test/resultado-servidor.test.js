@@ -20,6 +20,7 @@ function servidor(hoja, extraEnHoja, registros, cabecera) {
     contactos: [], registros: registros || [], sesiones: sesiones.slice(), altas: altas.slice(), seguimientosTodos: enHoja.slice(), seguimientos: enHoja.filter(s => !L.anulado_(s)) });
   ctx.hoja_ = () => ({});
   ctx.encabezado_ = () => cabecera || ctx.COLUMNAS_SEGUIMIENTOS.slice();
+  ctx.columnasDeHoja_ = () => cabecera || ctx.COLUMNAS_SEGUIMIENTOS.slice();
   ctx.bloquear_ = () => { lock.tomado++; return { releaseLock: () => { lock.tomado--; } }; };
   ctx.SpreadsheetApp = { flush: () => { lock.flush++; } };
   ctx.leerSeguimientos_ = () => enHoja.concat(extraEnHoja || [], escrito.SEGUIMIENTOS);
@@ -141,7 +142,7 @@ test('hojas sin preparar: registrar y anular se niegan, no escriben y sueltan el
   const hoja = [{ ID: 'SEG-2', FECHA_HORA: '2026-10-02 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'NO CONTESTÓ', ACCION: 'HECHO', REFERENCIA: '' }];
   const cab = cargar(['Logica.gs', 'Registro.gs', 'Resultados.gs', 'Tablero.gs', 'Enfermeria.gs', 'Codigo.gs', 'Menu.gs']).COLUMNAS_SEGUIMIENTOS.slice(0, -2);
   const { ctx, escrito, lock } = servidor(hoja, [], [], cab);
-  assert.throws(() => ctx.registrarResultado(p({})), /Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas\./);
+  assert.throws(() => ctx.registrarResultado(p({})), /Falta preparar las hojas: a SEGUIMIENTOS le faltan las columnas ANULADO, MOTIVO_ANULACION\. En el Sheets, menú Seguimientos → Preparar hojas\./);
   assert.throws(() => ctx.anularResultado({ usuario: 'MAGALY', id: 'SEG-2', motivo: 'x' }), /Falta preparar las hojas/);
   assert.deepEqual([escrito.SEGUIMIENTOS.length, escrito.anulados.length, escrito.BITACORA.length, lock.tomado], [0, 0, 0, 0]);
 });

@@ -53,7 +53,11 @@ var CATALOGO_REGISTRO_INICIAL = {
   TRATAMIENTOS: ['HIERRO SACARATO', 'HIERRO DERISOMALTOSA', 'HIERRO CARBOXIMALTOSA'],
   MARCAS: ['HIERRO CARBOXIMALTOSA | FERINJECT', 'HIERRO CARBOXIMALTOSA | LIKFER', 'HIERRO DERISOMALTOSA | MONOFER'],
   // Enfermería: las reacciones que se eligen al registrar un contacto o una sesión (REACCIONES_INICIALES en Logica.gs).
-  REACCIONES: REACCIONES_INICIALES
+  REACCIONES: REACCIONES_INICIALES,
+  // Roles (26/10/2026): quien está aquí entra solo para ver; quien está en USUARIOS_ENFERMERIA es la enfermera (se pone a mano:
+  // ningún nombre real en el código). El resto de USUARIOS son admisionistas.
+  USUARIOS_CONSULTA: ['ADMINISTRACION', 'MARKETING'],
+  USUARIOS_ENFERMERIA: []
 };
 
 var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
@@ -66,20 +70,23 @@ function ampliarHojas_() {
   var ss = ss_(), cambios = [];
 
   // Sus columnas nuevas, siempre al final, y después la columna OP (idempotencia: el reintento de una operación no la repite).
+  // Se buscan por nombre (revisarEncabezado): con columnas movidas o en otra grafía se agrega igual lo que falta y se avisa; con
+  // una columna renombrada o repetida no se agrega nada (quedaría la misma columna dos veces).
   hojasConOp_().forEach(function (par) {
     var sh = ss.getSheetByName(par[0]);
     if (!sh) return;
-    var cab = encabezado_(sh), plan = encabezadoAmpliable(cab, par[1].concat([COLUMNA_OP]));
-    if (plan.error) cambios.push('✗ ' + par[0] + ': ' + plan.error);
-    else if (plan.agregar.length) {
-      sh.getRange(1, cab.length + 1, 1, plan.agregar.length).setValues([plan.agregar]).setFontWeight('bold');
-      cambios.push(par[0] + ': columna ' + plan.agregar.join(', ') + '.');
+    var cab = encabezadoCrudo_(sh), rev = revisarEncabezado(cab, par[1].concat([COLUMNA_OP]));
+    var avisos = lineasEncabezado(par[0], rev).filter(function (l) { return /^[✗⚠]/.test(l) && !/^✗ A /.test(l); });
+    if (rev.faltan.length && !rev.extra.length && !rev.repetidas.length) {
+      sh.getRange(1, cab.length + 1, 1, rev.faltan.length).setValues([rev.faltan]).setFontWeight('bold');
+      cambios.push(par[0] + ': columna ' + rev.faltan.join(', ') + '.');
     }
+    avisos.forEach(function (l) { cambios.push(l); });
   });
 
   var ct = ss.getSheetByName('CATALOGOS');
   if (ct) {
-    var cabC = encabezado_(ct), faltan = Object.keys(CATALOGO_REGISTRO_INICIAL).filter(function (c) { return cabC.indexOf(c) < 0; });
+    var cabC = encabezado_(ct).map(normColumna), faltan = Object.keys(CATALOGO_REGISTRO_INICIAL).filter(function (c) { return cabC.indexOf(c) < 0; });
     var parDoctor = faltan.indexOf('DOCTOR') >= 0, parSofdoc = faltan.indexOf('DOCTOR_SOFDOC') >= 0;
     if (parDoctor !== parSofdoc) {
       cambios.push('✗ CATALOGOS: DOCTOR y DOCTOR_SOFDOC van juntas; agregue a mano la que falta.');
@@ -88,10 +95,10 @@ function ampliarHojas_() {
     faltan.forEach(function (c) {
       var col = encabezado_(ct).length + 1, valores = CATALOGO_REGISTRO_INICIAL[c];
       ct.getRange(1, col, 1, 1).setValues([[c]]).setFontWeight('bold');
-      ct.getRange(2, col, valores.length, 1).setValues(valores.map(function (x) { return [x]; }));
+      if (valores.length) ct.getRange(2, col, valores.length, 1).setValues(valores.map(function (x) { return [x]; }));
     });
     if (faltan.length) cambios.push('CATALOGOS: columnas ' + faltan.join(', ') + '.');
-    var cM = encabezado_(ct).indexOf('MOTIVOS_DESCARTE');
+    var cM = encabezado_(ct).map(normColumna).indexOf('MOTIVOS_DESCARTE');
     if (cM >= 0) {
       var motivos = ct.getRange(1, cM + 1, Math.max(1, ct.getLastRow()), 1).getValues();
       motivos.forEach(function (f, i) {
@@ -105,7 +112,7 @@ function ampliarHojas_() {
 
   var rg = ss.getSheetByName('REGLAS');
   if (rg) {
-    var cabR = encabezado_(rg), cP = cabR.indexOf('PARAMETRO'), cV = cabR.indexOf('VALOR');
+    var cabR = encabezado_(rg).map(normColumna), cP = cabR.indexOf('PARAMETRO'), cV = cabR.indexOf('VALOR');
     if (cP >= 0 && cV >= 0) {
       var col = rg.getRange(1, cP + 1, Math.max(1, rg.getLastRow()), 1).getValues().map(function (f) { return normTexto(f[0]); });
       PARAMETROS_REGISTRO.forEach(function (par) {
@@ -155,7 +162,7 @@ function prepararHojas() {
       ['MAGALY', 'SE ATIENDE EN OTRO LUGAR', 'Dr. ELI FABRIZIO CABANILLAS HUALPA', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA'],
       ['ANA', 'NÚMERO EQUIVOCADO', '', ''],
       ['RACHEL', 'YA NO LO NECESITA', '', ''],
-      ['DR. ELI CABANILLAS', 'FALLECIÓ', '', ''],
+      ['', 'FALLECIÓ', '', ''],
       ['', 'OTRO', '', '']
     ]);
     c.getRange(1, 1, 1, 4).setFontWeight('bold');
@@ -283,7 +290,7 @@ function activarDiaria() {
 function emparejarIndicacionesEnHoja_(citas) {
   var sh = hoja_('INDICACIONES'), datos = sh.getDataRange().getValues();
   if (datos.length < 2) return 0;
-  var cab = datos[0].map(function (c) { return String(c).trim(); });
+  var cab = datos[0].map(normColumna);
   var cN = cab.indexOf('NOMBRE'), cD = cab.indexOf('DNI'), cE = cab.indexOf('EMPAREJAMIENTO');
   if (cN < 0 || cD < 0 || cE < 0) throw new Error('INDICACIONES necesita las columnas NOMBRE, DNI y EMPAREJAMIENTO.');
   var filas = datos.slice(1).map(function (f) {
@@ -387,7 +394,8 @@ function importarLoQueFalta_() {
   aplicarEmparejamientos(nuevas, construirIndiceNombres(citas));
   completarIds(existentes.concat(nuevas));
 
-  var sh = hoja_('INDICACIONES'), cab = encabezado_(sh), desde = sh.getLastRow() + 1;
+  // Por nombre de columna (normColumna): INDICACIONES puede tener columnas movidas o escritas a mano.
+  var sh = hoja_('INDICACIONES'), cab = encabezadoCrudo_(sh).map(normColumna), desde = sh.getLastRow() + 1;
   cab.forEach(function (c, j) {
     var r = sh.getRange(desde, j + 1, nuevas.length, 1);
     if (COLUMNAS_FECHA[c]) r.setNumberFormat('yyyy-mm-dd');
@@ -429,12 +437,21 @@ function verificar() {
     var s = ss.getSheetByName(n);
     lineas.push(s ? '✓ ' + n + ': ' + Math.max(0, s.getLastRow() - 1) + ' filas.' : '✗ Falta la hoja ' + n + '. Use «Preparar hojas».');
   });
+  // El encabezado de cada hoja que la app escribe: columnas que faltan, renombradas, repetidas, movidas o con otra grafía.
+  hojasConOp_().concat([['INDICACIONES', COLUMNAS_INDICACIONES, true]]).forEach(function (par) {
+    var s = ss.getSheetByName(par[0]);
+    if (s) lineasEncabezado(par[0], revisarEncabezado(encabezadoCrudo_(s), par[2] ? par[1] : par[1].concat([COLUMNA_OP])))
+      .forEach(function (l) { lineas.push(l); });
+  });
+  // Lo que quedó vivo de un registro que se deshizo por un fallo (y falló también deshacerlo): se anula en la ficha (caso 7).
+  if (ss.getSheetByName('REGISTROS') && ss.getSheetByName('SESIONES')) {
+    var restos = sesionesDeRegistrosDeshechos(leerRegistros_(), leerSesiones_());
+    if (restos.length) lineas.push('✗ SESIONES: ' + (restos.length === 1 ? 'quedó viva 1 sesión' : 'quedaron vivas ' + restos.length + ' sesiones') +
+      ' de registros que se deshicieron por un fallo (' + restos.map(function (s) { return s.ID + ' de ' + s.ID_REGISTRO + ', DNI ' + s.DNI; }).join('; ') +
+      '): no cuentan en la meta; anúlelas en la ficha del paciente («Anular sesión»).');
+  }
   var sgV = ss.getSheetByName('SEGUIMIENTOS');
   if (sgV) {
-    var planV = encabezadoAmpliable(encabezado_(sgV), COLUMNAS_SEGUIMIENTOS.concat([COLUMNA_OP]));
-    lineas.push(planV.error ? '✗ SEGUIMIENTOS: ' + planV.error
-      : planV.agregar.length ? '✗ A SEGUIMIENTOS le falta la columna ' + planV.agregar.join(', ') + '. Use «Preparar hojas».'
-      : '✓ SEGUIMIENTOS tiene todas sus columnas.');
     var ra = resumenAntiguos(leerSeguimientos_());
     lineas.push('ℹ SEGUIMIENTOS: ' + ra.nuevos + ' con resultado, ' + ra.hechos + ' «hecho» y ' + ra.descartes +
       ' descartes antiguos, ' + ra.fallecidos + ' fallecidos, ' + ra.anulados + ' anulados.');

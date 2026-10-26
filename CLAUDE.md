@@ -2,7 +2,8 @@
 
 Plataforma para no perder pacientes que no volvieron a su reevaluación, del **Centro
 Hematológico del Perú**. Es Apps Script incrustado en el libro madre **BD SOFDOC SEGUIMIENTOS**.
-La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
+La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administración y Marketing entran solo para ver
+(ver «Roles»). El médico **no** usa la plataforma: comunica sus decisiones y ellas las registran.
 
 - Libro madre: `1L8fY-NXWE1agakIPEdqoLnLry0-lvYr0Z-9JfsfGxRM`
 - Base de hierro (solo para la importación única): `1FrJ9oXyeHLLABqLcSA2VyXry-x_ZeFow6LsSACeJw8o`
@@ -65,12 +66,13 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - El DNI se guarda y se compara con `normDni` (sin puntos ni guiones, y sin ceros a la izquierda si es solo dígitos), también
   en el buscador del tablero (`normDni` de `Index.html`) y en el DEMO: «09997401» y «9997401» encuentran al mismo paciente.
 - Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión, y nunca la de un
-  registro anulado. Al anular un registro se anula **en el mismo candado** su agenda viva (`agendaVivaDeRegistro`: la próxima
+  registro anulado (salvo la que quedó viva de un registro que se deshizo por un fallo: `anuladoPorFallo`). Al anular un registro se anula **en el mismo candado** su agenda viva (`agendaVivaDeRegistro`: la próxima
   sesión agendada al marcar una y un «Agendó cita» que aún no pasó); sus sesiones hechas no se tocan y siguen contando en la
   meta del día en que se hicieron. La próxima sesión agendada al marcar una **no suma aparte** en la meta del día: es parte de
   la sesión (`hechosHoyPor_` salta las agendas ligadas con `sesionLigada`).
 - El estado de un registro (cotizado, en curso, completo, anulado) se calcula con `estadoRegistro`; no se guarda.
-- `SEGUIMIENTOS` se escribe por posición: una columna nueva solo se agrega al final (`encabezadoAmpliable`).
+- Las hojas se leen **y se escriben por nombre de columna** (`normColumna`: sin espacios de más, mayúsculas, sin tildes): ver
+  «Correcciones de la batería de 80 pruebas». Una columna nueva se sigue agregando al final («Preparar hojas»).
 - Sin conexión a WhatsApp: la app muestra los datos y se marca «Seguimiento hecho».
 - La bandeja tiene tres tipos de seguimiento: reevaluación (series `VENCIDO`), hierro y
   procedimiento (cotizado y no hecho, `pendientesIndicacion`). Los de hierro y procedimiento
@@ -127,6 +129,76 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - El filtro de especialidad agrupa por `normTexto` y muestra la forma más usada (`formasMasFrecuentes` en `bootstrap`).
 - La ficha de un registro «Cerrado» solo lista las sesiones hechas. El buscador del tablero muestra el foco (`.buscar:focus-within`).
 - **Alta definitiva y tratamiento en curso** (caso 39, decidido el 24/10/2026): ver «Etapa 2», «Las cuatro decisiones del médico».
+
+## Roles (26/10/2026)
+
+El médico ya no usa la plataforma: comunica sus decisiones a las admisionistas y a la enfermera, y las registran ellas
+(Registro → Decisión del médico, o «Decisión del médico…» en la ficha). Ningún usuario recibe filtros ni pantallas especiales
+por su nombre (se quitaron el filtro propuesto del médico y su entrada directa a Indicadores). Los médicos siguen siendo
+`DOCTOR`/`MÉDICO` de citas y registros. La enfermera y las admisionistas **no comparten funciones**.
+
+| Rol | Quién (`CATALOGOS`) | Pantallas | Escribe |
+|---|---|---|---|
+| Admisión | `USUARIOS` (Magaly, Ana, Rachel) | Tablero, Registro, Pacientes, Indicadores | Todo menos Enfermería: resultados, registros, sesiones, Editar, decisiones del médico, anulaciones, asignar DNI |
+| Enfermería | `USUARIOS_ENFERMERIA` (LISET) | Enfermería (entra directo) y Pacientes (ficha en solo lectura) | Solo `registrarContactoEnfermeria`, `anularContactoEnfermeria` y la «Aplicación» (DIA 0) |
+| Solo consulta | `USUARIOS_CONSULTA` (ADMINISTRACION, MARKETING) | Todas, con la nota «Usuario de solo consulta»; sin meta del día | Nada |
+
+- **Basta con estar en su columna** para aparecer en «¿Quién es usted?» (`catalogosDesdeFilas` une `USUARIOS`,
+  `USUARIOS_ENFERMERIA` y `USUARIOS_CONSULTA`); si alguien está en dos, consulta gana a enfermería y enfermería a admisión
+  (`rolDe`, comparación normalizada). `bootstrap().roles` manda el rol de cada usuario.
+- **Servidor**: cada función que escribe comprueba el rol **antes de leer o escribir nada** (tampoco la BITACORA): `exigirRol_` →
+  `errorDeRol`: «Esta acción es de admisión.», «Esta acción es de enfermería.» o «Usuario de solo consulta: no puede modificar
+  datos.». `test/logica-roles.test.js` recorre las 15 funciones × los tres roles.
+- **`marcarSesion` y la reacción** (decidido el 26/10/2026): marcar es de admisión; una `reaccion` que llegue (una pestaña vieja)
+  **se ignora** —la sesión se guarda— y la respuesta lo avisa en `reaccionError`. La reacción la registra la enfermera.
+- **Pantalla**: el menú y la entrada salen del rol (`aplicarRol`, `SECCIONES_ROL`); los botones que escriben se deshabilitan donde
+  el rol no escribe (`puedeEscribirAqui`, `ESCRITURA`, con un `MutationObserver`); sin arrastrar tarjetas ni atajos 1 a 4 y X;
+  `llamar` rechaza antes de enviar con el texto del servidor. Los Indicadores siguen con las cifras de Enfermería.
+- **DEMO**: ADMINISTRACION y MARKETING de solo consulta y ENFERMERA PRUEBA enfermera; sus funciones comprueban el rol.
+- **Publicar los roles**: `npm run subir` → «Preparar hojas» (agrega a `CATALOGOS` `USUARIOS_CONSULTA` con ADMINISTRACION y
+  MARKETING, y `USUARIOS_ENFERMERIA` vacía; si ya existen no las toca) → **a mano en `CATALOGOS`**: poner a LISET en
+  `USUARIOS_ENFERMERIA` y **quitar «DR. ELI CABANILLAS» de `USUARIOS`** → «Verificar» → probar en el `@HEAD` con una
+  admisionista, la enfermera y ADMINISTRACION → `npm run actualizar`. Hasta poner a LISET en su columna, Enfermería no deja
+  escribir a nadie (todos serían admisión).
+
+## Correcciones de la batería de 80 pruebas (26/10/2026)
+
+- **Encabezados escritos o movidos a mano** (casos 49 y 50). `leerObjetos_` normaliza el nombre de cada columna (`normColumna`:
+  «fecha», « FECHA » y «Fécha» son FECHA). `anexarObjeto_` **escribe por nombre**: cada valor va bajo la columna que se llama así
+  en la fila 1, esté donde esté; nunca por posición. Si falta una columna (salvo `OP`) o está repetida, se niega sin escribir con
+  un mensaje claro (`revisarEncabezado` → `errorEncabezado`): «Falta preparar las hojas: a SESIONES le falta la columna FECHA…»
+  si «Preparar hojas» lo arregla, o «La hoja SESIONES tiene columnas renombradas o que la app no reconoce (…): use «Verificar»…».
+  Así ninguna hoja (tampoco SESIONES ni BITACORA) queda desalineada. `conOp_`, `exigirColumnas_`, `marcarAnulado_`,
+  `actualizarCeldas_`, asignar/confirmar DNI y la importación buscan las columnas por nombre normalizado. `marcarSesion` y el
+  registro con la sesión 1 aplicada revisan SESIONES antes de escribir nada. **«Verificar»** revisa el encabezado de las seis
+  hojas que se escriben y de INDICACIONES (`lineasEncabezado`): ✗ si falta o está repetida una columna o hay una renombrada, ⚠ si
+  está en otra grafía o cambiada de lugar (funciona igual, conviene corregirla), ℹ si hay columnas propias. «Preparar hojas»
+  agrega lo que falta aunque haya columnas movidas, y no toca una hoja con una columna renombrada (quedaría dos veces).
+- **«Volvieron tras el seguimiento»** (caso 13): `kpiRecuperacion` tampoco cuenta los seguimientos de un Control
+  (`ESPECIALIDAD` = CONTROL) ni ninguno con `REFERENCIA` a un registro: no tienen serie y nunca «vuelven».
+- **Sesión con la fecha ilegible** (caso 6): `sumarDias` con una fecha vacía o ilegible devuelve ''; `estadoRegistro.ultima` es
+  la fecha válida más reciente (la sesión sin fecha cuenta como hecha, pero no da la «próxima»); la etiqueta de En tratamiento
+  omite «próxima ~» si no hay fecha. Salvaguarda general en `tarjeta_`: ninguna `ETIQUETA` con NaN/undefined (se quita ese trozo)
+  ni `FECHA_CLAVE` que no sea una fecha sale del servidor.
+- **Deshacer que falla a medias** (caso 7, decidido el 26/10/2026). Un registro anulado al deshacer un fallo («No se guardó…» o
+  «Se rehízo…», `anuladoPorFallo`) nunca existió: si quedó viva una sesión suya (falló también anularla), (1) el reintento con el
+  mismo op la ve como «a medias» y la anula en el candado (`registroRepetido_`); (2) `anularSesion` la acepta; (3) no suma en la
+  meta (`hechosHoyPor_`); (4) la ficha la muestra bajo el registro anulado con «Anular sesión»; (5) «Verificar» la lista
+  (`sesionesDeRegistrosDeshechos`). Las sesiones de un registro anulado a mano siguen como antes: cuentan y no se anulan.
+- **Impresión** (caso 61): los tokens de `html[data-modo="oscuro"]` valen solo en `@media screen`; lo impreso (el «Resumen
+  para imprimir» o un Ctrl+P) sale siempre con los de `:root`.
+- **Fallecido**: con «Falleció» vigente también se rechazan la decisión del médico (`darDeAlta`), Editar, asignar y confirmar DNI,
+  con el mismo `mensajeFallecido`; anular sí se puede. La pantalla tampoco los ofrece (Registro → Decisión deshabilita
+  «Registrar»; la ficha no muestra «Decisión del médico…» ni «Editar»).
+- **Volver al Tablero** (caso 63): si se escribió desde otra pantalla (`S.escribioFuera`) o la última carga tiene más de 60 s
+  (`S.tableroEn`, `TABLERO_VIEJO_MS`), se recarga en silencio, sin perder filtros.
+- **Editar**: con las sesiones por debajo de las ya hechas, «Guardar cambios» se deshabilita con el texto del servidor
+  («Ya hizo N sesiones: el total no puede ser menor.», `fechaMalEdicion`).
+- **Dos decisiones en carrera** (caso 41, decidido el 26/10/2026): dentro del candado, `darDeAlta` rechaza la decisión si hay
+  otra viva del mismo DNI y especialidad registrada con otro op en los últimos `VENTANA_DECISION_MIN` (2) minutos —`FECHA_HORA` va
+  al minuto—: «Ya se registró una decisión hoy para esta especialidad; anúlela para cambiarla.» (`decisionDeHoy`). Una decisión
+  posterior, fuera de esa ventana, sigue reemplazando a la anterior (`decisionPosterior_`). El DEMO, de una sola pestaña, no la
+  simula.
 
 ## «¿Qué pasó?» (Etapa 1)
 
@@ -294,12 +366,15 @@ Pedido de Liset (Enfermería). Especificación: `docs/superpowers/specs/2026-10-
 - **Pantalla «Enfermería»** (menú y barra del celular): vencidos (el más antiguo primero), hoy y próximos 7 días (plegable).
   «Ya me contacté» abre en la misma fila: ¿reacción? No / Inmediata / Mediata, cuáles (chips) y nota (obligatoria con «Otra»).
   «No contestó» guarda directo. Todo con «Deshacer» (`anularContactoEnfermeria`, solo `ENF-…`).
-- **Al marcar una sesión de hierro** (tablero y ficha): «¿Reacción durante la aplicación?» opcional; `marcarSesion({ reaccion })`
-  la guarda en el mismo candado como fila `ENFERMERIA` con `DIA = 0` e `INMEDIATA`.
+- **Reacción durante la aplicación** (desde el 26/10/2026, ver «Roles»): ya no se pregunta al marcar la sesión. Cada sesión de
+  hierro de los últimos `ENFERMERIA_CORTE_DIAS` trae en Enfermería su fila «Aplicación · sesión k del dd/mm» (`DIA = 0`,
+  `APLICACION`), arriba en Vencidos/Hoy, donde la enfermera registra No o Sí + reacciones (`INMEDIATA`); sin «No contestó».
+  Se guarda en `ENFERMERIA` con `DIA = 0`, como antes; las filas DIA 0 ya guardadas se leen igual y la dejan cumplida.
 - **Ficha**: bajo cada tratamiento de hierro, su historial de Enfermería. **Indicadores**: la tarjeta de hierro suma
   «Reacciones: n pacientes (inmediatas x, mediatas y)» y «Contactos de enfermería a tiempo: p %» (campos `REAC_*` y `ENF_*`
   al final de `CAMPOS_RESUMEN`, por mes de la sesión).
-- La enfermera elige su nombre en «¿Quién es usted?»: hay que **agregarlo a `CATALOGOS.USUARIOS`** (no se escribe en el código).
+- La enfermera elige su nombre en «¿Quién es usted?»: hay que **ponerla en `CATALOGOS.USUARIOS_ENFERMERIA`** (LISET; no se
+  escribe en el código). Ver «Roles».
 - **Publicar**: `npm run subir` → «Preparar hojas» (crea `ENFERMERIA`, agrega `REACCIONES` a `CATALOGOS` y
   `ENFERMERIA_DIAS` y `ENFERMERIA_CORTE_DIAS` a `REGLAS`) → «Verificar» (debe listar `ENFERMERIA`) → agregar a la enfermera en
   `USUARIOS` → en el `@HEAD`, con el paciente de prueba: registrar un hierro con la primera sesión de ayer, ver sus contactos,

@@ -26,7 +26,8 @@
   --ease-out:cubic-bezier(.23,1,.32,1);--ease-in-out:cubic-bezier(.77,0,.175,1);--ease-drawer:cubic-bezier(.32,.72,0,1);
   --r:12px;--r-s:8px;--mono:'Geist Mono',ui-monospace,monospace;color-scheme:light
 }
-html[data-modo="oscuro"]{
+/* Solo en pantalla: lo impreso (el «Resumen para imprimir» o un Ctrl+P) sale siempre con los tokens claros de :root. */
+@media screen{html[data-modo="oscuro"]{
   --bg:#0E1015;--side:#12151B;--surface:#171B22;--surface-2:#1D222B;--col:#13171D;--line:#272D38;--line-2:#3A4250;
   --ink:#ECEEF1;--soft:#C3C8D1;--muted:#98A0AD;
   --accent:#EC7B71;--accent-hover:#F39489;--accent-ink:#1A0908;--accent-soft:#2E1816;--accent-ring:rgb(236 123 113 / .35);
@@ -34,7 +35,7 @@ html[data-modo="oscuro"]{
   --w1:#EC7B71;--w2:#B85A52;--w3:#844640;--w4:#4E2C29;
   --velo:rgb(4 5 8 / .6);--skel:#1F242D;--skel-2:#2A303B;--toast:#ECEEF1;--toast-ink:#12151B;
   --shadow:0 1px 0 rgb(255 255 255 / .03) inset,0 6px 20px rgb(4 5 8 / .35);--shadow-lg:-24px 0 64px rgb(4 5 8 / .5);color-scheme:dark
-}
+}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{font-family:'Geist',sans-serif;font-size:14px;line-height:1.45;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .3s ease,color .3s ease}
@@ -43,6 +44,10 @@ button{cursor:pointer}
 a{color:var(--accent)}a:hover{color:var(--accent-hover)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 ::selection{background:var(--accent-soft);color:var(--ink)}
+[data-sec][hidden]{display:none!important}
+.solo-consulta{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:8px 12px;border-radius:var(--r-s);background:var(--info-soft);color:var(--ink);font-size:13.5px;font-weight:500}
+.solo-consulta[hidden]{display:none}
+.solo-consulta i{color:var(--info);font-size:18px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
 
@@ -455,6 +460,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .ses.pend>i{color:var(--muted)}
 .ses.anulada{color:var(--muted)}
 .ses.anulada .tx{text-decoration:line-through}
+.ses.resto>i{color:var(--warn)}
 .ses .lohizo{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
 .ses .lohizo .ctl,.ses .lohizo .btn{height:40px}
 .ses .motivo,.altas .motivo{flex-basis:100%}
@@ -636,8 +642,6 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .enf-panel{margin-top:6px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface-2);display:flex;flex-direction:column;gap:10px}
 .enf-panel h3{margin:0;font-size:13.5px;font-weight:600}
 .enf-vacio{color:var(--soft)}
-.reac-aplic{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px dashed var(--line-2);border-radius:var(--r-s)}
-.ra-cab{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px}
 .trat-enf{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--soft)}
 .trat-enf li.anulado{text-decoration:line-through;color:var(--muted)}
 .trat-enf b{color:var(--ink);font-weight:600}
@@ -780,6 +784,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
       <button type="button" class="ctl js-tema" aria-label="Cambiar entre modo claro y oscuro"><i class="ph ph-moon"></i></button>
     </header>
     <main id="vista">
+      <p class="solo-consulta" id="solo-consulta" role="status" hidden><i class="ph ph-eye"></i><span>Usuario de solo consulta: puede ver todo, pero no modificar datos.</span></p>
       <section class="vista" id="v-tablero">
         <div class="cab">
           <div>
@@ -918,6 +923,20 @@ const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.
 const ESCRIBEN_CON_OP = { registrarResultado: 1, marcarSesion: 1, guardarRegistro: 1, registrarContactoEnfermeria: 1, darDeAlta: 1,
   anularRegistro: 1, anularSesion: 1, anularAlta: 1, anularResultado: 1, anularContactoEnfermeria: 1 };
 const OPS = new Map(), OP_VIGENCIA_MS = 10 * 60 * 1000;
+/** Todo lo que escribe (con op o sin él). */
+const ESCRIBEN = Object.assign({ editarRegistro: 1, asignarDniIndicacion: 1, confirmarEmparejamiento: 1, marcarSeguimiento: 1, descartar: 1 }, ESCRIBEN_CON_OP);
+/* Roles (26/10/2026, como errorDeRol de Logica.gs): Enfermería es de la enfermera; lo demás que escribe, de admisión; el usuario
+   de solo consulta no escribe nada. */
+const DE_ENFERMERIA = { registrarContactoEnfermeria: 1, anularContactoEnfermeria: 1 };
+const MENSAJES_ROL = { CONSULTA: 'Usuario de solo consulta: no puede modificar datos.', ADMISION: 'Esta acción es de admisión.',
+  ENFERMERIA: 'Esta acción es de enfermería.' };
+function errorDeRolUi(rol, fn) {
+  const pide = DE_ENFERMERIA[fn] ? 'ENFERMERIA' : 'ADMISION';
+  if (!rol || rol === pide) return '';
+  return rol === 'CONSULTA' ? MENSAJES_ROL.CONSULTA : MENSAJES_ROL[pide];
+}
+/** Al volver al Tablero desde otra pantalla, se recarga si la última carga tiene más de esto (o si se escribió fuera). */
+const TABLERO_VIEJO_MS = 60 * 1000;
 function conOp(fn, args) {
   const p = args[0];
   if (!ESCRIBEN_CON_OP[fn] || !p || typeof p !== 'object' || p.op) return { args, clave: '' };
@@ -947,11 +966,20 @@ function textoDemasiadoLargo(p) {
     || largoMal(r.nota, LARGO_TEXTO, 'La nota de la reacción');
 }
 function llamar(fn, ...args0) {
+  // Lo que el rol no puede hacer no sale de la pantalla (el servidor lo rechaza igual).
+  const noRol = ESCRIBEN[fn] && args0[0] && typeof args0[0] === 'object' ? errorDeRolUi(rolDeUsuario(args0[0].usuario), fn) : '';
+  if (noRol) return Promise.reject(new Error(noRol));
   const largo = ESCRIBEN_CON_OP[fn] || fn === 'editarRegistro' ? textoDemasiadoLargo(args0[0]) : '';
   if (largo) return Promise.reject(new Error(largo));
   const { args, clave } = conOp(fn, args0);
   // Se guardó pero algo secundario falló (la BITACORA): la respuesta trae `aviso` y se muestra aparte, sin bloquear.
-  const listo = r => { if (clave) OPS.delete(clave); if (r && typeof r.aviso === 'string' && r.aviso) avisoServidor(r.aviso); return r; };
+  const listo = r => {
+    if (clave) OPS.delete(clave);
+    if (r && typeof r.aviso === 'string' && r.aviso) avisoServidor(r.aviso);
+    // Lo escrito desde otra pantalla deja viejo el tablero: al volver a él se recarga (VISTAS.tablero.mostrar).
+    if (ESCRIBEN[fn] && S.seccion !== 'tablero') S.escribioFuera = true;
+    return r;
+  };
   if (EN_APPS_SCRIPT) {
     return new Promise((res, rej) => google.script.run
       .withSuccessHandler(res)
@@ -975,10 +1003,12 @@ const S = {
   cerrados: [],     // getTablero().cerrados
   fase: 'cargando', // 'cargando' | 'listo' | 'error'
   tipo: '',         // '' | 'REEVALUACION' | 'HIERRO' | 'PROCEDIMIENTO' (seg.tipo, como la app anterior)
-  medico: '', medicoPropuesto: '', mes: '', esp: '', sinTel: false, q: '',
+  medico: '', mes: '', esp: '', sinTel: false, q: '',
   verTodo: {},      // { col: true } las franjas abiertas con «Ver los N →»
   sinRecargar: new Set(), // CLAVE de tarjetas con una sesión marcada cuya tarjeta aún no trae el tablero recargado
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
+  tableroEn: 0,       // Date.now() de la última vez que se aplicó un getTablero
+  escribioFuera: false, // se escribió desde otra pantalla: al volver al Tablero se recarga
   escrituras: 0,      // sube cuando sale cada guardado: una recarga pedida antes puede traer el tablero de antes
   recargaPendiente: false, // una recarga silenciosa descartada que se repide cuando enVuelo quede vacío
   historiaTrasRecarga: '', // Deshacer: CLAVE del panel abierto cuya historia se repide cuando se aplique la recarga
@@ -1013,17 +1043,13 @@ function medicoCorto(m) {
   const bonito = apellido.map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
   return (titulo ? titulo + ' ' : '') + bonito;
 }
-/** 'DR. ELI CABANILLAS' -> el médico de la lista cuyo nombre contiene ELI y CABANILLAS. '' si el usuario no es médico. */
-function medicoDeUsuario(u, medicos) {
-  const t = norm(u).split(/[^A-Z]+/).filter(Boolean);
-  if (!t.length || (t[0] !== 'DR' && t[0] !== 'DRA')) return '';
-  const resto = t.slice(1);
-  return (medicos || []).find(m => { const n = norm(m); return resto.every(x => n.includes(x)); }) || '';
-}
 function adaptarBoot(b) {
   return {
     hoy: b.hoy,
-    usuarios: (b.usuarios || []).map(u => ({ v: u, l: nombreBonito(u), rol: /^DRA?\b/.test(norm(u)) ? 'Médico' : 'Asesora', med: medicoDeUsuario(u, b.medicos) })),
+    // El médico ya no usa la plataforma (26/10/2026): comunica sus decisiones y las registran las admisionistas. Nadie recibe
+    // filtros ni pantallas especiales por su nombre.
+    // rol: ADMISION, ENFERMERIA o CONSULTA (bootstrap().roles, rolDe en Logica.gs); sin él, admisión.
+    usuarios: (b.usuarios || []).map(u => ({ v: u, l: nombreBonito(u), rol: (b.roles && b.roles[u]) || 'ADMISION' })),
     medicos: (b.medicos || []).map(m => ({ k: m, full: m, short: medicoCorto(m) })),
     doctores: b.doctores || [],
     // Una por normTexto (el servidor ya manda la forma más usada): nunca «Hematología» y «Hematologia» a la vez.
@@ -1038,6 +1064,74 @@ function adaptarBoot(b) {
 
 /* ============ Shell ============ */
 const yo = () => (S.boot && S.boot.usuarios.find(u => u.v === S.usuario)) || null;
+/** El rol de quien usa la app ('' sin elegir) y el de un usuario cualquiera (ADMISION, ENFERMERIA o CONSULTA). */
+const rolActual = () => (yo() || {}).rol || '';
+const rolDeUsuario = u => ((S.boot && S.boot.usuarios.find(x => norm(x.v) === norm(u))) || {}).rol || '';
+
+/*
+ * Roles (26/10/2026). Admisión: Tablero, Registro, Pacientes e Indicadores. Enfermería: Enfermería y Pacientes (ficha en solo
+ * lectura); entra directo a Enfermería. Solo consulta: todas las pantallas, sin escribir nada. Sin usuario elegido, todas.
+ */
+const SECCIONES_ROL = { ADMISION: ['tablero', 'registro', 'pacientes', 'indicadores'], ENFERMERIA: ['enfermeria', 'pacientes'] };
+const seccionesDe = rol => SECCIONES_ROL[rol] || Object.keys(VISTAS);
+/** Los botones que escriben. Se deshabilitan donde el rol no escribe (puedeEscribirAqui). */
+const ESCRITURA = '[data-acc],[data-confirmar],[data-confirmar-ultima],[data-anular-ultima],[data-marcar-sesion],[data-anular],[data-confirmar-anular],'
+  + '[data-anular-ses],[data-anular-reg],[data-anular-alta],[data-editar],[data-editar-ficha],[data-guardar-edicion],[data-decision],[data-alta-ok],'
+  + '[data-lohizo],[data-asignar],[data-emparejar],#rgo,[data-enf-ya],[data-enf-nc],[data-enf-guardar]';
+/** ¿Puede el rol escribir con este botón? Enfermería escribe solo en su pantalla; admisión, en todas menos esa; consulta, en ninguna. */
+function puedeEscribirAqui(el) {
+  const rol = rolActual();
+  if (!rol) return true;
+  if (rol === 'CONSULTA') return false;
+  const enf = !!(el && el.closest && el.closest('#v-enfermeria'));
+  return rol === 'ENFERMERIA' ? enf : !enf;
+}
+const mensajeNoPuede = () => rolActual() === 'CONSULTA' ? MENSAJES_ROL.CONSULTA : rolActual() === 'ENFERMERIA' ? MENSAJES_ROL.ADMISION : MENSAJES_ROL.ENFERMERIA;
+/** Deshabilita (y marca con data-sl) los botones que el rol no puede usar; devuelve los que deshabilitó por rol al cambiar de usuario. */
+function marcarSoloLectura() {
+  const rol = rolActual();
+  if ((!rol || rol === 'ADMISION') && !marcarSoloLectura.hay) return;
+  let hay = false;
+  $$(ESCRITURA).forEach(b => {
+    const no = !puedeEscribirAqui(b);
+    if (no) { hay = true; if (!b.disabled) { b.disabled = true; b.dataset.sl = '1'; } }
+    else if (b.dataset.sl) { b.disabled = false; delete b.dataset.sl; }
+  });
+  marcarSoloLectura.hay = hay;
+}
+new MutationObserver(() => {
+  if (marcarSoloLectura.pendiente) return;
+  marcarSoloLectura.pendiente = true;
+  queueMicrotask(() => { marcarSoloLectura.pendiente = false; marcarSoloLectura(); });
+}).observe(document.documentElement, { childList: true, subtree: true });
+// Lo que no se puede deshabilitar a tiempo (un botón recién pintado) tampoco se usa: el clic se detiene y se avisa.
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest(ESCRITURA);
+  if (!b || puedeEscribirAqui(b)) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  avisar(mensajeNoPuede());
+}, true);
+// Los atajos que escriben (1 a 4 y X) no sirven a quien no escribe en el tablero.
+document.addEventListener('keydown', e => {
+  const rol = rolActual();
+  if ((rol !== 'CONSULTA' && rol !== 'ENFERMERIA') || S.seccion !== 'tablero' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target, enCampo = t && (['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable);
+  if (enCampo || !['1', '2', '3', '4', 'x'].includes(String(e.key).toLowerCase())) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  avisar(mensajeNoPuede());
+}, true);
+/** El menú, la nota de solo consulta y la pantalla de entrada según el rol. `entrar`: al arrancar o al cambiar de usuario. */
+function aplicarRol(entrar) {
+  const rol = rolActual(), ok = seccionesDe(rol);
+  document.documentElement.dataset.rol = rol ? rol.toLowerCase() : 'ninguno';
+  $$('[data-sec]').forEach(b => { b.hidden = !ok.includes(b.dataset.sec); });
+  const nota = $('#solo-consulta');
+  if (nota) nota.hidden = rol !== 'CONSULTA';
+  if (entrar && rol === 'ENFERMERIA') ir('enfermeria', true);
+  else if (!ok.includes(S.seccion)) ir(ok[0], true);
+  marcarSoloLectura.hay = true;
+  marcarSoloLectura();
+}
 
 function aplicarModo() {
   document.documentElement.dataset.modo = S.modo;
@@ -1062,8 +1156,7 @@ function saludoHora() {
 }
 function pintarSaludo() {
   const u = yo(), s = saludoHora();
-  const titulo = /^DRA\b/.test(norm(u ? u.v : '')) ? ', doctora ' : ', doctor ';
-  $('#saludo').textContent = !u ? s : u.rol === 'Médico' ? s + titulo + u.l.split(' ').pop() : s + ', ' + u.l;
+  $('#saludo').textContent = !u ? s : s + ', ' + u.l;
 }
 
 function pintarUsuarios() {
@@ -1077,12 +1170,10 @@ function elegirUsuario(v) {
   LS.set('seg.usuario', v);
   $$('.js-usuario').forEach(sel => { sel.value = v; });
   pintarSaludo();
-  // La meta y el filtro propuesto se recalculan sin volver a pedir el tablero (getTablero no depende del usuario).
-  proponerMedico();
+  if (S.boot) aplicarRol(true);
+  // La meta se recalcula sin volver a pedir el tablero (getTablero no depende del usuario).
   if (S.boot) pintarTablero();
-  // En Indicadores también se vuelve a proponer el filtro del médico (D2).
-  IND.medico = null;
-  if (S.seccion === 'indicadores' && IND.listo) pintarIndicadores(false);
+  if (S.boot && typeof validarRegistro === 'function') validarRegistro();
 }
 
 /** Ningún guardado sale sin «¿Quién es usted?». */
@@ -1099,6 +1190,8 @@ const VISTAS = { tablero: {}, registro: {}, pacientes: {}, indicadores: {}, enfe
 /** sinAnim: al arrancar o con el teclado (lo que se dispara con el teclado no se anima; README §7). */
 function ir(sec, sinAnim) {
   if (!VISTAS[sec]) sec = 'tablero';
+  // Una pantalla que el rol no tiene lleva a la primera de las suyas (aplicarRol).
+  if (S.boot && !seccionesDe(rolActual()).includes(sec)) sec = seccionesDe(rolActual())[0];
   const cambiar = () => {
     S.seccion = sec;
     cerrarPanel(true);
@@ -1329,18 +1422,12 @@ function filtrados(conTipo) {
 }
 const hayFiltros = () => !!(S.tipo || S.medico || S.mes || S.esp || S.sinTel || S.q.trim());
 
-/** Al médico se le propone su filtro; puede cambiarlo a «Todos» (D2). Si deja de serlo, se quita lo propuesto. */
-function proponerMedico() {
-  const u = yo();
-  if (u && u.med) { S.medico = u.med; S.medicoPropuesto = u.med; }
-  else if (S.medicoPropuesto) { if (S.medico === S.medicoPropuesto) S.medico = ''; S.medicoPropuesto = ''; }
-}
-
 /** Meta del día: lo que registró HOY quien usa la app (hechosHoyPor), no el total del equipo (hechosHoy). */
 function pintarMeta() {
   const md = $('#metadia'), meta = Number(S.reglas && S.reglas.metaDiaria) || 0;
-  md.hidden = !meta;
-  if (!meta) return;
+  // Quien no registra seguimientos (solo consulta, enfermería) no tiene meta del día.
+  md.hidden = !meta || rolActual() === 'CONSULTA' || rolActual() === 'ENFERMERIA';
+  if (md.hidden) return;
   const barra = md.querySelector('.barra i'), texto = md.lastElementChild;
   if (!S.usuario) {
     md.className = 'meta-dia sin';
@@ -1374,11 +1461,10 @@ function iniciarTablero() {
   const t = LS.get('seg.tipo');
   S.tipo = TIPOS.some(([k]) => k === t) ? t : '';
   S.mes = LS.get('seg.mes');   // se valida contra los meses que hay cuando llega el tablero (pintarTablero)
-  // Médico y especialidad recordados, solo si siguen en la lista; al médico que usa la app, proponerMedico le pone el suyo.
+  // Médico y especialidad recordados, solo si siguen en la lista.
   const med = LS.get('seg.medico'), esp = LS.get('seg.esp');
   S.medico = S.boot.medicos.some(m => m.k === med) ? med : '';
   S.esp = (esp && S.boot.especialidades.find(e => norm(e) === norm(esp))) || '';   // «HEMATOLOGIA» recordada = «HEMATOLOGÍA»
-  proponerMedico();
   $('#fmed').innerHTML = '<option value="">Todos los médicos</option>'
     + S.boot.medicos.map(m => `<option value="${esc(m.k)}" title="${esc(m.full)}">${esc(m.short)}</option>`).join('');
   $('#fesp').innerHTML = '<option value="">Todas las especialidades</option>'
@@ -1443,6 +1529,7 @@ async function cargarTablero(pedido, silencioso, intento) {
       S.recargaPendiente = true;
       return false;
     }
+    S.tableroEn = Date.now();
     if (silencioso) {
       conFlip(() => { adaptarTablero(r); pintarTablero(); });
       trasRecargar();
@@ -1481,10 +1568,9 @@ function pintarTablero() {
   const vis = listo ? filtrados(true) : [], base = listo ? filtrados(false) : [];
   const enCol = c => vis.filter(p => p.col === c);
   const nCol = c => listo ? enCol(c).length : '—';
-  const u = yo(), soloSuyos = !!(u && u.med && S.medico === u.med);
   const d = diaUTC(S.hoy).getUTCDay();
   pintarSaludo();   // la hora cambia durante el día: el saludo se repasa con cada repintado del tablero
-  $('#subtit').textContent = `${DSEM_LARGO[d] || ''} ${dmy(S.hoy)}${listo ? ' · ' + nCol(1) + ' por contactar' : ''}${soloSuyos ? ' · solo sus pacientes' : ''}`;
+  $('#subtit').textContent = `${DSEM_LARGO[d] || ''} ${dmy(S.hoy)}${listo ? ' · ' + nCol(1) + ' por contactar' : ''}`;
   pintarMeta();
 
   // El detalle de cada fase (siguen a los filtros, como las tarjetas). Va en la cabecera de su franja.
@@ -1628,6 +1714,7 @@ document.addEventListener('pointerdown', e => {
   if (e.button !== 0 || e.pointerType === 'touch' || !MULTICOL.matches || seleccion.panel) return;
   if (e.target.closest('button, a, input, select, textarea')) return;
   const c = e.target.closest('#tablero [data-card]'); if (!c) return;
+  if (!puedeEscribirAqui(c)) return;   // solo consulta: no se arrastran tarjetas
   const p = S.pacientes.find(x => x.id === c.dataset.card); if (!p || p.col === 4) return;
   arrastre = { p, el: c, x: e.clientX, y: e.clientY, on: false, col: 0, g: null };
 });
@@ -2010,7 +2097,6 @@ function sesionesHtml(p) {
   const agendada = sesionAgendada(p);
   return `<label class="campo">Fecha de la sesión<input type="date" id="pfs" value="${esc(f)}"${r.min ? ` min="${esc(r.min)}"` : ''} max="${esc(r.max)}"></label>`
     + (ultima ? '' : `<label class="campo">Próxima sesión (opcional)<input type="date" id="pfp" value="${esc(P.proximaF)}" min="${esc(rp.min)}" max="${esc(rp.max)}"></label>`)
-    + (p.t === 'hier' && p.idRegistro ? htmlReac('panel:' + p.id) : '')
     + `<div class="acc"><button type="button" data-marcar-sesion><i class="ph ph-check-square i-ok"></i><span>Marcar sesión ${k} hecha</span><span class="kbd">1</span></button>`
     + (agendada ? '<button type="button" data-acc="cambiar"><i class="ph ph-calendar-blank i-info"></i><span>Cambiar fecha</span><span class="kbd">2</span></button>' : '')
     + `<button type="button" data-anular-ultima${ult && !P.anularUltima && !sesionSinRecargar(p) ? '' : ' disabled'}><i class="ph ph-arrow-counter-clockwise"></i><span>Anular la última</span></button></div>`
@@ -2038,11 +2124,7 @@ function marcarSesionPanel(teclado) {
   const r = rangoSesion(p), f = P.sesionF || r.f, m = validarFecha('lohizo', f, r);
   if (m) { avisar(m); return; }
   const extra = { fecha: f, teclado: !!teclado }, prox = sesionDe(p).ultima ? '' : String(P.proximaF || '').trim();
-  // Enfermería: la reacción durante la aplicación viaja con la sesión (marcarSesion la guarda en el mismo candado).
-  const reac = p.t === 'hier' ? reaccionDe('panel:' + p.id) : null;
-  if (reac && reac.error) { avisar(reac.error); return; }
-  if (reac) extra.reaccion = reac;
-  delete REAC['panel:' + p.id];
+  // La reacción durante la aplicación ya no se pregunta aquí: la registra la enfermera en su fila «Aplicación» (26/10/2026).
   if (prox) {
     const rp = rangoProxima(f);
     if (prox <= f) { avisar(`La próxima sesión debe ser después de la sesión que marca (${dmy(f)}).`); return; }
@@ -2671,7 +2753,15 @@ $('#panel').addEventListener('change', e => {
   if (e.target.name === 'pn') { P.paso.tel = e.target.value; pintarPanel(); }
 });
 $('#velo').addEventListener('click', () => cerrarPanel());
-VISTAS.tablero.mostrar = () => pastilla($('#seg'), true);
+VISTAS.tablero.mostrar = () => {
+  pastilla($('#seg'), true);
+  // Volver desde otra pantalla: si allí se escribió o la última carga tiene más de un minuto, se recarga en silencio
+  // (sin esqueletos; los filtros viven en S y no se tocan). Otra pestaña pudo cerrar o mover tarjetas entretanto (caso 63).
+  if (S.fase === 'listo' && (S.escribioFuera || Date.now() - S.tableroEn > TABLERO_VIEJO_MS)) {
+    S.escribioFuera = false;
+    cargarTablero(null, true);
+  }
+};
 
 /* ============ REGISTRO (README §6.3; MAPEO §1.4-§1.8) ============ */
 /**
@@ -3117,9 +3207,10 @@ function validarRegistro() {
   const largo = esDecision() ? dniLargo(dniEscrito) : (dniEscrito ? documentoMal(dniEscrito) : '')
     || (!esDecision() && $('#rnom') ? largoMal($('#rnom').value, LARGO_NOMBRE, 'El nombre') : '')
     || (RG.modo === 'control' && $('#rexamenes') ? largoMal($('#rexamenes').value, LARGO_TEXTO, 'Los exámenes') : '');
-  const muerto = !esDecision() && RG.pac ? mensajeFallecido(RG.pac.fallecido) : '';
+  // Con «Falleció» vigente tampoco se registra una decisión del médico (el servidor la rechaza con el mismo texto).
+  const muerto = RG.pac ? mensajeFallecido(RG.pac.fallecido) : '';
   const mal = largo || muerto || (f.length ? '' : fechaMalRegistro());
-  b.disabled = f.length > 0 || !!mal || RG.enviando;
+  b.disabled = f.length > 0 || !!mal || RG.enviando || !puedeEscribirAqui(b);
   $$('#rseg [data-rtab]').forEach(x => { x.disabled = RG.enviando; });
   $('#rfalta').textContent = largo || muerto || (f.length ? `Falta: ${f.join(', ')}.` : mal ? mal
     : RG.modo === 'indicacion' ? (n === 1 ? `Se creará 1 registro${conSesion}.` : `Se crearán ${n} registros${conSesion}.`)
@@ -3292,6 +3383,9 @@ function formEdicion(x, ed) {
 function fechaMalEdicion(x, borrador) {
   const c = cambiosEdicion(x, borrador || {}), hoy = S.hoy;
   if ('contacto' in c && telefonoMal(c.contacto)) return telefonoMal(c.contacto);
+  // Como validarEdicionRegistro: el total no baja de las sesiones ya hechas (el mismo texto que el servidor).
+  const hechas = Number(x.HECHAS) || 0;
+  if ('sesiones' in c && c.sesiones < hechas) return 'Ya hizo ' + hechas + ' sesiones: el total no puede ser menor.';
   if ('fecha' in c) { if (!c.fecha) return 'Falta la fecha.'; if (c.fecha > hoy) return 'La fecha no puede ser futura.'; }
   if (c.fechaInicio && (c.fechaInicio < hoy || c.fechaInicio > masDias(hoy, 180))) return 'La fecha de la primera sesión va de hoy a 180 días.';
   if ('fechaRetorno' in c) {
@@ -3304,7 +3398,7 @@ function fechaMalEdicion(x, borrador) {
 function refrescarEdicion(caja, x, borrador, guardando) {
   if (!caja || !x) return;
   const mal = fechaMalEdicion(x, borrador), b = caja.querySelector('[data-guardar-edicion]'), p = caja.querySelector('.aviso-edicion');
-  if (b) b.disabled = !!mal || !!guardando;
+  if (b) b.disabled = !!mal || !!guardando || !puedeEscribirAqui(b);
   if (p) p.textContent = mal;
 }
 function abrirEdicion(id) {
@@ -3501,7 +3595,7 @@ function adaptarFicha(r) {
       return { esp: s.ESPECIALIDAD, estado: NOMBRE_ESTADO[s.ESTADO] || frase(s.ESTADO), tono: s.ESTADO === 'ALTA' ? 'e-alta' : esBueno(s) ? 'e-ok' : 'e-mal',
         perfil: perfilDe(s), pend: s.PENDIENTE || '', consultas: propias, ultima: hechas.length ? hechas[hechas.length - 1].f : '',
         esperada: esperada && !SIN_ESPERA[s.ESTADO] ? { f: esperada, vence: isoDe(s.VENCE), pasada: esperada <= S.hoy } : null,
-        puedeAlta: s.ESTADO !== 'ALTA' && !conAlta, medico: s.MEDICO_ULTIMO || '' };
+        puedeAlta: s.ESTADO !== 'ALTA' && !conAlta && !r.fallecido, medico: s.MEDICO_ULTIMO || '' };
     }),
     trats: (r.registros || []).map(x => {
       const e = String(x.ESTADO_REGISTRO || x.ESTADO || ''), control = x.TIPO === 'CONTROL';
@@ -3510,7 +3604,7 @@ function adaptarFicha(r) {
         estado: NOMBRE_REG[e] || frase(e), tono: TONO_REG[e] || '', anulado: e === 'ANULADO', cerrado: e === 'CERRADO',
         abierto: e === 'COTIZADO' || e === 'EN CURSO' || (e === 'PROGRAMADO' && !control), anulable: e !== 'ANULADO' && e !== 'COMPLETO',
         linea: lineaEstadoRegistro(x), fila: Object.assign({}, x, { FECHA: isoDe(x.FECHA), FECHA_INICIO: isoDe(x.FECHA_INICIO), FECHA_RETORNO: isoDe(x.FECHA_RETORNO) }),
-        motivo: x.MOTIVO_ANULACION || '',
+        motivo: x.MOTIVO_ANULACION || '', porFallo: x.POR_FALLO === true, editable: !r.fallecido,
         sesiones: (x.sesiones || []).map(s => ({ id: String(s.ID || ''), numero: Number(s.NUMERO) || 0, f: isoDe(s.FECHA), quien: nombreBonito(s.ASESORA) }))
           .sort((a, b) => a.numero - b.numero),
         hierro: norm(x.TIPO) === 'HIERRO',
@@ -3738,11 +3832,15 @@ function htmlTrat(t) {
         ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span><span class="lohizo">`
           + `<input type="date" class="ctl mono" data-fecha-ses="${esc(t.id)}" value="${esc(f)}" min="${esc(ultima)}" max="${esc(S.hoy)}" aria-label="Fecha de la sesión ${i + 1}">`
           + `<button type="button" class="btn btn-p" data-lohizo="${esc(t.id)}">Lo hizo</button></span>`
-          + (t.hierro ? htmlReac('ficha:' + t.id) : '') + '</li>';
+          + '</li>';
       } else if (!t.cerrado) ses += `<li class="ses pend"><i class="ph ph-circle-dashed"></i><span class="tx">${nombre} · pendiente</span></li>`;
       // Cerrado («No desea realizarse», no vino): las sesiones que faltan ya no están pendientes; solo se listan las hechas.
     }
     ses += (PA.sesAnuladas[t.id] || []).map(a => `<li class="ses anulada"><i class="ph ph-x-circle"></i><span class="tx">Sesión ${esc(a.numero)} · <span class="mono">${esc(dmy(a.f))}</span> · ${esc(a.quien)}</span> · anulada: ${esc(a.motivo)}</li>`).join('');
+  } else if (t.porFallo) {
+    // Un registro que se deshizo por un fallo y del que quedó viva una sesión (falló también anularla): se ve y se anula aquí (caso 7).
+    ses = t.sesiones.map(s => `<li class="ses resto"><i class="ph ph-warning"></i><span class="tx">Sesión ${s.numero} · <span class="mono">${esc(dmy(s.f))}</span> · ${esc(s.quien)} · quedó viva al deshacer el registro: anúlela</span>`
+      + (!anulandoAqui('sesion', s.id) ? ` <button type="button" class="enlace" data-anular-ses="${esc(s.id)}">Anular sesión</button>` : '') + motivoAqui('sesion', s.id) + '</li>').join('');
   }
   return `<div class="trat" data-reg="${esc(t.id)}"><div class="trat-cab"><b>${esc(t.titulo)}</b> <span class="tag ${t.tono}">${esc(t.estado)}</span></div>`
     + `<span class="trat-meta">${esc(t.id)} · ${esc(dmy(t.f))} · ${esc(t.med)} · registró ${esc(t.quien)}${t.anulado ? ' · anulado' + (t.motivo ? ': ' + esc(t.motivo) : '') : ''}</span>`
@@ -3753,7 +3851,7 @@ function htmlTrat(t) {
       + ` · ${esc(f.contestado ? (f.tipo && f.tipo !== 'NINGUNA' ? (TIPO_REAC[f.tipo] || f.tipo).toLowerCase() + ': ' + f.reaccion : 'sin reacción') : 'no contestó')}`
       + `${f.nota ? ' · ' + esc(f.nota) : ''} · <span class="mono">${esc(f.cuando)}</span> · ${esc(f.quien)}${f.anulado && f.motivo ? ' · anulado: ' + esc(f.motivo) : ''}</li>`).join('') + '</ul></div>' : '')
     + (editando ? formEdicion(t.fila, { borrador: PA.borrador, guardando: PA.enVuelo === 'editarRegistro' }) : '')
-    + (!t.anulado && !editando ? '<div class="trat-acc">' + `<button type="button" class="enlace" data-editar-ficha="${esc(t.id)}">Editar</button>`
+    + (!t.anulado && !editando ? '<div class="trat-acc">' + (t.editable ? `<button type="button" class="enlace" data-editar-ficha="${esc(t.id)}">Editar</button>` : '')
       + (t.anulable && !anulandoAqui('registro', t.id) ? `<button type="button" class="enlace" data-anular-reg="${esc(t.id)}">Anular registro</button>` : '')
       + (t.anulable ? motivoAqui('registro', t.id) : '') + '</div>' : '')
     + '</div>';
@@ -3862,11 +3960,9 @@ function loHizo(b) {
   if (!t || PA.enVuelo) return;
   const f = t.id in PA.fechas ? PA.fechas[t.id] : S.hoy;
   if (!f) { avisar('Falta la fecha de la sesión.'); return; }
-  const reac = t.hierro ? reaccionDe('ficha:' + t.id) : null;
-  if (reac && reac.error) { avisar(reac.error); return; }
-  escribirFicha({ boton: b, fn: 'marcarSesion', datos: Object.assign({ id: t.id, fecha: f, nota: '', sesion: t.sesiones.length + 1 }, reac ? { reaccion: reac } : {}),
+  escribirFicha({ boton: b, fn: 'marcarSesion', datos: { id: t.id, fecha: f, nota: '', sesion: t.sesiones.length + 1 },
     aviso: r => r.completo ? 'Tratamiento completado: ' + t.id + '.' : `Sesión ${(r.sesion && Number(r.sesion.NUMERO)) || t.sesiones.length + 1} de ${t.n} registrada: ${t.id}.`,
-    luego: () => { delete PA.fechas[t.id]; delete REAC['ficha:' + t.id]; } });
+    luego: () => { delete PA.fechas[t.id]; } });
 }
 
 /* ---- Anular (registro, sesión, alta o seguimiento): motivo en la misma fila, como en el panel ---- */
@@ -4165,7 +4261,7 @@ const ACUMULADAS = { llegan: 1, campanas: 1, procs: 1 };
 const IND = {
   listo: false, pidiendo: false, error: '', quieto: false,
   tab: 'resumen', mes: '', esp: '', sub: 'tipo', verCamp: false, soloMes: false,
-  medico: null,     // null = proponer el del usuario médico (D2) al pintar; luego, lo que elija
+  medico: '',       // el médico elegido en el filtro ('' = todos)
   dniEscrito: {},   // «Procedimientos sin paciente»: lo escrito en cada fila, para que un repintado no lo borre
   asignando: ''     // el ID de la fila que se está guardando: no se manda otra
 };
@@ -4234,7 +4330,6 @@ function pintarIndicadores(anim) {
   $('#mant').disabled = i <= 0;
   $('#msig').disabled = i < 0 || i >= meses.length - 1;
   const meds = medicosInd();
-  if (IND.medico === null) IND.medico = medicoDeUsuario(S.usuario, meds);
   if (IND.medico && !meds.includes(IND.medico)) IND.medico = '';
   $('#imed').innerHTML = '<option value="">Todos los médicos</option>'
     + meds.map(m => `<option value="${esc(m)}" title="${esc(m)}">${esc(medicoCorto(m))}</option>`).join('');
@@ -4742,19 +4837,23 @@ function htmlContactoEnf(c) {
   return `<li class="enf${vencido ? ' vencido' : ''}" data-enf="${esc(c.CLAVE)}">`
     + `<div class="enf-cab"><b>${esc(nombreBonito(c.NOMBRE) || 'DNI ' + c.DNI)}</b><span class="tag t-hier">${esc(marca || 'Hierro')}</span></div>`
     + `<div class="enf-l">Sesión ${c.NUMERO_SESION} de ${c.SESIONES} · aplicada el ${esc(dm(c.FECHA_SESION))} · DNI ${esc(c.DNI)}</div>`
-    + `<div class="enf-cuando">${esc(diaTexto(c.DIA))} · ${c.GRUPO === 'HOY' ? 'toca hoy' : (vencido ? 'tocaba el ' : 'toca el ') + esc(dm(c.FECHA))}${vencido ? ' · hace ' + plural(hace, 'día', 'días') : ''}</div>`
+    + (c.APLICACION ? `<div class="enf-cuando">Aplicación · sesión ${c.NUMERO_SESION} del ${esc(dm(c.FECHA_SESION))} · ¿hubo reacción al aplicarla?</div>`
+      : `<div class="enf-cuando">${esc(diaTexto(c.DIA))} · ${c.GRUPO === 'HOY' ? 'toca hoy' : (vencido ? 'tocaba el ' : 'toca el ') + esc(dm(c.FECHA))}${vencido ? ' · hace ' + plural(hace, 'día', 'días') : ''}</div>`)
     + reacs + (c.NO_CONTESTO ? `<span class="enf-nc">No contestó ${c.NO_CONTESTO === 1 ? '1 vez' : c.NO_CONTESTO + ' veces'}</span>` : '')
     + '<div class="enf-pie">' + (tel ? `<span class="enf-tel"><i class="ph ph-phone"></i>${esc(telBonito(tel))}<button type="button" class="btn btn-s" data-enf-copiar="${esc(tel)}"><i class="ph ph-copy"></i>Copiar</button></span>`
       : c.USUARIO ? `<span class="enf-tel"><i class="ph ph-at"></i>${esc(c.USUARIO)}</span>` : '<span class="enf-tel sin"><i class="ph ph-phone-slash"></i>Sin teléfono</span>')
-    + `<span class="enf-acc"><button type="button" class="btn btn-p" data-enf-ya="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''} aria-expanded="${abierto}"><i class="ph ph-check"></i>Ya me contacté</button>`
-    + `<button type="button" class="btn btn-s" data-enf-nc="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''}><i class="ph ph-phone-x"></i>No contestó</button></span></div>`
+    + `<span class="enf-acc"><button type="button" class="btn btn-p" data-enf-ya="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''} aria-expanded="${abierto}"><i class="ph ph-check"></i>${c.APLICACION ? 'Registrar' : 'Ya me contacté'}</button>`
+    + (c.APLICACION ? '' : `<button type="button" class="btn btn-s" data-enf-nc="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''}><i class="ph ph-phone-x"></i>No contestó</button>`) + '</span></div>'
     + (abierto ? htmlPanelEnf(c) : '') + '</li>';
 }
 /** «Ya me contacté»: ¿tuvo reacción? (No / Inmediata / Mediata), cuáles (chips), nota (obligatoria con «Otra») y Guardar. */
 function htmlPanelEnf(c) {
   const con = EN.tipo === 'INMEDIATA' || EN.tipo === 'MEDIATA', otra = EN.sel.some(esOtra);
-  return `<div class="enf-panel" role="group" aria-label="Contacto con ${esc(nombreBonito(c.NOMBRE))}"><h3>¿Tuvo reacción?</h3>`
-    + `<div class="chips" role="radiogroup" aria-label="¿Tuvo reacción?">${[['NINGUNA', 'No'], ['INMEDIATA', 'Inmediata'], ['MEDIATA', 'Mediata']].map(([k, l]) =>
+  // «Aplicación» (DIA 0): No o Sí, y la reacción es inmediata.
+  const opciones = c.APLICACION ? [['NINGUNA', 'No'], ['INMEDIATA', 'Sí']] : [['NINGUNA', 'No'], ['INMEDIATA', 'Inmediata'], ['MEDIATA', 'Mediata']];
+  const pregunta = c.APLICACION ? '¿Reacción durante la aplicación?' : '¿Tuvo reacción?';
+  return `<div class="enf-panel" role="group" aria-label="${c.APLICACION ? 'Aplicación de' : 'Contacto con'} ${esc(nombreBonito(c.NOMBRE))}"><h3>${pregunta}</h3>`
+    + `<div class="chips" role="radiogroup" aria-label="${pregunta}">${opciones.map(([k, l]) =>
       `<button type="button" class="pill" role="radio" data-enf-tipo="${k}" aria-checked="${EN.tipo === k}" aria-pressed="${EN.tipo === k}">${l}</button>`).join('')}</div>`
     + (con ? `<h3>¿Cuál?</h3><div class="chips" aria-label="Reacciones">${reaccionesCat().map(r =>
       `<button type="button" class="chip" data-enf-reac="${esc(r)}" aria-pressed="${EN.sel.includes(r)}">${esc(r)}</button>`).join('')}</div>` : '')
@@ -4769,7 +4868,7 @@ function pintarEnfermeria() {
   if (EN.error && !EN.lista) { C.innerHTML = `<p class="vacio">No se pudo cargar la lista: ${esc(EN.error)} <button type="button" class="pill" data-enf-reintentar><i class="ph ph-arrow-clockwise"></i>Reintentar</button></p>`; return; }
   if (!EN.lista) { C.innerHTML = '<p class="vacio" role="status">Cargando los contactos…</p>'; return; }
   const n = g => EN.lista.filter(c => c.GRUPO === g).length;
-  $('#enf-sub').textContent = `${plural(n('VENCIDO') + n('HOY'), 'contacto', 'contactos')} por hacer hoy · tras cada sesión de hierro: al día siguiente, a los 3 y a los 5 días.`;
+  $('#enf-sub').textContent = `${plural(n('VENCIDO') + n('HOY'), 'contacto', 'contactos')} por hacer hoy · tras cada sesión de hierro: la aplicación (¿hubo reacción?), al día siguiente, a los 3 y a los 5 días.`;
   if (!EN.lista.length) { C.innerHTML = '<p class="vacio enf-vacio"><i class="ph ph-check-circle"></i>No hay contactos pendientes. Aparecen solos al marcar cada sesión de hierro.</p>'; return; }
   C.innerHTML = GRUPOS_ENF.map(([g, t, r]) => {
     const L = EN.lista.filter(c => c.GRUPO === g);
@@ -4824,7 +4923,8 @@ async function guardarContactoEnf(clave, datos) {
     invalidarIndicadores();
     pintarEnfermeria();
     const id = r.fila && r.fila.ID;
-    const que = datos.resultado === 'CONTACTADO' ? (datos.reaccionTipo === 'NINGUNA' ? 'contactado, sin reacción' : `contactado, reacción ${TIPO_REAC[datos.reaccionTipo].toLowerCase()}: ${datos.reacciones.join(', ')}`) : 'no contestó';
+    const que = c.APLICACION ? (datos.reaccionTipo === 'NINGUNA' ? 'sin reacción' : `reacción inmediata: ${datos.reacciones.join(', ')}`)
+      : datos.resultado === 'CONTACTADO' ? (datos.reaccionTipo === 'NINGUNA' ? 'contactado, sin reacción' : `contactado, reacción ${TIPO_REAC[datos.reaccionTipo].toLowerCase()}: ${datos.reacciones.join(', ')}`) : 'no contestó';
     avisar(`Guardado: ${nombre} · ${diaTexto(c.DIA).toLowerCase()} · ${que}.`, id ? { texto: 'Deshacer', fn: () => deshacerEnf(id, quien, nombre) } : null);
     if (datos.resultado === 'CONTACTADO') { const sig = $('#enf-cuerpo [data-enf-ya]'); if (sig) sig.focus({ preventScroll: true }); }
   } catch (e) {
@@ -4843,38 +4943,7 @@ async function deshacerEnf(id, quien, nombre) {
   await cargarEnfermeria(true);
 }
 
-/* ---- «¿Reacción durante la aplicación?» al marcar una sesión de hierro (panel del tablero y ficha) ---- */
-const REAC = {};   // ctx ('panel:CLAVE' o 'ficha:REG-…') -> { hubo, sel, nota }
-const estadoReac = ctx => REAC[ctx] = REAC[ctx] || { hubo: false, sel: [], nota: '' };
-function htmlReac(ctx) {
-  const e = estadoReac(ctx), otra = e.sel.some(esOtra);
-  return `<div class="reac-aplic" data-reac-ctx="${esc(ctx)}"><div class="ra-cab"><span>¿Reacción durante la aplicación?</span>`
-    + `<span class="chips"><button type="button" class="pill" data-ra="no" aria-pressed="${!e.hubo}">No</button><button type="button" class="pill" data-ra="si" aria-pressed="${e.hubo}">Sí</button></span></div>`
-    + (e.hubo ? `<div class="chips" aria-label="Reacciones durante la aplicación">${reaccionesCat().map(r => `<button type="button" class="chip" data-ra-reac="${esc(r)}" aria-pressed="${e.sel.includes(r)}">${esc(r)}</button>`).join('')}</div>`
-      + `<label class="campo">Nota ${otra ? '(obligatoria con «Otra»)' : '(opcional)'}<input data-ra-nota autocomplete="off" value="${esc(e.nota)}"></label>` : '')
-    + '</div>';
-}
-/** Lo que se envía a marcarSesion: null (sin reacción), { error } o { hubo, reacciones, nota }. */
-function reaccionDe(ctx) {
-  const e = REAC[ctx];
-  if (!e || !e.hubo) return null;
-  if (!e.sel.length) return { error: 'Elija al menos una reacción.' };
-  if (e.sel.some(esOtra) && !e.nota.trim()) return { error: 'Escriba cuál fue la reacción en la nota («Otra»).' };
-  return { hubo: true, reacciones: e.sel.slice(), nota: e.nota.trim() };
-}
-document.addEventListener('click', e => {
-  const b = e.target.closest('.reac-aplic [data-ra], .reac-aplic [data-ra-reac]'); if (!b) return;
-  const box = b.closest('.reac-aplic'), ctx = box.dataset.reacCtx, st = estadoReac(ctx);
-  if (b.dataset.ra) st.hubo = b.dataset.ra === 'si';
-  else st.sel = st.sel.includes(b.dataset.raReac) ? st.sel.filter(x => x !== b.dataset.raReac) : st.sel.concat(b.dataset.raReac);
-  const sel = b.dataset.ra ? `[data-ra="${b.dataset.ra}"]` : `[data-ra-reac="${CSS.escape(b.dataset.raReac)}"]`;
-  box.outerHTML = htmlReac(ctx);
-  const nuevo = $(`.reac-aplic[data-reac-ctx="${CSS.escape(ctx)}"] ${sel}`); if (nuevo) nuevo.focus({ preventScroll: true });
-});
-document.addEventListener('input', e => {
-  if (!e.target.matches || !e.target.matches('.reac-aplic [data-ra-nota]')) return;
-  estadoReac(e.target.closest('.reac-aplic').dataset.reacCtx).nota = e.target.value;
-});
+/* La «¿Reacción durante la aplicación?» ya no se pregunta al marcar la sesión: es la fila «Aplicación» (DIA 0) de Enfermería. */
 
 /* ============ Arranque ============ */
 async function iniciar() {
@@ -4917,14 +4986,13 @@ async function arrancar() {
   S.usuario = S.boot.usuarios.some(u => u.v === recordado) ? recordado : '';
   pintarUsuarios();
   pintarSaludo();
+  aplicarRol(true);
   iniciarTablero();
   iniciarRegistro();
   iniciarPacientes();
   iniciarIndicadores();
   iniciarEnfermeria();
   cargarTablero(pedidoTablero);
-  // D2: el médico entra directo a Indicadores, con su filtro propuesto (puede cambiarlo a «Todos»).
-  if (yo() && yo().rol === 'Médico') ir('indicadores', true);
 }
 
 /* ==========================================================================
@@ -4943,7 +5011,10 @@ async function arrancar() {
 const DEMO = (() => {
   const hoy = '2026-10-01';
   let demoListo = false;   // altaSinReevaluacion mira las altas y las citas, que se declaran más abajo
-  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS', 'ENFERMERA PRUEBA'];   // nombres inventados
+  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'ENFERMERA PRUEBA', 'ADMINISTRACION', 'MARKETING'];   // nombres inventados
+  // Como rolDe (Logica.gs): CATALOGOS.USUARIOS_ENFERMERIA y USUARIOS_CONSULTA; el resto, admisión.
+  const ROLES = { 'ENFERMERA PRUEBA': 'ENFERMERIA', ADMINISTRACION: 'CONSULTA', MARKETING: 'CONSULTA' };
+  const rolDemo = u => { const k = usuarios.find(y => mismo(y, u)); return k ? (ROLES[k] || 'ADMISION') : ''; };
   const reglas = { espera: 15, maxSeguimientos: 3, graciaAgenda: 2, diasEntreSesiones: 7, esperaCotizacion: 7, metaRetorno: 60, metaTratamiento: 95, metaDiaria: 15,
     postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
   const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
@@ -5057,8 +5128,9 @@ const DEMO = (() => {
       if (t.PROXIMA_AGENDADA) return 'Cita el ' + diaCorto(t.PROXIMA_AGENDADA);
       return '';
     }
+    // Sin fecha válida de la última sesión, sin «próxima» (como etiquetaDe de Tablero.gs: nunca NaN).
     if (t.COLUMNA === 'EN_TRATAMIENTO') return 'Sesión ' + t.HECHAS + ' de ' + t.SESIONES + ' · faltan ' + (Number(t.SESIONES) - Number(t.HECHAS))
-      + ' · próxima ~' + dm(mas(t.ULTIMA_SESION, reglas.diasEntreSesiones));
+      + (/^\d{4}-\d{2}-\d{2}$/.test(String(t.ULTIMA_SESION || '')) ? ' · próxima ~' + dm(mas(t.ULTIMA_SESION, reglas.diasEntreSesiones)) : '');
     return t.ETIQUETA || '';
   }
   /** Pone la tarjeta en `columna` (o la saca del tablero con ''), con CLAVE, ETIQUETA y FECHA_CLAVE como tarjeta_(). */
@@ -5126,13 +5198,6 @@ const DEMO = (() => {
     if (!pedidas.length) throw new Error('Elija al menos una reacción.');
     return [...new Set(pedidas.map(p => { const r = REACCIONES.find(y => mismo(y, p)); if (!r) throw new Error('La reacción «' + p + '» no está en el catálogo.'); return r; }))];
   };
-  /** reaccionAplicacion: null sin reacción; si no, la fila DIA 0 (INMEDIATA) sin la sesión. */
-  const reaccionDemo = reac => {
-    if (!reac || !reac.hubo) return null;
-    const lista = reaccionesDe(reac.reacciones), nota = String(reac.nota || '').trim();
-    if (lista.some(r => mismo(r, 'Otra')) && !nota) throw new Error('Escriba cuál fue la reacción en la nota («Otra»).');
-    return { DIA: 0, RESULTADO: 'CONTACTADO', REACCION_TIPO: 'INMEDIATA', REACCION: lista.join(' · '), NOTA: nota };
-  };
   /** contactosEnfermeria: pendientes, en orden de llamada (vencidos, hoy, próximos 7 días). */
   function contactosDemo() {
     const desde = mas(hoy, -CORTE_ENF), hasta = mas(hoy, 7), out = [];
@@ -5143,7 +5208,8 @@ const DEMO = (() => {
       const reacciones = filas.filter(f => f.RESULTADO === 'CONTACTADO' && f.REACCION_TIPO && f.REACCION_TIPO !== 'NINGUNA')
         .sort((a, b) => a.DIA - b.DIA).map(f => ({ DIA: f.DIA, TIPO: f.REACCION_TIPO, REACCION: f.REACCION }));
       const tel = normTel(r.CONTACTO);
-      DIAS_ENF.forEach(dia => {
+      // Como contactosEnfermeria: DIA 0 = «Aplicación» (la enfermera registra si hubo reacción al aplicarla).
+      [0].concat(DIAS_ENF).forEach(dia => {
         const fecha = mas(x.FECHA, dia);
         if (fecha < desde || fecha > hasta) return;
         const delDia = filas.filter(f => f.DIA === dia);
@@ -5151,7 +5217,7 @@ const DEMO = (() => {
         out.push({ CLAVE: x.ID + '|' + dia, ID_REGISTRO: r.ID, ID_SESION: x.ID, NUMERO_SESION: Number(x.NUMERO), DNI: r.DNI, NOMBRE: r.NOMBRE,
           TELEFONOS: tel.length === 9 ? tel : '', USUARIO: tel.length === 9 ? '' : r.CONTACTO, TRATAMIENTO: frase(r.DETALLE), MARCA: frase(r.MARCA),
           SESIONES: Number(r.SESIONES), FECHA_SESION: x.FECHA, DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
-          NO_CONTESTO: delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length, REACCIONES: reacciones });
+          NO_CONTESTO: delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length, APLICACION: dia === 0, REACCIONES: reacciones });
       });
     });
     return out.sort((a, b) => a.FECHA < b.FECHA ? -1 : a.FECHA > b.FECHA ? 1 : a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : a.CLAVE < b.CLAVE ? -1 : 1);
@@ -5583,6 +5649,7 @@ const DEMO = (() => {
   const api = {
     bootstrap: () => ({
       hoy, usuarios, motivos, resultados: ORDEN_RESULTADOS,
+      roles: Object.fromEntries(usuarios.map(u => [u, rolDemo(u)])),
       especialidades: [...new Set(series.map(x => x.ESPECIALIDAD).concat(antiguas.map(x => x.ESPECIALIDAD_CONSULTA)))].sort(),
       medicos: [...new Set(series.concat(antiguas).map(x => x.MEDICO_ULTIMO))].sort(),
       doctores, procedimientos, tratamientos, marcas, reacciones: REACCIONES.slice(),
@@ -5598,6 +5665,8 @@ const DEMO = (() => {
       if (!c) throw new Error('Ese contacto ya no está en la lista. Recargue la página.');
       const resultado = ['CONTACTADO', 'NO CONTESTO'].find(r => mismo(r, x.resultado));
       if (!resultado) throw new Error('Elija si contestó o no.');
+      if (c.DIA === 0 && resultado !== 'CONTACTADO') throw new Error('En la aplicación no hay llamada: registre si hubo reacción (no o inmediata).');
+      if (c.DIA === 0 && mismo(x.reaccionTipo, 'MEDIATA')) throw new Error('En la aplicación la reacción es inmediata (o ninguna).');
       const nota = String(x.nota || '').trim();
       let tipo = '', reaccion = '';
       if (resultado === 'CONTACTADO') {
@@ -5699,7 +5768,7 @@ const DEMO = (() => {
           return { ID: r.ID, FECHA: r.FECHA, TIPO: r.TIPO, TEXTO: textoRegistro(r), DOCTOR: r.DOCTOR, ASESORA: r.ASESORA, SESIONES: f.SESIONES, HECHAS: ss.length,
             ESTADO: estado, ESTADO_REGISTRO: estado, CIERRE: cerrado ? (tc.CIERRE || 'FALLECIÓ') : '', FECHA_CIERRE: cerrado ? (tc.FECHA_CIERRE || hoy) : '', NO_VINO: '',
             SIN_REEVALUACION: estado === 'COMPLETO' ? reg(r).SIN_REEVALUACION : '',
-            MOTIVO_ANULACION: r.MOTIVO_ANULACION, NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
+            MOTIVO_ANULACION: r.MOTIVO_ANULACION, POR_FALLO: !!r.ANULADO && /^(No se guardó|Se rehízo)/.test(String(r.MOTIVO_ANULACION || '').trim()), NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
             FECHA_INICIO: f.FECHA_INICIO, EXAMENES: f.EXAMENES, FECHA_RETORNO: f.FECHA_RETORNO,
             sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
         }),
@@ -5841,6 +5910,8 @@ const DEMO = (() => {
       exigir(x);
       const r = regPorId(String((x && x.id) || '').trim());
       if (!r) throw new Error('No encontré ese registro. Recargue la página.');
+      // Como editarRegistro: con «Falleció» vigente no se edita (sí se anula).
+      if (muertos[dniDe(r.DNI)]) throw new Error(mensajeFallecido(muertos[dniDe(r.DNI)]));
       if (r.ANULADO) throw new Error('Ese registro está anulado.');
       const control = r.TIPO === 'CONTROL', hechas = sesionesDe(r.ID).length, cambios = (x && x.cambios) || {}, out = {};
       const COL = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
@@ -5971,8 +6042,8 @@ const DEMO = (() => {
         if (prox < hoy) throw new Error('La próxima sesión no puede ser anterior a hoy.');
         if (prox > mas(f, 180)) throw new Error('La próxima sesión va hasta 180 días después de la sesión.');
       }
-      // «¿Reacción durante la aplicación?» (reaccionAplicacion): se valida antes de escribir nada.
-      const reac = r.TIPO === 'HIERRO' ? reaccionDemo(x.reaccion) : null;
+      // Como marcarSesion: la reacción durante la aplicación la registra Enfermería (fila «Aplicación»); una que llegue se ignora.
+      const reacIgnorada = !!(x.reaccion && x.reaccion.hubo);
       const cuando = ahora();
       const s = { ID: siguiente(sesiones, 'SES'), FECHA_HORA: cuando, ID_REGISTRO: r.ID, NUMERO: validas.length + 1, FECHA: f, ASESORA: quien,
         NOTA: String(x.nota || '').trim(), ANULADO: '', MOTIVO_ANULACION: '' };
@@ -5983,12 +6054,7 @@ const DEMO = (() => {
       if (!t) tarjetas.push(t = ubicar(reg(r), ''));
       trasSesion(t, r);
       const out = { ok: true, sesion: s, completo: s.NUMERO >= r.SESIONES };
-      if (reac) {
-        const fe = Object.assign({ ID: idEnf(), FECHA_HORA: cuando, ID_REGISTRO: r.ID, ID_SESION: s.ID, NUMERO_SESION: s.NUMERO, DNI: r.DNI,
-          ENFERMERA: quien, ANULADO: '', MOTIVO_ANULACION: '' }, reac);
-        enfermeria.push(fe);
-        out.reaccion = fe;
-      }
+      if (reacIgnorada) out.reaccionError = 'La sesión quedó marcada; la reacción durante la aplicación la registra Enfermería (fila «Aplicación» de la sesión ' + s.NUMERO + ').';
       if (prox && demo._fallarAgenda) out.agendaError = 'No se pudo agendar la próxima sesión: ' + demo._fallarAgenda;
       else if (prox) {
         // La misma fila que «Agendó cita» sobre un registro en curso, ligada a esta sesión (filaProximaSesion).
@@ -6010,9 +6076,11 @@ const DEMO = (() => {
       if (!s) throw new Error('No encontré la sesión ' + x.id + '.');
       if (s.ANULADO) throw new Error('La sesión ' + s.ID + ' ya estaba anulada.');
       const delReg = regPorId(s.ID_REGISTRO);
-      if (delReg && delReg.ANULADO) throw new Error('El registro ' + delReg.ID + ' está anulado: sus sesiones ya no se anulan.');
+      // Como validarAnulacionSesion: la de un registro anulado al deshacer un fallo (anuladoPorFallo) sí se anula.
+      const porFallo = delReg && delReg.ANULADO && /^(No se guardó|Se rehízo)/.test(String(delReg.MOTIVO_ANULACION || '').trim());
+      if (delReg && delReg.ANULADO && !porFallo) throw new Error('El registro ' + delReg.ID + ' está anulado: sus sesiones ya no se anulan.');
       const propias = sesionesDe(s.ID_REGISTRO);
-      if (propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
+      if (!porFallo && propias[propias.length - 1] !== s) throw new Error('Solo se puede anular la última sesión del tratamiento.');
       s.ANULADO = 'SÍ';
       s.MOTIVO_ANULACION = String(x.motivo).trim();
       // Como anularSesion: la próxima que se agendó al marcar esta sesión se anula con ella, y también un «Agendó cita» sin liga
@@ -6037,6 +6105,7 @@ const DEMO = (() => {
       const quien = exigir(x);
       const dni = dniDe(x.dni), hechas = citas.filter(c => c.DNI === dni && c.ESTADO === 'REALIZADO' && mismo(c.ESPECIALIDAD, x.especialidad));
       if (!dni) throw new Error('Falta el DNI del paciente.');
+      if (muertos[dni]) throw new Error(mensajeFallecido(muertos[dni]));   // como darDeAlta
       if (!hechas.length) throw new Error('Ese paciente no tiene consultas realizadas en ' + String(x.especialidad || '').toUpperCase() + '.');
       const doc = doctorDe(x.doctor);
       if (!doc) throw new Error('Elija el doctor que da el alta.');
@@ -6103,6 +6172,7 @@ const DEMO = (() => {
       exigir(x);
       const dni = dniDe(x.dni);
       if (!dni) throw new Error('Falta el DNI.');
+      if (muertos[dni]) throw new Error(mensajeFallecido(muertos[dni]));   // como confirmarEmparejamiento
       const i = porConfirmar.find(y => y.ID === x.id);
       if (!i) throw new Error('No encontré la indicación ' + x.id + '.');
       porConfirmar = porConfirmar.filter(y => y !== i);
@@ -6120,6 +6190,7 @@ const DEMO = (() => {
       exigir(x);
       const dni = dniDe(x.dni).replace(/\s/g, '');
       if (!dni) throw new Error('Escriba el DNI del paciente.');
+      if (muertos[dniDe(dni)]) throw new Error(mensajeFallecido(muertos[dniDe(dni)]));   // como asignarDniIndicacion
       const i = sinCandidato.find(y => y.ID === x.id);
       if (!i) throw new Error('La indicación ' + x.id + ' ya tiene paciente.');
       if (!citas.some(c => c.DNI === dni) && !registros.some(r => r.DNI === dni && r.ANULADO !== 'SÍ')) {
@@ -6172,7 +6243,7 @@ const DEMO = (() => {
         rec('2026-08', 'RACHEL', 'HEMATOLOGÍA', KAREN), rec('2026-08', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 14, '2026-08-27'),
         rec('2026-08', 'ANA', 'HEMATOLOGÍA', ELI),
         rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', ELI, 6, '2026-09-16'), rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', KAREN),
-        rec('2026-09', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 12, '2026-09-22'), rec('2026-09', 'DR. ELI CABANILLAS', 'HEMATOLOGÍA', ELI, 9, '2026-09-30'),
+        rec('2026-09', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 12, '2026-09-22'), rec('2026-09', 'ANA', 'HEMATOLOGÍA', ELI, 9, '2026-09-30'),
         rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', ELI, 3, '2026-09-25'), rec('2026-09', 'ANA', 'HEMATOLOGÍA', KAREN)
       ],
       motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NO DESEA CONTINUAR', N: 3 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }, { MOTIVO: 'FALLECIÓ', N: 1 }],
@@ -6240,6 +6311,9 @@ const DEMO = (() => {
     demo[fn] = (...args) => {
       demo._llamadas[fn] = (demo._llamadas[fn] || 0) + 1;
       demo._ultimo[fn] = clonar(args);
+      // Como exigirRol_: lo que escribe comprueba el rol antes de nada.
+      const noRol = ESCRIBEN[fn] ? errorDeRolUi(rolDemo(args[0] && args[0].usuario), fn) : '';
+      if (noRol) throw new Error(noRol);
       const op = args[0] && typeof args[0] === 'object' ? String(args[0].op || '') : '';
       const correr = () => {
         if (op && hechasPorOp[fn + '|' + op]) return Object.assign(clonar(hechasPorOp[fn + '|' + op]), { repetida: true });

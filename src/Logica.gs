@@ -73,8 +73,10 @@ function diasEntre(desde, hasta) {
   return n === n ? n : 0;   // NaN (una fecha que no es yyyy-mm-dd) → 0
 }
 
+/** La fecha `n` días después; '' si `iso` está vacía o no es una fecha (nunca «NaN-aN-aN» en una etiqueta: caso 6 de la batería de 80). */
 function sumarDias(iso, n) {
   var d = new Date(diaUtc_(iso) + n * 86400000);
+  if (!iso || isNaN(d.getTime())) return '';
   return d.getUTCFullYear() + '-' + ('0' + (d.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + d.getUTCDate()).slice(-2);
 }
 
@@ -108,6 +110,78 @@ function indiceDeEncabezado(encabezado) {
     if (k && idx[k] === undefined) idx[k] = i;
   });
   return idx;
+}
+
+/* ---------- Encabezados escritos o movidos a mano (batería de 80 pruebas, casos 49 y 50) ---------- */
+
+/** El nombre de una columna como lo compara el código: sin espacios de más, en mayúsculas y sin tildes («fecha», « FECHA » → FECHA). */
+function normColumna(c) { return normTexto(c); }
+
+/**
+ * Cómo está el encabezado `cab` (la fila 1, tal como está escrita) frente a las `columnas` que espera el código:
+ * `grafia` (la misma columna escrita de otra forma), `movidas` (las que están en otro orden que el esperado), `faltan`,
+ * `repetidas` (la misma columna dos veces), `extra` (las que el código no conoce) y `posicion` (columna → índice, la primera).
+ * La app lee y escribe por NOMBRE (normColumna), así que grafía y orden no rompen nada; faltan y repetidas, sí.
+ */
+function revisarEncabezado(cab, columnas) {
+  var esperadas = {}, posicion = {}, grafia = [], extra = [], repetidas = [], orden = [];
+  (columnas || []).forEach(function (c) { esperadas[normColumna(c)] = c; });
+  (cab || []).forEach(function (c, j) {
+    var crudo = String(c == null ? '' : c), n = normColumna(crudo);
+    if (!n) return;
+    if (!(n in esperadas)) { extra.push(crudo.trim()); return; }
+    if (n in posicion) { if (repetidas.indexOf(n) < 0) repetidas.push(n); return; }
+    posicion[n] = j;
+    orden.push(n);
+    if (crudo !== esperadas[n]) grafia.push({ escrita: crudo, esperada: esperadas[n] });
+  });
+  var faltan = (columnas || []).filter(function (c) { return !(normColumna(c) in posicion); });
+  var enOrden = (columnas || []).map(normColumna).filter(function (n) { return n in posicion; });
+  var movidas = orden.filter(function (n, i) { return enOrden[i] !== n; });
+  return { grafia: grafia, movidas: movidas, faltan: faltan, repetidas: repetidas, extra: extra, posicion: posicion };
+}
+
+/** «le falta la columna A» / «le faltan las columnas A, B». */
+function listaColumnas_(l) { return (l.length === 1 ? 'le falta la columna ' : 'le faltan las columnas ') + l.join(', '); }
+
+/**
+ * Por qué no se puede escribir una fila en la hoja `nombre` con esta revisión (revisarEncabezado), o '' si se puede. La columna OP
+ * puede faltar (se escribe sin idempotencia); las movidas y las de otra grafía no impiden nada: se escribe por nombre.
+ */
+function errorEncabezado(nombre, rev) {
+  if (rev.repetidas.length) {
+    return 'La hoja ' + nombre + ' tiene ' + (rev.repetidas.length === 1 ? 'la columna ' + rev.repetidas[0] + ' repetida' : 'repetidas las columnas ' + rev.repetidas.join(', ')) +
+      ': la app no sabe en cuál escribir. Use «Verificar» y deje una sola.';
+  }
+  var faltan = rev.faltan.filter(function (c) { return c !== 'OP'; });
+  if (!faltan.length) return '';
+  if (rev.extra.length) {
+    return 'La hoja ' + nombre + ' tiene columnas renombradas o que la app no reconoce (falta ' + faltan.join(', ') + '; está «' +
+      rev.extra.join('», «') + '»): use «Verificar» y corrija el encabezado.';
+  }
+  return 'Falta preparar las hojas: a ' + nombre + ' ' + listaColumnas_(faltan) + '. En el Sheets, menú Seguimientos → Preparar hojas.';
+}
+
+/** Lo que «Verificar» (y «Preparar hojas») dicen del encabezado de una hoja. Sin nada que decir: «✓ … tiene todas sus columnas.» */
+function lineasEncabezado(nombre, rev) {
+  var l = [];
+  if (rev.repetidas.length) l.push('✗ ' + nombre + ': ' + (rev.repetidas.length === 1 ? 'la columna ' + rev.repetidas[0] + ' está repetida' :
+    'están repetidas las columnas ' + rev.repetidas.join(', ')) + ': la app no escribe en esta hoja hasta que quede una sola.');
+  if (rev.faltan.length && rev.extra.length) {
+    l.push('✗ ' + nombre + ': el encabezado no coincide: falta ' + rev.faltan.join(', ') + ' y la app no reconoce «' + rev.extra.join('», «') +
+      '». Si es la misma columna, corrija su nombre en la fila 1 («Preparar hojas» no lo arregla).');
+  } else if (rev.faltan.length) {
+    l.push('✗ A ' + nombre + ' ' + listaColumnas_(rev.faltan) + '. Use «Preparar hojas».');
+  } else if (rev.extra.length) {
+    l.push('ℹ ' + nombre + ': columnas propias que la app no usa: «' + rev.extra.join('», «') + '».');
+  }
+  if (rev.grafia.length) l.push('⚠ ' + nombre + ': el encabezado no coincide en la grafía: ' + rev.grafia.map(function (g) {
+    return '«' + g.escrita + '» (se espera «' + g.esperada + '»)';
+  }).join(', ') + '. Se lee y se escribe igual, pero conviene corregirlo.');
+  if (rev.movidas.length) l.push('⚠ ' + nombre + ': columnas cambiadas de lugar (' + rev.movidas.join(', ') +
+    '). La app las lee y escribe por su nombre, así que no se pierde nada; conviene devolverlas a su orden.');
+  if (!l.length) l.push('✓ ' + nombre + ' tiene todas sus columnas.');
+  return l;
 }
 
 /*
@@ -278,10 +352,13 @@ function plazoDe(reglas, especialidad) {
  */
 function catalogosDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
-  var out = { usuarios: [], motivos: [], alias: {}, doctores: [], procedimientos: [], tratamientos: [], marcas: {}, reacciones: [] };
+  var out = { usuarios: [], motivos: [], alias: {}, doctores: [], procedimientos: [], tratamientos: [], marcas: {}, reacciones: [],
+    consulta: [], enfermeria: [] };
   function celda(f, k) { return idx[k] === undefined ? '' : textoLimpio_(f[idx[k]]); }
   (filas || []).forEach(function (f) {
     var u = celda(f, 'USUARIOS'), m = celda(f, 'MOTIVOS_DESCARTE');
+    if (celda(f, 'USUARIOS_CONSULTA')) out.consulta.push(celda(f, 'USUARIOS_CONSULTA'));
+    if (celda(f, 'USUARIOS_ENFERMERIA')) out.enfermeria.push(celda(f, 'USUARIOS_ENFERMERIA'));
     var a = celda(f, 'MEDICO_ALIAS'), n = celda(f, 'MEDICO_NOMBRE');
     if (u) out.usuarios.push(u);
     if (m) out.motivos.push(m);
@@ -298,7 +375,34 @@ function catalogosDesdeFilas(encabezado, filas) {
   });
   // Sin la columna REACCIONES (antes de «Preparar hojas»), la lista inicial de Enfermería.
   if (!out.reacciones.length) out.reacciones = REACCIONES_INICIALES.slice();
+  // La enfermera y los de solo consulta también se eligen en «¿Quién es usted?»: basta con estar en su columna.
+  out.enfermeria.concat(out.consulta).forEach(function (u) {
+    if (!out.usuarios.some(function (x) { return normTexto(x) === normTexto(u); })) out.usuarios.push(u);
+  });
   return out;
+}
+
+/* ---------- Roles (26/10/2026): admisión, enfermería y solo consulta ---------- */
+
+var MENSAJES_ROL = { CONSULTA: 'Usuario de solo consulta: no puede modificar datos.', ADMISION: 'Esta acción es de admisión.',
+  ENFERMERIA: 'Esta acción es de enfermería.' };
+
+/**
+ * El rol de `usuario`: CONSULTA si está en CATALOGOS.USUARIOS_CONSULTA, ENFERMERIA si está en USUARIOS_ENFERMERIA, ADMISION si es
+ * cualquier otro usuario del catálogo, y '' si no está. Comparación normalizada (normTexto). Consulta gana a enfermería.
+ */
+function rolDe(catalogos, usuario) {
+  var n = normTexto(usuario), c = catalogos || {};
+  var en = function (l) { return (l || []).some(function (x) { return normTexto(x) === n; }); };
+  if (!n || !en(c.usuarios)) return '';
+  return en(c.consulta) ? 'CONSULTA' : en(c.enfermeria) ? 'ENFERMERIA' : 'ADMISION';
+}
+
+/** Por qué `usuario` no puede hacer una acción del rol `pedido` ('ADMISION' o 'ENFERMERIA'), o ''. Quien no está, '' (otro mensaje). */
+function errorDeRol(catalogos, usuario, pedido) {
+  var r = rolDe(catalogos, usuario);
+  if (!r || r === pedido) return '';
+  return r === 'CONSULTA' ? MENSAJES_ROL.CONSULTA : MENSAJES_ROL[pedido];
 }
 
 /** Reacciones que registra Enfermería; «Preparar hojas» las siembra en CATALOGOS.REACCIONES. */
@@ -1066,7 +1170,12 @@ function kpiIndicaciones(indicaciones, citas) {
  */
 function kpiRecuperacion(seguimientos, citas, hoy) {
   var series = armarSeries(citas), vistos = {}, out = [];
-  (seguimientos || []).filter(function (s) { return normTexto(s.ACCION) === 'HECHO' && !TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)]; })
+  // Solo los seguimientos de una reevaluación: ni hierro ni procedimiento, ni un Control (ESPECIALIDAD «CONTROL») ni nada ligado
+  // a un registro (REFERENCIA): esos no tienen serie de consultas y nunca «vuelven» (caso 13 de la batería de 80).
+  (seguimientos || []).filter(function (s) {
+    return normTexto(s.ACCION) === 'HECHO' && !TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)] && normTexto(s.ESPECIALIDAD) !== 'CONTROL' &&
+      !textoLimpio_(s.REFERENCIA);
+  })
     .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; })
     .forEach(function (s) {
       var f = fechaIso(s.FECHA_HORA);

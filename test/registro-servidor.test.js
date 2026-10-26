@@ -376,7 +376,7 @@ function conOp(extra, hojas) {
     assert.equal(S.lock.tomado, 1);
     const f = (S.escrito[n] || []).concat((hojas || {})[n] || []).find(x => x.ID === id);
     if (f && S.ctx.anulado_(f)) throw new Error(id + ' ya estaba anulado.');
-    if (f) f.ANULADO = 'SÍ';
+    if (f) { f.ANULADO = 'SÍ'; f.MOTIVO_ANULACION = motivo; }
     S.escrito.anulados.push([n, id, motivo]);
   };
   return S;
@@ -440,6 +440,23 @@ test('marcarSesion y las anulaciones con op: el reintento no marca otra sesión 
   assert.equal(escrito.anulados.length, 2);
 });
 
+test('guardarRegistro: si al deshacer falla la anulación de una SESIÓN, el reintento con el mismo op la anula (caso 7 de la batería de 80)', () => {
+  const { ctx, escrito } = conOp();
+  const anexar = ctx.anexarObjeto_, anular = ctx.marcarAnulado_;
+  let n = 0, fallarDeshacer = true;
+  ctx.anexarObjeto_ = (h, cols, o) => { if (h === 'REGISTROS' && ++n === 2) throw new Error('Service Spreadsheets timed out.'); return anexar(h, cols, o); };
+  ctx.marcarAnulado_ = (h, id, m) => { if (fallarDeshacer && h === 'SESIONES') throw new Error('Service Spreadsheets timed out.'); return anular(h, id, m); };
+  ctx.leerSesiones_ = () => escrito.SESIONES;
+  const p = datosReg({ dni: '40999000', procedimiento: '', tratamiento: 'HIERRO SACARATO', procedimientos: ['SANGRÍA'], sesiones: '2', fecha: '2026-10-03', fechaInicio: '2026-10-03', op: 'OP-huerfana-1' });
+  assert.throws(() => ctx.guardarRegistro(p), /Además no se pudo deshacer todo/);
+  assert.deepEqual(escrito.SESIONES.filter(s => !ctx.anulado_(s)).map(s => s.ID_REGISTRO), ['REG-000001'], 'quedó viva la sesión de un registro anulado');
+  fallarDeshacer = false;
+  const r = plano(ctx.guardarRegistro(p));
+  assert.equal(r.ok, true);
+  assert.ok(escrito.anulados.some(a => a[0] === 'SESIONES' && a[1] === 'SES-000001'), 'el reintento anula la sesión que quedó');
+  assert.deepEqual(escrito.SESIONES.filter(s => !ctx.anulado_(s)).map(s => s.ID_REGISTRO), ['REG-000002', 'REG-000003']);
+});
+
 test('guardarRegistro: tras un doble fallo (falla la 2.ª fila y deshacer la 1.ª), el reintento con el mismo op no dice «guardado» a medias: anula lo vivo y escribe todo (caso 6)', () => {
   const { ctx, escrito } = conOp();
   const anexar = ctx.anexarObjeto_, anular = ctx.marcarAnulado_;
@@ -495,4 +512,38 @@ test('tipos incorrectos se rechazan en vez de convertirse: motivo o nota objeto,
   assert.equal(L.largoMal_({ a: 1 }, 2000, 'La nota'), 'La nota debe ser un texto.');
   assert.equal(L.largoMal_(12, 2000, 'La nota'), '');
   assert.equal(L.largoMal_(null, 2000, 'La nota'), '');
+});
+
+test('con «Falleció» vigente también se rechazan la decisión del médico, Editar y asignar DNI (con el mismo mensaje); anular sí se puede', () => {
+  const muerto = { ID: 'SEG-9', FECHA_HORA: '2026-10-01 09:00', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', RESULTADO: 'FALLECIÓ', ACCION: 'DESCARTADO', MOTIVO: 'FALLECIÓ', ANULADO: '' };
+  const { ctx, escrito, lock } = servidor({ seguimientos: [muerto], indicaciones: [] }, { REGISTROS: [REG4] });
+  const MSG = /^Error: Este paciente figura como fallecido desde el 01\/10\/2026: para registrar, primero anule «Falleció» en su ficha\.$/;
+  assert.throws(() => ctx.darDeAlta({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05', decision: 'ALTA 6 MESES' }), MSG);
+  ctx.leerRegistros_ = () => [REG4];
+  ctx.leerSesiones_ = () => [];
+  ctx.actualizarCeldas_ = () => { throw new Error('no debía escribir'); };
+  assert.throws(() => ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { contacto: '912000111' } }), MSG);
+  const sh = hojaIndicaciones();
+  ctx.hoja_ = () => sh;
+  assert.throws(() => ctx.asignarDniIndicacion({ usuario: 'MAGALY', id: 'IND-0120', dni: '40111222' }), MSG);
+  assert.deepEqual(sh.v[1].slice(4), ['', 'SIN CANDIDATO']);
+  ctx.anularRegistro({ usuario: 'MAGALY', id: 'REG-000004', motivo: 'Error' });
+  assert.deepEqual([escrito.ALTAS.length, escrito.anulados.length, lock.tomado], [0, 1, 0]);
+});
+
+test('darDeAlta: una segunda decisión del mismo día y especialidad se rechaza dentro del candado, aunque la primera no deje alta vigente (caso 41)', () => {
+  const nr = { ID: 'ALT-000001', FECHA_HORA: '2026-10-05 10:29', FECHA: '2026-10-05', DNI: '40111222', ESPECIALIDAD: 'HEMATOLOGÍA', DOCTOR: 'Dra. Karen Matos',
+    REGISTRADO_POR: 'ANA', DECISION: 'NUEVA REEVALUACION', FECHA_RETORNO: '2026-12-05', ANULADO: '', OP: 'OP-otra-0001' };
+  const { ctx, escrito } = servidor({}, { ALTAS: [nr] });   // lo leído antes del candado aún no la tenía (carrera)
+  ctx.leerAltas_ = () => [nr];
+  const p = { usuario: 'MAGALY', dni: '40111222', especialidad: 'HEMATOLOGÍA', doctor: 'Dra. Karen Matos', fecha: '2026-10-05', decision: 'ALTA 1 AÑO', op: 'OP-mia-0001' };
+  assert.throws(() => ctx.darDeAlta(p), /^Error: Ya se registró una decisión hoy para esta especialidad; anúlela para cambiarla\.$/);
+  assert.equal(escrito.ALTAS.length, 0);
+  // Anulada la primera, sí.
+  nr.ANULADO = 'SÍ';
+  assert.equal(plano(ctx.darDeAlta(p)).ok, true);
+  // Otra especialidad, sí.
+  const { ctx: c2 } = servidor({}, {});
+  c2.leerAltas_ = () => [Object.assign({}, nr, { ANULADO: '', ESPECIALIDAD: 'REUMATOLOGÍA' })];
+  assert.equal(plano(c2.darDeAlta(p)).ok, true);
 });

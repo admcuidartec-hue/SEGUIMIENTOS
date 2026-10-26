@@ -32,9 +32,9 @@ function soloDelPaciente_(d, dni) {
     altas: (d.altas || []).filter(suyo), enfermeria: (d.enfermeria || []).filter(suyo) };
 }
 
-/** Guarda contra la ventana de publicación: SEGUIMIENTOS se escribe por posición y necesita sus columnas nuevas. */
+/** Guarda contra la ventana de publicación: SEGUIMIENTOS necesita sus columnas nuevas (exigirColumnas_). */
 function exigirHojaPreparada_() {
-  if (!columnasListas_(encabezado_(hoja_('SEGUIMIENTOS')), COLUMNAS_SEGUIMIENTOS)) throw new Error('Falta preparar las hojas: en el Sheets, menú Seguimientos → Preparar hojas.');
+  exigirColumnas_('SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS);
 }
 
 /** Tras una escritura delegada, la tarjeta recalculada (o '' si salió del tablero), para que la app confirme el movimiento. */
@@ -84,6 +84,7 @@ function resultadoRepetido_(d, dni, op, segs, registros) {
 
 /** `opciones` es interno (no viene de la app): { motivo } conserva el motivo original de una pestaña vieja. */
 function registrarResultado_(p, opciones) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), dni = normDni(p && p.dni), op = opDe_(p);
   // El mismo op ya se guardó (la respuesta se perdió y la app reintenta): lo de la primera vez, antes de validar nada.
   var repetido = resultadoRepetido_(d, dni, op, d.seguimientosTodos);
@@ -175,6 +176,7 @@ function registrarResultado_(p, opciones) {
 }
 
 function anularResultado(p) {
+  exigirRol_(p, 'ADMISION');
   var d = datos_(), quien = exigirUsuario_(d.catalogos, p && p.usuario), motivo = exigirMotivo_(p), id = textoLimpio_(p.id), op = opDe_(p);
   if (id.indexOf('SEG-') !== 0) throw new Error('Aquí solo se anulan resultados de seguimiento (SEG-…).');
   var lock = bloquear_();

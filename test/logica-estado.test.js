@@ -39,7 +39,7 @@ test('catalogosDesdeFilas lee usuarios, motivos y alias', () => {
     usuarios: ['MAGALY', 'ANA'],
     motivos: ['OTRO'],
     alias: { 'DR. ELI FABRIZIO CABANILLAS HUALPA': 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA' },
-    doctores: [], procedimientos: [], tratamientos: [], marcas: {}, reacciones: plano(L.REACCIONES_INICIALES)
+    doctores: [], procedimientos: [], tratamientos: [], marcas: {}, reacciones: plano(L.REACCIONES_INICIALES), consulta: [], enfermeria: []
   });
 });
 

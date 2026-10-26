@@ -9,7 +9,7 @@
 var DIAS_SEMANA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
 
 function dm_(iso) { return iso ? iso.slice(8, 10) + '/' + iso.slice(5, 7) : ''; }
-function diaCorto_(iso) { return DIAS_SEMANA[new Date(diaUtc_(iso)).getUTCDay()] + ' ' + dm_(iso); }
+function diaCorto_(iso) { return !fechaIso(iso) ? '' : DIAS_SEMANA[new Date(diaUtc_(iso)).getUTCDay()] + ' ' + dm_(iso); }
 function plural_(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
 
 function claveTarjeta(t) { return t.ID_REGISTRO || (t.DNI + '|' + t.ESPECIALIDAD); }
@@ -91,8 +91,10 @@ function etiquetaDe(t, reglas, hoy) {
     if (t.PROXIMA_AGENDADA) return 'Cita el ' + diaCorto_(t.PROXIMA_AGENDADA);
     return '';
   }
-  if (t.COLUMNA === 'EN_TRATAMIENTO') return 'Sesión ' + t.HECHAS + ' de ' + t.SESIONES + ' · faltan ' + (Number(t.SESIONES) - Number(t.HECHAS)) +
-    ' · próxima ~' + dm_(sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones));
+  if (t.COLUMNA === 'EN_TRATAMIENTO') {
+    var proxima = sumarDias(t.ULTIMA_SESION, reglas.diasEntreSesiones);
+    return 'Sesión ' + t.HECHAS + ' de ' + t.SESIONES + ' · faltan ' + (Number(t.SESIONES) - Number(t.HECHAS)) + (proxima ? ' · próxima ~' + dm_(proxima) : '');
+  }
   return t.ETIQUETA || '';
 }
 
@@ -103,12 +105,20 @@ function conTipo_(t, tipo) {
   return o;
 }
 
+/** La etiqueta sin los trozos (« · ») que traigan NaN, undefined o Invalid Date. */
+function sinBasura_(etiqueta) {
+  var e = String(etiqueta || '');
+  if (!/NaN|undefined|Invalid Date/.test(e)) return e;
+  return e.split(' · ').filter(function (p) { return !/NaN|undefined|Invalid Date/.test(p); }).join(' · ');
+}
+
 function tarjeta_(t, columna, reglas, hoy, fechaClave, etiqueta) {
   var o = conTipo_(t);
   o.CLAVE = claveTarjeta(o);
   o.COLUMNA = columna;
-  o.ETIQUETA = etiqueta || etiquetaDe(o, reglas, hoy);
-  o.FECHA_CLAVE = fechaClave || '';
+  o.ETIQUETA = sinBasura_(etiqueta || etiquetaDe(o, reglas, hoy));
+  // Salvaguarda general: ninguna FECHA_CLAVE que no sea una fecha (ordena la franja) ni ETIQUETA con NaN sale del servidor.
+  o.FECHA_CLAVE = /^\d{4}-\d{2}-\d{2}/.test(String(fechaClave || '')) ? fechaClave : '';
   return o;
 }
 
@@ -117,7 +127,10 @@ function hechosHoyPor_(d) {
   function sumar(quien) { quien = textoLimpio_(quien); if (quien) out[quien] = (out[quien] || 0) + 1; }
   // La agenda que se escribe al marcar una sesión con «Próxima sesión» (sesionLigada) es parte de esa sesión: no suma aparte.
   (d.seguimientos || []).forEach(function (s) { var r = resultadoDe(s); if (r && r.fecha === hoy && !sesionLigada(s)) sumar(s.RESPONSABLE); });
-  (d.sesiones || []).forEach(function (s) { if (!anulado_(s) && fechaIso(s.FECHA_HORA) === hoy) sumar(s.ASESORA); });
+  // La sesión que quedó viva de un registro anulado al deshacer un fallo (anuladoPorFallo) no se hizo: no suma.
+  var deshechos = {};
+  (d.registros || []).forEach(function (r) { if (anuladoPorFallo(r)) deshechos[r.ID] = 1; });
+  (d.sesiones || []).forEach(function (s) { if (!anulado_(s) && !deshechos[s.ID_REGISTRO] && fechaIso(s.FECHA_HORA) === hoy) sumar(s.ASESORA); });
   (d.altas || []).forEach(function (a) { if (!anulado_(a) && fechaIso(a.FECHA_HORA) === hoy) sumar(a.REGISTRADO_POR); });
   return out;
 }

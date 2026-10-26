@@ -59,27 +59,30 @@ const contactos = o => plano(L.contactosEnfermeria(Object.assign({ registros: [R
   enfermeria: [], seguimientos: [], hoy: HOY, reglas: R, telefonos: { '40111222': ['987654321'] }, catalogos: CAT }, o)));
 
 test('contactosEnfermeria: sesión + 1, + 3 y + 5 días, en orden de llamada (vencidos, hoy, próximos)', () => {
-  const c = contactos();
+  const todos = contactos(), c = todos.filter(x => !x.APLICACION);
+  // DIA 0 («Aplicación»): la enfermera registra si hubo reacción durante la aplicación, el día de la sesión.
+  assert.deepEqual(todos.filter(x => x.APLICACION).map(x => [x.CLAVE, x.DIA, x.FECHA, x.GRUPO]), [['SES-000001|0', 0, '2026-10-07', 'VENCIDO']]);
   assert.deepEqual(c.map(x => [x.DIA, x.FECHA, x.GRUPO]), [[1, '2026-10-08', 'VENCIDO'], [3, '2026-10-10', 'HOY'], [5, '2026-10-12', 'PROXIMO']]);
   assert.deepEqual([c[0].CLAVE, c[0].ID_REGISTRO, c[0].ID_SESION, c[0].NUMERO_SESION, c[0].NOMBRE, c[0].TELEFONOS, c[0].TRATAMIENTO, c[0].MARCA, c[0].SESIONES, c[0].NO_CONTESTO],
     ['SES-000001|1', 'REG-000001', 'SES-000001', 1, 'ROSA QUISPE', '987654321', 'Hierro carboximaltosa', 'Ferinject', 3, 0]);
   // Dos sesiones: el vencido más antiguo primero; dentro de un mismo día, por nombre.
   const dos = contactos({ registros: [REG('REG-000001'), REG('REG-000002', { DNI: '40999888', NOMBRE: 'ANA FLORES' })],
     sesiones: [SES('SES-000001', 'REG-000001', 1, '2026-10-07'), SES('SES-000002', 'REG-000002', 1, '2026-10-07'), SES('SES-000003', 'REG-000001', 2, '2026-10-09')] });
-  assert.deepEqual(dos.map(x => x.CLAVE), ['SES-000002|1', 'SES-000001|1', 'SES-000002|3', 'SES-000001|3', 'SES-000003|1',
+  assert.deepEqual(dos.filter(x => !x.APLICACION).map(x => x.CLAVE), ['SES-000002|1', 'SES-000001|1', 'SES-000002|3', 'SES-000001|3', 'SES-000003|1',
     'SES-000002|5', 'SES-000001|5', 'SES-000003|3', 'SES-000003|5']);
 });
 
 test('contactosEnfermeria: «contactado» lo cumple; «no contestó» lo deja con su cuenta; las anuladas no cuentan', () => {
   const c = contactos({ enfermeria: [ENF('ENF-000001', 'SES-000001', 1, 'CONTACTADO', { REACCION_TIPO: 'MEDIATA', REACCION: 'Cefalea · Náuseas' }),
     ENF('ENF-000002', 'SES-000001', 3, 'NO CONTESTO'), ENF('ENF-000003', 'SES-000001', 3, 'NO CONTESTO'),
-    ENF('ENF-000004', 'SES-000001', 5, 'CONTACTADO', { ANULADO: 'SÍ' })] });
+    ENF('ENF-000004', 'SES-000001', 5, 'CONTACTADO', { ANULADO: 'SÍ' })] }).filter(x => !x.APLICACION);
   assert.deepEqual(c.map(x => [x.DIA, x.NO_CONTESTO]), [[3, 2], [5, 0]]);
   assert.deepEqual(c[0].REACCIONES, [{ DIA: 1, TIPO: 'MEDIATA', REACCION: 'Cefalea · Náuseas' }], 'la reacción de un contacto previo de esa sesión');
   // La reacción durante la aplicación (DIA 0) también se muestra.
   const a = contactos({ enfermeria: [ENF('ENF-000005', 'SES-000001', 0, 'CONTACTADO', { REACCION_TIPO: 'INMEDIATA', REACCION: 'Mareo' })] });
   assert.deepEqual(a[0].REACCIONES, [{ DIA: 0, TIPO: 'INMEDIATA', REACCION: 'Mareo' }]);
-  assert.equal(a.length, 3, 'el DIA 0 no cumple ningún contacto');
+  assert.equal(a.length, 3, 'el DIA 0 no cumple ningún contacto de llamada');
+  assert.equal(a.some(x => x.APLICACION), false, 'la fila DIA 0 ya guardada (antes, al marcar la sesión) cumple la «Aplicación»');
 });
 
 test('contactosEnfermeria: no muestra registros o sesiones anulados, otros tipos, fallecidos, lo viejo ni lo lejano', () => {
@@ -92,7 +95,7 @@ test('contactosEnfermeria: no muestra registros o sesiones anulados, otros tipos
   const viejo = contactos({ sesiones: [SES('SES-000001', 'REG-000001', 1, '2026-09-27')] });
   assert.deepEqual(viejo.map(x => [x.DIA, x.FECHA]), [[3, '2026-09-30'], [5, '2026-10-02']], 'el día 1 (28/09) tocaba hace 12 días');
   const lejos = contactos({ sesiones: [SES('SES-000001', 'REG-000001', 1, '2026-10-14')] });
-  assert.deepEqual(lejos.map(x => x.DIA), [1, 3], 'el día 5 (19/10) toca en 9 días');
+  assert.deepEqual(lejos.map(x => x.DIA), [0, 1, 3], 'el día 5 (19/10) toca en 9 días');
 });
 
 const val = (p, o) => plano(L.validarContactoEnfermeria(Object.assign({ usuario: 'enfermera prueba', clave: 'SES-000001|3', resultado: 'CONTACTADO',

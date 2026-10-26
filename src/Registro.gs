@@ -291,7 +291,10 @@ function estadoRegistro(r, sesiones) {
   var propias = sesionesDe_(r.ID, sesiones);
   var control = normTexto(r.TIPO) === 'CONTROL';
   var total = control ? 0 : Math.max(1, Number(r.SESIONES) || 1);
-  var ultima = propias.length ? fechaIso(propias[propias.length - 1].FECHA) : '';
+  // La «última» es la fecha válida más reciente: una sesión con la fecha ilegible (escrita a mano) cuenta como hecha, pero no
+  // da la fecha de la próxima ni del «Por reevaluar» (caso 6 de la batería de 80).
+  var ultima = '';
+  propias.forEach(function (s) { var f = fechaIso(s.FECHA); if (f && f > ultima) ultima = f; });
   var inicio = fechaIso(control ? r.FECHA_RETORNO : r.FECHA_INICIO) || '';
   var estado = anulado_(r) ? 'ANULADO' : control ? 'PROGRAMADO' : propias.length >= total ? 'COMPLETO' : propias.length ? 'EN CURSO'
     : inicio ? 'PROGRAMADO' : 'COTIZADO';
@@ -365,11 +368,30 @@ function sesionLigada(s) {
  * Solo la última sesión válida: anular una del medio rompería la numeración de las siguientes. Con `registros`, tampoco la de
  * un registro anulado: ya no está en ninguna lista, y sus sesiones hechas siguen contando en la meta del día en que se hicieron.
  */
+/**
+ * ¿Se anuló este registro al DESHACER un fallo? (deshacerEscritura_ y anularIncompleto_ ponen esos motivos): ese registro nunca
+ * llegó a existir, así que una sesión suya que quedó viva (falló también anularla) no cuenta en la meta y sí se puede anular
+ * (caso 7 de la batería de 80). Un registro anulado a mano conserva sus sesiones hechas, que siguen contando.
+ */
+function anuladoPorFallo(r) {
+  return !!r && anulado_(r) && /^(No se guardó|Se rehízo)/.test(textoLimpio_(r.MOTIVO_ANULACION));
+}
+
+/** Las sesiones vivas de registros anulados al deshacer un fallo (anuladoPorFallo): «Verificar» las lista. */
+function sesionesDeRegistrosDeshechos(registros, sesiones) {
+  var porFallo = {};
+  (registros || []).forEach(function (r) { if (anuladoPorFallo(r)) porFallo[r.ID] = r; });
+  return (sesiones || []).filter(function (s) { return !anulado_(s) && porFallo[s.ID_REGISTRO]; }).map(function (s) {
+    return { ID: s.ID, ID_REGISTRO: s.ID_REGISTRO, DNI: normDni(porFallo[s.ID_REGISTRO].DNI) };
+  });
+}
+
 function validarAnulacionSesion(id, sesiones, registros) {
   var s = (sesiones || []).filter(function (x) { return x.ID === id; })[0];
   if (!s) return { error: 'No encontré la sesión ' + id + '.', sesion: null };
   if (anulado_(s)) return { error: 'La sesión ' + id + ' ya estaba anulada.', sesion: null };
   var r = (registros || []).filter(function (x) { return x.ID === s.ID_REGISTRO; })[0];
+  if (anuladoPorFallo(r)) return { error: '', sesion: s };
   if (r && anulado_(r)) return { error: 'El registro ' + r.ID + ' está anulado: sus sesiones ya no se anulan.', sesion: null };
   var propias = sesionesDe_(s.ID_REGISTRO, sesiones);
   if (propias[propias.length - 1].ID !== id) return { error: 'Solo se puede anular la última sesión del tratamiento.', sesion: null };
@@ -594,6 +616,30 @@ var DECISIONES = {
   'ALTA 1 ANO': { nombre: 'ALTA 1 AÑO', texto: 'Alta con reevaluación a 1 año', meses: 12, tipo: '1 AÑO' },
   'NUEVA REEVALUACION': { nombre: 'NUEVA REEVALUACION', texto: 'Nueva reevaluación', meses: 0, pideFecha: true, tipo: 'REEVALUACION' }
 };
+var MENSAJE_DECISION_DE_HOY = 'Ya se registró una decisión hoy para esta especialidad; anúlela para cambiarla.';
+
+/** Minutos de una carrera: dos decisiones del mismo paciente y especialidad con menos que esto entre sí chocaron. */
+var VENTANA_DECISION_MIN = 2;
+
+function minutoDe_(fh) {
+  var m = String(fh || '').match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 60000 : NaN;
+}
+
+/**
+ * La decisión viva de ese paciente y especialidad registrada con otro op en los últimos VENTANA_DECISION_MIN minutos (FECHA_HORA,
+ * que va al minuto) antes de `ahora` ('yyyy-mm-dd HH:mm'), o null. Es la carrera del caso 41: una admisionista desde la ficha y otra
+ * desde Registro a la vez. Una decisión posterior (otra consulta, otro rato) no choca: la reemplaza (decisionPosterior_).
+ */
+function decisionDeHoy(altas, dni, especialidad, ahora, op) {
+  var k = normDni(dni), e = normTexto(especialidad), t = minutoDe_(ahora);
+  return (altas || []).filter(function (x) {
+    var d = t - minutoDe_(x.FECHA_HORA);
+    return !anulado_(x) && normDni(x.DNI) === k && normTexto(x.ESPECIALIDAD) === e && d >= 0 && d <= VENTANA_DECISION_MIN &&
+      (!op || String(x.OP || '').trim() !== op);
+  })[0] || null;
+}
+
 function decisionDe_(a) { return DECISIONES[normTexto(a && a.DECISION) || 'ALTA'] || DECISIONES.ALTA; }
 /**
  * Topes de fecha «hasta un año» y «hasta dos años» desde hoy: por calendario (la misma fecha del año siguiente o de dentro de

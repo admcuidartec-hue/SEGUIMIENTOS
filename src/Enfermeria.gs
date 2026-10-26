@@ -60,7 +60,9 @@ function contactosEnfermeria(d) {
       .map(function (f) { return { DIA: Number(f.DIA) || 0, TIPO: normTexto(f.REACCION_TIPO), REACCION: textoLimpio_(f.REACCION) }; });
     var tel = (d.telefonos || {})[dni] || [], contacto = normTelefono(r.CONTACTO);
     if (!tel.length && contacto.length === 9) tel = [contacto];
-    dias.forEach(function (dia) {
+    // DIA 0 = «Aplicación»: la enfermera registra si hubo reacción durante la aplicación (desde el 26/10/2026 ya no se
+    // pregunta al marcar la sesión). Una fila DIA 0 ya guardada (antes, al marcar la sesión) la deja cumplida.
+    [0].concat(dias.filter(function (x) { return Number(x) !== 0; })).forEach(function (dia) {
       var fecha = sumarDias(fechaSes, dia);
       if (fecha < desde || fecha > hasta) return;
       var delDia = filas.filter(function (f) { return Number(f.DIA) === dia; });
@@ -71,6 +73,7 @@ function contactosEnfermeria(d) {
         TRATAMIENTO: frase_(r.DETALLE), MARCA: frase_(r.MARCA), SESIONES: Number(r.SESIONES) || 1, FECHA_SESION: fechaSes,
         DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
         NO_CONTESTO: delDia.filter(function (f) { return normTexto(f.RESULTADO) === 'NO CONTESTO'; }).length,
+        APLICACION: dia === 0,
         REACCIONES: reacciones
       });
     });
@@ -108,6 +111,9 @@ function validarContactoEnfermeria(p, d) {
   if (!c) return no('Ese contacto ya no está en la lista. Recargue la página.');
   var resultado = RESULTADOS_ENFERMERIA[normTexto(p.resultado)];
   if (!resultado) return no('Elija si contestó o no.');
+  // «Aplicación» (DIA 0): no es una llamada; la reacción, si la hubo, es inmediata.
+  if (Number(c.DIA) === 0 && resultado !== 'CONTACTADO') return no('En la aplicación no hay llamada: registre si hubo reacción (no o inmediata).');
+  if (Number(c.DIA) === 0 && TIPOS_REACCION[normTexto(p.reaccionTipo)] === 'MEDIATA') return no('En la aplicación la reacción es inmediata (o ninguna).');
   var nota = textoLimpio_(p.nota);
   if (largoMal_(p.nota, LARGO_TEXTO, 'La nota')) return no(largoMal_(p.nota, LARGO_TEXTO, 'La nota'));
   var fila = { ID_REGISTRO: c.ID_REGISTRO, ID_SESION: c.ID_SESION, NUMERO_SESION: c.NUMERO_SESION, DNI: c.DNI, DIA: c.DIA, RESULTADO: resultado,

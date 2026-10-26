@@ -333,6 +333,33 @@ async function abrirTablero(opciones = {}) {
   } catch (e) { await r.navegador.close(); throw e; }
   return r;
 }
+test('tablero: al volver de otra pantalla se recarga si hubo escrituras allí o pasó más de un minuto, sin perder los filtros', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const ir = async sec => { await pagina.locator(`.menu [data-sec="${sec}"]`).click(); await pagina.waitForFunction(s => S.seccion === s, sec); };
+    await pagina.evaluate(() => { S.tipo = 'HIERRO'; pintarTablero(); });
+    let n = await llamadas(pagina, 'getTablero');
+    await ir('registro'); await ir('tablero');
+    await pagina.waitForTimeout(300);
+    assert.equal(await llamadas(pagina, 'getTablero'), n, 'recién cargado y sin escrituras: no se pide otra vez');
+    // Una escritura en otra pantalla (Registro): al volver, se pide.
+    await ir('registro');
+    await pagina.evaluate(() => llamar('guardarRegistro', { usuario: 'MAGALY', dni: '47001002', nombre: 'Prueba Vuelve', contacto: '987001002', fecha: S.hoy,
+      doctor: 'Dra. Karen Matos', procedimientos: ['SANGRÍA'] }));
+    await ir('tablero');
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero > n, n);
+    await pagina.waitForFunction(() => !S.enVuelo.size && S.fase === 'listo');
+    assert.equal(await pagina.evaluate(() => S.tipo), 'HIERRO', 'el filtro sigue');
+    // Más de 60 s desde la última carga: al volver, se pide aunque no haya escrituras.
+    n = await llamadas(pagina, 'getTablero');
+    await ir('pacientes');
+    await pagina.evaluate(() => { S.tableroEn = Date.now() - 61000; });
+    await ir('tablero');
+    await pagina.waitForFunction(n => DEMO._llamadas.getTablero > n, n);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 /** Lo que el DEMO tiene ahora, sin pasar por la interfaz (copia vía llamar). */
 const datosDemo = pagina => pagina.evaluate(() => llamar('getTablero'));
 /** Tarjetas pintadas en una columna: [{ id, texto, grupo }] en orden de pantalla. */

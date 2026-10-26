@@ -920,6 +920,10 @@ const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.
 const ESCRIBEN_CON_OP = { registrarResultado: 1, marcarSesion: 1, guardarRegistro: 1, registrarContactoEnfermeria: 1, darDeAlta: 1,
   anularRegistro: 1, anularSesion: 1, anularAlta: 1, anularResultado: 1, anularContactoEnfermeria: 1 };
 const OPS = new Map(), OP_VIGENCIA_MS = 10 * 60 * 1000;
+/** Todo lo que escribe (con op o sin él). */
+const ESCRIBEN = Object.assign({ editarRegistro: 1, asignarDniIndicacion: 1, confirmarEmparejamiento: 1, marcarSeguimiento: 1, descartar: 1 }, ESCRIBEN_CON_OP);
+/** Al volver al Tablero desde otra pantalla, se recarga si la última carga tiene más de esto (o si se escribió fuera). */
+const TABLERO_VIEJO_MS = 60 * 1000;
 function conOp(fn, args) {
   const p = args[0];
   if (!ESCRIBEN_CON_OP[fn] || !p || typeof p !== 'object' || p.op) return { args, clave: '' };
@@ -953,7 +957,13 @@ function llamar(fn, ...args0) {
   if (largo) return Promise.reject(new Error(largo));
   const { args, clave } = conOp(fn, args0);
   // Se guardó pero algo secundario falló (la BITACORA): la respuesta trae `aviso` y se muestra aparte, sin bloquear.
-  const listo = r => { if (clave) OPS.delete(clave); if (r && typeof r.aviso === 'string' && r.aviso) avisoServidor(r.aviso); return r; };
+  const listo = r => {
+    if (clave) OPS.delete(clave);
+    if (r && typeof r.aviso === 'string' && r.aviso) avisoServidor(r.aviso);
+    // Lo escrito desde otra pantalla deja viejo el tablero: al volver a él se recarga (VISTAS.tablero.mostrar).
+    if (ESCRIBEN[fn] && S.seccion !== 'tablero') S.escribioFuera = true;
+    return r;
+  };
   if (EN_APPS_SCRIPT) {
     return new Promise((res, rej) => google.script.run
       .withSuccessHandler(res)
@@ -981,6 +991,8 @@ const S = {
   verTodo: {},      // { col: true } las franjas abiertas con «Ver los N →»
   sinRecargar: new Set(), // CLAVE de tarjetas con una sesión marcada cuya tarjeta aún no trae el tablero recargado
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
+  tableroEn: 0,       // Date.now() de la última vez que se aplicó un getTablero
+  escribioFuera: false, // se escribió desde otra pantalla: al volver al Tablero se recarga
   escrituras: 0,      // sube cuando sale cada guardado: una recarga pedida antes puede traer el tablero de antes
   recargaPendiente: false, // una recarga silenciosa descartada que se repide cuando enVuelo quede vacío
   historiaTrasRecarga: '', // Deshacer: CLAVE del panel abierto cuya historia se repide cuando se aplique la recarga
@@ -1445,6 +1457,7 @@ async function cargarTablero(pedido, silencioso, intento) {
       S.recargaPendiente = true;
       return false;
     }
+    S.tableroEn = Date.now();
     if (silencioso) {
       conFlip(() => { adaptarTablero(r); pintarTablero(); });
       trasRecargar();
@@ -2673,7 +2686,15 @@ $('#panel').addEventListener('change', e => {
   if (e.target.name === 'pn') { P.paso.tel = e.target.value; pintarPanel(); }
 });
 $('#velo').addEventListener('click', () => cerrarPanel());
-VISTAS.tablero.mostrar = () => pastilla($('#seg'), true);
+VISTAS.tablero.mostrar = () => {
+  pastilla($('#seg'), true);
+  // Volver desde otra pantalla: si allí se escribió o la última carga tiene más de un minuto, se recarga en silencio
+  // (sin esqueletos; los filtros viven en S y no se tocan). Otra pestaña pudo cerrar o mover tarjetas entretanto (caso 63).
+  if (S.fase === 'listo' && (S.escribioFuera || Date.now() - S.tableroEn > TABLERO_VIEJO_MS)) {
+    S.escribioFuera = false;
+    cargarTablero(null, true);
+  }
+};
 
 /* ============ REGISTRO (README §6.3; MAPEO §1.4-§1.8) ============ */
 /**

@@ -158,7 +158,7 @@ function prepararHojas() {
       ['MAGALY', 'SE ATIENDE EN OTRO LUGAR', 'Dr. ELI FABRIZIO CABANILLAS HUALPA', 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA'],
       ['ANA', 'NÚMERO EQUIVOCADO', '', ''],
       ['RACHEL', 'YA NO LO NECESITA', '', ''],
-      ['DR. ELI CABANILLAS', 'FALLECIÓ', '', ''],
+      ['', 'FALLECIÓ', '', ''],
       ['', 'OTRO', '', '']
     ]);
     c.getRange(1, 1, 1, 4).setFontWeight('bold');

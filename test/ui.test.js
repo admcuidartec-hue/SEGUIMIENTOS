@@ -78,8 +78,8 @@ test('«¿Quién es usted?» arranca vacío, sin usuario por omisión', async ()
     assert.equal(await pagina.locator('.side .js-usuario').inputValue(), '');
     assert.equal(await pagina.locator('.topmovil .js-usuario').inputValue(), '');
     const opciones = await pagina.locator('.side .js-usuario option').evaluateAll(l => l.map(o => [o.value, o.textContent]));
-    assert.deepEqual(opciones, [['', '— Elija —'], ['MAGALY', 'Magaly'], ['ANA', 'Ana'], ['RACHEL', 'Rachel'], ['DR. ELI CABANILLAS', 'Dr. Eli Cabanillas'],
-      ['ENFERMERA PRUEBA', 'Enfermera Prueba']]);
+    assert.deepEqual(opciones, [['', '— Elija —'], ['MAGALY', 'Magaly'], ['ANA', 'Ana'], ['RACHEL', 'Rachel'],
+      ['ENFERMERA PRUEBA', 'Enfermera Prueba']], 'el médico ya no es usuario (26/10/2026)');
     assert.equal(await pagina.evaluate(() => exigirUsuario()), false);
     assert.equal(await pagina.locator('#aviso span').textContent(), 'Elija quién es usted.');
     // Los dos selectores se sincronizan y el elegido se recuerda en seg.usuario.
@@ -178,8 +178,8 @@ test('adaptadores: adaptarBoot, nombreBonito, telBonito y medicoCorto', async ()
     }));
     assert.deepEqual(Object.keys(r.boot).sort(),
       ['doctores', 'especialidades', 'hoy', 'marcas', 'medicos', 'procedimientos', 'reacciones', 'reglas', 'tratamientos', 'usuarios']);
-    assert.deepEqual(r.boot.usuarios[0], { v: 'MAGALY', l: 'Magaly', rol: 'Asesora', med: '' });
-    assert.deepEqual(r.boot.usuarios[3], { v: 'DR. ELI CABANILLAS', l: 'Dr. Eli Cabanillas', rol: 'Médico', med: 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA' });
+    assert.deepEqual(r.boot.usuarios[0], { v: 'MAGALY', l: 'Magaly' });
+    assert.equal(r.boot.usuarios.some(u => /^DRA?\b/.test(u.v)), false, 'el médico ya no es usuario');
     assert.deepEqual(r.boot.medicos.find(m => m.k === 'Dra. ALEJANDRA LA TORRE MATUK'),
       { k: 'Dra. ALEJANDRA LA TORRE MATUK', full: 'Dra. ALEJANDRA LA TORRE MATUK', short: 'Dra. La Torre' });
     assert.equal(r.boot.hoy, '2026-10-01');
@@ -563,18 +563,10 @@ test('tablero: la meta del día sale de hechosHoyPor y cambia con el usuario sin
     assert.equal(await meta(), 'Hoy: 0 de 15 seguimientos');
     await pagina.locator('.side .js-usuario').selectOption('');
     assert.equal(await meta(), 'Elija quién es usted');
-    // Médico: se le propone su filtro, y puede cambiarlo a «Todos».
-    await pagina.locator('.side .js-usuario').selectOption('DR. ELI CABANILLAS');
-    assert.equal(await pagina.locator('#fmed').inputValue(), 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
-    assert.equal(await pagina.locator('#fmed').isDisabled(), false);
-    const meds = await pagina.evaluate(() => [...new Set(S.pacientes.filter(p => !p.oculto).map(p => p.med))]);
-    assert.ok(meds.length > 1);
-    const soloEli = await pagina.locator('#tablero [data-card]').evaluateAll(l => l.map(e => e.dataset.card));
-    assert.ok(soloEli.length > 0);
-    assert.ok(await pagina.evaluate(ids => ids.every(id => S.pacientes.find(p => p.id === id).med === 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA'), soloEli));
-    assert.match(await pagina.locator('#subtit').textContent(), /· solo sus pacientes$/);
-    await pagina.locator('#fmed').selectOption('');
-    assert.ok(await pagina.locator('#tablero [data-card]').count() > soloEli.length);
+    // Ningún usuario recibe un filtro por su nombre (el médico ya no usa la plataforma).
+    await pagina.locator('.side .js-usuario').selectOption('RACHEL');
+    assert.equal(await pagina.locator('#fmed').inputValue(), '');
+    assert.doesNotMatch(await pagina.locator('#subtit').textContent(), /solo sus pacientes/);
     assert.equal(await pagina.evaluate(() => DEMO._llamadas.getTablero), antes, 'cambiar de usuario no recarga el tablero');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
@@ -2978,19 +2970,16 @@ test('indicadores: el filtro de médico cambia las cifras; especialidad solo don
   } finally { await navegador.close(); }
 });
 
-test('indicadores: un médico entra directo a Indicadores con su filtro propuesto, y puede ver a todos (D2)', async () => {
-  const { navegador, pagina, errores } = await abrirIndicadores({ guardado: { 'seg.usuario': 'DR. ELI CABANILLAS' }, sinIr: true });
+test('indicadores: nadie entra directo a Indicadores ni recibe un filtro de médico por su nombre (el médico ya no es usuario)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'DR. ELI CABANILLAS' } });
   try {
-    assert.equal(await pagina.locator('.menu [aria-current="page"]').getAttribute('data-sec'), 'indicadores');
-    assert.equal(await pagina.locator('#imed').inputValue(), 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
-    assert.equal(await pagina.locator('#imed').isDisabled(), false);
-    assert.equal(await grande(pagina), '75%');
-    await pagina.locator('#imed').selectOption('');
-    assert.equal(await grande(pagina), '74%');
-    // Cambiar de pestaña o de mes no le vuelve a imponer el filtro.
-    await pestana(pagina, 'llegan');
-    await pestana(pagina, 'resumen');
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    assert.equal(await pagina.locator('.menu [aria-current="page"]').getAttribute('data-sec'), 'tablero');
+    assert.equal(await pagina.evaluate(() => S.usuario), '', 'un usuario recordado que ya no está en el catálogo se ignora');
+    await pagina.locator('.menu [data-sec="indicadores"]').click();
+    await pagina.waitForSelector('#ipanel[data-tab] section');
     assert.equal(await pagina.locator('#imed').inputValue(), '');
+    assert.equal(await grande(pagina), '74%');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -3592,14 +3581,12 @@ test('saludo: «doctora» para una médica; la hora es la de Lima aunque el nave
     await pagina.clock.setFixedTime(new Date('2026-10-01T20:10:00-05:00'));
     await pagina.locator('#fsin').click();   // un filtro repinta el tablero
     assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas noches, Magaly');
-    // Una médica: «doctora»; un médico: «doctor».
+    // Sin trato especial por el nombre: el saludo usa el nombre tal cual (el médico ya no es usuario).
     await pagina.evaluate(() => {
-      S.boot = adaptarBoot(Object.assign({}, DEMO.bootstrap(), { usuarios: ['MAGALY', 'DR. ELI CABANILLAS', 'DRA. KAREN MATOS'] }));
+      S.boot = adaptarBoot(Object.assign({}, DEMO.bootstrap(), { usuarios: ['MAGALY', 'DRA. KAREN MATOS'] }));
       S.usuario = 'DRA. KAREN MATOS'; pintarSaludo();
     });
-    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas noches, doctora Matos');
-    await pagina.evaluate(() => { S.usuario = 'DR. ELI CABANILLAS'; pintarSaludo(); });
-    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas noches, doctor Cabanillas');
+    assert.equal(await pagina.locator('#saludo').textContent(), 'Buenas noches, Dra. Karen Matos');
   } finally { await navegador.close(); }
 });
 

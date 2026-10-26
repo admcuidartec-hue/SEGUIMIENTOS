@@ -628,8 +628,8 @@ function minutoDe_(fh) {
 
 /**
  * La decisión viva de ese paciente y especialidad registrada con otro op en los últimos VENTANA_DECISION_MIN minutos (FECHA_HORA,
- * que va al minuto) antes de `ahora` ('yyyy-mm-dd HH:mm'), o null. Es la carrera del caso 41: el médico desde la ficha y una
- * asesora desde Registro a la vez. Una decisión posterior (otra consulta, otro rato) no choca: la reemplaza (decisionPosterior_).
+ * que va al minuto) antes de `ahora` ('yyyy-mm-dd HH:mm'), o null. Es la carrera del caso 41: una admisionista desde la ficha y otra
+ * desde Registro a la vez. Una decisión posterior (otra consulta, otro rato) no choca: la reemplaza (decisionPosterior_).
  */
 function decisionDeHoy(altas, dni, especialidad, ahora, op) {
   var k = normDni(dni), e = normTexto(especialidad), t = minutoDe_(ahora);

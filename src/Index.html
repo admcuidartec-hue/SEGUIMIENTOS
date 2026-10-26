@@ -987,7 +987,7 @@ const S = {
   cerrados: [],     // getTablero().cerrados
   fase: 'cargando', // 'cargando' | 'listo' | 'error'
   tipo: '',         // '' | 'REEVALUACION' | 'HIERRO' | 'PROCEDIMIENTO' (seg.tipo, como la app anterior)
-  medico: '', medicoPropuesto: '', mes: '', esp: '', sinTel: false, q: '',
+  medico: '', mes: '', esp: '', sinTel: false, q: '',
   verTodo: {},      // { col: true } las franjas abiertas con «Ver los N →»
   sinRecargar: new Set(), // CLAVE de tarjetas con una sesión marcada cuya tarjeta aún no trae el tablero recargado
   enVuelo: new Set(), // CLAVE de las tarjetas con un guardado sin respuesta todavía
@@ -1027,17 +1027,12 @@ function medicoCorto(m) {
   const bonito = apellido.map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
   return (titulo ? titulo + ' ' : '') + bonito;
 }
-/** 'DR. ELI CABANILLAS' -> el médico de la lista cuyo nombre contiene ELI y CABANILLAS. '' si el usuario no es médico. */
-function medicoDeUsuario(u, medicos) {
-  const t = norm(u).split(/[^A-Z]+/).filter(Boolean);
-  if (!t.length || (t[0] !== 'DR' && t[0] !== 'DRA')) return '';
-  const resto = t.slice(1);
-  return (medicos || []).find(m => { const n = norm(m); return resto.every(x => n.includes(x)); }) || '';
-}
 function adaptarBoot(b) {
   return {
     hoy: b.hoy,
-    usuarios: (b.usuarios || []).map(u => ({ v: u, l: nombreBonito(u), rol: /^DRA?\b/.test(norm(u)) ? 'Médico' : 'Asesora', med: medicoDeUsuario(u, b.medicos) })),
+    // El médico ya no usa la plataforma (26/10/2026): comunica sus decisiones y las registran las admisionistas. Nadie recibe
+    // filtros ni pantallas especiales por su nombre.
+    usuarios: (b.usuarios || []).map(u => ({ v: u, l: nombreBonito(u) })),
     medicos: (b.medicos || []).map(m => ({ k: m, full: m, short: medicoCorto(m) })),
     doctores: b.doctores || [],
     // Una por normTexto (el servidor ya manda la forma más usada): nunca «Hematología» y «Hematologia» a la vez.
@@ -1076,8 +1071,7 @@ function saludoHora() {
 }
 function pintarSaludo() {
   const u = yo(), s = saludoHora();
-  const titulo = /^DRA\b/.test(norm(u ? u.v : '')) ? ', doctora ' : ', doctor ';
-  $('#saludo').textContent = !u ? s : u.rol === 'Médico' ? s + titulo + u.l.split(' ').pop() : s + ', ' + u.l;
+  $('#saludo').textContent = !u ? s : s + ', ' + u.l;
 }
 
 function pintarUsuarios() {
@@ -1091,12 +1085,8 @@ function elegirUsuario(v) {
   LS.set('seg.usuario', v);
   $$('.js-usuario').forEach(sel => { sel.value = v; });
   pintarSaludo();
-  // La meta y el filtro propuesto se recalculan sin volver a pedir el tablero (getTablero no depende del usuario).
-  proponerMedico();
+  // La meta se recalcula sin volver a pedir el tablero (getTablero no depende del usuario).
   if (S.boot) pintarTablero();
-  // En Indicadores también se vuelve a proponer el filtro del médico (D2).
-  IND.medico = null;
-  if (S.seccion === 'indicadores' && IND.listo) pintarIndicadores(false);
 }
 
 /** Ningún guardado sale sin «¿Quién es usted?». */
@@ -1343,13 +1333,6 @@ function filtrados(conTipo) {
 }
 const hayFiltros = () => !!(S.tipo || S.medico || S.mes || S.esp || S.sinTel || S.q.trim());
 
-/** Al médico se le propone su filtro; puede cambiarlo a «Todos» (D2). Si deja de serlo, se quita lo propuesto. */
-function proponerMedico() {
-  const u = yo();
-  if (u && u.med) { S.medico = u.med; S.medicoPropuesto = u.med; }
-  else if (S.medicoPropuesto) { if (S.medico === S.medicoPropuesto) S.medico = ''; S.medicoPropuesto = ''; }
-}
-
 /** Meta del día: lo que registró HOY quien usa la app (hechosHoyPor), no el total del equipo (hechosHoy). */
 function pintarMeta() {
   const md = $('#metadia'), meta = Number(S.reglas && S.reglas.metaDiaria) || 0;
@@ -1388,11 +1371,10 @@ function iniciarTablero() {
   const t = LS.get('seg.tipo');
   S.tipo = TIPOS.some(([k]) => k === t) ? t : '';
   S.mes = LS.get('seg.mes');   // se valida contra los meses que hay cuando llega el tablero (pintarTablero)
-  // Médico y especialidad recordados, solo si siguen en la lista; al médico que usa la app, proponerMedico le pone el suyo.
+  // Médico y especialidad recordados, solo si siguen en la lista.
   const med = LS.get('seg.medico'), esp = LS.get('seg.esp');
   S.medico = S.boot.medicos.some(m => m.k === med) ? med : '';
   S.esp = (esp && S.boot.especialidades.find(e => norm(e) === norm(esp))) || '';   // «HEMATOLOGIA» recordada = «HEMATOLOGÍA»
-  proponerMedico();
   $('#fmed').innerHTML = '<option value="">Todos los médicos</option>'
     + S.boot.medicos.map(m => `<option value="${esc(m.k)}" title="${esc(m.full)}">${esc(m.short)}</option>`).join('');
   $('#fesp').innerHTML = '<option value="">Todas las especialidades</option>'
@@ -1496,10 +1478,9 @@ function pintarTablero() {
   const vis = listo ? filtrados(true) : [], base = listo ? filtrados(false) : [];
   const enCol = c => vis.filter(p => p.col === c);
   const nCol = c => listo ? enCol(c).length : '—';
-  const u = yo(), soloSuyos = !!(u && u.med && S.medico === u.med);
   const d = diaUTC(S.hoy).getUTCDay();
   pintarSaludo();   // la hora cambia durante el día: el saludo se repasa con cada repintado del tablero
-  $('#subtit').textContent = `${DSEM_LARGO[d] || ''} ${dmy(S.hoy)}${listo ? ' · ' + nCol(1) + ' por contactar' : ''}${soloSuyos ? ' · solo sus pacientes' : ''}`;
+  $('#subtit').textContent = `${DSEM_LARGO[d] || ''} ${dmy(S.hoy)}${listo ? ' · ' + nCol(1) + ' por contactar' : ''}`;
   pintarMeta();
 
   // El detalle de cada fase (siguen a los filtros, como las tarjetas). Va en la cabecera de su franja.
@@ -4196,7 +4177,7 @@ const ACUMULADAS = { llegan: 1, campanas: 1, procs: 1 };
 const IND = {
   listo: false, pidiendo: false, error: '', quieto: false,
   tab: 'resumen', mes: '', esp: '', sub: 'tipo', verCamp: false, soloMes: false,
-  medico: null,     // null = proponer el del usuario médico (D2) al pintar; luego, lo que elija
+  medico: '',       // el médico elegido en el filtro ('' = todos)
   dniEscrito: {},   // «Procedimientos sin paciente»: lo escrito en cada fila, para que un repintado no lo borre
   asignando: ''     // el ID de la fila que se está guardando: no se manda otra
 };
@@ -4265,7 +4246,6 @@ function pintarIndicadores(anim) {
   $('#mant').disabled = i <= 0;
   $('#msig').disabled = i < 0 || i >= meses.length - 1;
   const meds = medicosInd();
-  if (IND.medico === null) IND.medico = medicoDeUsuario(S.usuario, meds);
   if (IND.medico && !meds.includes(IND.medico)) IND.medico = '';
   $('#imed').innerHTML = '<option value="">Todos los médicos</option>'
     + meds.map(m => `<option value="${esc(m)}" title="${esc(m)}">${esc(medicoCorto(m))}</option>`).join('');
@@ -4954,8 +4934,6 @@ async function arrancar() {
   iniciarIndicadores();
   iniciarEnfermeria();
   cargarTablero(pedidoTablero);
-  // D2: el médico entra directo a Indicadores, con su filtro propuesto (puede cambiarlo a «Todos»).
-  if (yo() && yo().rol === 'Médico') ir('indicadores', true);
 }
 
 /* ==========================================================================
@@ -4974,7 +4952,7 @@ async function arrancar() {
 const DEMO = (() => {
   const hoy = '2026-10-01';
   let demoListo = false;   // altaSinReevaluacion mira las altas y las citas, que se declaran más abajo
-  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'DR. ELI CABANILLAS', 'ENFERMERA PRUEBA'];   // nombres inventados
+  const usuarios = ['MAGALY', 'ANA', 'RACHEL', 'ENFERMERA PRUEBA'];   // nombres inventados
   const reglas = { espera: 15, maxSeguimientos: 3, graciaAgenda: 2, diasEntreSesiones: 7, esperaCotizacion: 7, metaRetorno: 60, metaTratamiento: 95, metaDiaria: 15,
     postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
   const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
@@ -6211,7 +6189,7 @@ const DEMO = (() => {
         rec('2026-08', 'RACHEL', 'HEMATOLOGÍA', KAREN), rec('2026-08', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 14, '2026-08-27'),
         rec('2026-08', 'ANA', 'HEMATOLOGÍA', ELI),
         rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', ELI, 6, '2026-09-16'), rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', KAREN),
-        rec('2026-09', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 12, '2026-09-22'), rec('2026-09', 'DR. ELI CABANILLAS', 'HEMATOLOGÍA', ELI, 9, '2026-09-30'),
+        rec('2026-09', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 12, '2026-09-22'), rec('2026-09', 'ANA', 'HEMATOLOGÍA', ELI, 9, '2026-09-30'),
         rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', ELI, 3, '2026-09-25'), rec('2026-09', 'ANA', 'HEMATOLOGÍA', KAREN)
       ],
       motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NO DESEA CONTINUAR', N: 3 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }, { MOTIVO: 'FALLECIÓ', N: 1 }],

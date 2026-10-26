@@ -65,12 +65,13 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - El DNI se guarda y se compara con `normDni` (sin puntos ni guiones, y sin ceros a la izquierda si es solo dígitos), también
   en el buscador del tablero (`normDni` de `Index.html`) y en el DEMO: «09997401» y «9997401» encuentran al mismo paciente.
 - Una fila de Registro nunca se borra: se anula (`ANULADO` = SÍ + motivo). Solo se anula la última sesión, y nunca la de un
-  registro anulado. Al anular un registro se anula **en el mismo candado** su agenda viva (`agendaVivaDeRegistro`: la próxima
+  registro anulado (salvo la que quedó viva de un registro que se deshizo por un fallo: `anuladoPorFallo`). Al anular un registro se anula **en el mismo candado** su agenda viva (`agendaVivaDeRegistro`: la próxima
   sesión agendada al marcar una y un «Agendó cita» que aún no pasó); sus sesiones hechas no se tocan y siguen contando en la
   meta del día en que se hicieron. La próxima sesión agendada al marcar una **no suma aparte** en la meta del día: es parte de
   la sesión (`hechosHoyPor_` salta las agendas ligadas con `sesionLigada`).
 - El estado de un registro (cotizado, en curso, completo, anulado) se calcula con `estadoRegistro`; no se guarda.
-- `SEGUIMIENTOS` se escribe por posición: una columna nueva solo se agrega al final (`encabezadoAmpliable`).
+- Las hojas se leen **y se escriben por nombre de columna** (`normColumna`: sin espacios de más, mayúsculas, sin tildes): ver
+  «Correcciones de la batería de 80 pruebas». Una columna nueva se sigue agregando al final («Preparar hojas»).
 - Sin conexión a WhatsApp: la app muestra los datos y se marca «Seguimiento hecho».
 - La bandeja tiene tres tipos de seguimiento: reevaluación (series `VENCIDO`), hierro y
   procedimiento (cotizado y no hecho, `pendientesIndicacion`). Los de hierro y procedimiento
@@ -127,6 +128,45 @@ La usan Magaly, Ana, Rachel y el Dr. Eli Cabanillas.
 - El filtro de especialidad agrupa por `normTexto` y muestra la forma más usada (`formasMasFrecuentes` en `bootstrap`).
 - La ficha de un registro «Cerrado» solo lista las sesiones hechas. El buscador del tablero muestra el foco (`.buscar:focus-within`).
 - **Alta definitiva y tratamiento en curso** (caso 39, decidido el 24/10/2026): ver «Etapa 2», «Las cuatro decisiones del médico».
+
+## Correcciones de la batería de 80 pruebas (26/10/2026)
+
+- **Encabezados escritos o movidos a mano** (casos 49 y 50). `leerObjetos_` normaliza el nombre de cada columna (`normColumna`:
+  «fecha», « FECHA » y «Fécha» son FECHA). `anexarObjeto_` **escribe por nombre**: cada valor va bajo la columna que se llama así
+  en la fila 1, esté donde esté; nunca por posición. Si falta una columna (salvo `OP`) o está repetida, se niega sin escribir con
+  un mensaje claro (`revisarEncabezado` → `errorEncabezado`): «Falta preparar las hojas: a SESIONES le falta la columna FECHA…»
+  si «Preparar hojas» lo arregla, o «La hoja SESIONES tiene columnas renombradas o que la app no reconoce (…): use «Verificar»…».
+  Así ninguna hoja (tampoco SESIONES ni BITACORA) queda desalineada. `conOp_`, `exigirColumnas_`, `marcarAnulado_`,
+  `actualizarCeldas_`, asignar/confirmar DNI y la importación buscan las columnas por nombre normalizado. `marcarSesion` y el
+  registro con la sesión 1 aplicada revisan SESIONES antes de escribir nada. **«Verificar»** revisa el encabezado de las seis
+  hojas que se escriben y de INDICACIONES (`lineasEncabezado`): ✗ si falta o está repetida una columna o hay una renombrada, ⚠ si
+  está en otra grafía o cambiada de lugar (funciona igual, conviene corregirla), ℹ si hay columnas propias. «Preparar hojas»
+  agrega lo que falta aunque haya columnas movidas, y no toca una hoja con una columna renombrada (quedaría dos veces).
+- **«Volvieron tras el seguimiento»** (caso 13): `kpiRecuperacion` tampoco cuenta los seguimientos de un Control
+  (`ESPECIALIDAD` = CONTROL) ni ninguno con `REFERENCIA` a un registro: no tienen serie y nunca «vuelven».
+- **Sesión con la fecha ilegible** (caso 6): `sumarDias` con una fecha vacía o ilegible devuelve ''; `estadoRegistro.ultima` es
+  la fecha válida más reciente (la sesión sin fecha cuenta como hecha, pero no da la «próxima»); la etiqueta de En tratamiento
+  omite «próxima ~» si no hay fecha. Salvaguarda general en `tarjeta_`: ninguna `ETIQUETA` con NaN/undefined (se quita ese trozo)
+  ni `FECHA_CLAVE` que no sea una fecha sale del servidor.
+- **Deshacer que falla a medias** (caso 7, decidido el 26/10/2026). Un registro anulado al deshacer un fallo («No se guardó…» o
+  «Se rehízo…», `anuladoPorFallo`) nunca existió: si quedó viva una sesión suya (falló también anularla), (1) el reintento con el
+  mismo op la ve como «a medias» y la anula en el candado (`registroRepetido_`); (2) `anularSesion` la acepta; (3) no suma en la
+  meta (`hechosHoyPor_`); (4) la ficha la muestra bajo el registro anulado con «Anular sesión»; (5) «Verificar» la lista
+  (`sesionesDeRegistrosDeshechos`). Las sesiones de un registro anulado a mano siguen como antes: cuentan y no se anulan.
+- **Impresión** (caso 61): los tokens de `html[data-modo="oscuro"]` valen solo en `@media screen`; lo impreso (el «Resumen
+  para imprimir» o un Ctrl+P) sale siempre con los de `:root`.
+- **Fallecido**: con «Falleció» vigente también se rechazan la decisión del médico (`darDeAlta`), Editar, asignar y confirmar DNI,
+  con el mismo `mensajeFallecido`; anular sí se puede. La pantalla tampoco los ofrece (Registro → Decisión deshabilita
+  «Registrar»; la ficha no muestra «Decisión del médico…» ni «Editar»).
+- **Volver al Tablero** (caso 63): si se escribió desde otra pantalla (`S.escribioFuera`) o la última carga tiene más de 60 s
+  (`S.tableroEn`, `TABLERO_VIEJO_MS`), se recarga en silencio, sin perder filtros.
+- **Editar**: con las sesiones por debajo de las ya hechas, «Guardar cambios» se deshabilita con el texto del servidor
+  («Ya hizo N sesiones: el total no puede ser menor.», `fechaMalEdicion`).
+- **Dos decisiones en carrera** (caso 41, decidido el 26/10/2026): dentro del candado, `darDeAlta` rechaza la decisión si hay
+  otra viva del mismo DNI y especialidad registrada con otro op en los últimos `VENTANA_DECISION_MIN` (2) minutos —`FECHA_HORA` va
+  al minuto—: «Ya se registró una decisión hoy para esta especialidad; anúlela para cambiarla.» (`decisionDeHoy`). Una decisión
+  posterior, fuera de esa ventana, sigue reemplazando a la anterior (`decisionPosterior_`). El DEMO, de una sola pestaña, no la
+  simula.
 
 ## «¿Qué pasó?» (Etapa 1)
 

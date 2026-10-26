@@ -26,7 +26,8 @@
   --ease-out:cubic-bezier(.23,1,.32,1);--ease-in-out:cubic-bezier(.77,0,.175,1);--ease-drawer:cubic-bezier(.32,.72,0,1);
   --r:12px;--r-s:8px;--mono:'Geist Mono',ui-monospace,monospace;color-scheme:light
 }
-html[data-modo="oscuro"]{
+/* Solo en pantalla: lo impreso (el «Resumen para imprimir» o un Ctrl+P) sale siempre con los tokens claros de :root. */
+@media screen{html[data-modo="oscuro"]{
   --bg:#0E1015;--side:#12151B;--surface:#171B22;--surface-2:#1D222B;--col:#13171D;--line:#272D38;--line-2:#3A4250;
   --ink:#ECEEF1;--soft:#C3C8D1;--muted:#98A0AD;
   --accent:#EC7B71;--accent-hover:#F39489;--accent-ink:#1A0908;--accent-soft:#2E1816;--accent-ring:rgb(236 123 113 / .35);
@@ -34,7 +35,7 @@ html[data-modo="oscuro"]{
   --w1:#EC7B71;--w2:#B85A52;--w3:#844640;--w4:#4E2C29;
   --velo:rgb(4 5 8 / .6);--skel:#1F242D;--skel-2:#2A303B;--toast:#ECEEF1;--toast-ink:#12151B;
   --shadow:0 1px 0 rgb(255 255 255 / .03) inset,0 6px 20px rgb(4 5 8 / .35);--shadow-lg:-24px 0 64px rgb(4 5 8 / .5);color-scheme:dark
-}
+}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{font-family:'Geist',sans-serif;font-size:14px;line-height:1.45;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;transition:background-color .3s ease,color .3s ease}

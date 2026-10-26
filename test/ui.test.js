@@ -122,6 +122,20 @@ test('modo oscuro: el botón cambia data-modo y lo guarda en seg.modo', async ()
   } finally { await navegador.close(); }
 });
 
+test('modo oscuro: lo impreso sale siempre en claro (fondo blanco y texto oscuro), aunque la pantalla esté en oscuro', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.modo': 'oscuro' } });
+  try {
+    assert.equal(await pagina.evaluate(() => document.documentElement.dataset.modo), 'oscuro');
+    await pagina.emulateMedia({ media: 'print' });
+    const c = await pagina.evaluate(() => ({ fondo: getComputedStyle(document.body).backgroundColor, texto: getComputedStyle(document.body).color,
+      ink: getComputedStyle(document.documentElement).getPropertyValue('--ink').trim() }));
+    assert.deepEqual(c, { fondo: 'rgb(255, 255, 255)', texto: 'rgb(21, 23, 28)', ink: '#15171C' });
+    await pagina.emulateMedia({ media: 'screen' });
+    assert.equal(await pagina.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()), '#ECEEF1');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('modo oscuro: la primera vez sigue al sistema; luego manda lo guardado', async () => {
   let { navegador, pagina, errores } = await abrir({ colorScheme: 'dark' });
   try {

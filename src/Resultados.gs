@@ -157,7 +157,7 @@ function leerCiclo(lista, reglas, hoy, contactos) {
     // Algo decidido después: ya se había reabierto y esto es el ciclo nuevo (lo de antes del cierre no cuenta).
     if (despues.some(function (r) { return r.grupo !== 'TELEFONO'; })) { filas = despues; break; }
     var nuevos = contactos ? contactosNuevos_(contactos, antes) : [];
-    if (nuevos.length) { out.ultimo = filas[filas.length - 1].fecha; out.nuevoContacto = nuevos; out.reabierto = filas[k].fecha; return out; }
+    if (nuevos.length) { out.ultimo = filas[filas.length - 1].fecha; out.nuevoContacto = nuevos; return out; }
     break;
   }
   out.ultimo = filas[filas.length - 1].fecha;

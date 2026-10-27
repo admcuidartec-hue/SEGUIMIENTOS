@@ -1139,6 +1139,69 @@ test('panel: los cierres confirman en el panel; «Falleció» saca todas las tar
   } finally { await navegador.close(); }
 });
 
+test('«Sin contacto válido»: en el cierre (X) de todas las tarjetas, primero si no hay contacto; sale del tablero como «sin contacto» y «Deshacer» la devuelve', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const JORGE = '40222333|HEMATOLOGÍA';
+    // Con teléfonos también se ofrece (hierro de Rosa), detrás de «Número equivocado».
+    await abrirPanelDe(pagina, ROSA);
+    const cierresRosa = await pagina.locator('#panel .acc.cierra button').evaluateAll(l => l.map(b => b.dataset.acc));
+    assert.ok(cierresRosa.includes('sincontacto') && cierresRosa.indexOf('numero') < cierresRosa.indexOf('sincontacto'));
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !seleccion.panel);
+    // Jorge no tiene teléfono ni usuario: con X, «Sin contacto válido» es la primera opción y Enter abre su paso (no guarda).
+    await pagina.evaluate(id => seleccionar(id, true), JORGE);
+    await pagina.keyboard.press('x');
+    await pagina.waitForFunction(() => document.activeElement && document.activeElement.dataset.acc === 'sincontacto');
+    assert.equal(await pagina.locator('#panel [data-acc="numero"]').count(), 0, 'sin teléfono no hay «Número equivocado»');
+    await pagina.keyboard.press('Enter');
+    await pagina.waitForSelector('#panel .paso.cierre');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0, 'nada se cierra sin confirmar');
+    const paso = (await pagina.locator('#panel .paso').textContent()).replace(/\s+/g, ' ');
+    assert.match(paso, /Sin contacto válido/);
+    assert.match(paso, /Si después aparece otro teléfono o @usuario \(SOFDOC, CRM o Registro\), vuelve sola a «Por contactar»\./);
+    await pagina.locator('#panel [data-confirmar]').click();
+    await esperarEstable(pagina);
+    await esperarCol(pagina, JORGE, '');
+    assert.equal((await ultimo(pagina, 'registrarResultado')).resultado, 'SIN CONTACTO');
+    assert.match(await aviso(pagina), /^Guardado: Jorge Luis Mendoza Paredes · sin contacto válido\. Sale del tablero; vuelve sola si aparece otro contacto\./);
+    assert.match(await pagina.locator('#tablero [data-col="4"] .f-sub').textContent(), /3 cerrados este mes · 1 sin contacto/);
+    await pagina.locator('#ver-cerrados').click();
+    const filas = await pagina.locator('#cerrados li').evaluateAll(l => l.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+    assert.ok(filas.some(f => /Jorge Luis Mendoza Paredes/.test(f) && /Sin contacto válido/.test(f)));
+    // El servidor (DEMO) lo guardó con los contactos de entonces.
+    const seg = await pagina.evaluate(() => llamar('getPaciente', '40222333').then(r => r.seguimientos.slice(-1)[0]));
+    assert.deepEqual([seg.RESULTADO, seg.ACCION, seg.NOTA], ['SIN CONTACTO', 'DESCARTADO', 'Contactos al cerrar: ninguno']);
+    await pagina.locator('#aviso button:not([hidden])').click();   // Deshacer
+    await pagina.waitForFunction(() => DEMO._llamadas.anularResultado === 1);
+    await esperarCol(pagina, JORGE, '1');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('«Sin contacto válido»: un teléfono nuevo (Registro) la devuelve sola a «Por contactar» con «Nuevo contacto: …»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const JORGE = '40222333|HEMATOLOGÍA';
+    await pagina.evaluate(() => llamar('registrarResultado', { usuario: 'MAGALY', dni: '40222333', especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'SIN CONTACTO', nota: '' }));
+    let t = await pagina.evaluate(() => llamar('getTablero'));
+    assert.equal(Object.values(t.columnas).flat().some(x => x.CLAVE === '40222333|HEMATOLOGÍA'), false);
+    assert.equal(t.cifras.cerradosSinContacto, 1);
+    // La admisionista registra un procedimiento con un teléfono que no había: la reevaluación vuelve sola.
+    await pagina.evaluate(() => llamar('guardarRegistro', { usuario: 'MAGALY', dni: '40222333', nombre: 'Jorge Luis Mendoza Paredes', contacto: '987000999',
+      fecha: '2026-10-01', doctor: 'Dr. Elí Cabanillas', procedimientos: ['AMO'], tratamiento: '', sesiones: '', marca: '', confirmado: true }));
+    t = await pagina.evaluate(() => llamar('getTablero'));
+    const r = t.columnas.POR_CONTACTAR.find(x => x.CLAVE === '40222333|HEMATOLOGÍA');
+    assert.ok(r, 'de vuelta en Por contactar');
+    assert.deepEqual([r.ETIQUETA, r.NUEVO_CONTACTO, r.TELEFONOS], ['Nuevo contacto: 987000999', '987000999', '987000999']);
+    assert.equal(t.cifras.cerradosSinContacto, 0);
+    await pagina.evaluate(() => cargarTablero());
+    await esperarCol(pagina, JORGE, '1');
+    assert.match(await textoTarjeta(pagina, JORGE), /Nuevo contacto: 987000999/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('panel: «Número equivocado» con dos teléfonos deja la tarjeta y tacha el número', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
@@ -1178,7 +1241,7 @@ test('panel: «Número equivocado» con dos teléfonos deja la tarjeta y tacha e
     await pagina.keyboard.press('Escape');
     await abrirPanelDe(pagina, LUIS);
     await pagina.locator('#panel [data-acc="numero"]').click();
-    assert.match(await pagina.locator('#panel .paso').textContent(), /No le queda otro contacto: se cerrará el seguimiento\./);
+    assert.match(await pagina.locator('#panel .paso').textContent(), /No le queda otro contacto: queda «Sin contacto válido» y vuelve sola si aparece otro\./);
     assert.ok(await pagina.locator('#panel .paso.cierre').isVisible());
     assert.equal(await pagina.locator('#panel [data-confirmar]').isDisabled(), false);
     assert.deepEqual(errores, []);
@@ -2869,8 +2932,8 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     await pestana(pagina, 'motivos');
     assert.equal(await pagina.locator('#ipanel .conocido').textContent(),
       'Este cuadro todavía no se filtra por mes ni por médico, y no incluye los cierres automáticos «sin respuesta».');
-    assert.deepEqual(await filasDe(pagina, '.tabla'), [['Se atiende en otro lugar', '4 · 40 %'], ['No desea continuar', '3 · 30 %'],
-      ['Número equivocado', '2 · 20 %'], ['Falleció', '1 · 10 %']]);
+    assert.deepEqual(await filasDe(pagina, '.tabla'), [['Se atiende en otro lugar', '4 · 36 %'], ['No desea continuar', '3 · 27 %'],
+      ['Número equivocado', '2 · 18 %'], ['Falleció', '1 · 9 %'], ['Sin contacto válido', '1 · 9 %']]);
 
     // 7. Procedimientos sin paciente.
     await pestana(pagina, 'sinpac');

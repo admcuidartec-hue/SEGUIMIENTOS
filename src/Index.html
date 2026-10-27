@@ -1452,9 +1452,13 @@ function pintarMeta() {
   texto.textContent = ok ? `Meta del día cumplida · ${hechos} seguimientos` : `Hoy: ${sabe ? hechos : '—'} de ${meta} seguimientos`;
 }
 
+/** «Sin contacto válido» y el número equivocado del último contacto: la misma situación (SIN_CONTACTO de armarTablero). */
+const esSinContacto = c => c.SIN_CONTACTO === true || c.CIERRE === 'SIN CONTACTO';
+/** El nombre de un cierre o motivo para la pantalla: SIN CONTACTO es «Sin contacto válido». */
+const textoCierre = m => norm(m) === 'SIN CONTACTO' ? 'Sin contacto válido' : frase(m);
 function pintarCerrados() {
   $('#cerrados ul').innerHTML = S.cerrados.length ? S.cerrados.map(c => `<li><b>${esc(nombreBonito(c.NOMBRE) || 'DNI ' + c.DNI)}</b>`
-    + `<span>${esc(TIPO_TEXTO[c.TIPO_SEGUIMIENTO] || 'Todos sus seguimientos')}</span><span>${esc(frase(c.CIERRE))}</span>`
+    + `<span>${esc(TIPO_TEXTO[c.TIPO_SEGUIMIENTO] || 'Todos sus seguimientos')}</span><span>${esc(c.CIERRE === 'NÚMERO EQUIVOCADO' && esSinContacto(c) ? 'Sin contacto válido (número equivocado)' : textoCierre(c.CIERRE))}</span>`
     + `<span class="mono">${esc(dmy(String(c.FECHA_CIERRE || '').slice(0, 10)))}</span></li>`).join('') : '<li>No hay cierres este mes.</li>';
 }
 function verCerrados(ver) {
@@ -1586,8 +1590,8 @@ function pintarTablero() {
   const hoy6 = masDias(S.hoy, 6);
   // Citas: AGENDA = CITA, o sin AGENDA pero con fecha (una cita de SOFDOC en PROXIMA_AGENDADA), como el chip.
   const esCita = p => p.agenda === 'CITA' || (!p.agenda && !!(p.raw.PROXIMA_AGENDADA || p.fechaClave));
-  const nc = S.cerrados.length;
-  const enlace = listo && nc ? ` · <button type="button" class="enlace" id="ver-cerrados" aria-controls="cerrados" aria-expanded="${!$('#cerrados').hidden}">${plural(nc, 'cerrado', 'cerrados')} este mes</button>` : '';
+  const nc = S.cerrados.length, nsc = S.cerrados.filter(esSinContacto).length;
+  const enlace = listo && nc ? ` · <button type="button" class="enlace" id="ver-cerrados" aria-controls="cerrados" aria-expanded="${!$('#cerrados').hidden}">${plural(nc, 'cerrado', 'cerrados')} este mes${nsc ? ` · ${nsc} sin contacto` : ''}</button>` : '';
   const detalle = c => {
     if (!listo) return ['', false];
     const L = enCol(c);
@@ -1890,6 +1894,8 @@ const ACC = [
 const CIERRES = [
   { k: 'alta', r: 'ALTA MÉDICA', l: 'Alta médica', i: 'ph ph-seal-check', para: p => p.t === 'reev' },
   { k: 'numero', r: 'NÚMERO EQUIVOCADO', l: 'Número equivocado', i: 'ph ph-phone-disconnect', conTel: true },
+  // Sin teléfono, o ninguno sirve (no existe en WhatsApp) y no hay otro: para todos los tipos. Vuelve sola con un contacto nuevo.
+  { k: 'sincontacto', r: 'SIN CONTACTO', l: 'Sin contacto válido', i: 'ph ph-phone-slash' },
   { k: 'otrolugar', r: 'SE ATIENDE EN OTRO LUGAR', l: 'Se atiende en otro lugar', i: 'ph ph-buildings' },
   { k: 'fallecio', r: 'FALLECIÓ', l: 'Falleció', i: 'ph ph-flower-lotus' },
   { k: 'otro', r: 'NO DESEA CONTINUAR', l: 'No desea continuar', i: 'ph ph-dots-three-outline', para: p => !esIndicacion(p) },
@@ -1899,7 +1905,7 @@ const RES = {};
 // «Lo hizo» ya no es un botón de «¿Qué pasó?»: lo usan «Marcar sesión» (En tratamiento) y la ficha.
 ACC.concat(CIERRES, [{ k: 'lohizo', r: 'LO HIZO', l: 'Lo hizo', i: 'ph ph-check-square i-ok' }]).forEach(a => { RES[a.k] = a; RES[a.r] = a; });
 // Cierres que dejan una fila en «cerrados este mes» (el alta va a Completado).
-const CIERRAN = ['NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
+const CIERRAN = ['NÚMERO EQUIVOCADO', 'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE', 'SIN CONTACTO'];
 const ANULAR = { seguimiento: 'anularResultado', alta: 'anularAlta', sesion: 'anularSesion', registro: 'anularRegistro' };
 /**
  * Hierro o procedimiento por empezar: «Aceptó» y «No desea realizarse». Control y Por reevaluar se tratan como una reevaluación;
@@ -1908,7 +1914,11 @@ const ANULAR = { seguimiento: 'anularResultado', alta: 'anularAlta', sesion: 'an
 function esIndicacion(p) { return (p.t === 'hier' || p.t === 'proc') && !p.porReevaluar && !p.enCurso; }
 const accDe = p => ACC.filter(a => !a.para || a.para(p))
   .map(a => a.k === 'acepto' ? Object.assign({}, a, { l: p.t === 'hier' ? 'Aceptó tratamiento' : 'Aceptó procedimiento' }) : a);
-const cierresDe = p => CIERRES.filter(c => (!c.conTel || activos(p).length) && (!c.para || c.para(p)));
+// Sin ningún contacto, «Sin contacto válido» va primero: X y Enter llegan a ella.
+const cierresDe = p => {
+  const L = CIERRES.filter(c => (!c.conTel || activos(p).length) && (!c.para || c.para(p)));
+  return activos(p).length || p.usuario ? L : L.filter(c => c.k === 'sincontacto').concat(L.filter(c => c.k !== 'sincontacto'));
+};
 /** Un registro en Agendado con su sesión agendada («Sesión k el …»): programado o en curso. */
 const sesionAgendada = p => p.col === 2 && p.agenda === 'SESION' && !!p.idRegistro;
 /** Tarjetas cuyo panel es el bloque de sesiones (marcar la siguiente) en vez de «¿Qué pasó?». */
@@ -2056,6 +2066,8 @@ function yaEscrito(p) {
 function alertaDe(p) {
   if (p.col === 1) {
     const mal = p.dias > 30 || p.atraso > 0 ? 'mal' : '';
+    // Reabierta sola tras «Sin contacto válido»: lo que importa es el contacto que apareció.
+    if (p.raw.NUEVO_CONTACTO) return [`nuevo contacto: ${p.raw.NUEVO_CONTACTO}`, 'info'];
     if (p.t === 'reev') return [`hace ${plural(p.dias, 'día', 'días')} que no vuelve`, mal];
     // Por reevaluar, control vencido o «no vino»: la etiqueta del servidor ya dice qué pasó.
     if ((p.porReevaluar || p.t === 'ctrl' || p.raw.MOTIVO_PENDIENTE) && p.etiqueta) return [p.etiqueta, mal];
@@ -2234,7 +2246,7 @@ function htmlPaso(p) {
   const ps = P.paso, k = ps.k, act = activos(p);
   const para = p.t === 'reev' ? frase(p.esp) : p.t === 'hier' ? 'Hierro' : p.t === 'ctrl' ? 'Control + laboratorio' : frase(p.proc) || 'Procedimiento';
   let t = '', icon = 'ph ph-calendar-plus', aviso = '', campos = '', boton = 'Confirmar', deshab = false;
-  let cierre = ['alta', 'otrolugar', 'fallecio', 'otro', 'nodesea'].includes(k);   // el alta también cierra el seguimiento
+  let cierre = ['alta', 'otrolugar', 'fallecio', 'otro', 'nodesea', 'sincontacto'].includes(k);   // el alta también cierra el seguimiento
   const fecha = l => `<label class="campo">${l}<input type="date" id="pf" value="${esc(ps.f)}"${ps.rango.min ? ` min="${esc(ps.rango.min)}"` : ''} max="${esc(ps.rango.max)}"></label>`;
   if (k === 'agendo') {
     t = 'Agendó cita'; boton = 'Pasar a Agendado';
@@ -2284,10 +2296,14 @@ function htmlPaso(p) {
         `<label><input type="radio" name="pn" id="pn-${i}" value="${esc(x)}"${x === ps.tel ? ' checked' : ''}>${esc(telBonito(x))}</label>`).join('')}</div>`;
     }
     aviso = !ps.tel ? 'Elija el número equivocado.' : quedan.length ? `Le queda el ${telBonito(quedan[0])}: el seguimiento sigue.`
-      : p.usuario ? `Le queda el usuario ${p.usuario}: el seguimiento sigue.` : 'No le queda otro contacto: se cerrará el seguimiento.';
+      : p.usuario ? `Le queda el usuario ${p.usuario}: el seguimiento sigue.` : 'No le queda otro contacto: queda «Sin contacto válido» y vuelve sola si aparece otro.';
     cierre = !!ps.tel && !quedan.length && !p.usuario;
     deshab = !ps.tel;
     boton = cierre ? 'Cerrar el seguimiento' : 'Marcar número';
+  }
+  if (k === 'sincontacto') {
+    t = 'Sin contacto válido'; icon = 'ph ph-phone-slash';
+    aviso = 'Sale del tablero. Si después aparece otro teléfono o @usuario (SOFDOC, CRM o Registro), vuelve sola a «Por contactar». La nota es opcional.';
   }
   if (k === 'otrolugar') { t = 'Se atiende en otro lugar'; icon = 'ph ph-buildings'; aviso = 'Se cierra el seguimiento y el paciente sale del tablero.'; }
   if (k === 'fallecio') { t = 'Falleció'; icon = 'ph ph-flower-lotus'; aviso = 'Se cierra el seguimiento y el paciente no volverá a aparecer en ninguna lista.'; }
@@ -2433,7 +2449,8 @@ function planDe(p, res, extra) {
     // El número queda descartado para el paciente, no solo para esta tarjeta.
     S.pacientes.filter(x => x !== p && x.dni === p.dni && x.tel.includes(extra.telefono)).forEach(x => plan.cambios.push(cambio(x, sinTelefono(x.raw, extra.telefono))));
   }
-  if (!raw && CIERRAN.includes(res)) plan.cerrado = { CLAVE: p.id, DNI: p.dni, NOMBRE: p.raw.NOMBRE || '', TIPO_SEGUIMIENTO: p.tipo, CIERRE: res, FECHA_CIERRE: S.hoy };
+  if (!raw && CIERRAN.includes(res)) plan.cerrado = { CLAVE: p.id, DNI: p.dni, NOMBRE: p.raw.NOMBRE || '', TIPO_SEGUIMIENTO: p.tipo, CIERRE: res, FECHA_CIERRE: S.hoy,
+    SIN_CONTACTO: res === 'SIN CONTACTO' || res === 'NÚMERO EQUIVOCADO' };
   plan.celebra = res === 'LO HIZO' && p.t === 'hier' && !!raw && raw.COLUMNA === 'COMPLETADO' && !!p.idRegistro;
   return plan;
 }
@@ -2464,7 +2481,9 @@ function textoGuardado(p, res, r) {
   if (r && r.completo) return p.t === 'proc' ? `${base}. Pasa a Completado.` : `${nombre} completó el tratamiento.`;
   const fp = r && r.agenda ? String(r.agenda.FECHA_PROXIMA || '').slice(0, 10) : '';
   if (fp) return `${base} · próxima sesión el ${diaSem(fp)} ${dm(fp)}.`;
-  if (!t) return res === 'FALLECIÓ' ? `${base}. Se cerraron todos sus seguimientos.` : CIERRAN.includes(res) ? `${base}. Seguimiento cerrado.` : `${base}.`;
+  if (!t) return res === 'FALLECIÓ' ? `${base}. Se cerraron todos sus seguimientos.`
+    : res === 'SIN CONTACTO' || res === 'NÚMERO EQUIVOCADO' ? `${base}. Sale del tablero; vuelve sola si aparece otro contacto.`
+    : CIERRAN.includes(res) ? `${base}. Seguimiento cerrado.` : `${base}.`;
   if (res === 'NO CONTESTÓ' && t.AGENDA === 'SIN RESPUESTA') return `${base}. Se cerrará el ${dm(t.FECHA_AGENDA)} si no responde.`;
   if (res === 'NÚMERO EQUIVOCADO') return `${base}. El seguimiento sigue con el otro contacto.`;
   return t.ETIQUETA ? `${base} · ${t.ETIQUETA}` : `${base}.`;
@@ -2591,7 +2610,7 @@ function textoRes(s) {
   const f = dm(String(s.FECHA_PROXIMA || '').slice(0, 10));
   return ({ 'PAGO': `pagó el ${f}`, 'LO PENSARÁ': `lo pensará · llamar el ${f}`, 'AGENDÓ CITA': `agendó para el ${f}`, 'LO HIZO': `lo hizo el ${f}`,
     'NÚMERO EQUIVOCADO': `número equivocado: ${s.TELEFONO}`, 'DESCARTADO': `descartado${s.MOTIVO ? ': ' + String(s.MOTIVO).toLowerCase() : ''}`,
-    'SEGUIMIENTO HECHO': 'seguimiento hecho' })[r] || String(r || '').toLowerCase();
+    'SEGUIMIENTO HECHO': 'seguimiento hecho', 'SIN CONTACTO': 'sin contacto válido' })[r] || String(r || '').toLowerCase();
 }
 const PARA = { HIERRO: 'Hierro', PROCEDIMIENTO: 'Procedimiento', CONTROL: 'Control + laboratorio' };
 /**
@@ -3555,7 +3574,7 @@ function lineaEstadoRegistro(x) {
   const e = String(x.ESTADO_REGISTRO || x.ESTADO || '');
   if (e === 'ANULADO') return '';
   if (x.TIPO === 'CONTROL') return (x.FECHA_RETORNO ? 'Control el ' + dm(x.FECHA_RETORNO) : 'Control') + (String(x.EXAMENES || '').trim() ? ' · exámenes: ' + String(x.EXAMENES).trim() : '');
-  if (e === 'CERRADO') return 'Seguimiento cerrado' + (x.CIERRE ? ': ' + frase(x.CIERRE) : '') + (x.FECHA_CIERRE ? ' (' + dm(x.FECHA_CIERRE) + ')' : '');
+  if (e === 'CERRADO') return 'Seguimiento cerrado' + (x.CIERRE ? ': ' + textoCierre(x.CIERRE) : '') + (x.FECHA_CIERRE ? ' (' + dm(x.FECHA_CIERRE) + ')' : '');
   if (e === 'PROGRAMADO') return 'Programado el ' + dm(x.FECHA_INICIO) + (x.NO_VINO ? ' · no vino' : '');
   if (e === 'EN CURSO') return `Sesión ${Number(x.HECHAS) || 0} de ${Number(x.SESIONES) || 0}`;
   if (e === 'COMPLETO') return 'Completo' + (x.SIN_REEVALUACION ? ' · Sin reevaluación: alta definitiva del ' + dmy(String(x.SIN_REEVALUACION).slice(0, 10)) : '');
@@ -4579,7 +4598,7 @@ function htmlRecup(k, R, f) {
 }
 
 function htmlMotivos(k) {
-  const filas = (k.motivos || []).map(m => [frase(m.MOTIVO || 'Sin motivo'), Number(m.N) || 0]).filter(x => x[1] > 0);
+  const filas = (k.motivos || []).map(m => [textoCierre(m.MOTIVO || 'Sin motivo'), Number(m.N) || 0]).filter(x => x[1] > 0);
   const tot = filas.reduce((a, x) => a + x[1], 0), max = Math.max(0, ...filas.map(x => x[1]));
   return `<section class="sec-i">${cabSeccion('Motivos de cierre')}
     <p class="intro">Por qué se cerraron los seguimientos que tuvieron un motivo: ${tot === 1 ? '1 cierre' : tot + ' cierres'} desde el inicio.</p>
@@ -5059,10 +5078,10 @@ const DEMO = (() => {
     postTratamiento: 30, controlLab: 15, avisoAltaControl: 30 };
   const motivos = ['SE ATIENDE EN OTRO LUGAR', 'NÚMERO EQUIVOCADO', 'YA NO LO NECESITA', 'FALLECIÓ', 'OTRO'];
   const ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ', 'PAGO', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
-    'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
+    'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE', 'SIN CONTACTO'];
   const GRUPO = { 'NO CONTESTÓ': 'SIGUE', 'LO PENSARÁ': 'SIGUE', 'AGENDÓ CITA': 'SIGUE', 'LO HIZO': 'SIGUE', 'ACEPTÓ': 'SIGUE', 'PAGO': 'PAGO', 'ALTA MÉDICA': 'CIERRE',
     'NÚMERO EQUIVOCADO': 'TELEFONO', 'SE ATIENDE EN OTRO LUGAR': 'CIERRE', 'FALLECIÓ': 'CIERRE', 'NO DESEA CONTINUAR': 'CIERRE',
-    'NO DESEA REALIZARSE': 'CIERRE' };
+    'NO DESEA REALIZARSE': 'CIERRE', 'SIN CONTACTO': 'CIERRE' };
   const ELI = 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA', KAREN = 'Dra. KAREN DIANA MATOS PEÑA',
     LATORRE = 'Dra. ALEJANDRA LA TORRE MATUK', HANAMPA = 'Dr. JUVENAL HANAMPA ROQUE';
   const doctores = [{ doctor: 'Dr. Elí Cabanillas', sofdoc: ELI }, { doctor: 'Dra. Karen Matos', sofdoc: KAREN },
@@ -5155,6 +5174,7 @@ const DEMO = (() => {
   function etiquetaDe(t) {
     const sesion = 'Sesión ' + (Number(t.HECHAS) + 1) + ' de ' + t.SESIONES;
     if (t.COLUMNA === 'POR_CONTACTAR') {
+      if (t.NUEVO_CONTACTO) return 'Nuevo contacto: ' + t.NUEVO_CONTACTO;   // reabierta tras «Sin contacto válido» (etiquetaDe)
       if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') return 'Debía volver el ' + dm(t.PROXIMA_ESPERADA) + ' · hace ' + plural(entre(t.PROXIMA_ESPERADA, hoy), 'día', 'días');
       if (t.ESTADO === 'POR REEVALUAR') return 'Por reevaluar · terminó el ' + dm(t.ULTIMA_SESION);
       if (t.ESTADO_REGISTRO === 'EN CURSO') return sesion + (t.ATRASO > 0 ? ' · atrasada ' + plural(t.ATRASO, 'día', 'días') : ' · tocaba hoy');
@@ -5458,7 +5478,32 @@ const DEMO = (() => {
   }
   function cerrar(t, motivo) {
     t.ESTADO = 'CERRADO'; t.CIERRE = motivo; t.FECHA_CIERRE = hoy; t.COLUMNA = '';
-    cerrados.push({ CLAVE: t.CLAVE, DNI: t.DNI, NOMBRE: t.NOMBRE, TIPO_SEGUIMIENTO: t.TIPO_SEGUIMIENTO, CIERRE: motivo, FECHA_CIERRE: hoy });
+    const sin = motivo === 'SIN CONTACTO' || motivo === 'NÚMERO EQUIVOCADO';
+    // Como leerCiclo: lo que tenía al cerrar sin contacto; solo un contacto que no esté aquí la reabre (reabrirSinContacto).
+    if (sin) t.CONTACTOS_CIERRE = motivo === 'SIN CONTACTO' ? contactosTarjeta(t) : [];
+    cerrados.push({ CLAVE: t.CLAVE, DNI: t.DNI, NOMBRE: t.NOMBRE, TIPO_SEGUIMIENTO: t.TIPO_SEGUIMIENTO, CIERRE: motivo, FECHA_CIERRE: hoy, SIN_CONTACTO: sin });
+  }
+  const contactosTarjeta = t => String(t.TELEFONOS || '').split(' / ').filter(Boolean).concat(String(t.USUARIO || '').trim() ? [String(t.USUARIO).trim()] : []);
+  const claveContacto = c => { const n = normTel(c); return n.length === 9 ? n : norm(c); };
+  /**
+   * Como leerCiclo con los contactos de ahora: una tarjeta cerrada sin contacto vuelve sola a «Por contactar» si su paciente tiene
+   * un contacto (de un registro) que no estaba al cerrar, con «Nuevo contacto: …» y un ciclo nuevo.
+   */
+  function reabrirSinContacto(dni) {
+    const deRegistro = registros.filter(r => r.DNI === dni && !r.ANULADO).map(r => String(r.CONTACTO || '').trim()).filter(Boolean);
+    tarjetas.filter(t => t.DNI === dni && t.ESTADO === 'CERRADO' && t.CONTACTOS_CIERRE && !t.COLUMNA).forEach(t => {
+      const habia = new Set(t.CONTACTOS_CIERRE.map(claveContacto)), nuevos = [];
+      contactosTarjeta(t).concat(deRegistro).forEach(c => { const k = claveContacto(c); if (k && !habia.has(k)) { habia.add(k); nuevos.push(normTel(c).length === 9 ? normTel(c) : c); } });
+      if (!nuevos.length) return;
+      const tels = nuevos.filter(c => /^\d{9}$/.test(c)), usuario = nuevos.find(c => !/^\d{9}$/.test(c));
+      if (tels.length) t.TELEFONOS = String(t.TELEFONOS || '').split(' / ').filter(Boolean).concat(tels).join(' / ');
+      if (usuario && !String(t.USUARIO || '').trim()) t.USUARIO = usuario;
+      Object.assign(t, { ESTADO: t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? 'VENCIDO' : t.ESTADO_REGISTRO === 'COMPLETO' ? 'POR REEVALUAR' : 'PENDIENTE',
+        CIERRE: '', FECHA_CIERRE: '', N_SEGUIMIENTOS: 0, AGENDA: '', FECHA_AGENDA: '', INTENTO: 0, NUEVO_CONTACTO: nuevos.join(' / ') });
+      delete t.CONTACTOS_CIERRE;
+      ubicar(t, 'POR_CONTACTAR');
+      for (let i = cerrados.length - 1; i >= 0; i--) if (cerrados[i].CLAVE === t.CLAVE) cerrados.splice(i, 1);
+    });
   }
   const ordenPorContactar = (a, b) => {
     const conPend = t => t.TIPO_SEGUIMIENTO !== 'REEVALUACION' || t.PENDIENTE ? 0 : 1;
@@ -5538,6 +5583,8 @@ const DEMO = (() => {
     let notaFinal = nota;
     if (res === 'ALTA MÉDICA') notaFinal = 'Alta: ' + doctorDe(x.doctor).doctor + (nota ? '. ' + nota : '');
     if (res === 'NO DESEA CONTINUAR' || res === 'NO DESEA REALIZARSE') notaFinal = 'Motivo: ' + String(x.motivo).trim() + (nota ? '. ' + nota : '');
+    // Como validarResultado: «Sin contacto válido» guarda los contactos que tenía al cerrar.
+    if (res === 'SIN CONTACTO') notaFinal = 'Contactos al cerrar: ' + (contactosTarjeta(t).join(' / ') || 'ninguno') + (nota ? ' · ' + nota : '');
     if (res === 'ACEPTÓ' && nSes !== null) notaFinal = 'Sesiones: ' + nSes + (notaFinal ? '. ' + notaFinal : '');
     // «Aceptó» programa el registro (FECHA_INICIO) o, si viene del historial, crea uno nuevo, como registrarResultado_.
     let registro = null;
@@ -5600,7 +5647,7 @@ const DEMO = (() => {
         tarjetas.push(ubicar(reg(registro, prog), 'AGENDADO'));
       } else { Object.assign(t, prog); ubicar(t, 'AGENDADO'); }
     }
-    if (res === 'SE ATIENDE EN OTRO LUGAR' || res === 'NO DESEA CONTINUAR' || res === 'NO DESEA REALIZARSE') cerrar(t, res);
+    if (res === 'SE ATIENDE EN OTRO LUGAR' || res === 'NO DESEA CONTINUAR' || res === 'NO DESEA REALIZARSE' || res === 'SIN CONTACTO') cerrar(t, res);
     if (res === 'FALLECIÓ') {
       tarjetas.filter(y => y.DNI === dni && ABIERTAS.includes(y.COLUMNA)).forEach(y => { y.ESTADO = 'CERRADO'; y.COLUMNA = ''; });
       muertos[dni] = { fecha: hoy, quien, id: s.ID };
@@ -5766,7 +5813,8 @@ const DEMO = (() => {
       return { columnas: col, cerrados,
         cifras: { porContactar: col.POR_CONTACTAR.length, contactados: col.CONTACTADO.length, pagados: col.PAGO_REALIZADO.length,
           agendados: col.AGENDADO.length, enTratamiento: col.EN_TRATAMIENTO.length,
-          completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length, hechosHoy: hechosEquipo, hechosHoyPor: Object.assign({}, hechosPor) } };
+          completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length,
+          cerradosSinContacto: cerrados.filter(c => c.SIN_CONTACTO).length, hechosHoy: hechosEquipo, hechosHoyPor: Object.assign({}, hechosPor) } };
     },
 
     registrarResultado,
@@ -5935,6 +5983,7 @@ const DEMO = (() => {
         else { const t = reg(f); tarjetas.push(ubicar(t, t.ESTADO === 'PENDIENTE' ? 'POR_CONTACTAR' : '')); }
         f.TEXTO = textoRegistro(f);
       });
+      reabrirSinContacto(dni);   // un contacto nuevo reabre lo cerrado «sin contacto válido»
       return { ok: true, registros: filas, sesiones: hechas };
     },
 
@@ -6045,6 +6094,7 @@ const DEMO = (() => {
         }
         ubicar(t, t.COLUMNA, t.ETIQUETA, t.COLUMNA === 'COMPLETADO' ? t.FECHA_CLAVE : '');
       });
+      if ('CONTACTO' in out) reabrirSinContacto(r.DNI);   // Editar con un contacto nuevo también la reabre
       return { ok: true, registro: filaRegistrada(r) };
     },
 
@@ -6300,7 +6350,8 @@ const DEMO = (() => {
         rec('2026-09', 'RACHEL', 'REUMATOLOGÍA', HANAMPA, 12, '2026-09-22'), rec('2026-09', 'ANA', 'HEMATOLOGÍA', ELI, 9, '2026-09-30'),
         rec('2026-09', 'MAGALY', 'HEMATOLOGÍA', ELI, 3, '2026-09-25'), rec('2026-09', 'ANA', 'HEMATOLOGÍA', KAREN)
       ],
-      motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NO DESEA CONTINUAR', N: 3 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }, { MOTIVO: 'FALLECIÓ', N: 1 }],
+      motivos: [{ MOTIVO: 'SE ATIENDE EN OTRO LUGAR', N: 4 }, { MOTIVO: 'NO DESEA CONTINUAR', N: 3 }, { MOTIVO: 'NÚMERO EQUIVOCADO', N: 2 }, { MOTIVO: 'FALLECIÓ', N: 1 },
+        { MOTIVO: 'SIN CONTACTO', N: 1 }],
       // «Sin lead en el CRM» es el valor literal del servidor (Logica.gs); la pantalla dice «Sin registro en el CRM».
       campanas: [
         cam('2026-07', ELI, 'FACEBOOK ADS', 'V-STOP ANEM1', 6, 0, 2), cam('2026-07', KAREN, 'FACEBOOK ADS', 'I-SIN ENERGIA', 4, 0, 1),

@@ -18,7 +18,7 @@ test('reglas: especialidad con o sin tilde es la misma', () => {
 test('reglas: sin filas se usan los valores por defecto', () => {
   const r = L.reglasDesdeFilas(['ESPECIALIDAD'], []);
   assert.deepEqual(plano(r), { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60, esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15, postTratamiento: 30, controlLab: 15, avisoAltaControl: 30, metaTratamiento: 95,
-    diasEnfermeria: [1, 3, 5], corteEnfermeria: 10 });
+    diasEnfermeria: [1, 3, 5], corteEnfermeria: 10, maxIntentosEnfermeria: 2 });
 });
 
 test('reglas: META_DIARIA_SEGUIMIENTOS se lee de REGLAS', () => {

@@ -69,6 +69,8 @@ function columnaDe(t) {
 function etiquetaDe(t, reglas, hoy) {
   var sesion = 'Sesión ' + (Number(t.HECHAS) + 1) + ' de ' + t.SESIONES;
   if (t.COLUMNA === 'POR_CONTACTAR') {
+    // Reabierta sola tras «Sin contacto válido» (o el número equivocado del último): qué contacto apareció.
+    if (t.NUEVO_CONTACTO) return 'Nuevo contacto: ' + t.NUEVO_CONTACTO;
     if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') {
       if (t.RETORNO_TIPO === '6 MESES' || t.RETORNO_TIPO === '1 AÑO') return 'Control de alta a ' + (t.RETORNO_TIPO === '6 MESES' ? '6 meses' : '1 año') + ' · el ' + dm_(t.FECHA_RETORNO);
       if (t.RETORNO_TIPO === 'REEVALUACION') return 'Debía volver el ' + dm_(t.FECHA_RETORNO) + ' (lo indicó el médico)';
@@ -164,7 +166,9 @@ function armarTablero(d) {
     }
     if (t.ESTADO === 'CERRADO' && mesDe(t.FECHA_CIERRE) === mes) {
       if (t.CIERRE === 'ALTA MÉDICA') col.COMPLETADO.push(tarjeta_(t, 'COMPLETADO', reglas, hoy, t.FECHA_CIERRE, 'Alta médica'));
-      else cerrados.push({ CLAVE: claveTarjeta(t), DNI: t.DNI, NOMBRE: t.NOMBRE, TIPO_SEGUIMIENTO: t.TIPO_SEGUIMIENTO, CIERRE: t.CIERRE, FECHA_CIERRE: t.FECHA_CIERRE });
+      // «Sin contacto válido» y el número equivocado del último contacto son la misma situación: sin contacto (SIN_CONTACTO).
+      else cerrados.push({ CLAVE: claveTarjeta(t), DNI: t.DNI, NOMBRE: t.NOMBRE, TIPO_SEGUIMIENTO: t.TIPO_SEGUIMIENTO, CIERRE: t.CIERRE, FECHA_CIERRE: t.FECHA_CIERRE,
+        SIN_CONTACTO: t.CIERRE === 'SIN CONTACTO' || t.CIERRE === 'NÚMERO EQUIVOCADO' });
     }
   });
   Object.keys(d.vigentes || {}).forEach(function (k) {
@@ -243,6 +247,7 @@ function armarTablero(d) {
     cerrados: cerrados,
     cifras: { porContactar: col.POR_CONTACTAR.length, contactados: col.CONTACTADO.length, pagados: col.PAGO_REALIZADO.length,
       agendados: col.AGENDADO.length, enTratamiento: col.EN_TRATAMIENTO.length,
-      completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length, hechosHoy: hechosHoy, hechosHoyPor: hechosHoyPor_(d) }
+      completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length,
+      cerradosSinContacto: cerrados.filter(function (c) { return c.SIN_CONTACTO; }).length, hechosHoy: hechosHoy, hechosHoyPor: hechosHoyPor_(d) }
   };
 }

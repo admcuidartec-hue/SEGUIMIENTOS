@@ -229,6 +229,33 @@ function opDe_(p) {
   return /^[A-Za-z0-9._\-]{6,80}$/.test(o) ? o : '';
 }
 
+/**
+ * Columnas que llegaron después de la OP (27/10/2026): en la hoja van detrás de ella, al final. Son opcionales como la OP:
+ * sin ellas se escribe como antes, salvo que haya que guardar un valor que no sea el de omisión (columnasRegistros_).
+ */
+var COLUMNAS_TRAS_OP = { REGISTROS: ['ORIGEN_HIERRO'] };
+
+/** El encabezado completo que espera «Preparar hojas» y «Verificar»: las columnas, la OP y las que llegaron después. */
+function conTrasOp_(nombre, columnas) { return columnas.concat([COLUMNA_OP], COLUMNAS_TRAS_OP[nombre] || []); }
+
+/** ¿La hoja tiene esa columna (por nombre normalizado)? Si no se puede saber, no. */
+function tieneColumna_(nombre, columna) {
+  try { return columnasDeHoja_(nombre).map(normColumna).indexOf(normColumna(columna)) >= 0; } catch (e) { return false; }
+}
+
+/**
+ * Las columnas con que se escriben `filas` en REGISTROS: con ORIGEN_HIERRO si la hoja ya la tiene. Sin ella, un hierro del CHP
+ * (el valor de omisión) se escribe igual; uno del paciente se niega ANTES de escribir nada, pidiendo «Preparar hojas».
+ */
+function columnasRegistros_(filas) {
+  var cols = conOp_('REGISTROS', COLUMNAS_REGISTROS);
+  if (tieneColumna_('REGISTROS', COLUMNA_ORIGEN_HIERRO)) return cols.concat([COLUMNA_ORIGEN_HIERRO]);
+  if ((filas || []).some(function (f) { return f && f.ORIGEN_HIERRO === 'PACIENTE'; })) {
+    throw new Error('Falta preparar las hojas: a REGISTROS le falta la columna ORIGEN_HIERRO. En el Sheets, menú Seguimientos → Preparar hojas.');
+  }
+  return cols;
+}
+
 /** Las columnas con que se escribe `nombre`: con OP al final si la hoja ya la tiene; si no (o no se puede saber), sin ella. */
 function conOp_(nombre, columnas) {
   MEMO.conOp = MEMO.conOp || {};
@@ -423,7 +450,7 @@ function bootstrap() {
     reglas: { espera: d.reglas.espera, maxSeguimientos: d.reglas.maxSeguimientos, graciaAgenda: d.reglas.graciaAgenda,
       diasEntreSesiones: d.reglas.diasEntreSesiones, esperaCotizacion: d.reglas.esperaCotizacion,
       metaRetorno: d.reglas.metaRetorno, metaTratamiento: d.reglas.metaTratamiento, metaDiaria: d.reglas.metaDiaria,
-      diasEnfermeria: d.reglas.diasEnfermeria, corteEnfermeria: d.reglas.corteEnfermeria,
+      diasEnfermeria: d.reglas.diasEnfermeria, corteEnfermeria: d.reglas.corteEnfermeria, maxIntentosEnfermeria: d.reglas.maxIntentosEnfermeria,
       postTratamiento: d.reglas.postTratamiento, controlLab: d.reglas.controlLab, avisoAltaControl: d.reglas.avisoAltaControl }
   });
 }
@@ -475,6 +502,7 @@ function getPaciente(dni) {
         CIERRE: f.cierre, FECHA_CIERRE: f.fechaCierre, NO_VINO: f.noVino, SIN_REEVALUACION: f.sinReevaluacion,
         NOMBRE: r.NOMBRE || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
         FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '',
+        ORIGEN_HIERRO: origenHierro(r),
         sesiones: sesionesDe_(r.ID, d.sesiones).map(function (s) {
           return { ID: s.ID, NUMERO: Number(s.NUMERO), FECHA: fechaIso(s.FECHA), ASESORA: s.ASESORA };
         }) };

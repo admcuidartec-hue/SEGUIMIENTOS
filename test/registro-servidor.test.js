@@ -146,7 +146,7 @@ test('guardarRegistro: procedimientos[] y un tratamiento en el mismo envío escr
   assert.deepEqual(escrito.REGISTROS.map(x => Object.fromEntries(Object.entries(x).sort())), [
     Object.assign({ ID: 'REG-000001', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', MARCA: '', SESIONES: 1 }, base),
     Object.assign({ ID: 'REG-000002', TIPO: 'PROCEDIMIENTO', DETALLE: 'AMO', MARCA: '', SESIONES: 1 }, base),
-    Object.assign({ ID: 'REG-000003', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'FERINJECT', SESIONES: 2 }, base)
+    Object.assign({ ID: 'REG-000003', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', MARCA: 'FERINJECT', SESIONES: 2, ORIGEN_HIERRO: 'CHP' }, base)
   ].map(x => Object.fromEntries(Object.entries(x).sort())));
   assert.equal(r.ok, true);
   assert.deepEqual(r.registros.map(x => x.ID), ['REG-000001', 'REG-000002', 'REG-000003']);
@@ -224,6 +224,46 @@ test('editarRegistro: relee dentro del candado, escribe solo lo cambiado, marca 
   ctx.leerRegistros_ = () => [Object.assign({}, REG4, { ANULADO: 'SÍ' })];
   assert.throws(() => ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { contacto: '912000111' } }), /anulado/);
   assert.equal(lock.tomado, 0);
+});
+
+test('hierro propio: guardarRegistro escribe ORIGEN_HIERRO; sin la columna, un CHP se guarda igual y un PACIENTE pide «Preparar hojas» sin escribir', () => {
+  const hierro = { tratamiento: 'HIERRO SACARATO', sesiones: '2', procedimiento: '', confirmado: true, dni: '40999888' };
+  const con = servidor();
+  const cols = [];
+  con.ctx.columnasDeHoja_ = () => plano(con.ctx.COLUMNAS_REGISTROS).concat(['OP', 'ORIGEN_HIERRO']);
+  con.ctx.anexarObjeto_ = (n, c, o) => { cols.push(plano(c)); con.escrito[n].push(plano(o)); };
+  const r = plano(con.ctx.guardarRegistro(datosReg(Object.assign({ origenHierro: 'PACIENTE' }, hierro))));
+  assert.equal(r.ok, true);
+  assert.equal(con.escrito.REGISTROS[0].ORIGEN_HIERRO, 'PACIENTE');
+  assert.equal(cols[0].slice(-1)[0], 'ORIGEN_HIERRO', 'se escribe por nombre, al final');
+  assert.equal(r.registros[0].TEXTO, 'Hierro sacarato × 2 sesiones · hierro propio');
+  assert.equal(con.escrito.BITACORA[0][2], 'REG-000001 · 40999888 · Hierro sacarato × 2 sesiones · hierro propio');
+  // Sin la columna (antes de «Preparar hojas»).
+  const sin = servidor();
+  sin.ctx.columnasDeHoja_ = () => plano(sin.ctx.COLUMNAS_REGISTROS).concat(['OP']);
+  assert.throws(() => sin.ctx.guardarRegistro(datosReg(Object.assign({ origenHierro: 'PACIENTE' }, hierro))), /Falta preparar las hojas: a REGISTROS le falta la columna ORIGEN_HIERRO/);
+  assert.deepEqual([sin.escrito.REGISTROS.length, sin.lock.tomado], [0, 0]);
+  sin.ctx.guardarRegistro(datosReg(hierro));
+  assert.deepEqual(sin.escrito.REGISTROS.map(x => x.ORIGEN_HIERRO), ['CHP'], 'el CHP (por omisión) se guarda igual');
+});
+
+test('hierro propio: editarRegistro cambia ORIGEN_HIERRO; sin la columna se niega antes de escribir', () => {
+  const REGH = Object.assign({}, REG4, { TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', SESIONES: '2' });
+  const { ctx, escrito, lock } = servidor({ registros: [REGH] }, { REGISTROS: [REGH] });
+  const celdas = [];
+  ctx.leerRegistros_ = () => [REGH];
+  ctx.leerSesiones_ = () => [];
+  ctx.columnasDeHoja_ = () => plano(ctx.COLUMNAS_REGISTROS).concat(['OP', 'ORIGEN_HIERRO']);
+  ctx.actualizarCeldas_ = (h, id, c) => { assert.equal(lock.tomado, 1); celdas.push([h, id, plano(c)]); };
+  const r = plano(ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { origenHierro: 'PACIENTE', contacto: '912000111' } }));
+  assert.equal(r.ok, true);
+  assert.deepEqual(celdas, [['REGISTROS', 'REG-000004', { CONTACTO: '912000111', ORIGEN_HIERRO: 'PACIENTE', EDITADO: '2026-10-05 10:30' }]]);
+  assert.equal(r.registro.ORIGEN_HIERRO, 'PACIENTE');
+  assert.match(escrito.BITACORA.map(b => b[2]).join(' | '), /ORIGEN_HIERRO:  → PACIENTE/);
+  ctx.columnasDeHoja_ = () => plano(ctx.COLUMNAS_REGISTROS).concat(['OP']);
+  ctx.leerRegistros_ = () => [REGH];
+  assert.throws(() => ctx.editarRegistro({ usuario: 'MAGALY', id: 'REG-000004', cambios: { origenHierro: 'PACIENTE', contacto: '955000111' } }), /le falta la columna ORIGEN_HIERRO/);
+  assert.equal(celdas.length, 1, 'no escribió nada');
 });
 
 test('getRegistros: hoy o un mes, con los datos para editar', () => {

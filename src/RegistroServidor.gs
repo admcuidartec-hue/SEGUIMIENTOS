@@ -60,6 +60,8 @@ function guardarRegistro(p) {
     // Otra asesora pudo registrar lo mismo entre la lectura de arriba y el candado: el duplicado se revisa otra vez aquí.
     dup = !(p && p.confirmado) && duplicadoDe_(sinOp_(registros, op), v.filas);
     if (dup) return limpiarParaEnvio(dup);
+    // Con un hierro del paciente y sin la columna ORIGEN_HIERRO, se niega aquí, antes de escribir nada.
+    var columnasReg = columnasRegistros_(v.filas);
     var ahora = fechaHoraTexto_(new Date()), hechas = [], filasSes = [];
     // Todo se valida antes de escribir la primera fila: un registro de varias filas es todo o nada.
     v.filas.forEach(function (f, i) {
@@ -84,7 +86,7 @@ function guardarRegistro(p) {
     try {
       v.filas.forEach(function (f) {
         var copia = copia_(f, {}); delete copia.TEXTO;
-        anexarObjeto_('REGISTROS', conOp_('REGISTROS', COLUMNAS_REGISTROS), copia);
+        anexarObjeto_('REGISTROS', columnasReg, copia);
         deshacer.push(function () { marcarAnulado_('REGISTROS', f.ID, motivo); });
         var s = filasSes.filter(function (x) { return x.ID_REGISTRO === f.ID; })[0];
         if (s) {
@@ -409,6 +411,8 @@ function editarRegistro(p) {
     if (v.error) throw new Error(v.error);
     var cols = Object.keys(v.cambios);
     if (!cols.length) return { ok: false, sinCambios: true };
+    // El origen del hierro va en su columna (detrás de OP): sin ella, se niega antes de escribir ninguna celda.
+    if ('ORIGEN_HIERRO' in v.cambios) columnasRegistros_([{ ORIGEN_HIERRO: 'PACIENTE' }]);
     var ahora = fechaHoraTexto_(new Date()), escribir = copia_(v.cambios, { EDITADO: ahora });
     actualizarCeldas_('REGISTROS', id, escribir);
     cols.forEach(function (c) { bitacora_(quien, 'EDITAR REGISTRO', id + ' · ' + c + ': ' + v.antes[c] + ' → ' + v.cambios[c]); });
@@ -425,7 +429,8 @@ function filaRegistrada_(r, d) {
   return { ID: r.ID, HORA: String(r.FECHA_HORA || '').slice(11, 16), ASESORA: r.ASESORA, NOMBRE: r.NOMBRE, DNI: r.DNI, TEXTO: textoRegistro(r),
     ANULADO: anulado_(r), MOTIVO_ANULACION: r.MOTIVO_ANULACION || '', EDITADO: r.EDITADO || '', FECHA: fechaIso(r.FECHA) || '', TIPO: normTexto(r.TIPO),
     DOCTOR: r.DOCTOR || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '', SESIONES: e.total, HECHAS: e.hechas,
-    FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '', DECISION: '' };
+    FECHA_INICIO: fechaIso(r.FECHA_INICIO) || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: fechaIso(r.FECHA_RETORNO) || '', DECISION: '',
+    ORIGEN_HIERRO: origenHierro(r) };
 }
 
 function getRegistros(p) {

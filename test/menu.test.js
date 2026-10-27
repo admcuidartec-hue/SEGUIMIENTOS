@@ -213,8 +213,8 @@ test('ampliarHojas_: REFERENCIA en SEGUIMIENTOS, catálogos de Registro, quita A
   assert.equal(cat.v[2][1], '', 'ALTA MÉDICA quitado');
   assert.deepEqual(reg.v.slice(2).map(f => [f[4], f[5]]), [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
     ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30],
-    ['META_CUMPLIMIENTO_TRATAMIENTO_PCT', 95], ['ENFERMERIA_DIAS', '1,3,5'], ['ENFERMERIA_CORTE_DIAS', 10]]);
-  assert.equal(cambios.length, 13, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los diez parámetros');
+    ['META_CUMPLIMIENTO_TRATAMIENTO_PCT', 95], ['ENFERMERIA_DIAS', '1,3,5'], ['ENFERMERIA_CORTE_DIAS', 10], ['ENFERMERIA_MAX_INTENTOS', 2]]);
+  assert.equal(cambios.length, 14, 'SEGUIMIENTOS, CATALOGOS, ALTA MÉDICA y los once parámetros');
   assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
 });
 
@@ -308,11 +308,24 @@ test('ampliarHojas_: REGISTROS y ALTAS reciben sus columnas nuevas al final, una
   const alt = hojaFalsa([COLS_ALT]);
   ctx.ss_ = () => ({ getSheetByName: n => ({ REGISTROS: reg, ALTAS: alt })[n] || null });
   const cambios = [...ctx.ampliarHojas_()];
-  assert.deepEqual(reg.v[0].slice(14), ['FECHA_INICIO', 'EXAMENES', 'FECHA_RETORNO', 'EDITADO', 'OP']);
+  assert.deepEqual(reg.v[0].slice(14), ['FECHA_INICIO', 'EXAMENES', 'FECHA_RETORNO', 'EDITADO', 'OP', 'ORIGEN_HIERRO']);
   assert.deepEqual(reg.v[1].slice(0, 3), ['REG-000001', '2026-10-01 09:00', '2026-10-01'], 'no toca las filas');
   assert.deepEqual(alt.v[0].slice(10), ['DECISION', 'FECHA_RETORNO', 'OP']);
-  assert.ok(cambios.some(c => /^REGISTROS: columna FECHA_INICIO, EXAMENES, FECHA_RETORNO, EDITADO, OP\.$/.test(c)));
+  assert.ok(cambios.some(c => /^REGISTROS: columna FECHA_INICIO, EXAMENES, FECHA_RETORNO, EDITADO, OP, ORIGEN_HIERRO\.$/.test(c)));
   assert.deepEqual([...ctx.ampliarHojas_()].filter(c => /REGISTROS|ALTAS/.test(c)), [], 'la segunda vez no cambia nada');
+});
+
+test('«Preparar hojas» agrega ORIGEN_HIERRO detrás de la OP de REGISTROS, sin avisar de columnas movidas; «Verificar» la pide', () => {
+  const { ctx } = contexto();
+  const reg = hojaFalsa([ctx.COLUMNAS_REGISTROS.concat(['OP'])]);
+  ctx.ss_ = () => ({ getSheetByName: n => (n === 'REGISTROS' ? reg : null) });
+  assert.deepEqual([...ctx.ampliarHojas_()].filter(c => /REGISTROS/.test(c)), ['REGISTROS: columna ORIGEN_HIERRO.']);
+  assert.deepEqual(plano(reg.v[0].slice(-2)), ['OP', 'ORIGEN_HIERRO']);
+  assert.deepEqual(plano(ctx.lineasEncabezado('REGISTROS', ctx.revisarEncabezado(reg.v[0], ctx.conTrasOp_('REGISTROS', ctx.COLUMNAS_REGISTROS)))),
+    ['✓ REGISTROS tiene todas sus columnas.']);
+  assert.match(ctx.lineasEncabezado('REGISTROS', ctx.revisarEncabezado(ctx.COLUMNAS_REGISTROS.concat(['OP']), ctx.conTrasOp_('REGISTROS', ctx.COLUMNAS_REGISTROS)))[0],
+    /^✗ A REGISTROS le falta la columna ORIGEN_HIERRO\. Use «Preparar hojas»\.$/);
+  assert.deepEqual(plano(ctx.hojasBase_().REGISTROS).slice(-2), ['OP', 'ORIGEN_HIERRO'], 'una hoja nueva nace con ella');
 });
 
 test('«Preparar hojas» agrega OP al final de las seis hojas que se escriben por posición; sin OP el servidor sigue escribiendo', () => {
@@ -322,8 +335,8 @@ test('«Preparar hojas» agrega OP al final de las seis hojas que se escriben po
     ['ENFERMERIA', ctx.COLUMNAS_ENFERMERIA], ['SESIONES', ctx.COLUMNAS_SESIONES], ['BITACORA', ctx.COLUMNAS_BITACORA]]) hojas[n] = hojaFalsa([cols.slice()]);
   ctx.ss_ = () => ({ getSheetByName: n => hojas[n] || null });
   const cambios = [...ctx.ampliarHojas_()];
-  assert.deepEqual(cambios, ['SEGUIMIENTOS', 'REGISTROS', 'ALTAS', 'ENFERMERIA', 'SESIONES', 'BITACORA'].map(n => n + ': columna OP.'));
-  Object.values(hojas).forEach(h => assert.equal(h.v[0][h.v[0].length - 1], 'OP'));
+  assert.deepEqual(cambios, ['SEGUIMIENTOS', 'REGISTROS', 'ALTAS', 'ENFERMERIA', 'SESIONES', 'BITACORA'].map(n => n + (n === 'REGISTROS' ? ': columna OP, ORIGEN_HIERRO.' : ': columna OP.')));
+  Object.entries(hojas).forEach(([n, h]) => assert.equal(h.v[0][h.v[0].length - 1], n === 'REGISTROS' ? 'ORIGEN_HIERRO' : 'OP'));
   assert.deepEqual([...ctx.ampliarHojas_()], [], 'la segunda vez no cambia nada');
   // Con o sin OP las hojas están listas; sin una columna de antes, no.
   assert.equal(ctx.columnasListas_(ctx.COLUMNAS_SESIONES.concat(['OP']), ctx.COLUMNAS_SESIONES), true);

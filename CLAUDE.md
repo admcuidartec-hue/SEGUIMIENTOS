@@ -19,7 +19,7 @@ La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administ
 | `src/Codigo.gs` | Lee y escribe el Sheets; funciones que llama la app |
 | `src/Registro.gs` | Lógica pura de la pestaña Registro: registros, sesiones y altas |
 | `src/RegistroServidor.gs` | Funciones de la pestaña Registro que escriben `REGISTROS`, `SESIONES` y `ALTAS` |
-| `src/Enfermeria.gs` | Lógica pura de Enfermería: contactos tras cada sesión de hierro, reacciones y sus cifras |
+| `src/Enfermeria.gs` | Lógica pura de Enfermería: contactos tras cada sesión de hierro, reacciones, «No respondió» y sus cifras |
 | `src/EnfermeriaServidor.gs` | Funciones de Enfermería que leen y escriben `ENFERMERIA` |
 | `src/Menu.gs` | Menú `Seguimientos` del Sheets |
 | `src/Index.html` | La app. El bloque `DEMO` del final permite abrirla en el navegador sin desplegar: **no lo elimine** |
@@ -200,6 +200,55 @@ por su nombre (se quitaron el filtro propuesto del médico y su entrada directa 
   posterior, fuera de esa ventana, sigue reemplazando a la anterior (`decisionPosterior_`). El DEMO, de una sola pestaña, no la
   simula.
 
+## Hierro propio, cierre de Enfermería y «Sin contacto válido» (27/10/2026)
+
+**1. Hierro propio del paciente (`REGISTROS.ORIGEN_HIERRO`).** La enfermera llama tras cada sesión a **todos** los pacientes de
+hierro: los que lo compran en el CHP y los que traen su propio hierro y se lo aplican aquí. **La admisionista registra también el
+hierro que trae el paciente** (Registro → Indicación, con la casilla «Hierro propio del paciente (lo trae él)»): sin registro no hay
+sesiones ni contactos de Enfermería.
+- Valores `CHP` (por omisión) o `PACIENTE`; las filas sin valor se leen como CHP (`origenHierro`). Solo en filas de hierro.
+  `guardarRegistro({ origenHierro })` y Editar («Origen del hierro», `cambios.origenHierro`) lo cambian.
+- La columna va **detrás de `OP`** (`COLUMNAS_TRAS_OP`, `conTrasOp_` en `Codigo.gs`), no dentro de `COLUMNAS_REGISTROS`: así
+  «Preparar hojas» la agrega al final y «Verificar» no la ve como «cambiada de lugar». Es opcional como la OP: sin ella un hierro
+  del CHP se guarda igual; uno del paciente (o editar el origen) se niega **antes de escribir nada** con «Falta preparar las hojas: a
+  REGISTROS le falta la columna ORIGEN_HIERRO…» (`columnasRegistros_`).
+- `textoRegistro` añade «· hierro propio» (tarjeta, panel, ficha, Registrados y BITACORA); la fila de Enfermería también lo dice.
+- Indicadores: la tarjeta de hierro (y el resumen impreso) dice «Hierro del CHP: n · propio del paciente: m» (`HIERRO_PROPIO`, al
+  final de `CAMPOS_RESUMEN`). Las cifras de cumplimiento no cambian: incluyen a los dos.
+
+**2. Enfermería: cierre automático tras `ENFERMERIA_MAX_INTENTOS` (2) «No contestó».** Un día de llamada (1, 3, 5…) con esa
+cantidad de «No contestó» sin anular y ningún «Contactado» queda **«No respondió»** (no logrado) y sale de la lista
+(`noRespondioEnfermeria`); los días siguientes de esa sesión siguen apareciendo en su fecha.
+- Tras el primero la fila dice «No contestó 1 vez · se cierra al siguiente intento» (cada contacto trae `MAX_INTENTOS`). «Deshacer»
+  (anular el último «No contestó») la devuelve a pendiente.
+- **La «Aplicación» (DIA 0) no se cierra así** (decidido el 27/10/2026): no es una llamada y no admite «No contestó»; queda
+  pendiente hasta que la enfermera registre si hubo reacción, o hasta `ENFERMERIA_CORTE_DIAS`.
+- Ficha: «Sesión k · Día d: no respondió (n intentos)». Indicadores: «contactos a tiempo» lo cuenta como no logrado y añade
+  «no respondieron: n» (`ENF_NO_RESPONDIO`).
+
+**3. Cierre «Sin contacto válido» (`RESULTADO = SIN CONTACTO`).** Para una tarjeta sin teléfono, o cuyo número no existe en
+WhatsApp y no hay otro. Está en `RESULTADOS` (grupo `CIERRE`, `ACCION = DESCARTADO`), para todos los tipos, con nota opcional;
+en el panel va en «Cerrar el seguimiento» (X) y es la primera opción si la tarjeta no tiene ningún contacto (X y Enter llegan a ella).
+- La tarjeta sale del tablero y cuenta en «Cerrados este mes» como sin contacto («… cerrados este mes · n sin contacto»,
+  `SIN_CONTACTO`, `cifras.cerradosSinContacto`). «Motivos de cierre» la incluye como «Sin contacto válido» en todos los tipos.
+- **Reapertura automática**: la `NOTA` guarda los contactos que tenía al cerrar («Contactos al cerrar: 987654321 / @usuario» o
+  «… ninguno», `contactosAlCerrar`). `leerCiclo` recibe los contactos de ahora (teléfonos de SOFDOC/historial, CRM y Registro, y el
+  @usuario; también un contacto cambiado con Editar): con uno que no estaba, la tarjeta vuelve sola a «Por contactar» con
+  «Nuevo contacto: …» (`NUEVO_CONTACTO`) y **un ciclo nuevo** (lo de antes del cierre no cuenta, ni la deja ANTIGUA por tiempo).
+  El mismo número que no servía no la reabre.
+- **Relación con «Número equivocado»**: marcar equivocado el **último** contacto (`ACCION = DESCARTADO` con su `TELEFONO`) es la
+  misma situación: se trata como un «Sin contacto válido» con ningún contacto al cerrar. Su tarjeta queda cerrada con el motivo
+  `NÚMERO EQUIVOCADO` (se lista como «Sin contacto válido (número equivocado)») y se reabre igual, con «Nuevo contacto», cuando llega
+  otro. Como antes, cierra también las demás tarjetas del DNI (`sinContacto_`, por paciente) mientras no haya contacto; esas
+  vuelven a donde estaban. «Sin contacto válido» cierra solo su tarjeta.
+- Se anula como cualquier resultado («Deshacer» o la historia).
+
+**Publicar estos tres cambios**: `npm run subir` → en el Sheets, **«Preparar hojas»** (agrega `ORIGEN_HIERRO` al final de
+`REGISTROS` y `ENFERMERIA_MAX_INTENTOS` = 2 a `REGLAS`) → «Verificar» (debe decir «REGISTROS tiene todas sus columnas») → en el
+`@HEAD`, con el paciente de prueba: un hierro con «Hierro propio», dos «No contestó» de Enfermería y su «Deshacer», un «Sin
+contacto válido» y su «Deshacer» → `npm run actualizar`. Avisar a las admisionistas: el hierro que trae el paciente **también se
+registra**, y existe el cierre «Sin contacto válido».
+
 ## «¿Qué pasó?» (Etapa 1)
 
 - La lista de resultados vive en `RESULTADOS` (`src/Resultados.gs`), no en `CATALOGOS`.
@@ -210,6 +259,7 @@ por su nombre (se quitaron el filtro propuesto del médico y su entrada directa 
 - Solo «No contestó» cuenta para el cierre automático (`MAX_SEGUIMIENTOS` seguidos, más la espera).
 - «Número equivocado» marca el número y no cierra mientras quede otro contacto: otro teléfono o el contacto de Registro que no
   es teléfono («@usuario», `usuariosPorDni`), que llega a todas las tarjetas del DNI (también a la reevaluación) como `USUARIO`.
+  Con el último contacto la situación es la de «Sin contacto válido» (ver la sección del 27/10/2026).
 - «Falleció» vale para todo el paciente.
 - Las filas anuladas (`ANULADO = SI`) no cuentan en ninguna cifra; `datos_` las filtra.
 - Tras publicar, usar «Preparar hojas», que agrega 5 columnas a `SEGUIMIENTOS` y los parámetros que falten en `REGLAS`
@@ -361,7 +411,8 @@ Pedido de Liset (Enfermería). Especificación: `docs/superpowers/specs/2026-10-
 - **Contactos tras cada sesión de hierro**: sesión + 1, + 3 y + 5 días (`REGLAS.ENFERMERIA_DIAS` = «1,3,5»). Se **calculan**
   (`contactosEnfermeria`); en la hoja **`ENFERMERIA`** solo queda lo registrado (`CONTACTADO` o `NO CONTESTO`, con
   `REACCION_TIPO` `NINGUNA` / `INMEDIATA` / `MEDIATA` y `REACCION` del catálogo `CATALOGOS.REACCIONES`). Un contacto
-  `CONTACTADO` queda cumplido; un `NO CONTESTO` lo deja en la lista. No se muestran los de registros o sesiones anulados,
+  `CONTACTADO` queda cumplido; un `NO CONTESTO` lo deja en la lista hasta `ENFERMERIA_MAX_INTENTOS` (ver la sección del
+  27/10/2026). No se muestran los de registros o sesiones anulados,
   los de un fallecido ni los que tocaban hace más de `ENFERMERIA_CORTE_DIAS` (10).
 - **Pantalla «Enfermería»** (menú y barra del celular): vencidos (el más antiguo primero), hoy y próximos 7 días (plegable).
   «Ya me contacté» abre en la misma fila: ¿reacción? No / Inmediata / Mediata, cuáles (chips) y nota (obligatoria con «Otra»).

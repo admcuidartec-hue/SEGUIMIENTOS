@@ -9,6 +9,27 @@ var COLUMNAS_SESIONES = ['ID', 'FECHA_HORA', 'ID_REGISTRO', 'NUMERO', 'FECHA', '
 var COLUMNAS_ALTAS = ['ID', 'FECHA_HORA', 'FECHA', 'DNI', 'ESPECIALIDAD', 'DOCTOR', 'REGISTRADO_POR', 'NOTA', 'ANULADO', 'MOTIVO_ANULACION',
   'DECISION', 'FECHA_RETORNO'];
 
+/**
+ * De dónde es el hierro (pedido del 27/10/2026): CHP (lo compra en el CHP, por omisión) o PACIENTE (lo trae él y se lo aplican
+ * aquí). La enfermera llama igual a los dos. Columna al final de REGISTROS, después de OP (COLUMNAS_TRAS_OP en Codigo.gs): si
+ * falta, se escribe sin ella mientras el origen sea CHP; un PACIENTE pide «Preparar hojas». Las filas sin valor se leen como CHP.
+ */
+var COLUMNA_ORIGEN_HIERRO = 'ORIGEN_HIERRO';
+var ORIGENES_HIERRO = { CHP: 'CHP', PACIENTE: 'PACIENTE' };
+
+/** El origen del hierro de un registro: 'PACIENTE' o 'CHP' (también sin valor, las filas antiguas); '' si no es hierro. */
+function origenHierro(r) {
+  if (normTexto(r && r.TIPO) !== 'HIERRO') return '';
+  return normTexto(r.ORIGEN_HIERRO) === 'PACIENTE' ? 'PACIENTE' : 'CHP';
+}
+
+/** Lo que pide el formulario: 'CHP', 'PACIENTE', '' (no lo dice) o null (no vale). */
+function origenPedido_(v) {
+  if (v === true) return 'PACIENTE';
+  if (v === false || v === undefined || v === null || textoLimpio_(v) === '') return '';
+  return ORIGENES_HIERRO[normTexto(v)] || null;
+}
+
 var MAX_SESIONES = 20;
 var DIAS_DUPLICADO = 7;
 
@@ -89,7 +110,8 @@ function textoRegistro(r) {
   if (normTexto(r.TIPO) === 'CONTROL') return 'Control + laboratorio' + (textoLimpio_(r.EXAMENES) ? ' · ' + textoLimpio_(r.EXAMENES) : '');
   if (r.TIPO !== 'HIERRO') return frase_(r.DETALLE);
   var n = Number(r.SESIONES) || 1;
-  return frase_(r.DETALLE) + (r.MARCA ? ' · ' + frase_(r.MARCA) : '') + ' × ' + n + (n === 1 ? ' sesión' : ' sesiones');
+  return frase_(r.DETALLE) + (r.MARCA ? ' · ' + frase_(r.MARCA) : '') + ' × ' + n + (n === 1 ? ' sesión' : ' sesiones') +
+    (origenHierro(r) === 'PACIENTE' ? ' · hierro propio' : '');
 }
 
 /** El médico para filtros y cifras: su nombre en SOFDOC o, si no tiene, el DOCTOR tal cual. */
@@ -142,6 +164,8 @@ function validarRegistro(p, catalogos, hoy) {
   var procs = (Array.isArray(p.procedimientos) ? p.procedimientos : []).concat(proc ? [proc] : [])
     .map(textoLimpio_).filter(Boolean);
   if (!procs.length && !trat) return no('Elija un procedimiento, un tratamiento o ambos.');
+  var origen = origenPedido_(p.origenHierro);
+  if (origen === null) return no('El origen del hierro no es válido: CHP o PACIENTE.');
   var base = base0;
   var filas = [];
   var vistos = {};
@@ -164,7 +188,7 @@ function validarRegistro(p, catalogos, hoy) {
     } else if (textoLimpio_(p.marca)) {
       return no(t1 + ' no lleva marca.');
     }
-    filas.push(copia_(base, { TIPO: 'HIERRO', DETALLE: t1, MARCA: marca, SESIONES: n }));
+    filas.push(copia_(base, { TIPO: 'HIERRO', DETALLE: t1, MARCA: marca, SESIONES: n, ORIGEN_HIERRO: origen || 'CHP' }));
   }
   return { error: '', filas: filas, sesionHecha: sesionHecha };
 }
@@ -182,7 +206,7 @@ function duplicadoReciente(registros, fila) {
 /* ---------- Editar un registro ---------- */
 
 var EDITABLES = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
-  sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO' };
+  sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO', origenHierro: 'ORIGEN_HIERRO' };
 
 /** Valida los cambios pedidos a un registro. Devuelve solo lo que de verdad cambia y su valor anterior. */
 function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
@@ -244,6 +268,13 @@ function validarEdicionRegistro(r, cambios, sesiones, catalogos, hoy) {
       nuevo = textoLimpio_(v);
       if (largoMal_(nuevo, LARGO_TEXTO, 'Los exámenes')) return no(largoMal_(nuevo, LARGO_TEXTO, 'Los exámenes'));
     }
+    else if (col === 'ORIGEN_HIERRO') {
+      nuevo = origenPedido_(v);
+      if (nuevo === null) return no('El origen del hierro no es válido: CHP o PACIENTE.');
+      if (normTexto(r.TIPO) !== 'HIERRO') return no('Solo un hierro tiene origen (CHP o del paciente).');
+      nuevo = nuevo || 'CHP';
+      if (nuevo === origenHierro(r)) continue;
+    }
     else if (col === 'FECHA_RETORNO') {
       if (!control) return no('Solo un control tiene fecha de retorno.');
       nuevo = fechaIso(v); if (!nuevo || nuevo <= hoy) return no('La fecha de retorno debe ser después de hoy.');
@@ -273,6 +304,7 @@ function iguales_(col, v, r, catalogos) {
   else if (col === 'NOMBRE') nuevo = textoLimpio_(v).toUpperCase();
   else if (col === 'CONTACTO') { nuevo = contactoNormal_(v); actual = contactoNormal_(actual); }
   else if (col === 'SESIONES') nuevo = Number(v);
+  else if (col === 'ORIGEN_HIERRO') { var o = origenPedido_(v); nuevo = o === null ? '\u0000' : o || 'CHP'; actual = normTexto(actual) === 'PACIENTE' ? 'PACIENTE' : 'CHP'; }
   else nuevo = textoLimpio_(v);
   if (col === 'DETALLE') nuevo = enLista_((normTexto(r.TIPO) === 'HIERRO' ? catalogos.tratamientos : catalogos.procedimientos), v) || '\u0000';
   if (col === 'MARCA') nuevo = enLista_(((catalogos.marcas || {})[normTexto(r.DETALLE)] || []), v) || (textoLimpio_(v) === '' ? '' : '\u0000');
@@ -515,7 +547,6 @@ function pendientesRegistro(d) {
       if (desdeCotizacion && String(s.FECHA_HORA || '') > trasAceptar && (resultadoDe(s) || {}).grupo === 'CIERRE') return true;
       return fechaIso(s.FECHA_HORA) >= desde && String(s.FECHA_HORA || '') >= corte;
     }).sort(porFechaHora_);
-    var c = leerCiclo(lista, reglas, hoy);
     var tel = normTelefono(r.CONTACTO), usuario = tel.length === 9 ? '' : textoLimpio_(r.CONTACTO);
     // Sin teléfonos conocidos del DNI (p. ej. un control de alguien que solo vino por Registro), vale el CONTACTO del registro,
     // salvo que esté marcado como equivocado después de registrarse.
@@ -523,6 +554,8 @@ function pendientesRegistro(d) {
     if (!telefonos.length && tel.length === 9 && !(marcaTel && !(fechaIso(r.FECHA) > marcaTel))) telefonos = [tel];
     var mapaTel = {};
     mapaTel[dni] = telefonos;
+    // Con los contactos de ahora: uno que no había al cerrar «Sin contacto válido» la reabre (leerCiclo).
+    var c = leerCiclo(lista, reglas, hoy, contactosTarjeta_(telefonos, usuario || (d.usuarios || {})[dni]));
     var sc = sinContacto_(dni, marcas, mapaTel, usuario || (d.usuarios || {})[dni]), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '', falta = '';
     var agenda = c.agenda;
     // En un tratamiento en curso, la cita que se agenda es su próxima sesión: «Sesión k+1 el …».
@@ -562,6 +595,8 @@ function pendientesRegistro(d) {
     }
     else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
+    // Reabierta por un contacto nuevo («Sin contacto válido»): vuelve a Por contactar aunque fuera ANTIGUO.
+    if (c.nuevoContacto && estado === 'ANTIGUO') estado = e.estado === 'COMPLETO' ? 'POR REEVALUAR' : 'PENDIENTE';
     // Pagó y aún no tiene fecha: Pago realizado en vez de Por contactar, Contactado o ANTIGUO (Etapa 3, §2.2).
     if (c.pago && (estado === 'PENDIENTE' || estado === 'ANTIGUO' || estado === 'POR REEVALUAR' || (estado === 'AGENDADO' && agenda && AGENDAS_CONTACTO[agenda.tipo]))) {
       estado = 'PAGO REALIZADO'; agenda = null; motivo = '';
@@ -580,6 +615,7 @@ function pendientesRegistro(d) {
       DETALLE: textoRegistro(r),
       TRATAMIENTO: r.TIPO === 'HIERRO' ? frase_(r.DETALLE) : '',
       MARCA: r.TIPO === 'HIERRO' ? frase_(r.MARCA) : '',
+      ORIGEN_HIERRO: origenHierro(r),
       SESIONES: e.total,
       HECHAS: e.hechas,
       ULTIMA_SESION: e.ultima,
@@ -603,7 +639,8 @@ function pendientesRegistro(d) {
       EXAMENES: textoLimpio_(r.EXAMENES),
       FECHA_INICIO: e.inicio,
       FECHA_FALTA: falta,
-      FECHA_PAGO: c.pago
+      FECHA_PAGO: c.pago,
+      NUEVO_CONTACTO: (c.nuevoContacto || []).join(' / ')
     };
   }).filter(Boolean);
 }
@@ -794,7 +831,7 @@ function indicacionesDeRegistros(registros, sesiones, catalogos, reglas, hoy) {
       ID: r.ID, FECHA: fecha, TIPO: normTexto(r.TIPO), DETALLE: r.DETALLE, CANTIDAD: e.total,
       MEDICO_SOLICITANTE: medicoDeRegistro(r, catalogos), ASESORA: r.ASESORA, NOMBRE: r.NOMBRE,
       TELEFONO: tel.length === 9 ? tel : '', ESTADO: e.estado === 'COTIZADO' ? 'COTIZÓ' : 'ACEPTÓ',
-      OBSERVACIONES: '', DNI: normDni(r.DNI), EMPAREJAMIENTO: 'REGISTRO', ORIGEN: 'REGISTROS',
+      OBSERVACIONES: '', DNI: normDni(r.DNI), EMPAREJAMIENTO: 'REGISTRO', ORIGEN: 'REGISTROS', ORIGEN_HIERRO: origenHierro(r),
       COMPLETO: e.estado === 'COMPLETO' ? 'SÍ' : 'NO',
       // Un cotizado dentro de su espera todavía no es «no siguió».
       EN_ESPERA: e.estado === 'COTIZADO' && fecha && diasEntre(fecha, hoy) < reglas.esperaCotizacion ? 'SÍ' : ''

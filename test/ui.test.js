@@ -1139,6 +1139,69 @@ test('panel: los cierres confirman en el panel; «Falleció» saca todas las tar
   } finally { await navegador.close(); }
 });
 
+test('«Sin contacto válido»: en el cierre (X) de todas las tarjetas, primero si no hay contacto; sale del tablero como «sin contacto» y «Deshacer» la devuelve', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const JORGE = '40222333|HEMATOLOGÍA';
+    // Con teléfonos también se ofrece (hierro de Rosa), detrás de «Número equivocado».
+    await abrirPanelDe(pagina, ROSA);
+    const cierresRosa = await pagina.locator('#panel .acc.cierra button').evaluateAll(l => l.map(b => b.dataset.acc));
+    assert.ok(cierresRosa.includes('sincontacto') && cierresRosa.indexOf('numero') < cierresRosa.indexOf('sincontacto'));
+    await pagina.keyboard.press('Escape');
+    await pagina.waitForFunction(() => !seleccion.panel);
+    // Jorge no tiene teléfono ni usuario: con X, «Sin contacto válido» es la primera opción y Enter abre su paso (no guarda).
+    await pagina.evaluate(id => seleccionar(id, true), JORGE);
+    await pagina.keyboard.press('x');
+    await pagina.waitForFunction(() => document.activeElement && document.activeElement.dataset.acc === 'sincontacto');
+    assert.equal(await pagina.locator('#panel [data-acc="numero"]').count(), 0, 'sin teléfono no hay «Número equivocado»');
+    await pagina.keyboard.press('Enter');
+    await pagina.waitForSelector('#panel .paso.cierre');
+    assert.equal(await llamadas(pagina, 'registrarResultado'), 0, 'nada se cierra sin confirmar');
+    const paso = (await pagina.locator('#panel .paso').textContent()).replace(/\s+/g, ' ');
+    assert.match(paso, /Sin contacto válido/);
+    assert.match(paso, /Si después aparece otro teléfono o @usuario \(SOFDOC, CRM o Registro\), vuelve sola a «Por contactar»\./);
+    await pagina.locator('#panel [data-confirmar]').click();
+    await esperarEstable(pagina);
+    await esperarCol(pagina, JORGE, '');
+    assert.equal((await ultimo(pagina, 'registrarResultado')).resultado, 'SIN CONTACTO');
+    assert.match(await aviso(pagina), /^Guardado: Jorge Luis Mendoza Paredes · sin contacto válido\. Sale del tablero; vuelve sola si aparece otro contacto\./);
+    assert.match(await pagina.locator('#tablero [data-col="4"] .f-sub').textContent(), /3 cerrados este mes · 1 sin contacto/);
+    await pagina.locator('#ver-cerrados').click();
+    const filas = await pagina.locator('#cerrados li').evaluateAll(l => l.map(x => x.textContent.replace(/\s+/g, ' ').trim()));
+    assert.ok(filas.some(f => /Jorge Luis Mendoza Paredes/.test(f) && /Sin contacto válido/.test(f)));
+    // El servidor (DEMO) lo guardó con los contactos de entonces.
+    const seg = await pagina.evaluate(() => llamar('getPaciente', '40222333').then(r => r.seguimientos.slice(-1)[0]));
+    assert.deepEqual([seg.RESULTADO, seg.ACCION, seg.NOTA], ['SIN CONTACTO', 'DESCARTADO', 'Contactos al cerrar: ninguno']);
+    await pagina.locator('#aviso button:not([hidden])').click();   // Deshacer
+    await pagina.waitForFunction(() => DEMO._llamadas.anularResultado === 1);
+    await esperarCol(pagina, JORGE, '1');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('«Sin contacto válido»: un teléfono nuevo (Registro) la devuelve sola a «Por contactar» con «Nuevo contacto: …»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const JORGE = '40222333|HEMATOLOGÍA';
+    await pagina.evaluate(() => llamar('registrarResultado', { usuario: 'MAGALY', dni: '40222333', especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'SIN CONTACTO', nota: '' }));
+    let t = await pagina.evaluate(() => llamar('getTablero'));
+    assert.equal(Object.values(t.columnas).flat().some(x => x.CLAVE === '40222333|HEMATOLOGÍA'), false);
+    assert.equal(t.cifras.cerradosSinContacto, 1);
+    // La admisionista registra un procedimiento con un teléfono que no había: la reevaluación vuelve sola.
+    await pagina.evaluate(() => llamar('guardarRegistro', { usuario: 'MAGALY', dni: '40222333', nombre: 'Jorge Luis Mendoza Paredes', contacto: '987000999',
+      fecha: '2026-10-01', doctor: 'Dr. Elí Cabanillas', procedimientos: ['AMO'], tratamiento: '', sesiones: '', marca: '', confirmado: true }));
+    t = await pagina.evaluate(() => llamar('getTablero'));
+    const r = t.columnas.POR_CONTACTAR.find(x => x.CLAVE === '40222333|HEMATOLOGÍA');
+    assert.ok(r, 'de vuelta en Por contactar');
+    assert.deepEqual([r.ETIQUETA, r.NUEVO_CONTACTO, r.TELEFONOS], ['Nuevo contacto: 987000999', '987000999', '987000999']);
+    assert.equal(t.cifras.cerradosSinContacto, 0);
+    await pagina.evaluate(() => cargarTablero());
+    await esperarCol(pagina, JORGE, '1');
+    assert.match(await textoTarjeta(pagina, JORGE), /Nuevo contacto: 987000999/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
 test('panel: «Número equivocado» con dos teléfonos deja la tarjeta y tacha el número', async () => {
   const { navegador, pagina, errores } = await abrirTablero();
   try {
@@ -1178,7 +1241,7 @@ test('panel: «Número equivocado» con dos teléfonos deja la tarjeta y tacha e
     await pagina.keyboard.press('Escape');
     await abrirPanelDe(pagina, LUIS);
     await pagina.locator('#panel [data-acc="numero"]').click();
-    assert.match(await pagina.locator('#panel .paso').textContent(), /No le queda otro contacto: se cerrará el seguimiento\./);
+    assert.match(await pagina.locator('#panel .paso').textContent(), /No le queda otro contacto: queda «Sin contacto válido» y vuelve sola si aparece otro\./);
     assert.ok(await pagina.locator('#panel .paso.cierre').isVisible());
     assert.equal(await pagina.locator('#panel [data-confirmar]').isDisabled(), false);
     assert.deepEqual(errores, []);
@@ -2803,7 +2866,7 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     const trat = k => pagina.locator(`#ipanel .trat-u[data-trat="${k}"]`).innerText().then(x => x.replace(/\s+/g, ' ').trim());
     assert.equal(await trat('hierro'), 'Tratamiento de hierro 20 indicados 50 % cumplimiento Completaron 8 · 50 % No siguieron 8 · 50 % '
       + 'En curso 4 · aún no cuentan Meta de cumplimiento: 95 % · a 45 puntos ▲ 15 puntos mejor que agosto (35 %). '
-      + 'Reacciones: 3 pacientes (inmediatas 1, mediatas 3). Contactos de enfermería a tiempo: 78 % (14 de 18).');
+      + 'Hierro del CHP: 18 · propio del paciente: 2. Reacciones: 3 pacientes (inmediatas 1, mediatas 3). Contactos de enfermería a tiempo: 78 % (14 de 18) · no respondieron: 2.');
     assert.equal(await trat('proc'), 'Procedimientos 5 cotizados 40 % cumplimiento Realizados 2 · 40 % No realizados 3 · 60 % '
       + 'Meta de cumplimiento: 95 % · a 55 puntos ▲ 26 puntos mejor que agosto (14 %).');
     assert.deepEqual(await pagina.locator('#ipanel .trat-u[data-trat="hierro"] .t-barra i').evaluateAll(l => l.map(i => [i.className, i.style.flexGrow])),
@@ -2869,8 +2932,8 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     await pestana(pagina, 'motivos');
     assert.equal(await pagina.locator('#ipanel .conocido').textContent(),
       'Este cuadro todavía no se filtra por mes ni por médico, y no incluye los cierres automáticos «sin respuesta».');
-    assert.deepEqual(await filasDe(pagina, '.tabla'), [['Se atiende en otro lugar', '4 · 40 %'], ['No desea continuar', '3 · 30 %'],
-      ['Número equivocado', '2 · 20 %'], ['Falleció', '1 · 10 %']]);
+    assert.deepEqual(await filasDe(pagina, '.tabla'), [['Se atiende en otro lugar', '4 · 36 %'], ['No desea continuar', '3 · 27 %'],
+      ['Número equivocado', '2 · 18 %'], ['Falleció', '1 · 9 %'], ['Sin contacto válido', '1 · 9 %']]);
 
     // 7. Procedimientos sin paciente.
     await pestana(pagina, 'sinpac');
@@ -3150,7 +3213,7 @@ test('imprimible: se arma con los datos del DEMO, llama a window.print y su cifr
     // La tarjeta unificada, igual que en la pantalla.
     const imp = await pagina.locator('#imp-p1 .imp-trat').evaluateAll(l => l.map(p => p.textContent.replace(/\s+/g, ' ').trim()));
     assert.equal(imp.length, 2);
-    assert.match(imp[0], /^50 %\s*Tratamiento de hierro · cumplimiento · 20 indicados\s*Completaron: 8 \(50 %\) · No siguieron: 8 \(50 %\) · en curso: 4\s*Meta de cumplimiento: 95 % · a 45 puntos\s*▲ 15 puntos mejor que agosto \(35 %\)\.\s*Reacciones: 3 pacientes \(inmediatas 1, mediatas 3\)\.\s*Contactos de enfermería a tiempo: 78 % \(14 de 18\)\.$/);
+    assert.match(imp[0], /^50 %\s*Tratamiento de hierro · cumplimiento · 20 indicados\s*Completaron: 8 \(50 %\) · No siguieron: 8 \(50 %\) · en curso: 4\s*Meta de cumplimiento: 95 % · a 45 puntos\s*▲ 15 puntos mejor que agosto \(35 %\)\.\s*Hierro del CHP: 18 · propio del paciente: 2\.\s*Reacciones: 3 pacientes \(inmediatas 1, mediatas 3\)\.\s*Contactos de enfermería a tiempo: 78 % \(14 de 18\) · no respondieron: 2\.$/);
     assert.match(imp[1], /^40 %\s*Procedimientos · cumplimiento · 5 cotizados\s*Realizados: 2 \(40 %\) · No realizados: 3 \(60 %\)\s*Meta de cumplimiento: 95 % · a 55 puntos\s*▲ 26 puntos mejor que agosto \(14 %\)\.$/);
     assert.match(await pagina.locator('#imp-p1 .imp-rec').textContent(), /39% volvieron tras el seguimiento \(7 de 18\)\./);
     assert.match(p1, /Mes a mes · % que volvió a su reevaluación/);
@@ -4109,25 +4172,55 @@ test('Enfermería: «Ya me contacté» pide la reacción (y la nota con «Otra»
   } finally { await navegador.close(); }
 });
 
-test('Enfermería: «No contestó» guarda sin preguntar y deja la fila con «No contestó n veces»; sin reacción también se cumple', async () => {
+test('Enfermería: «No contestó» guarda sin preguntar; el primero avisa que se cierra al siguiente y el segundo deja «No respondió»; «Deshacer» lo devuelve', async () => {
   const { navegador, pagina, errores } = await abrirEnfermeria();
   try {
-    const fila = '#enf-cuerpo [data-enf="SES-000003|5"]';
-    await pagina.locator(`${fila} [data-enf-nc]`).click();
-    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 1);
-    await pagina.waitForFunction(s => /No contestó 2 veces/.test(document.querySelector(s).textContent), fila);
+    // Si el servidor falla, la fila vuelve y se avisa.
+    await pagina.evaluate(() => { DEMO._fallar.registrarContactoEnfermeria = 'Sin conexión.'; });
+    await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] [data-enf-nc]').click();
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] .enf-nc').count(), 0, 'la cuenta vuelve a cero');
+    await pagina.evaluate(() => { delete DEMO._fallar.registrarContactoEnfermeria; });
+    // Primer intento: la fila sigue y dice que el siguiente la cierra (ENFERMERIA_MAX_INTENTOS = 2).
+    await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] [data-enf-nc]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 2);
+    await pagina.waitForFunction(() => /No contestó 1 vez · se cierra al siguiente intento/.test(document.querySelector('#enf-cuerpo [data-enf="SES-000004|1"]').textContent));
     assert.equal((await ultimo(pagina, 'registrarContactoEnfermeria')).resultado, 'NO CONTESTO');
+    // Segundo intento (el día 5 de Carlos ya tenía uno): sale de la lista como «No respondió»; los días siguientes siguen.
+    const fila = '#enf-cuerpo [data-enf="SES-000003|5"]';
+    assert.match(await pagina.locator(fila).textContent(), /No contestó 1 vez · se cierra al siguiente intento/);
+    await pagina.locator(`${fila} [data-enf-nc]`).click();
+    await pagina.waitForFunction(s => !document.querySelector(s), fila);
+    await pagina.waitForFunction(() => /No respondió» \(2 intentos\)/.test(document.querySelector('#aviso span').textContent));
+    assert.match(await aviso(pagina), /^Guardado: Carlos Enrique Núñez León · día 5 · no contestó: queda «No respondió» \(2 intentos\)\.$/);
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 3);
+    // «Deshacer» anula el último «No contestó»: vuelve a pendiente con su cuenta.
+    await pagina.locator('#aviso button:not([hidden])').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularContactoEnfermeria === 1);
+    await pagina.waitForFunction(s => /No contestó 1 vez/.test((document.querySelector(s) || {}).textContent || ''), fila);
+    // Sin reacción también se cumple.
     await pagina.locator(`${fila} [data-enf-ya]`).click();
     await pagina.locator(`${fila} [data-enf-tipo="NINGUNA"]`).click();
     assert.equal(await pagina.locator(`${fila} [data-enf-reac]`).count(), 0, 'sin reacción no hay chips');
     await pagina.locator(`${fila} [data-enf-guardar]`).click();
     await pagina.waitForFunction(s => !document.querySelector(s), fila);
     assert.equal((await ultimo(pagina, 'registrarContactoEnfermeria')).reaccionTipo, 'NINGUNA');
-    // Si el servidor falla, la fila vuelve y se avisa.
-    await pagina.evaluate(() => { DEMO._fallar.registrarContactoEnfermeria = 'Sin conexión.'; });
-    await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] [data-enf-nc]').click();
-    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
-    assert.equal(await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] .enf-nc').count(), 0, 'la cuenta vuelve a cero');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Enfermería: tras el segundo «No contestó» la ficha dice «Día 5: no respondió (2 intentos)»', async () => {
+  const { navegador, pagina, errores } = await abrirEnfermeria();
+  try {
+    const fila = '#enf-cuerpo [data-enf="SES-000003|5"]';
+    await pagina.locator(`${fila} [data-enf-nc]`).click();
+    await pagina.waitForFunction(s => !document.querySelector(s), fila);
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 1);
+    await pagina.evaluate(() => abrirFicha('41333444'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    const t = await pagina.locator('#ficha .trat-enf').first().textContent().then(x => x.replace(/\s+/g, ' '));
+    assert.match(t, /Sesión 1 · Día 5: no respondió \(2 intentos\)/);
+    assert.doesNotMatch(t, /Día 1: no respondió/, 'solo el día que llegó a los dos intentos');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -4207,6 +4300,69 @@ test('Registro: una primera sesión con fecha pasada avisa y marca la sesión 1 
     const e = await pagina.evaluate(() => llamar('guardarRegistro', { usuario: 'MAGALY', dni: '46111333', nombre: 'Otra Prueba', contacto: '987111001',
       fecha: '2026-09-28', doctor: 'Dr. Elí Cabanillas', tratamiento: 'HIERRO SACARATO', sesiones: 2, fechaInicio: '2026-09-20' }).then(() => 'ok', x => x.message));
     assert.equal(e, 'La primera sesión no puede ser anterior a la fecha del registro (28/09/2026).');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('hierro propio: la casilla aparece con un tratamiento, viaja como origenHierro y la enfermera lo llama igual («hierro propio»)', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('46111555');
+    await pagina.locator('#rnom').fill('Paciente Prueba Propio');
+    await pagina.locator('#rtel').fill('987111555');
+    await pagina.locator('#rfec').fill('2026-09-28');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    assert.equal(await pagina.locator('#rpropio').count(), 0, 'sin tratamiento no hay casilla');
+    await pagina.locator('#rtrats [data-trat="HIERRO SACARATO"]').click();
+    assert.equal((await pagina.locator('label[for="rpropio"], label:has(#rpropio)').first().textContent()).trim(), 'Hierro propio del paciente (lo trae él)');
+    assert.equal(await pagina.locator('#rpropio').isChecked(), false, 'por omisión, del CHP');
+    await pagina.locator('#rpropio').check();
+    await pagina.locator('#rses [data-ses="2"]').click();
+    assert.equal(await pagina.locator('#rpropio').isChecked(), true, 'elegir las sesiones no la desmarca');
+    await pagina.locator('#rinicio').fill('2026-09-30');
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForFunction(() => /^Registro guardado/.test(document.querySelector('#aviso span').textContent));
+    assert.equal((await ultimo(pagina, 'guardarRegistro')).origenHierro, 'PACIENTE');
+    assert.match(await aviso(pagina), /Hierro sacarato × 2 sesiones · hierro propio/);
+    assert.equal(await pagina.locator('#rpropio').count(), 0, 'el formulario se limpia');
+    // La enfermera ve sus contactos como los de cualquier hierro, con «hierro propio».
+    await pagina.evaluate(() => elegirUsuario('ENFERMERA PRUEBA'));
+    await pagina.waitForFunction(() => S.seccion === 'enfermeria');
+    await pagina.waitForSelector('#enf-cuerpo .enf');
+    const f = (await filasEnf(pagina)).filter(x => /Paciente Prueba Propio/.test(x.texto));
+    assert.ok(f.length >= 2, 'aplicación y llamadas');
+    assert.ok(f.every(x => /hierro propio/.test(x.texto)));
+    // Un hierro del CHP no lo dice.
+    assert.ok((await filasEnf(pagina)).filter(x => /Carlos Enrique/.test(x.texto)).every(x => !/hierro propio/.test(x.texto)));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('hierro propio: Editar cambia el origen (CHP ↔ propio) y la tarjeta y la ficha lo muestran', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const id = 'REG-000003';
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    const sel = pagina.locator('#rlista [data-campo="origenHierro"]');
+    assert.equal(await sel.inputValue(), 'CHP');
+    assert.deepEqual(await sel.locator('option').allTextContents(), ['Del CHP', 'Propio del paciente (lo trae él)']);
+    await sel.selectOption('PACIENTE');
+    await pagina.locator('#rlista [data-guardar-edicion]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.editarRegistro > 0);
+    assert.deepEqual(await ultimo(pagina, 'editarRegistro'), { usuario: 'MAGALY', id, cambios: { origenHierro: 'PACIENTE' } });
+    await pagina.waitForFunction(i => /hierro propio/.test(document.querySelector(`#rlista li[data-reg="${i}"]`).textContent), id);
+    const t = await pagina.evaluate(() => llamar('getTablero'));
+    const tarjeta = Object.values(t.columnas).flat().find(x => x.CLAVE === id);
+    assert.match(tarjeta.DETALLE, /hierro propio$/);
+    assert.equal(tarjeta.ORIGEN_HIERRO, 'PACIENTE');
+    await pagina.evaluate(() => abrirFicha('40555666'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    assert.match(await pagina.locator(`#ficha .trat[data-reg="${id}"]`).textContent(), /hierro propio/);
+    // Y de vuelta al CHP.
+    const r = await pagina.evaluate(i => llamar('editarRegistro', { usuario: 'MAGALY', id: i, cambios: { origenHierro: 'CHP' } }), id);
+    assert.equal(r.registro.ORIGEN_HIERRO, 'CHP');
+    assert.doesNotMatch(r.registro.TEXTO, /hierro propio/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

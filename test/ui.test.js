@@ -2803,7 +2803,7 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     const trat = k => pagina.locator(`#ipanel .trat-u[data-trat="${k}"]`).innerText().then(x => x.replace(/\s+/g, ' ').trim());
     assert.equal(await trat('hierro'), 'Tratamiento de hierro 20 indicados 50 % cumplimiento Completaron 8 · 50 % No siguieron 8 · 50 % '
       + 'En curso 4 · aún no cuentan Meta de cumplimiento: 95 % · a 45 puntos ▲ 15 puntos mejor que agosto (35 %). '
-      + 'Reacciones: 3 pacientes (inmediatas 1, mediatas 3). Contactos de enfermería a tiempo: 78 % (14 de 18) · no respondieron: 2.');
+      + 'Hierro del CHP: 18 · propio del paciente: 2. Reacciones: 3 pacientes (inmediatas 1, mediatas 3). Contactos de enfermería a tiempo: 78 % (14 de 18) · no respondieron: 2.');
     assert.equal(await trat('proc'), 'Procedimientos 5 cotizados 40 % cumplimiento Realizados 2 · 40 % No realizados 3 · 60 % '
       + 'Meta de cumplimiento: 95 % · a 55 puntos ▲ 26 puntos mejor que agosto (14 %).');
     assert.deepEqual(await pagina.locator('#ipanel .trat-u[data-trat="hierro"] .t-barra i').evaluateAll(l => l.map(i => [i.className, i.style.flexGrow])),
@@ -3150,7 +3150,7 @@ test('imprimible: se arma con los datos del DEMO, llama a window.print y su cifr
     // La tarjeta unificada, igual que en la pantalla.
     const imp = await pagina.locator('#imp-p1 .imp-trat').evaluateAll(l => l.map(p => p.textContent.replace(/\s+/g, ' ').trim()));
     assert.equal(imp.length, 2);
-    assert.match(imp[0], /^50 %\s*Tratamiento de hierro · cumplimiento · 20 indicados\s*Completaron: 8 \(50 %\) · No siguieron: 8 \(50 %\) · en curso: 4\s*Meta de cumplimiento: 95 % · a 45 puntos\s*▲ 15 puntos mejor que agosto \(35 %\)\.\s*Reacciones: 3 pacientes \(inmediatas 1, mediatas 3\)\.\s*Contactos de enfermería a tiempo: 78 % \(14 de 18\) · no respondieron: 2\.$/);
+    assert.match(imp[0], /^50 %\s*Tratamiento de hierro · cumplimiento · 20 indicados\s*Completaron: 8 \(50 %\) · No siguieron: 8 \(50 %\) · en curso: 4\s*Meta de cumplimiento: 95 % · a 45 puntos\s*▲ 15 puntos mejor que agosto \(35 %\)\.\s*Hierro del CHP: 18 · propio del paciente: 2\.\s*Reacciones: 3 pacientes \(inmediatas 1, mediatas 3\)\.\s*Contactos de enfermería a tiempo: 78 % \(14 de 18\) · no respondieron: 2\.$/);
     assert.match(imp[1], /^40 %\s*Procedimientos · cumplimiento · 5 cotizados\s*Realizados: 2 \(40 %\) · No realizados: 3 \(60 %\)\s*Meta de cumplimiento: 95 % · a 55 puntos\s*▲ 26 puntos mejor que agosto \(14 %\)\.$/);
     assert.match(await pagina.locator('#imp-p1 .imp-rec').textContent(), /39% volvieron tras el seguimiento \(7 de 18\)\./);
     assert.match(p1, /Mes a mes · % que volvió a su reevaluación/);
@@ -4237,6 +4237,69 @@ test('Registro: una primera sesión con fecha pasada avisa y marca la sesión 1 
     const e = await pagina.evaluate(() => llamar('guardarRegistro', { usuario: 'MAGALY', dni: '46111333', nombre: 'Otra Prueba', contacto: '987111001',
       fecha: '2026-09-28', doctor: 'Dr. Elí Cabanillas', tratamiento: 'HIERRO SACARATO', sesiones: 2, fechaInicio: '2026-09-20' }).then(() => 'ok', x => x.message));
     assert.equal(e, 'La primera sesión no puede ser anterior a la fecha del registro (28/09/2026).');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('hierro propio: la casilla aparece con un tratamiento, viaja como origenHierro y la enfermera lo llama igual («hierro propio»)', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    await pagina.locator('#rdni').fill('46111555');
+    await pagina.locator('#rnom').fill('Paciente Prueba Propio');
+    await pagina.locator('#rtel').fill('987111555');
+    await pagina.locator('#rfec').fill('2026-09-28');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    assert.equal(await pagina.locator('#rpropio').count(), 0, 'sin tratamiento no hay casilla');
+    await pagina.locator('#rtrats [data-trat="HIERRO SACARATO"]').click();
+    assert.equal((await pagina.locator('label[for="rpropio"], label:has(#rpropio)').first().textContent()).trim(), 'Hierro propio del paciente (lo trae él)');
+    assert.equal(await pagina.locator('#rpropio').isChecked(), false, 'por omisión, del CHP');
+    await pagina.locator('#rpropio').check();
+    await pagina.locator('#rses [data-ses="2"]').click();
+    assert.equal(await pagina.locator('#rpropio').isChecked(), true, 'elegir las sesiones no la desmarca');
+    await pagina.locator('#rinicio').fill('2026-09-30');
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    await pagina.locator('#rgo').click();
+    await pagina.waitForFunction(() => /^Registro guardado/.test(document.querySelector('#aviso span').textContent));
+    assert.equal((await ultimo(pagina, 'guardarRegistro')).origenHierro, 'PACIENTE');
+    assert.match(await aviso(pagina), /Hierro sacarato × 2 sesiones · hierro propio/);
+    assert.equal(await pagina.locator('#rpropio').count(), 0, 'el formulario se limpia');
+    // La enfermera ve sus contactos como los de cualquier hierro, con «hierro propio».
+    await pagina.evaluate(() => elegirUsuario('ENFERMERA PRUEBA'));
+    await pagina.waitForFunction(() => S.seccion === 'enfermeria');
+    await pagina.waitForSelector('#enf-cuerpo .enf');
+    const f = (await filasEnf(pagina)).filter(x => /Paciente Prueba Propio/.test(x.texto));
+    assert.ok(f.length >= 2, 'aplicación y llamadas');
+    assert.ok(f.every(x => /hierro propio/.test(x.texto)));
+    // Un hierro del CHP no lo dice.
+    assert.ok((await filasEnf(pagina)).filter(x => /Carlos Enrique/.test(x.texto)).every(x => !/hierro propio/.test(x.texto)));
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('hierro propio: Editar cambia el origen (CHP ↔ propio) y la tarjeta y la ficha lo muestran', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const id = 'REG-000003';
+    await pagina.locator(`#rlista [data-editar="${id}"]`).click();
+    const sel = pagina.locator('#rlista [data-campo="origenHierro"]');
+    assert.equal(await sel.inputValue(), 'CHP');
+    assert.deepEqual(await sel.locator('option').allTextContents(), ['Del CHP', 'Propio del paciente (lo trae él)']);
+    await sel.selectOption('PACIENTE');
+    await pagina.locator('#rlista [data-guardar-edicion]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.editarRegistro > 0);
+    assert.deepEqual(await ultimo(pagina, 'editarRegistro'), { usuario: 'MAGALY', id, cambios: { origenHierro: 'PACIENTE' } });
+    await pagina.waitForFunction(i => /hierro propio/.test(document.querySelector(`#rlista li[data-reg="${i}"]`).textContent), id);
+    const t = await pagina.evaluate(() => llamar('getTablero'));
+    const tarjeta = Object.values(t.columnas).flat().find(x => x.CLAVE === id);
+    assert.match(tarjeta.DETALLE, /hierro propio$/);
+    assert.equal(tarjeta.ORIGEN_HIERRO, 'PACIENTE');
+    await pagina.evaluate(() => abrirFicha('40555666'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    assert.match(await pagina.locator(`#ficha .trat[data-reg="${id}"]`).textContent(), /hierro propio/);
+    // Y de vuelta al CHP.
+    const r = await pagina.evaluate(i => llamar('editarRegistro', { usuario: 'MAGALY', id: i, cambios: { origenHierro: 'CHP' } }), id);
+    assert.equal(r.registro.ORIGEN_HIERRO, 'CHP');
+    assert.doesNotMatch(r.registro.TEXTO, /hierro propio/);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

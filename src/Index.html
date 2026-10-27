@@ -345,6 +345,10 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .caja .rot{display:flex;flex-direction:column;gap:8px}
 .caja .rot>span:first-child{font-size:12.5px;color:var(--muted)}
 .sin-marca{color:var(--soft)}
+/* Hierro propio del paciente (ORIGEN_HIERRO): casilla de Registro → Indicación. */
+.propio{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
+.propio input{accent-color:var(--accent);width:18px;height:18px;margin:0}
+.propio-n{margin:0;font-size:12.5px;color:var(--muted)}
 .dup{display:flex;flex-direction:column;gap:12px;padding:16px;border:1px solid var(--warn);border-radius:var(--r);background:var(--warn-soft);animation:subir .22s var(--ease-out)}
 .dup .fila{display:flex;gap:10px}
 .dup .fila i{font-size:20px;color:var(--warn)}
@@ -2777,7 +2781,7 @@ function invalidarIndicadores() { S.kpi = null; S.resumen = null; S.indGen++; }
 
 const RG = {
   listo: false, modo: 'indicacion',   // pestaña (data-rtab): 'indicacion' | 'control' | 'decision'
-  procs: [], trat: '', ses: 0, otro: '', marca: '',
+  procs: [], trat: '', ses: 0, otro: '', marca: '', propio: false,   // propio: hierro que trae el paciente (ORIGEN_HIERRO)
   dni: '', pac: null,            // el último DNI pedido y lo que devolvió buscarPacienteRegistro
   auto: {},                      // lo que se completó solo, por campo: se reemplaza si cambia el DNI
   aEsp: '', dec: 'ALTA', enviando: false, teclado: false,
@@ -2981,7 +2985,7 @@ function pintarDecision() {
 /** Deja el formulario vacío, salvo la fecha: se suelen registrar varios pacientes del mismo día seguidos. */
 function limpiarRegistro(anim, enfocarDni) {
   const fecha = ($('#rfec') || $('#afec') || {}).value;
-  Object.assign(RG, { procs: [], trat: '', ses: 0, otro: '', marca: '', dni: '', pac: null, auto: {}, aEsp: '', dec: 'ALTA' });
+  Object.assign(RG, { procs: [], trat: '', ses: 0, otro: '', marca: '', propio: false, dni: '', pac: null, auto: {}, aEsp: '', dec: 'ALTA' });
   clearTimeout(RG.espera);
   pintarFormRegistro(anim);
   const f = $('#rfec') || $('#afec');
@@ -2995,6 +2999,7 @@ function cambioRegistro(e) {
   const id = e.target.id;
   if (id === 'rdni' || id === 'adni') cambioDni(e.target);
   if (id === 'rsesotro') RG.otro = e.target.value;
+  if (id === 'rpropio') RG.propio = e.target.checked;
   if (e.target.name === 'rdec') { RG.dec = e.target.value; pintarDecision(); }
   if (id === 'afec') pintarDecision();
   if (e.type === 'input' && $('#rdup')) $('#rdup').innerHTML = '';
@@ -3086,7 +3091,9 @@ function pintarSesiones() {
     + `<button type="button" class="chip cuadro" data-ses="otro" aria-pressed="${RG.ses === 'otro'}">Otro</button>`
     + `${RG.ses === 'otro' ? `<label class="campo"><input id="rsesotro" class="otro" type="number" min="6" max="20" placeholder="6" aria-label="Sesiones (6 a 20)" value="${esc(RG.otro)}"></label>` : ''}</div></div>
     <div class="rot"><span>Marca</span>${marcas.length ? `<div class="chips">${marcas.map(m => `<button type="button" class="chip cuadro" data-marca="${esc(m)}" aria-pressed="${RG.marca === m}">${esc(etiquetaCat(m))}</button>`).join('')}</div>`
-      : `<span class="sin-marca">${esc(sinMarca(RG.trat))}</span>`}</div></div>`;
+      : `<span class="sin-marca">${esc(sinMarca(RG.trat))}</span>`}</div>
+    <div class="rot"><label class="propio"><input type="checkbox" id="rpropio"${RG.propio ? ' checked' : ''}>Hierro propio del paciente (lo trae él)</label>
+      <p class="propio-n">Regístrelo igual: la enfermera llama tras cada sesión a todos los pacientes de hierro, lo compren aquí o lo traigan.</p></div></div>`;
 }
 
 function clicRegistro(e) {
@@ -3102,7 +3109,7 @@ function clicRegistro(e) {
     RG.trat = d.trat;
     const m = marcasDe(RG.trat);
     RG.marca = m.length === 1 ? m[0] : '';
-    if (!RG.trat) { RG.ses = 0; RG.otro = ''; }
+    if (!RG.trat) { RG.ses = 0; RG.otro = ''; RG.propio = false; }
     $$('#rtrats [data-trat]').forEach(x => x.setAttribute('aria-pressed', String(x === t)));
     pintarSesiones();
   } else if (d.ses) {
@@ -3247,6 +3254,7 @@ async function registrar(forzar, teclado) {
       if (RG.modo === 'control') Object.assign(datos, { tipo: 'CONTROL', examenes: $('#rexamenes').value.trim(), fechaRetorno: $('#rretorno').value });
       else {
         Object.assign(datos, { procedimientos: RG.procs.slice(), tratamiento: RG.trat, sesiones: RG.trat ? sesionesElegidas() : '', marca: RG.trat ? RG.marca : '' });
+        if (RG.trat && RG.propio) datos.origenHierro = 'PACIENTE';
         if ($('#rinicio').value) datos.fechaInicio = $('#rinicio').value;
       }
       if (forzar) datos.confirmado = true;
@@ -3345,16 +3353,18 @@ const filaEl = id => $$('#rlista [data-reg]').find(x => x.dataset.reg === id);
 
 /* ---- Editar un registro (editarRegistro): los campos según el tipo; se manda solo lo cambiado ---- */
 const COL_EDICION = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
-  sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO' };
+  sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO', origenHierro: 'ORIGEN_HIERRO' };
 function camposEdicion(x) {
   const c = ['fecha', 'doctor', 'nombre', 'contacto'];
   if (x.TIPO === 'CONTROL') return c.concat('examenes', 'fechaRetorno');
   c.push('detalle');
-  if (x.TIPO === 'HIERRO') c.push('marca', 'sesiones');
+  if (x.TIPO === 'HIERRO') c.push('marca', 'sesiones', 'origenHierro');
   if (!Number(x.HECHAS)) c.push('fechaInicio');   // ya empezado, la fecha de inicio no se cambia
   return c;
 }
-const valorOriginal = (x, k) => x[COL_EDICION[k]] == null ? '' : String(x[COL_EDICION[k]]);
+// El origen de un hierro antiguo (sin valor) es el CHP, como origenHierro de Registro.gs.
+const valorOriginal = (x, k) => k === 'origenHierro' ? (norm(x.ORIGEN_HIERRO) === 'PACIENTE' ? 'PACIENTE' : 'CHP')
+  : x[COL_EDICION[k]] == null ? '' : String(x[COL_EDICION[k]]);
 const valorEdicion = (x, k, borrador) => k in borrador ? borrador[k] : valorOriginal(x, k);
 /**
  * El formulario en línea, con la forma de una fila de getRegistros. ed = { borrador, guardando }: «Registrados» (RG) y la
@@ -3375,7 +3385,9 @@ function formEdicion(x, ed) {
     sesiones: () => campo('sesiones', 'Sesiones', `<input type="number" data-campo="sesiones" class="mono" min="${Math.max(1, Number(x.HECHAS) || 0)}" max="20" value="${esc(v('sesiones'))}">`),
     fechaInicio: () => fecha('fechaInicio', 'Primera sesión', hoy, masDias(hoy, 180)),
     examenes: () => campo('examenes', 'Exámenes indicados', `<textarea data-campo="examenes" rows="2">${esc(v('examenes'))}</textarea>`, true),
-    fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), topeUnAnio(hoy)) };
+    fechaRetorno: () => fecha('fechaRetorno', 'Fecha de retorno', masDias(hoy, 1), topeUnAnio(hoy)),
+    origenHierro: () => campo('origenHierro', 'Origen del hierro', `<select data-campo="origenHierro">${[['CHP', 'Del CHP'], ['PACIENTE', 'Propio del paciente (lo trae él)']]
+      .map(([o, l]) => `<option value="${o}"${o === v('origenHierro') ? ' selected' : ''}>${l}</option>`).join('')}</select>`) };
   const mal = fechaMalEdicion(x, ed.borrador);
   return `<div class="edita">${camposEdicion(x).map(k => html[k]()).join('')}
     <p class="aviso-edicion" role="status">${esc(mal)}</p>
@@ -4435,12 +4447,14 @@ function datosTrats(filas, mes, metaT) {
   return TRATS.map(def => {
     const c = cumplimiento(m, def.k), a = cumplimiento(ma, def.k);
     // Enfermería, solo en la tarjeta de hierro: pacientes con reacción y contactos hechos a tiempo.
-    const enf = def.k === 'hierro' ? { pac: m.REAC_PAC, inm: m.REAC_INM, med: m.REAC_MED, deb: m.ENF_DEBIDOS, at: m.ENF_A_TIEMPO, nr: m.ENF_NO_RESPONDIO } : null;
+    const enf = def.k === 'hierro' ? { pac: m.REAC_PAC, inm: m.REAC_INM, med: m.REAC_MED, deb: m.ENF_DEBIDOS, at: m.ENF_A_TIEMPO, nr: m.ENF_NO_RESPONDIO,
+      ind: m.HIERRO, propio: m.HIERRO_PROPIO } : null;
     return { def, c, metaT, enf, meta: textoMeta(metaT, c.p, 0, 'Meta de cumplimiento') || { clase: '' }, comp: comparativo(c, a, mesAnterior(mes)) };
   });
 }
-/** Las dos frases de Enfermería de la tarjeta de hierro. */
+/** Las frases de la tarjeta de hierro: de dónde es el hierro (CHP o propio del paciente) y las dos de Enfermería. */
 const textosEnf = e => !e ? [] : [
+  `Hierro del CHP: ${Math.max(0, (Number(e.ind) || 0) - (Number(e.propio) || 0))} · propio del paciente: ${Number(e.propio) || 0}.`,
   `Reacciones: ${plural(e.pac, 'paciente', 'pacientes')} (inmediatas ${e.inm}, mediatas ${e.med}).`,
   // «No respondió» (ENFERMERIA_MAX_INTENTOS «No contestó») ya cuenta como no logrado a tiempo; se dice aparte cuántos.
   e.deb ? `Contactos de enfermería a tiempo: ${pc(e.at, e.deb)} % (${e.at} de ${e.deb}) · no respondieron: ${Number(e.nr) || 0}.` : 'Contactos de enfermería a tiempo: todavía ninguno tocaba.'];
@@ -4859,7 +4873,7 @@ function htmlContactoEnf(c) {
   const marca = [c.TRATAMIENTO, c.MARCA].filter(Boolean).join(' · ');
   return `<li class="enf${vencido ? ' vencido' : ''}" data-enf="${esc(c.CLAVE)}">`
     + `<div class="enf-cab"><b>${esc(nombreBonito(c.NOMBRE) || 'DNI ' + c.DNI)}</b><span class="tag t-hier">${esc(marca || 'Hierro')}</span></div>`
-    + `<div class="enf-l">Sesión ${c.NUMERO_SESION} de ${c.SESIONES} · aplicada el ${esc(dm(c.FECHA_SESION))} · DNI ${esc(c.DNI)}</div>`
+    + `<div class="enf-l">Sesión ${c.NUMERO_SESION} de ${c.SESIONES} · aplicada el ${esc(dm(c.FECHA_SESION))} · DNI ${esc(c.DNI)}${c.ORIGEN_HIERRO === 'PACIENTE' ? ' · hierro propio' : ''}</div>`
     + (c.APLICACION ? `<div class="enf-cuando">Aplicación · sesión ${c.NUMERO_SESION} del ${esc(dm(c.FECHA_SESION))} · ¿hubo reacción al aplicarla?</div>`
       : `<div class="enf-cuando">${esc(diaTexto(c.DIA))} · ${c.GRUPO === 'HOY' ? 'toca hoy' : (vencido ? 'tocaba el ' : 'toca el ') + esc(dm(c.FECHA))}${vencido ? ' · hace ' + plural(hace, 'día', 'días') : ''}</div>`)
     + reacs + (c.NO_CONTESTO ? `<span class="enf-nc">No contestó ${c.NO_CONTESTO === 1 ? '1 vez' : c.NO_CONTESTO + ' veces'}${c.NO_CONTESTO === maxIntentosEnf(c) - 1 ? ' · se cierra al siguiente intento' : ''}</span>` : '')
@@ -5067,7 +5081,10 @@ const DEMO = (() => {
   const frase = s => { const t = String(s || '').trim().toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
   const textoRegistro = r => r.TIPO === 'CONTROL' ? 'Control + laboratorio' + (String(r.EXAMENES || '').trim() ? ' · ' + String(r.EXAMENES).trim() : '')
     : r.TIPO !== 'HIERRO' ? frase(r.DETALLE)
-    : frase(r.DETALLE) + (r.MARCA ? ' · ' + frase(r.MARCA) : '') + ' × ' + r.SESIONES + (Number(r.SESIONES) === 1 ? ' sesión' : ' sesiones');
+    : frase(r.DETALLE) + (r.MARCA ? ' · ' + frase(r.MARCA) : '') + ' × ' + r.SESIONES + (Number(r.SESIONES) === 1 ? ' sesión' : ' sesiones')
+      + (origenDe(r) === 'PACIENTE' ? ' · hierro propio' : '');
+  // Como origenHierro (Registro.gs): PACIENTE o CHP (también sin valor); '' si no es hierro.
+  const origenDe = r => r.TIPO !== 'HIERRO' ? '' : norm(r.ORIGEN_HIERRO) === 'PACIENTE' ? 'PACIENTE' : 'CHP';
   const clonar = x => JSON.parse(JSON.stringify(x));
   // Como siguienteId (Registro.gs): el mayor + 1, nunca la cantidad de filas (el DEMO trae REG-000021 y REG-000022: se repetirían).
   const siguiente = (lista, prefijo) => prefijo + '-' + String(lista.reduce((m, x) => Math.max(m, Number((new RegExp('^' + prefijo + '-(\\d+)$').exec(x.ID) || [])[1]) || 0), 0) + 1).padStart(6, '0');
@@ -5126,7 +5143,7 @@ const DEMO = (() => {
     return Object.assign({ ID_REGISTRO: r.ID, DNI: r.DNI, ESPECIALIDAD: r.TIPO, TIPO_SEGUIMIENTO: r.TIPO, NOMBRE: r.NOMBRE,
       TELEFONOS: tel.length === 9 ? tel : '', USUARIO: usuario, MEDICO_ULTIMO: d && d.sofdoc ? d.sofdoc : r.DOCTOR,
       ESPECIALIDAD_CONSULTA: especialidadDe(d && d.sofdoc ? d.sofdoc : ''), FECHA_COTIZACION: r.FECHA, DETALLE: textoRegistro(r),
-      TRATAMIENTO: r.TIPO === 'HIERRO' ? frase(r.DETALLE) : '', MARCA: r.TIPO === 'HIERRO' ? frase(r.MARCA) : '',
+      TRATAMIENTO: r.TIPO === 'HIERRO' ? frase(r.DETALLE) : '', MARCA: r.TIPO === 'HIERRO' ? frase(r.MARCA) : '', ORIGEN_HIERRO: origenDe(r),
       SESIONES: r.SESIONES, HECHAS: hechas, ULTIMA_SESION: ultima, ULTIMA_SESION_ID: hechas ? ss[hechas - 1].ID : '', DIAS: dias, ULTIMA_CITA: r.FECHA, N_SEGUIMIENTOS: 0,
       ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg, FECHA_REEVALUAR: sinReev ? '' : reevaluar, SIN_REEVALUACION: sinReev,
       FECHA_INICIO: r.TIPO === 'CONTROL' ? r.FECHA_RETORNO || '' : r.FECHA_INICIO || '',
@@ -5243,7 +5260,7 @@ const DEMO = (() => {
         // Como noRespondioEnfermeria: MAX_ENF «No contestó» vivos dejan el día «No respondió» (sale de la lista).
         if (dia !== 0 && delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length >= MAX_ENF) return;
         out.push({ CLAVE: x.ID + '|' + dia, ID_REGISTRO: r.ID, ID_SESION: x.ID, NUMERO_SESION: Number(x.NUMERO), DNI: r.DNI, NOMBRE: r.NOMBRE,
-          TELEFONOS: tel.length === 9 ? tel : '', USUARIO: tel.length === 9 ? '' : r.CONTACTO, TRATAMIENTO: frase(r.DETALLE), MARCA: frase(r.MARCA),
+          TELEFONOS: tel.length === 9 ? tel : '', USUARIO: tel.length === 9 ? '' : r.CONTACTO, TRATAMIENTO: frase(r.DETALLE), MARCA: frase(r.MARCA), ORIGEN_HIERRO: origenDe(r),
           SESIONES: Number(r.SESIONES), FECHA_SESION: x.FECHA, DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
           NO_CONTESTO: delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length, APLICACION: dia === 0, MAX_INTENTOS: MAX_ENF, REACCIONES: reacciones });
       });
@@ -5270,7 +5287,7 @@ const DEMO = (() => {
       ANULADO: !!r.ANULADO, MOTIVO_ANULACION: r.MOTIVO_ANULACION || '', EDITADO: r.EDITADO || '', FECHA: r.FECHA, TIPO: r.TIPO,
       DOCTOR: r.DOCTOR || '', CONTACTO: r.CONTACTO || '', DETALLE: r.DETALLE || '', MARCA: r.MARCA || '',
       SESIONES: r.TIPO === 'CONTROL' ? 0 : Math.max(1, Number(r.SESIONES) || 1), HECHAS: hechas,
-      FECHA_INICIO: r.FECHA_INICIO || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: r.FECHA_RETORNO || '', DECISION: '' };
+      FECHA_INICIO: r.FECHA_INICIO || '', EXAMENES: r.EXAMENES || '', FECHA_RETORNO: r.FECHA_RETORNO || '', DECISION: '', ORIGEN_HIERRO: origenDe(r) };
   };
   // Tarea 9: Ana María vino solo por Registro y todavía no tiene consultas en SOFDOC (en el servidor real ningún registro
   // crea consultas; el DEMO las inventa para los demás). Su ficha toma el nombre del registro.
@@ -5797,7 +5814,7 @@ const DEMO = (() => {
             ESTADO: estado, ESTADO_REGISTRO: estado, CIERRE: cerrado ? (tc.CIERRE || 'FALLECIÓ') : '', FECHA_CIERRE: cerrado ? (tc.FECHA_CIERRE || hoy) : '', NO_VINO: '',
             SIN_REEVALUACION: estado === 'COMPLETO' ? reg(r).SIN_REEVALUACION : '',
             MOTIVO_ANULACION: r.MOTIVO_ANULACION, POR_FALLO: !!r.ANULADO && /^(No se guardó|Se rehízo)/.test(String(r.MOTIVO_ANULACION || '').trim()), NOMBRE: f.NOMBRE, CONTACTO: f.CONTACTO, DETALLE: f.DETALLE, MARCA: f.MARCA,
-            FECHA_INICIO: f.FECHA_INICIO, EXAMENES: f.EXAMENES, FECHA_RETORNO: f.FECHA_RETORNO,
+            FECHA_INICIO: f.FECHA_INICIO, EXAMENES: f.EXAMENES, FECHA_RETORNO: f.FECHA_RETORNO, ORIGEN_HIERRO: f.ORIGEN_HIERRO,
             sesiones: ss.map(s => ({ ID: s.ID, NUMERO: s.NUMERO, FECHA: s.FECHA, ASESORA: s.ASESORA })) };
         }),
         altas: altasFicha(k),
@@ -5873,6 +5890,9 @@ const DEMO = (() => {
       const procs = filas.length ? [] : (Array.isArray(x.procedimientos) ? x.procedimientos : []).concat(x.procedimiento ? [x.procedimiento] : []).map(p => String(p).trim()).filter(Boolean);
       const trat = filas.length ? '' : String(x.tratamiento || '').trim();
       if (!filas.length && !procs.length && !trat) throw new Error('Elija un procedimiento, un tratamiento o ambos.');
+      // Como origenPedido_: CHP por omisión o PACIENTE (lo trae el paciente).
+      const origen = x.origenHierro === undefined || x.origenHierro === '' ? 'CHP' : ['CHP', 'PACIENTE'].find(o => mismo(o, x.origenHierro));
+      if (!origen) throw new Error('El origen del hierro no es válido: CHP o PACIENTE.');
       procs.forEach(p => {
         const p1 = procedimientos.find(y => mismo(y, p));
         if (!p1) throw new Error('El procedimiento «' + p + '» no está en CATALOGOS.');
@@ -5887,7 +5907,7 @@ const DEMO = (() => {
         const marca = lista.find(m => mismo(m, x.marca)) || '';
         if (lista.length && !marca) throw new Error('Elija la marca de ' + t1 + ': ' + lista.join(' o ') + '.');
         if (!lista.length && String(x.marca || '').trim()) throw new Error(t1 + ' no lleva marca.');
-        filas.push(Object.assign({}, base, { TIPO: 'HIERRO', DETALLE: t1, MARCA: marca, SESIONES: n }));
+        filas.push(Object.assign({}, base, { TIPO: 'HIERRO', DETALLE: t1, MARCA: marca, SESIONES: n, ORIGEN_HIERRO: origen }));
       }
       if (!x.confirmado) {
         for (const f of filas) {
@@ -5943,18 +5963,19 @@ const DEMO = (() => {
       if (r.ANULADO) throw new Error('Ese registro está anulado.');
       const control = r.TIPO === 'CONTROL', hechas = sesionesDe(r.ID).length, cambios = (x && x.cambios) || {}, out = {};
       const COL = { fecha: 'FECHA', doctor: 'DOCTOR', nombre: 'NOMBRE', contacto: 'CONTACTO', detalle: 'DETALLE', marca: 'MARCA',
-        sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO' };
+        sesiones: 'SESIONES', fechaInicio: 'FECHA_INICIO', examenes: 'EXAMENES', fechaRetorno: 'FECHA_RETORNO', origenHierro: 'ORIGEN_HIERRO' };
       const lista = () => r.TIPO === 'HIERRO' ? tratamientos : procedimientos;
       for (const k of Object.keys(cambios)) {
         if (k === 'dni') throw new Error('Para cambiar el paciente, anule el registro y regístrelo de nuevo.');
         const col = COL[k];
         if (!col) throw new Error('No se puede cambiar ' + k + '.');
-        const v = cambios[k], t = String(v == null ? '' : v).trim(), actual = r[col] == null ? '' : String(r[col]);
+        const v = cambios[k], t = String(v == null ? '' : v).trim(), actual = col === 'ORIGEN_HIERRO' ? origenDe(r) || 'CHP' : r[col] == null ? '' : String(r[col]);
         // iguales_: el valor normalizado que ya tiene no cuenta.
         const igual = col === 'DOCTOR' ? !!doctorDe(t) && doctorDe(t).doctor === actual : col === 'NOMBRE' ? t.toUpperCase() === actual
           : col === 'CONTACTO' ? contactoEnvio(t) === contactoEnvio(actual)
           : col === 'SESIONES' ? Number(t) === Number(actual) : col === 'DETALLE' ? (lista().find(y => mismo(y, t)) || '\u0000') === actual
           : col === 'MARCA' ? ((marcas[norm(r.DETALLE)] || []).find(y => mismo(y, t)) || (t ? '\u0000' : '')) === actual
+          : col === 'ORIGEN_HIERRO' ? (t ? norm(t) : 'CHP') === actual
           : /^FECHA/.test(col) ? t.slice(0, 10) === actual.slice(0, 10) : t === actual;
         if (igual) continue;
         let nuevo;
@@ -5988,6 +6009,11 @@ const DEMO = (() => {
           if (nuevo && hechas) throw new Error('Ya empezó el tratamiento: la fecha de inicio no se cambia.');
           if (nuevo && (nuevo < hoy || nuevo > mas(hoy, 180))) throw new Error('La fecha de la primera sesión va de hoy a 180 días.');
         } else if (col === 'EXAMENES') { if (!control) throw new Error('Solo un control tiene exámenes.'); nuevo = t; }
+        else if (col === 'ORIGEN_HIERRO') {
+          nuevo = ['CHP', 'PACIENTE'].find(o => mismo(o, t));
+          if (!nuevo) throw new Error('El origen del hierro no es válido: CHP o PACIENTE.');
+          if (r.TIPO !== 'HIERRO') throw new Error('Solo un hierro tiene origen (CHP o del paciente).');
+        }
         else if (col === 'FECHA_RETORNO') {
           if (!control) throw new Error('Solo un control tiene fecha de retorno.');
           nuevo = t.slice(0, 10);
@@ -6006,7 +6032,7 @@ const DEMO = (() => {
       // La tarjeta del registro toma los datos nuevos (el servidor la recalcula al leer).
       tarjetas.filter(t => t.ID_REGISTRO === r.ID).forEach(t => {
         const n = reg(r);
-        ['NOMBRE', 'MEDICO_ULTIMO', 'FECHA_COTIZACION', 'DETALLE', 'TRATAMIENTO', 'MARCA', 'SESIONES', 'TELEFONOS', 'USUARIO'].forEach(k => { t[k] = n[k]; });
+        ['NOMBRE', 'MEDICO_ULTIMO', 'FECHA_COTIZACION', 'DETALLE', 'TRATAMIENTO', 'MARCA', 'ORIGEN_HIERRO', 'SESIONES', 'TELEFONOS', 'USUARIO'].forEach(k => { t[k] = n[k]; });
         if (r.FECHA_INICIO && t.AGENDA === 'SESION') t.FECHA_AGENDA = r.FECHA_INICIO;
         if (control && t.AGENDA === 'CONTROL') t.FECHA_AGENDA = r.FECHA_RETORNO;
         // Otro total de sesiones puede cambiar el estado (estadoRegistro): se recalcula como al marcar una sesión. Completo,
@@ -6296,12 +6322,12 @@ const DEMO = (() => {
       const ENF = { ['2026-09|' + ELI]: [2, 1, 2, 12, 9, 1], ['2026-09|' + KAREN]: [1, 0, 1, 6, 5, 1], ['2026-08|' + ELI]: [1, 1, 0, 9, 5, 0] };
       const r = (MES, MEDICO, v) => { const e = ENF[MES + '|' + MEDICO] || [0, 0, 0, 0, 0, 0];
         return { MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], NUEVOS_ALTA: v[12] || 0, CONTROL: v[3],
-          CONTROL_NO: v[4], CONTROL_CURSO: v[5], CONTROL_ALTA: v[13] || 0, HIERRO: v[6], HIERRO_NO: v[7], HIERRO_COMPLETO: v[14] || 0,
+          CONTROL_NO: v[4], CONTROL_CURSO: v[5], CONTROL_ALTA: v[13] || 0, HIERRO: v[6], HIERRO_NO: v[7], HIERRO_COMPLETO: v[14] || 0, HIERRO_PROPIO: v[15] || 0,
           PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11], REAC_PAC: e[0], REAC_INM: e[1], REAC_MED: e[2], ENF_DEBIDOS: e[3], ENF_A_TIEMPO: e[4], ENF_NO_RESPONDIO: e[5] }; };
       return { hoy, meta: reglas.metaRetorno, metaTratamiento: reglas.metaTratamiento, medicos: [ELI, HANAMPA, KAREN], filas: [
-        r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4, 0, 0, 5]),
+        r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4, 0, 0, 5, 1]),
         r('2026-09', HANAMPA, [6, 0, 5, 4, 1, 2, 0, 0, 0, 0, 2, 1]),
-        r('2026-09', KAREN, [20, 1, 14, 15, 2, 9, 8, 3, 2, 1, 6, 2, 0, 0, 3]),
+        r('2026-09', KAREN, [20, 1, 14, 15, 2, 9, 8, 3, 2, 1, 6, 2, 0, 0, 3, 1]),
         r('2026-08', ELI, [40, 24, 0, 30, 9, 0, 15, 6, 4, 3, 12, 5, 0, 0, 6]),
         r('2026-08', HANAMPA, [8, 4, 0, 6, 2, 0, 0, 0, 1, 1, 3, 1]),
         r('2026-08', KAREN, [35, 20, 0, 20, 6, 0, 10, 5, 2, 2, 8, 3]),

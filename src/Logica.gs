@@ -503,9 +503,10 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
   // Un ciclo nuevo solo empieza cuando vuelve a tocar (la fecha esperada). Lo registrado entre la última consulta y esa
   // fecha se hizo sin saber de la consulta (SOFDOC la trajo tarde): la consulta realizada ya cerró ese ciclo (caso 27).
   var posteriores = lista.filter(function (s) { var f = fechaIso(s.FECHA_HORA); return f > ultima && f >= out.esperada; });
-  var c = leerCiclo(posteriores, reglas, hoy);
+  var c = leerCiclo(posteriores, reglas, hoy, extra.contactos);
   out.intentos = c.intentos;
   out.pago = c.pago;
+  out.nuevoContacto = c.nuevoContacto || [];
 
   if (c.cierre) { out.estado = 'CERRADO'; out.cierre = c.cierre.motivo; out.fechaCierre = c.cierre.fecha; return out; }
   if (extra.sinContacto) { out.estado = 'CERRADO'; out.cierre = 'NÚMERO EQUIVOCADO'; out.fechaCierre = extra.sinContacto; return out; }
@@ -522,7 +523,8 @@ function estadoDeSerie(serie, seguimientos, reglas, hoy, alta, extra) {
   if (hechoAntesDeVolver && hoy < out.vence) { out.estado = 'RECUPERADO'; return out; }
   if (hoy < out.esperada) { out.estado = 'AL DÍA'; return out; }
   if (hoy < out.vence) { out.estado = 'POR VENCER'; return out; }
-  out.estado = out.atraso <= reglas.corte ? 'VENCIDO' : 'ANTIGUO';
+  // Reabierta por un contacto nuevo («Sin contacto válido»): vuelve a Por contactar aunque esté muy atrasada.
+  out.estado = out.atraso <= reglas.corte || out.nuevoContacto.length ? 'VENCIDO' : 'ANTIGUO';
   return out;
 }
 /* ==========================================================================
@@ -876,7 +878,8 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
     var s = series[k];
     if (!s.realizadas.length) return;
     var e = estadoDeSerie(s, segs[k], reglas, hoy, (altas || {})[k],
-      { fallecido: !!muertos[s.dni], sinContacto: sinContacto_(s.dni, marcas, tel, (usuarios || {})[s.dni]), retorno: (retornos || {})[k] });
+      { fallecido: !!muertos[s.dni], sinContacto: sinContacto_(s.dni, marcas, tel, (usuarios || {})[s.dni]), retorno: (retornos || {})[k],
+        contactos: contactosTarjeta_(tel[s.dni], (usuarios || {})[s.dni]) });
     out.push({
       DNI: s.dni,
       ESPECIALIDAD: s.especialidad,
@@ -902,13 +905,19 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
       RETORNO_TIPO: ((retornos || {})[k] || {}).tipo || '',
       FECHA_RETORNO: ((retornos || {})[k] || {}).fecha || '',
       FECHA_PAGO: e.pago || '',
-      USUARIO: (usuarios || {})[s.dni] || ''   // fuera de la hoja PACIENTES, como el retorno y el pago
+      USUARIO: (usuarios || {})[s.dni] || '',   // fuera de la hoja PACIENTES, como el retorno y el pago
+      NUEVO_CONTACTO: (e.nuevoContacto || []).join(' / ')   // reabierta tras «Sin contacto válido»: el contacto que la reabrió
     });
   });
   return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });
 }
 
 var TIPOS_INDICACION = { HIERRO: 1, PROCEDIMIENTO: 1 };
+
+/** Los contactos de una tarjeta para leerCiclo: sus teléfonos y, si hay, el @usuario. */
+function contactosTarjeta_(telefonos, usuario) {
+  return (telefonos || []).slice().concat(textoLimpio_(usuario) ? [textoLimpio_(usuario)] : []);
+}
 
 /**
  * Hierro y procedimientos cotizados y no hechos, como seguimientos propios:
@@ -946,7 +955,7 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
     var ultima = realizadas[realizadas.length - 1];
     var lista = (segs[k] || []).filter(function (s) { return fechaIso(s.FECHA_HORA) >= g.fecha; })
       .sort(function (a, b) { return a.FECHA_HORA < b.FECHA_HORA ? -1 : a.FECHA_HORA > b.FECHA_HORA ? 1 : 0; });
-    var c = leerCiclo(lista, reglas, hoy);
+    var c = leerCiclo(lista, reglas, hoy, contactosTarjeta_(tel[g.dni], (usuarios || {})[g.dni]));
     var dias = Math.max(0, diasEntre(g.fecha, hoy)), estado = 'PENDIENTE', cierre = c.cierre;
     var sc = sinContacto_(g.dni, marcas, tel, (usuarios || {})[g.dni]);
     if (muertos[g.dni]) estado = 'FALLECIDO';
@@ -955,7 +964,7 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
     else if (c.loHizo) estado = 'COMPLETADO';
     else if (c.agenda) estado = 'AGENDADO';
     else if (c.pago) estado = 'PAGO REALIZADO';
-    else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
+    else if (dias > reglas.corteIndicaciones && !c.nuevoContacto) estado = 'ANTIGUO';   // reabierta por un contacto nuevo: vuelve
     return {
       DNI: g.dni,
       ESPECIALIDAD: g.tipo,
@@ -980,7 +989,8 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
       FECHA_AGENDA: c.agenda ? c.agenda.fecha : '',
       INTENTO: c.agenda ? c.agenda.intento : 0,
       FECHA_LOHIZO: c.loHizo,
-      FECHA_PAGO: c.pago
+      FECHA_PAGO: c.pago,
+      NUEVO_CONTACTO: (c.nuevoContacto || []).join(' / ')
     };
   });
 }
@@ -1206,7 +1216,9 @@ function kpiMotivos(seguimientos) {
   var acc = {};
   (seguimientos || []).forEach(function (s) {
     var indicacion = TIPOS_INDICACION[normTexto(s.ESPECIALIDAD)];
-    if (normTexto(s.ACCION) !== 'DESCARTADO' || (indicacion && normTexto(s.RESULTADO) !== 'NO DESEA REALIZARSE')) return;
+    // En hierro y procedimiento solo cuentan «No desea realizarse» y «Sin contacto válido» (este, en todos los tipos).
+    var r = normTexto(s.RESULTADO);
+    if (normTexto(s.ACCION) !== 'DESCARTADO' || (indicacion && r !== 'NO DESEA REALIZARSE' && r !== 'SIN CONTACTO')) return;
     var m = s.MOTIVO || 'SIN MOTIVO';
     acc[m] = (acc[m] || 0) + 1;
   });

@@ -547,7 +547,6 @@ function pendientesRegistro(d) {
       if (desdeCotizacion && String(s.FECHA_HORA || '') > trasAceptar && (resultadoDe(s) || {}).grupo === 'CIERRE') return true;
       return fechaIso(s.FECHA_HORA) >= desde && String(s.FECHA_HORA || '') >= corte;
     }).sort(porFechaHora_);
-    var c = leerCiclo(lista, reglas, hoy);
     var tel = normTelefono(r.CONTACTO), usuario = tel.length === 9 ? '' : textoLimpio_(r.CONTACTO);
     // Sin teléfonos conocidos del DNI (p. ej. un control de alguien que solo vino por Registro), vale el CONTACTO del registro,
     // salvo que esté marcado como equivocado después de registrarse.
@@ -555,6 +554,8 @@ function pendientesRegistro(d) {
     if (!telefonos.length && tel.length === 9 && !(marcaTel && !(fechaIso(r.FECHA) > marcaTel))) telefonos = [tel];
     var mapaTel = {};
     mapaTel[dni] = telefonos;
+    // Con los contactos de ahora: uno que no había al cerrar «Sin contacto válido» la reabre (leerCiclo).
+    var c = leerCiclo(lista, reglas, hoy, contactosTarjeta_(telefonos, usuario || (d.usuarios || {})[dni]));
     var sc = sinContacto_(dni, marcas, mapaTel, usuario || (d.usuarios || {})[dni]), cierre = c.cierre, estado = 'PENDIENTE', motivo = '', volvio = '', falta = '';
     var agenda = c.agenda;
     // En un tratamiento en curso, la cita que se agenda es su próxima sesión: «Sesión k+1 el …».
@@ -594,6 +595,8 @@ function pendientesRegistro(d) {
     }
     else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
+    // Reabierta por un contacto nuevo («Sin contacto válido»): vuelve a Por contactar aunque fuera ANTIGUO.
+    if (c.nuevoContacto && estado === 'ANTIGUO') estado = e.estado === 'COMPLETO' ? 'POR REEVALUAR' : 'PENDIENTE';
     // Pagó y aún no tiene fecha: Pago realizado en vez de Por contactar, Contactado o ANTIGUO (Etapa 3, §2.2).
     if (c.pago && (estado === 'PENDIENTE' || estado === 'ANTIGUO' || estado === 'POR REEVALUAR' || (estado === 'AGENDADO' && agenda && AGENDAS_CONTACTO[agenda.tipo]))) {
       estado = 'PAGO REALIZADO'; agenda = null; motivo = '';
@@ -636,7 +639,8 @@ function pendientesRegistro(d) {
       EXAMENES: textoLimpio_(r.EXAMENES),
       FECHA_INICIO: e.inicio,
       FECHA_FALTA: falta,
-      FECHA_PAGO: c.pago
+      FECHA_PAGO: c.pago,
+      NUEVO_CONTACTO: (c.nuevoContacto || []).join(' / ')
     };
   }).filter(Boolean);
 }

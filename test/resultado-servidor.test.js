@@ -62,6 +62,31 @@ test('número equivocado: con otro teléfono sigue (TELEFONO); el último cierra
   assert.equal(r.tarjeta, '', 'cerrada: ya no está en el tablero');
 });
 
+test('«Sin contacto válido»: cierra con los contactos de entonces; un teléfono nuevo del CRM la reabre en Por contactar y vuelve a aceptar resultados', () => {
+  const { ctx, escrito } = servidor();
+  const r = plano(ctx.registrarResultado(p({ resultado: 'SIN CONTACTO', nota: 'ninguno existe en WhatsApp' })));
+  const s = escrito.SEGUIMIENTOS[0];
+  assert.deepEqual([s.RESULTADO, s.ACCION, s.MOTIVO, s.NOTA], ['SIN CONTACTO', 'DESCARTADO', 'SIN CONTACTO',
+    'Contactos al cerrar: 987654321 / 912345678 · ninguno existe en WhatsApp']);
+  assert.equal(r.tarjeta, '', 'sale del tablero');
+  assert.deepEqual(escrito.BITACORA.slice(-1), [['MAGALY', 'RESULTADO', '40111222 · HEMATOLOGÍA · SIN CONTACTO']]);
+  // Desde aquí, lo leído incluye lo escrito (y, más abajo, el contacto nuevo del CRM).
+  const base = ctx.datos_, extra = {};
+  ctx.datos_ = () => { const d = base(); d.seguimientosTodos = ctx.leerSeguimientos_(); d.seguimientos = d.seguimientosTodos.filter(x => !ctx.anulado_(x));
+    return ctx.derivar_(Object.assign(d, extra)); };
+  const t = plano(ctx.getTablero());
+  assert.deepEqual(t.cerrados.map(c => [c.CIERRE, c.SIN_CONTACTO]), [['SIN CONTACTO', true]]);
+  assert.throws(() => ctx.registrarResultado(p({ resultado: 'NO CONTESTÓ' })), /no está en la lista/, 'cerrada no acepta resultados');
+  // Llega un teléfono nuevo por el CRM: vuelve sola, con la etiqueta.
+  extra.contactos = [{ DNI_PACIENTE: '40111222', TELEFONO: '955111222' }];
+  const t2 = plano(ctx.getTablero());
+  const tarjeta = t2.columnas.POR_CONTACTAR.find(x => x.DNI === '40111222' && x.TIPO_SEGUIMIENTO === 'REEVALUACION');
+  assert.equal(tarjeta.ETIQUETA, 'Nuevo contacto: 955111222');
+  assert.equal(t2.cerrados.length, 0);
+  const n = plano(ctx.registrarResultado(p({ resultado: 'NO CONTESTÓ' })));
+  assert.deepEqual([n.tarjeta.COLUMNA, n.tarjeta.INTENTO], ['CONTACTADO', 1], 'un ciclo nuevo: el primer intento');
+});
+
 test('alta médica de una reevaluación y «lo hizo» de un registro van a sus funciones', () => {
   const { ctx, escrito } = servidor();
   const a = plano(ctx.registrarResultado(p({ resultado: 'ALTA MÉDICA', doctor: 'Dra. Karen Matos', fecha: '2026-10-06' })));

@@ -16,13 +16,53 @@ var RESULTADOS = {
   'PAGO':                     { nombre: 'PAGO',                     grupo: 'PAGO',     pide: 'FECHA',    soloIndicacion: false },
   'ALTA MEDICA':              { nombre: 'ALTA MÉDICA',              grupo: 'CIERRE',   pide: 'DOCTOR',   soloIndicacion: false },
   'NUMERO EQUIVOCADO':        { nombre: 'NÚMERO EQUIVOCADO',        grupo: 'TELEFONO', pide: 'TELEFONO', soloIndicacion: false },
+  // «Sin contacto válido» (27/10/2026): sin teléfono, o el número no existe en WhatsApp y no hay otro. Se reabre solo si aparece
+  // un contacto que no había al cerrar (leerCiclo con los contactos de ahora; los de entonces van en la NOTA).
+  'SIN CONTACTO':             { nombre: 'SIN CONTACTO',             grupo: 'CIERRE',   pide: '',         soloIndicacion: false },
   'SE ATIENDE EN OTRO LUGAR': { nombre: 'SE ATIENDE EN OTRO LUGAR', grupo: 'CIERRE',   pide: '',         soloIndicacion: false },
   'FALLECIO':                 { nombre: 'FALLECIÓ',                 grupo: 'CIERRE',   pide: '',         soloIndicacion: false },
   'NO DESEA CONTINUAR':       { nombre: 'NO DESEA CONTINUAR',       grupo: 'CIERRE',   pide: 'MOTIVO',   soloIndicacion: false },
   'NO DESEA REALIZARSE':      { nombre: 'NO DESEA REALIZARSE',      grupo: 'CIERRE',   pide: 'MOTIVO',   soloIndicacion: true }
 };
 var ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO', 'ACEPTÓ', 'PAGO', 'ALTA MÉDICA', 'NÚMERO EQUIVOCADO',
-  'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE'];
+  'SE ATIENDE EN OTRO LUGAR', 'FALLECIÓ', 'NO DESEA CONTINUAR', 'NO DESEA REALIZARSE', 'SIN CONTACTO'];
+
+/** Al cerrar «Sin contacto válido», la NOTA empieza con los contactos que tenía la tarjeta: «Contactos al cerrar: a / b» o «… ninguno». */
+var PREFIJO_CONTACTOS = 'Contactos al cerrar: ';
+
+/** Los contactos que había al cerrar, leídos de la NOTA ([] con «ninguno» o sin el prefijo). */
+function contactosAlCerrar(nota) {
+  var t = textoLimpio_(nota);
+  if (t.indexOf(PREFIJO_CONTACTOS) !== 0) return [];
+  var lista = t.slice(PREFIJO_CONTACTOS.length).split(' · ')[0];
+  return normTexto(lista) === 'NINGUNO' ? [] : lista.split(' / ').map(textoLimpio_).filter(Boolean);
+}
+
+/** Cómo se comparan dos contactos: un teléfono por sus 9 dígitos; un usuario sin mayúsculas ni tildes. */
+function claveContacto_(c) { var t = normTelefono(c); return t.length === 9 ? t : normTexto(c); }
+
+/** Los de `ahora` que no estaban en `antes` (sin repetir), tal como se escriben. */
+function contactosNuevos_(ahora, antes) {
+  var habia = {}, out = [];
+  (antes || []).forEach(function (c) { habia[claveContacto_(c)] = 1; });
+  (ahora || []).forEach(function (c) {
+    var k = claveContacto_(c);
+    if (!k || habia[k]) return;
+    habia[k] = 1;
+    out.push(textoLimpio_(c));
+  });
+  return out;
+}
+
+/**
+ * ¿Esta fila deja la tarjeta sin contacto? Devuelve los contactos que había entonces, o null. «Sin contacto válido» guarda los
+ * suyos en la NOTA; un «Número equivocado» del último contacto (ACCION DESCARTADO, con su teléfono) no dejó ninguno.
+ */
+function cierreSinContacto_(r) {
+  if (r.resultado === 'SIN CONTACTO') return contactosAlCerrar(r.nota);
+  if (r.resultado === 'NÚMERO EQUIVOCADO' && r.telefono && r.accion === 'DESCARTADO') return [];
+  return null;
+}
 
 /**
  * Qué significa una fila de SEGUIMIENTOS. Las antiguas (sin RESULTADO) se leen
@@ -32,7 +72,8 @@ var ORDEN_RESULTADOS = ['NO CONTESTÓ', 'LO PENSARÁ', 'AGENDÓ CITA', 'LO HIZO'
 function resultadoDe(s) {
   if (!s || anulado_(s)) return null;
   var base = { fecha: fechaIso(s.FECHA_HORA), fechaHora: String(s.FECHA_HORA || ''), fechaProxima: fechaIso(s.FECHA_PROXIMA),
-    telefono: normTelefono(s.TELEFONO), quien: textoLimpio_(s.RESPONSABLE), id: textoLimpio_(s.ID) };
+    telefono: normTelefono(s.TELEFONO), quien: textoLimpio_(s.RESPONSABLE), id: textoLimpio_(s.ID), accion: normTexto(s.ACCION),
+    nota: textoLimpio_(s.NOTA) };
   function con(o) { Object.keys(o).forEach(function (k) { base[k] = o[k]; }); return base; }
   var r = RESULTADOS[normTexto(s.RESULTADO)];
   if (r) {
@@ -100,13 +141,25 @@ function fallecidos(seguimientos) {
  * Lee los seguimientos de UN ciclo: los posteriores a la última consulta, a la
  * cotización o a la última sesión, según el tipo. Gana el último resultado que
  * decide; un «número equivocado» con teléfono no decide (lo resuelve sinContacto_).
+ * `contactos` (opcional): los teléfonos y el @usuario que tiene ahora la tarjeta. Con uno que no estaba al cerrar «Sin contacto
+ * válido» (o al marcar equivocado el último número), la tarjeta se reabre: `nuevoContacto` y un ciclo nuevo, sin lo de antes.
  */
-function leerCiclo(lista, reglas, hoy) {
+function leerCiclo(lista, reglas, hoy, contactos) {
   var filas = (lista || []).map(resultadoDe).filter(Boolean).sort(function (a, b) {
     return a.fechaHora < b.fechaHora ? -1 : a.fechaHora > b.fechaHora ? 1 : 0;
   });
   var out = { intentos: 0, ultimo: '', cierre: null, agenda: null, loHizo: '', pago: '' };
   if (!filas.length) return out;
+  for (var k = filas.length - 1; k >= 0; k--) {
+    var antes = cierreSinContacto_(filas[k]);
+    if (!antes) continue;
+    var despues = filas.slice(k + 1);
+    // Algo decidido después: ya se había reabierto y esto es el ciclo nuevo (lo de antes del cierre no cuenta).
+    if (despues.some(function (r) { return r.grupo !== 'TELEFONO'; })) { filas = despues; break; }
+    var nuevos = contactos ? contactosNuevos_(contactos, antes) : [];
+    if (nuevos.length) { out.ultimo = filas[filas.length - 1].fecha; out.nuevoContacto = nuevos; out.reabierto = filas[k].fecha; return out; }
+    break;
+  }
   out.ultimo = filas[filas.length - 1].fecha;
   // «Pagó» no decide la agenda: la tarjeta queda en Pago realizado hasta que una fecha real o un cierre la mueva.
   var pagos = filas.filter(function (r) { return r.grupo === 'PAGO'; }), ultPago = pagos[pagos.length - 1];
@@ -228,6 +281,11 @@ function validarResultado(p, d) {
     if (!tel) return no('Elija cuál teléfono está equivocado.');
     if (String(t.TELEFONOS || '').split(' / ').indexOf(tel) < 0) return no('Ese teléfono no es de este paciente.');
     fila.TELEFONO = tel;
+  }
+  if (r.nombre === 'SIN CONTACTO') {
+    // Lo que tenía la tarjeta al cerrar: solo un contacto que no esté aquí la reabre (leerCiclo).
+    var habia = String(t.TELEFONOS || '').split(' / ').map(textoLimpio_).filter(Boolean).concat(textoLimpio_(t.USUARIO) ? [textoLimpio_(t.USUARIO)] : []);
+    fila.NOTA = unirNota_(PREFIJO_CONTACTOS + (habia.length ? habia.join(' / ') : 'ninguno'), nota);
   }
   if (r.nombre === 'NO DESEA CONTINUAR') {
     var motivo = textoLimpio_(p.motivo);

@@ -2803,7 +2803,7 @@ test('indicadores: cada una de las siete pestañas se pinta con los números del
     const trat = k => pagina.locator(`#ipanel .trat-u[data-trat="${k}"]`).innerText().then(x => x.replace(/\s+/g, ' ').trim());
     assert.equal(await trat('hierro'), 'Tratamiento de hierro 20 indicados 50 % cumplimiento Completaron 8 · 50 % No siguieron 8 · 50 % '
       + 'En curso 4 · aún no cuentan Meta de cumplimiento: 95 % · a 45 puntos ▲ 15 puntos mejor que agosto (35 %). '
-      + 'Reacciones: 3 pacientes (inmediatas 1, mediatas 3). Contactos de enfermería a tiempo: 78 % (14 de 18).');
+      + 'Reacciones: 3 pacientes (inmediatas 1, mediatas 3). Contactos de enfermería a tiempo: 78 % (14 de 18) · no respondieron: 2.');
     assert.equal(await trat('proc'), 'Procedimientos 5 cotizados 40 % cumplimiento Realizados 2 · 40 % No realizados 3 · 60 % '
       + 'Meta de cumplimiento: 95 % · a 55 puntos ▲ 26 puntos mejor que agosto (14 %).');
     assert.deepEqual(await pagina.locator('#ipanel .trat-u[data-trat="hierro"] .t-barra i').evaluateAll(l => l.map(i => [i.className, i.style.flexGrow])),
@@ -3150,7 +3150,7 @@ test('imprimible: se arma con los datos del DEMO, llama a window.print y su cifr
     // La tarjeta unificada, igual que en la pantalla.
     const imp = await pagina.locator('#imp-p1 .imp-trat').evaluateAll(l => l.map(p => p.textContent.replace(/\s+/g, ' ').trim()));
     assert.equal(imp.length, 2);
-    assert.match(imp[0], /^50 %\s*Tratamiento de hierro · cumplimiento · 20 indicados\s*Completaron: 8 \(50 %\) · No siguieron: 8 \(50 %\) · en curso: 4\s*Meta de cumplimiento: 95 % · a 45 puntos\s*▲ 15 puntos mejor que agosto \(35 %\)\.\s*Reacciones: 3 pacientes \(inmediatas 1, mediatas 3\)\.\s*Contactos de enfermería a tiempo: 78 % \(14 de 18\)\.$/);
+    assert.match(imp[0], /^50 %\s*Tratamiento de hierro · cumplimiento · 20 indicados\s*Completaron: 8 \(50 %\) · No siguieron: 8 \(50 %\) · en curso: 4\s*Meta de cumplimiento: 95 % · a 45 puntos\s*▲ 15 puntos mejor que agosto \(35 %\)\.\s*Reacciones: 3 pacientes \(inmediatas 1, mediatas 3\)\.\s*Contactos de enfermería a tiempo: 78 % \(14 de 18\) · no respondieron: 2\.$/);
     assert.match(imp[1], /^40 %\s*Procedimientos · cumplimiento · 5 cotizados\s*Realizados: 2 \(40 %\) · No realizados: 3 \(60 %\)\s*Meta de cumplimiento: 95 % · a 55 puntos\s*▲ 26 puntos mejor que agosto \(14 %\)\.$/);
     assert.match(await pagina.locator('#imp-p1 .imp-rec').textContent(), /39% volvieron tras el seguimiento \(7 de 18\)\./);
     assert.match(p1, /Mes a mes · % que volvió a su reevaluación/);
@@ -4109,25 +4109,55 @@ test('Enfermería: «Ya me contacté» pide la reacción (y la nota con «Otra»
   } finally { await navegador.close(); }
 });
 
-test('Enfermería: «No contestó» guarda sin preguntar y deja la fila con «No contestó n veces»; sin reacción también se cumple', async () => {
+test('Enfermería: «No contestó» guarda sin preguntar; el primero avisa que se cierra al siguiente y el segundo deja «No respondió»; «Deshacer» lo devuelve', async () => {
   const { navegador, pagina, errores } = await abrirEnfermeria();
   try {
-    const fila = '#enf-cuerpo [data-enf="SES-000003|5"]';
-    await pagina.locator(`${fila} [data-enf-nc]`).click();
-    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 1);
-    await pagina.waitForFunction(s => /No contestó 2 veces/.test(document.querySelector(s).textContent), fila);
+    // Si el servidor falla, la fila vuelve y se avisa.
+    await pagina.evaluate(() => { DEMO._fallar.registrarContactoEnfermeria = 'Sin conexión.'; });
+    await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] [data-enf-nc]').click();
+    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
+    assert.equal(await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] .enf-nc').count(), 0, 'la cuenta vuelve a cero');
+    await pagina.evaluate(() => { delete DEMO._fallar.registrarContactoEnfermeria; });
+    // Primer intento: la fila sigue y dice que el siguiente la cierra (ENFERMERIA_MAX_INTENTOS = 2).
+    await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] [data-enf-nc]').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 2);
+    await pagina.waitForFunction(() => /No contestó 1 vez · se cierra al siguiente intento/.test(document.querySelector('#enf-cuerpo [data-enf="SES-000004|1"]').textContent));
     assert.equal((await ultimo(pagina, 'registrarContactoEnfermeria')).resultado, 'NO CONTESTO');
+    // Segundo intento (el día 5 de Carlos ya tenía uno): sale de la lista como «No respondió»; los días siguientes siguen.
+    const fila = '#enf-cuerpo [data-enf="SES-000003|5"]';
+    assert.match(await pagina.locator(fila).textContent(), /No contestó 1 vez · se cierra al siguiente intento/);
+    await pagina.locator(`${fila} [data-enf-nc]`).click();
+    await pagina.waitForFunction(s => !document.querySelector(s), fila);
+    await pagina.waitForFunction(() => /No respondió» \(2 intentos\)/.test(document.querySelector('#aviso span').textContent));
+    assert.match(await aviso(pagina), /^Guardado: Carlos Enrique Núñez León · día 5 · no contestó: queda «No respondió» \(2 intentos\)\.$/);
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 3);
+    // «Deshacer» anula el último «No contestó»: vuelve a pendiente con su cuenta.
+    await pagina.locator('#aviso button:not([hidden])').click();
+    await pagina.waitForFunction(() => DEMO._llamadas.anularContactoEnfermeria === 1);
+    await pagina.waitForFunction(s => /No contestó 1 vez/.test((document.querySelector(s) || {}).textContent || ''), fila);
+    // Sin reacción también se cumple.
     await pagina.locator(`${fila} [data-enf-ya]`).click();
     await pagina.locator(`${fila} [data-enf-tipo="NINGUNA"]`).click();
     assert.equal(await pagina.locator(`${fila} [data-enf-reac]`).count(), 0, 'sin reacción no hay chips');
     await pagina.locator(`${fila} [data-enf-guardar]`).click();
     await pagina.waitForFunction(s => !document.querySelector(s), fila);
     assert.equal((await ultimo(pagina, 'registrarContactoEnfermeria')).reaccionTipo, 'NINGUNA');
-    // Si el servidor falla, la fila vuelve y se avisa.
-    await pagina.evaluate(() => { DEMO._fallar.registrarContactoEnfermeria = 'Sin conexión.'; });
-    await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] [data-enf-nc]').click();
-    await pagina.waitForFunction(() => /No se guardó/.test(document.querySelector('#aviso span').textContent));
-    assert.equal(await pagina.locator('#enf-cuerpo [data-enf="SES-000004|1"] .enf-nc').count(), 0, 'la cuenta vuelve a cero');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Enfermería: tras el segundo «No contestó» la ficha dice «Día 5: no respondió (2 intentos)»', async () => {
+  const { navegador, pagina, errores } = await abrirEnfermeria();
+  try {
+    const fila = '#enf-cuerpo [data-enf="SES-000003|5"]';
+    await pagina.locator(`${fila} [data-enf-nc]`).click();
+    await pagina.waitForFunction(s => !document.querySelector(s), fila);
+    await pagina.waitForFunction(() => DEMO._llamadas.registrarContactoEnfermeria === 1);
+    await pagina.evaluate(() => abrirFicha('41333444'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    const t = await pagina.locator('#ficha .trat-enf').first().textContent().then(x => x.replace(/\s+/g, ' '));
+    assert.match(t, /Sesión 1 · Día 5: no respondió \(2 intentos\)/);
+    assert.doesNotMatch(t, /Día 1: no respondió/, 'solo el día que llegó a los dos intentos');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

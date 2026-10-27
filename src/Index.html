@@ -3617,7 +3617,9 @@ function adaptarFicha(r) {
         enf: (r.enfermeria || []).filter(f => f.ID_REGISTRO === x.ID).map(f => ({ sesion: Number(f.NUMERO_SESION) || 0, dia: Number(f.DIA) || 0,
           contestado: norm(f.RESULTADO) === 'CONTACTADO', tipo: norm(f.REACCION_TIPO), reaccion: String(f.REACCION || ''), nota: String(f.NOTA || ''),
           cuando: dm(String(f.FECHA_HORA || '').slice(0, 10)), quien: nombreBonito(f.ENFERMERA), anulado: f.ANULADO === true || norm(f.ANULADO) === 'SI',
-          motivo: String(f.MOTIVO_ANULACION || '') })).sort((a, b) => a.sesion - b.sesion || a.dia - b.dia) };
+          motivo: String(f.MOTIVO_ANULACION || '') })).sort((a, b) => a.sesion - b.sesion || a.dia - b.dia),
+        // Los días de llamada que quedaron «No respondió»: ENFERMERIA_MAX_INTENTOS «No contestó» vivos y ningún «Contactado».
+        noResp: noRespondioFicha((r.enfermeria || []).filter(f => f.ID_REGISTRO === x.ID)) };
     }),
     altas,
     previos: (r.indicaciones || []).map(i => ({ f: isoDe(i.FECHA), tipo: frase(i.TIPO), det: etiquetaCat(i.DETALLE) + (Number(i.CANTIDAD) > 1 ? ' ×' + Number(i.CANTIDAD) : ''),
@@ -3822,6 +3824,17 @@ function pintarDecisionFicha() {
   const box = $('#fdecx');
   if (box && PA.alta) box.innerHTML = htmlDecisionFicha(PA.alta);
 }
+/** Como noRespondioEnfermeria (Enfermeria.gs): [{ sesion, dia, n }] de los días con max «No contestó» sin anular y sin «Contactado». */
+function noRespondioFicha(filas) {
+  const max = maxIntentosEnf(null), por = {};
+  filas.forEach(f => {
+    if (f.ANULADO === true || norm(f.ANULADO) === 'SI' || !Number(f.DIA)) return;
+    const k = (Number(f.NUMERO_SESION) || 0) + '|' + Number(f.DIA), o = por[k] = por[k] || { sesion: Number(f.NUMERO_SESION) || 0, dia: Number(f.DIA), n: 0, ok: false };
+    if (norm(f.RESULTADO) === 'CONTACTADO') o.ok = true;
+    if (norm(f.RESULTADO) === 'NO CONTESTO') o.n++;
+  });
+  return Object.values(por).filter(o => !o.ok && o.n >= max).sort((a, b) => a.sesion - b.sesion || a.dia - b.dia);
+}
 function htmlTrat(t) {
   const editando = !t.anulado && PA.editando === t.id;
   const k = t.sesiones.length, ultima = k ? t.sesiones[k - 1].f : t.f;
@@ -3854,7 +3867,8 @@ function htmlTrat(t) {
     + (ses ? `<ol class="sesiones">${ses}</ol>` : '')
     + (t.enf && t.enf.length ? '<div class="trat-enf-t"><b>Enfermería</b><ul class="trat-enf">' + t.enf.map(f => `<li class="${f.anulado ? 'anulado' : ''}"><b>Sesión ${f.sesion} · ${esc(diaTexto(f.dia))}</b>`
       + ` · ${esc(f.contestado ? (f.tipo && f.tipo !== 'NINGUNA' ? (TIPO_REAC[f.tipo] || f.tipo).toLowerCase() + ': ' + f.reaccion : 'sin reacción') : 'no contestó')}`
-      + `${f.nota ? ' · ' + esc(f.nota) : ''} · <span class="mono">${esc(f.cuando)}</span> · ${esc(f.quien)}${f.anulado && f.motivo ? ' · anulado: ' + esc(f.motivo) : ''}</li>`).join('') + '</ul></div>' : '')
+      + `${f.nota ? ' · ' + esc(f.nota) : ''} · <span class="mono">${esc(f.cuando)}</span> · ${esc(f.quien)}${f.anulado && f.motivo ? ' · anulado: ' + esc(f.motivo) : ''}</li>`).join('')
+      + (t.noResp || []).map(o => `<li class="no-resp"><b>Sesión ${o.sesion} · ${esc(diaTexto(o.dia))}: no respondió (${o.n} intentos)</b></li>`).join('') + '</ul></div>' : '')
     + (editando ? formEdicion(t.fila, { borrador: PA.borrador, guardando: PA.enVuelo === 'editarRegistro' }) : '')
     + (!t.anulado && !editando ? '<div class="trat-acc">' + (t.editable ? `<button type="button" class="enlace" data-editar-ficha="${esc(t.id)}">Editar</button>` : '')
       + (t.anulable && !anulandoAqui('registro', t.id) ? `<button type="button" class="enlace" data-anular-reg="${esc(t.id)}">Anular registro</button>` : '')
@@ -4124,7 +4138,8 @@ const porCantidad = i => (a, b) => b[1][i] - a[1][i] || (a[0] < b[0] ? -1 : a[0]
 /* ---- Resumen del mes (getResumen): un paciente que no volvió cuenta en el mes de su última consulta ---- */
 const CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
   'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS',
-  'REAC_PAC', 'REAC_INM', 'REAC_MED', 'ENF_DEBIDOS', 'ENF_A_TIEMPO'];   // Enfermería (cifrasEnfermeria)
+  'REAC_PAC', 'REAC_INM', 'REAC_MED', 'ENF_DEBIDOS', 'ENF_A_TIEMPO',   // Enfermería (cifrasEnfermeria)
+  'ENF_NO_RESPONDIO', 'HIERRO_PROPIO'];   // contactos que quedaron «No respondió» y hierros que trajo el paciente
 function sumarMes(filas, mes) {
   const o = {};
   CAMPOS_RESUMEN.forEach(c => { o[c] = 0; });
@@ -4420,14 +4435,15 @@ function datosTrats(filas, mes, metaT) {
   return TRATS.map(def => {
     const c = cumplimiento(m, def.k), a = cumplimiento(ma, def.k);
     // Enfermería, solo en la tarjeta de hierro: pacientes con reacción y contactos hechos a tiempo.
-    const enf = def.k === 'hierro' ? { pac: m.REAC_PAC, inm: m.REAC_INM, med: m.REAC_MED, deb: m.ENF_DEBIDOS, at: m.ENF_A_TIEMPO } : null;
+    const enf = def.k === 'hierro' ? { pac: m.REAC_PAC, inm: m.REAC_INM, med: m.REAC_MED, deb: m.ENF_DEBIDOS, at: m.ENF_A_TIEMPO, nr: m.ENF_NO_RESPONDIO } : null;
     return { def, c, metaT, enf, meta: textoMeta(metaT, c.p, 0, 'Meta de cumplimiento') || { clase: '' }, comp: comparativo(c, a, mesAnterior(mes)) };
   });
 }
 /** Las dos frases de Enfermería de la tarjeta de hierro. */
 const textosEnf = e => !e ? [] : [
   `Reacciones: ${plural(e.pac, 'paciente', 'pacientes')} (inmediatas ${e.inm}, mediatas ${e.med}).`,
-  e.deb ? `Contactos de enfermería a tiempo: ${pc(e.at, e.deb)} % (${e.at} de ${e.deb}).` : 'Contactos de enfermería a tiempo: todavía ninguno tocaba.'];
+  // «No respondió» (ENFERMERIA_MAX_INTENTOS «No contestó») ya cuenta como no logrado a tiempo; se dice aparte cuántos.
+  e.deb ? `Contactos de enfermería a tiempo: ${pc(e.at, e.deb)} % (${e.at} de ${e.deb}) · no respondieron: ${Number(e.nr) || 0}.` : 'Contactos de enfermería a tiempo: todavía ninguno tocaba.'];
 /** Una tarjeta unificada: cifra, barra apilada, reparto, meta y comparativo. */
 function htmlTratU({ def, c, meta, metaT, comp, enf }) {
   const pp = n => c.base ? ` · ${pc(n, c.base)} %` : '';
@@ -4809,6 +4825,8 @@ const TIPO_REAC = { NINGUNA: 'Sin reacción', INMEDIATA: 'Inmediata', MEDIATA: '
 const reaccionesCat = () => (S.boot && S.boot.reacciones && S.boot.reacciones.length ? S.boot.reacciones : []);
 const esOtra = r => norm(r) === 'OTRA';
 const diaTexto = d => Number(d) === 0 ? 'En la aplicación' : 'Día ' + d;
+/** Cuántos «No contestó» dejan el contacto «No respondió» (REGLAS.ENFERMERIA_MAX_INTENTOS: lo trae cada contacto y bootstrap). */
+const maxIntentosEnf = c => Number(c && c.MAX_INTENTOS) || Number(S.reglas && S.reglas.maxIntentosEnfermeria) || 2;
 
 function iniciarEnfermeria() {
   VISTAS.enfermeria.mostrar = () => cargarEnfermeria();
@@ -4844,7 +4862,7 @@ function htmlContactoEnf(c) {
     + `<div class="enf-l">Sesión ${c.NUMERO_SESION} de ${c.SESIONES} · aplicada el ${esc(dm(c.FECHA_SESION))} · DNI ${esc(c.DNI)}</div>`
     + (c.APLICACION ? `<div class="enf-cuando">Aplicación · sesión ${c.NUMERO_SESION} del ${esc(dm(c.FECHA_SESION))} · ¿hubo reacción al aplicarla?</div>`
       : `<div class="enf-cuando">${esc(diaTexto(c.DIA))} · ${c.GRUPO === 'HOY' ? 'toca hoy' : (vencido ? 'tocaba el ' : 'toca el ') + esc(dm(c.FECHA))}${vencido ? ' · hace ' + plural(hace, 'día', 'días') : ''}</div>`)
-    + reacs + (c.NO_CONTESTO ? `<span class="enf-nc">No contestó ${c.NO_CONTESTO === 1 ? '1 vez' : c.NO_CONTESTO + ' veces'}</span>` : '')
+    + reacs + (c.NO_CONTESTO ? `<span class="enf-nc">No contestó ${c.NO_CONTESTO === 1 ? '1 vez' : c.NO_CONTESTO + ' veces'}${c.NO_CONTESTO === maxIntentosEnf(c) - 1 ? ' · se cierra al siguiente intento' : ''}</span>` : '')
     + '<div class="enf-pie">' + (tel ? `<span class="enf-tel"><i class="ph ph-phone"></i>${esc(telBonito(tel))}<button type="button" class="btn btn-s" data-enf-copiar="${esc(tel)}"><i class="ph ph-copy"></i>Copiar</button></span>`
       : c.USUARIO ? `<span class="enf-tel"><i class="ph ph-at"></i>${esc(c.USUARIO)}</span>` : '<span class="enf-tel sin"><i class="ph ph-phone-slash"></i>Sin teléfono</span>')
     + `<span class="enf-acc"><button type="button" class="btn btn-p" data-enf-ya="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''} aria-expanded="${abierto}"><i class="ph ph-check"></i>${c.APLICACION ? 'Registrar' : 'Ya me contacté'}</button>`
@@ -4917,7 +4935,9 @@ async function guardarContactoEnf(clave, datos) {
   const c = (EN.lista || []).find(x => x.CLAVE === clave); if (!c) return;
   const antes = EN.lista.slice(), quien = S.usuario, nombre = nombreBonito(c.NOMBRE);
   EN.enVuelo = clave;
-  if (datos.resultado === 'CONTACTADO') { EN.lista = EN.lista.filter(x => x !== c); EN.abierto = ''; }
+  // El «No contestó» que llega a ENFERMERIA_MAX_INTENTOS deja el contacto «No respondió»: sale de la lista, como un contactado.
+  const cierra = datos.resultado === 'NO CONTESTO' && !c.APLICACION && c.NO_CONTESTO + 1 >= maxIntentosEnf(c);
+  if (datos.resultado === 'CONTACTADO' || cierra) { EN.lista = EN.lista.filter(x => x !== c); EN.abierto = ''; }
   else EN.lista = EN.lista.map(x => x === c ? Object.assign({}, x, { NO_CONTESTO: x.NO_CONTESTO + 1 }) : x);
   pintarEnfermeria();
   EN.gen++;   // una lista pedida antes ya no vale
@@ -4929,9 +4949,10 @@ async function guardarContactoEnf(clave, datos) {
     pintarEnfermeria();
     const id = r.fila && r.fila.ID;
     const que = c.APLICACION ? (datos.reaccionTipo === 'NINGUNA' ? 'sin reacción' : `reacción inmediata: ${datos.reacciones.join(', ')}`)
-      : datos.resultado === 'CONTACTADO' ? (datos.reaccionTipo === 'NINGUNA' ? 'contactado, sin reacción' : `contactado, reacción ${TIPO_REAC[datos.reaccionTipo].toLowerCase()}: ${datos.reacciones.join(', ')}`) : 'no contestó';
+      : datos.resultado === 'CONTACTADO' ? (datos.reaccionTipo === 'NINGUNA' ? 'contactado, sin reacción' : `contactado, reacción ${TIPO_REAC[datos.reaccionTipo].toLowerCase()}: ${datos.reacciones.join(', ')}`)
+      : cierra ? `no contestó: queda «No respondió» (${c.NO_CONTESTO + 1} intentos)` : 'no contestó';
     avisar(`Guardado: ${nombre} · ${diaTexto(c.DIA).toLowerCase()} · ${que}.`, id ? { texto: 'Deshacer', fn: () => deshacerEnf(id, quien, nombre) } : null);
-    if (datos.resultado === 'CONTACTADO') { const sig = $('#enf-cuerpo [data-enf-ya]'); if (sig) sig.focus({ preventScroll: true }); }
+    if (datos.resultado === 'CONTACTADO' || cierra) { const sig = $('#enf-cuerpo [data-enf-ya]'); if (sig) sig.focus({ preventScroll: true }); }
   } catch (e) {
     EN.lista = antes; EN.enVuelo = '';
     if (datos.resultado === 'CONTACTADO') EN.abierto = clave;
@@ -5185,7 +5206,7 @@ const DEMO = (() => {
   /* ---- Enfermería (Enfermeria.gs): contactos a los días 1, 3 y 5 de cada sesión de hierro y la hoja ENFERMERIA ---- */
   const REACCIONES = ['Náuseas', 'Vómitos', 'Cefalea', 'Mareo', 'Dolor en la zona de punción', 'Flebitis', 'Enrojecimiento o picazón',
     'Erupción en la piel', 'Hipotensión', 'Palpitaciones', 'Fiebre', 'Dolor muscular o articular', 'Sabor metálico', 'Otra'];
-  const DIAS_ENF = [1, 3, 5], CORTE_ENF = 10;
+  const DIAS_ENF = [1, 3, 5], CORTE_ENF = 10, MAX_ENF = 2;   // MAX_ENF: REGLAS.ENFERMERIA_MAX_INTENTOS
   const enfermeria = [];
   const idEnf = () => siguiente(enfermeria, 'ENF');
   const ENFR = (FECHA_HORA, ID_SESION, ID_REGISTRO, NUMERO_SESION, DNI, DIA, RESULTADO, REACCION_TIPO, REACCION, NOTA) =>
@@ -5219,10 +5240,12 @@ const DEMO = (() => {
         if (fecha < desde || fecha > hasta) return;
         const delDia = filas.filter(f => f.DIA === dia);
         if (delDia.some(f => f.RESULTADO === 'CONTACTADO')) return;
+        // Como noRespondioEnfermeria: MAX_ENF «No contestó» vivos dejan el día «No respondió» (sale de la lista).
+        if (dia !== 0 && delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length >= MAX_ENF) return;
         out.push({ CLAVE: x.ID + '|' + dia, ID_REGISTRO: r.ID, ID_SESION: x.ID, NUMERO_SESION: Number(x.NUMERO), DNI: r.DNI, NOMBRE: r.NOMBRE,
           TELEFONOS: tel.length === 9 ? tel : '', USUARIO: tel.length === 9 ? '' : r.CONTACTO, TRATAMIENTO: frase(r.DETALLE), MARCA: frase(r.MARCA),
           SESIONES: Number(r.SESIONES), FECHA_SESION: x.FECHA, DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
-          NO_CONTESTO: delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length, APLICACION: dia === 0, REACCIONES: reacciones });
+          NO_CONTESTO: delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length, APLICACION: dia === 0, MAX_INTENTOS: MAX_ENF, REACCIONES: reacciones });
       });
     });
     return out.sort((a, b) => a.FECHA < b.FECHA ? -1 : a.FECHA > b.FECHA ? 1 : a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : a.CLAVE < b.CLAVE ? -1 : 1);
@@ -5658,7 +5681,7 @@ const DEMO = (() => {
       especialidades: [...new Set(series.map(x => x.ESPECIALIDAD).concat(antiguas.map(x => x.ESPECIALIDAD_CONSULTA)))].sort(),
       medicos: [...new Set(series.concat(antiguas).map(x => x.MEDICO_ULTIMO))].sort(),
       doctores, procedimientos, tratamientos, marcas, reacciones: REACCIONES.slice(),
-      reglas: Object.assign({ diasEnfermeria: DIAS_ENF.slice(), corteEnfermeria: CORTE_ENF }, reglas)
+      reglas: Object.assign({ diasEnfermeria: DIAS_ENF.slice(), corteEnfermeria: CORTE_ENF, maxIntentosEnfermeria: MAX_ENF }, reglas)
     }),
 
     getEnfermeria: () => ({ hoy, contactos: contactosDemo(), reacciones: REACCIONES.slice(), dias: DIAS_ENF.slice() }),
@@ -6268,12 +6291,13 @@ const DEMO = (() => {
 
     // Una fila por mes y médico, como resumenPorMes. Setiembre está en curso (NUEVOS_CURSO y CONTROL_CURSO).
     getResumen: () => {
-      // Enfermería (cifrasEnfermeria): [pacientes con reacción, con inmediata, con mediata, contactos que ya tocaban, a tiempo].
-      const ENF = { ['2026-09|' + ELI]: [2, 1, 2, 12, 9], ['2026-09|' + KAREN]: [1, 0, 1, 6, 5], ['2026-08|' + ELI]: [1, 1, 0, 9, 5] };
-      const r = (MES, MEDICO, v) => { const e = ENF[MES + '|' + MEDICO] || [0, 0, 0, 0, 0];
+      // Enfermería (cifrasEnfermeria): [pacientes con reacción, con inmediata, con mediata, contactos que ya tocaban, a tiempo,
+      // no respondieron (ENFERMERIA_MAX_INTENTOS «No contestó»)].
+      const ENF = { ['2026-09|' + ELI]: [2, 1, 2, 12, 9, 1], ['2026-09|' + KAREN]: [1, 0, 1, 6, 5, 1], ['2026-08|' + ELI]: [1, 1, 0, 9, 5, 0] };
+      const r = (MES, MEDICO, v) => { const e = ENF[MES + '|' + MEDICO] || [0, 0, 0, 0, 0, 0];
         return { MES, MEDICO, NUEVOS: v[0], NUEVOS_NO: v[1], NUEVOS_CURSO: v[2], NUEVOS_ALTA: v[12] || 0, CONTROL: v[3],
           CONTROL_NO: v[4], CONTROL_CURSO: v[5], CONTROL_ALTA: v[13] || 0, HIERRO: v[6], HIERRO_NO: v[7], HIERRO_COMPLETO: v[14] || 0,
-          PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11], REAC_PAC: e[0], REAC_INM: e[1], REAC_MED: e[2], ENF_DEBIDOS: e[3], ENF_A_TIEMPO: e[4] }; };
+          PROC: v[8], PROC_NO: v[9], SEGUIMIENTOS: v[10], RECUPERADOS: v[11], REAC_PAC: e[0], REAC_INM: e[1], REAC_MED: e[2], ENF_DEBIDOS: e[3], ENF_A_TIEMPO: e[4], ENF_NO_RESPONDIO: e[5] }; };
       return { hoy, meta: reglas.metaRetorno, metaTratamiento: reglas.metaTratamiento, medicos: [ELI, HANAMPA, KAREN], filas: [
         r('2026-09', ELI, [30, 2, 20, 25, 3, 15, 12, 5, 3, 2, 10, 4, 0, 0, 5]),
         r('2026-09', HANAMPA, [6, 0, 5, 4, 1, 2, 0, 0, 0, 0, 2, 1]),

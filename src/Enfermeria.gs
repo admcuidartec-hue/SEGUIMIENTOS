@@ -93,7 +93,7 @@ function contactosEnfermeria(d) {
       out.push({
         CLAVE: s.ID + '|' + dia, ID_REGISTRO: r.ID, ID_SESION: s.ID, NUMERO_SESION: Number(s.NUMERO) || 0, DNI: dni,
         NOMBRE: textoLimpio_(r.NOMBRE), TELEFONOS: tel.join(' / '), USUARIO: contacto.length === 9 ? '' : textoLimpio_(r.CONTACTO),
-        TRATAMIENTO: frase_(r.DETALLE), MARCA: frase_(r.MARCA), SESIONES: Number(r.SESIONES) || 1, FECHA_SESION: fechaSes,
+        TRATAMIENTO: frase_(r.DETALLE), MARCA: frase_(r.MARCA), ORIGEN_HIERRO: origenHierro(r), SESIONES: Number(r.SESIONES) || 1, FECHA_SESION: fechaSes,
         DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
         NO_CONTESTO: delDia.filter(function (f) { return normTexto(f.RESULTADO) === 'NO CONTESTO'; }).length,
         APLICACION: dia === 0, MAX_INTENTOS: max,

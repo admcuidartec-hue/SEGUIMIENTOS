@@ -44,7 +44,21 @@ test('validarRegistro: procedimiento y tratamiento en un formulario son dos fila
     { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987654321',
       MARCA: '', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', SESIONES: 1 },
     { FECHA: '2026-10-04', ASESORA: 'MAGALY', DOCTOR: 'Dr. Elí Cabanillas', NOMBRE: 'ROSA QUISPE', DNI: '40111222', CONTACTO: '987654321',
-      MARCA: 'FERINJECT', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', SESIONES: 3 }]);
+      MARCA: 'FERINJECT', ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA', SESIONES: 3,
+      ORIGEN_HIERRO: 'CHP' }]);
+});
+
+test('hierro propio del paciente: ORIGEN_HIERRO = PACIENTE solo en la fila de hierro; CHP por omisión y en las filas antiguas', () => {
+  const r = plano(L.validarRegistro(base({ procedimiento: 'AMO', tratamiento: 'HIERRO SACARATO', sesiones: '2', origenHierro: 'paciente' }), CAT, HOY));
+  assert.equal(r.error, '');
+  assert.deepEqual(r.filas.map(f => [f.TIPO, f.ORIGEN_HIERRO]), [['PROCEDIMIENTO', undefined], ['HIERRO', 'PACIENTE']]);
+  assert.equal(plano(L.validarRegistro(base({ tratamiento: 'HIERRO SACARATO', sesiones: '2', origenHierro: 'CHP' }), CAT, HOY)).filas[0].ORIGEN_HIERRO, 'CHP');
+  assert.match(L.validarRegistro(base({ tratamiento: 'HIERRO SACARATO', sesiones: '2', origenHierro: 'FARMACIA' }), CAT, HOY).error, /origen del hierro/);
+  assert.deepEqual(['', 'chp', 'PACIENTE', 'Paciente', 'otro'].map(x => L.origenHierro({ TIPO: 'HIERRO', ORIGEN_HIERRO: x })), ['CHP', 'CHP', 'PACIENTE', 'PACIENTE', 'CHP']);
+  assert.equal(L.origenHierro({ TIPO: 'PROCEDIMIENTO', ORIGEN_HIERRO: 'PACIENTE' }), '', 'un procedimiento no tiene origen');
+  // El texto del registro lo dice (tarjeta, panel, ficha, Registrados y BITACORA).
+  assert.equal(L.textoRegistro({ TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', SESIONES: 2, ORIGEN_HIERRO: 'PACIENTE' }), 'Hierro sacarato × 2 sesiones · hierro propio');
+  assert.equal(L.textoRegistro({ TIPO: 'HIERRO', DETALLE: 'HIERRO SACARATO', SESIONES: 2 }), 'Hierro sacarato × 2 sesiones');
 });
 
 test('validarRegistro rechaza lo que no se puede guardar', () => {
@@ -300,6 +314,20 @@ test('resumenPorMes: altas aparte y hierro completado', () => {
   assert.deepEqual([jul.NUEVOS, jul.NUEVOS_NO, jul.NUEVOS_ALTA, jul.HIERRO, jul.HIERRO_NO, jul.HIERRO_COMPLETO], [2, 1, 1, 2, 0, 1]);
 });
 
+test('hierro propio: viaja en las indicaciones y en la tarjeta; el Resumen del mes cuenta HIERRO_PROPIO sin cambiar el cumplimiento', () => {
+  const R = reglas(L);
+  const r = [reg({ ID: 'REG-000001', FECHA: '2026-09-20', ORIGEN_HIERRO: 'PACIENTE' }), reg({ ID: 'REG-000002', DNI: '40111223', FECHA: '2026-09-21' }),
+    reg({ ID: 'REG-000003', DNI: '40111224', FECHA: '2026-09-22', TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA', SESIONES: '1' })];
+  const inds = plano(L.indicacionesDeRegistros(r, [], CAT, R, HOY));
+  assert.deepEqual(inds.map(x => [x.ID, x.ORIGEN_HIERRO]), [['REG-000001', 'PACIENTE'], ['REG-000002', 'CHP'], ['REG-000003', '']]);
+  const sep = plano(L.resumenPorMes([cita({ fecha: '2026-09-01' })], inds, [], R, HOY)).find(x => x.MES === '2026-09' && x.MEDICO === 'Dr. ELÍ FABRIZIO CABANILLAS HUALPA');
+  assert.deepEqual([sep.HIERRO, sep.HIERRO_PROPIO, sep.HIERRO_NO], [2, 1, 2], 'los dos cuentan en el cumplimiento; uno es propio');
+  const pend = plano(L.pendientesRegistro({ registros: r, sesiones: [], seguimientos: [], citas: [cita({ fecha: '2026-09-01' })], reglas: R, hoy: HOY,
+    telefonos: {}, catalogos: CAT2 }));
+  assert.deepEqual(pend.map(x => [x.ID_REGISTRO, x.ORIGEN_HIERRO, x.DETALLE]), [['REG-000001', 'PACIENTE', 'Hierro carboximaltosa · Ferinject × 3 sesiones · hierro propio'],
+    ['REG-000002', 'CHP', 'Hierro carboximaltosa · Ferinject × 3 sesiones'], ['REG-000003', '', 'Sangría']]);
+});
+
 test('no realizado: un programado rechazado (cierre) o que no vino pasada la gracia cuenta como «no siguió» / «no realizado»', () => {
   const R = reglas(L);   // gracia 2 días
   const segNo = (id, f, res) => ({ ID: 'SEG-' + id + f, FECHA_HORA: f + ' 10:00', DNI: '40111222', ESPECIALIDAD: 'HIERRO', RESPONSABLE: 'MAGALY',
@@ -518,6 +546,16 @@ test('contacto: un teléfono se guarda sin espacios ni signos, al registrar y al
   assert.deepEqual(v({ contacto: '912 000-111' }).cambios, { CONTACTO: '912000111' });
   assert.deepEqual(v({ contacto: '@rosa.q' }).cambios, { CONTACTO: '@rosa.q' });
   assert.match(v({ contacto: '  ' }).error, /teléfono o usuario/);
+});
+
+test('validarEdicionRegistro: el origen del hierro se edita (CHP ↔ PACIENTE); vacío equivale a CHP; solo en hierro', () => {
+  const v = (r, c) => plano(L.validarEdicionRegistro(r, c, [], CAT3, '2026-10-09'));
+  assert.deepEqual(v(REGH(), { origenHierro: 'PACIENTE' }), { error: '', cambios: { ORIGEN_HIERRO: 'PACIENTE' }, antes: { ORIGEN_HIERRO: '' } });
+  assert.deepEqual(v(REGH(), { origenHierro: 'CHP' }).cambios, {}, 'una fila antigua sin valor ya es CHP');
+  assert.deepEqual(v(REGH({ ORIGEN_HIERRO: 'PACIENTE' }), { origenHierro: 'CHP' }).cambios, { ORIGEN_HIERRO: 'CHP' });
+  assert.match(v(REGH(), { origenHierro: 'X' }).error, /origen del hierro/);
+  assert.match(v(REGH({ TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA' }), { origenHierro: 'PACIENTE' }).error, /Solo un hierro/);
+  assert.deepEqual(v(REGH({ TIPO: 'PROCEDIMIENTO', DETALLE: 'SANGRÍA' }), { origenHierro: '' }).cambios, {}, 'el formulario lo manda vacío en un procedimiento');
 });
 
 test('validarEdicionRegistro: al cambiar el tratamiento sin enviar la marca, la marca se revalida', () => {

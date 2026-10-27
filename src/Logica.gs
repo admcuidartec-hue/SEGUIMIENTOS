@@ -1342,8 +1342,10 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
     if (!grupos[g]) {
       var previa = i.DNI ? ultimaAntesDe_(porDni[i.DNI], i.FECHA) : null;
       grupos[g] = { mes: mesDe(i.FECHA), tipo: i.TIPO, dni: i.DNI, primera: i.FECHA,
-        medico: i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO', acepto: false, completo: false };
+        medico: i.MEDICO_SOLICITANTE || (previa ? previa.MEDICO : '') || 'SIN MÉDICO', acepto: false, completo: false, propio: false };
     }
+    // Hierro propio del paciente (Registro, ORIGEN_HIERRO): se cuenta aparte; el cumplimiento incluye a los dos.
+    if (i.ORIGEN_HIERRO === 'PACIENTE') grupos[g].propio = true;
     if (i.FECHA < grupos[g].primera) grupos[g].primera = i.FECHA;
     if (i.ESTADO === 'ACEPTÓ' && !i.NO_REALIZADO) { grupos[g].acepto = true; if (i.COMPLETO !== 'NO') grupos[g].completo = true; }
   });
@@ -1356,6 +1358,7 @@ function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
     f[campo]++;
     if (!siguio) f[campo + '_NO']++;
     if (campo === 'HIERRO' && siguio && completo) f.HIERRO_COMPLETO++;
+    if (campo === 'HIERRO' && g.propio) f.HIERRO_PROPIO++;
   });
 
   // Seguimientos hechos y cuántos volvieron.

@@ -30,7 +30,7 @@ function hojasBase_() {
     BITACORA: COLUMNAS_BITACORA.concat([COLUMNA_OP]),
     CONTACTOS_CRM: COLUMNAS_CONTACTOS,
     KPI: ['RETORNO POR COHORTE'],
-    REGISTROS: COLUMNAS_REGISTROS.concat([COLUMNA_OP]),
+    REGISTROS: conTrasOp_('REGISTROS', COLUMNAS_REGISTROS),
     SESIONES: COLUMNAS_SESIONES.concat([COLUMNA_OP]),
     ALTAS: COLUMNAS_ALTAS.concat([COLUMNA_OP]),
     ENFERMERIA: COLUMNAS_ENFERMERIA.concat([COLUMNA_OP])
@@ -70,13 +70,14 @@ var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES'
 function ampliarHojas_() {
   var ss = ss_(), cambios = [];
 
-  // Sus columnas nuevas, siempre al final, y después la columna OP (idempotencia: el reintento de una operación no la repite).
+  // Sus columnas nuevas, siempre al final, y después la columna OP (idempotencia: el reintento de una operación no la repite) y las
+  // que llegaron después de ella (COLUMNAS_TRAS_OP: ORIGEN_HIERRO en REGISTROS).
   // Se buscan por nombre (revisarEncabezado): con columnas movidas o en otra grafía se agrega igual lo que falta y se avisa; con
   // una columna renombrada o repetida no se agrega nada (quedaría la misma columna dos veces).
   hojasConOp_().forEach(function (par) {
     var sh = ss.getSheetByName(par[0]);
     if (!sh) return;
-    var cab = encabezadoCrudo_(sh), rev = revisarEncabezado(cab, par[1].concat([COLUMNA_OP]));
+    var cab = encabezadoCrudo_(sh), rev = revisarEncabezado(cab, conTrasOp_(par[0], par[1]));
     var avisos = lineasEncabezado(par[0], rev).filter(function (l) { return /^[✗⚠]/.test(l) && !/^✗ A /.test(l); });
     if (rev.faltan.length && !rev.extra.length && !rev.repetidas.length) {
       sh.getRange(1, cab.length + 1, 1, rev.faltan.length).setValues([rev.faltan]).setFontWeight('bold');
@@ -441,7 +442,7 @@ function verificar() {
   // El encabezado de cada hoja que la app escribe: columnas que faltan, renombradas, repetidas, movidas o con otra grafía.
   hojasConOp_().concat([['INDICACIONES', COLUMNAS_INDICACIONES, true]]).forEach(function (par) {
     var s = ss.getSheetByName(par[0]);
-    if (s) lineasEncabezado(par[0], revisarEncabezado(encabezadoCrudo_(s), par[2] ? par[1] : par[1].concat([COLUMNA_OP])))
+    if (s) lineasEncabezado(par[0], revisarEncabezado(encabezadoCrudo_(s), par[2] ? par[1] : conTrasOp_(par[0], par[1])))
       .forEach(function (l) { lineas.push(l); });
   });
   // Lo que quedó vivo de un registro que se deshizo por un fallo (y falló también deshacerlo): se anula en la ficha (caso 7).

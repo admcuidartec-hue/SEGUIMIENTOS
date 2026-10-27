@@ -188,3 +188,10 @@ test('noRespondioEnfermeria y cifrasEnfermeria: «no respondieron» cuenta como 
     hoy: HOY, reglas: R, catalogos: CAT }));
   assert.deepEqual(c['2026-10|Dra. KAREN DIANA MATOS PEÑA'], { REAC_PAC: 0, REAC_INM: 0, REAC_MED: 0, ENF_DEBIDOS: 3, ENF_A_TIEMPO: 0, ENF_NO_RESPONDIO: 1 });
 });
+
+test('contactosEnfermeria: la enfermera llama también al hierro propio del paciente, y la fila lo dice', () => {
+  const c = contactos({ registros: [REG('REG-000001', { ORIGEN_HIERRO: 'PACIENTE' })] });
+  assert.equal(c.length, 4, 'aplicación y días 1, 3 y 5, como un hierro del CHP');
+  assert.deepEqual([...new Set(c.map(x => x.ORIGEN_HIERRO))], ['PACIENTE']);
+  assert.deepEqual([...new Set(contactos().map(x => x.ORIGEN_HIERRO))], ['CHP'], 'sin valor: CHP');
+});

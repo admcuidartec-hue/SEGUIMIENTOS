@@ -423,7 +423,7 @@ function bootstrap() {
     reglas: { espera: d.reglas.espera, maxSeguimientos: d.reglas.maxSeguimientos, graciaAgenda: d.reglas.graciaAgenda,
       diasEntreSesiones: d.reglas.diasEntreSesiones, esperaCotizacion: d.reglas.esperaCotizacion,
       metaRetorno: d.reglas.metaRetorno, metaTratamiento: d.reglas.metaTratamiento, metaDiaria: d.reglas.metaDiaria,
-      diasEnfermeria: d.reglas.diasEnfermeria, corteEnfermeria: d.reglas.corteEnfermeria,
+      diasEnfermeria: d.reglas.diasEnfermeria, corteEnfermeria: d.reglas.corteEnfermeria, maxIntentosEnfermeria: d.reglas.maxIntentosEnfermeria,
       postTratamiento: d.reglas.postTratamiento, controlLab: d.reglas.controlLab, avisoAltaControl: d.reglas.avisoAltaControl }
   });
 }

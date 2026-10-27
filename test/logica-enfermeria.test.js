@@ -74,9 +74,9 @@ test('contactosEnfermeria: sesión + 1, + 3 y + 5 días, en orden de llamada (ve
 
 test('contactosEnfermeria: «contactado» lo cumple; «no contestó» lo deja con su cuenta; las anuladas no cuentan', () => {
   const c = contactos({ enfermeria: [ENF('ENF-000001', 'SES-000001', 1, 'CONTACTADO', { REACCION_TIPO: 'MEDIATA', REACCION: 'Cefalea · Náuseas' }),
-    ENF('ENF-000002', 'SES-000001', 3, 'NO CONTESTO'), ENF('ENF-000003', 'SES-000001', 3, 'NO CONTESTO'),
+    ENF('ENF-000002', 'SES-000001', 3, 'NO CONTESTO'), ENF('ENF-000003', 'SES-000001', 3, 'NO CONTESTO', { ANULADO: 'SÍ' }),
     ENF('ENF-000004', 'SES-000001', 5, 'CONTACTADO', { ANULADO: 'SÍ' })] }).filter(x => !x.APLICACION);
-  assert.deepEqual(c.map(x => [x.DIA, x.NO_CONTESTO]), [[3, 2], [5, 0]]);
+  assert.deepEqual(c.map(x => [x.DIA, x.NO_CONTESTO, x.MAX_INTENTOS]), [[3, 1, 2], [5, 0, 2]]);
   assert.deepEqual(c[0].REACCIONES, [{ DIA: 1, TIPO: 'MEDIATA', REACCION: 'Cefalea · Náuseas' }], 'la reacción de un contacto previo de esa sesión');
   // La reacción durante la aplicación (DIA 0) también se muestra.
   const a = contactos({ enfermeria: [ENF('ENF-000005', 'SES-000001', 0, 'CONTACTADO', { REACCION_TIPO: 'INMEDIATA', REACCION: 'Mareo' })] });
@@ -149,10 +149,42 @@ test('cifrasEnfermeria: pacientes con reacción por tipo y contactos a tiempo, p
   const c = plano(L.cifrasEnfermeria({ registros: regs, sesiones: ses, enfermeria: enf, hoy: HOY, reglas: R, catalogos: CAT }));
   const oct = c['2026-10|Dra. KAREN DIANA MATOS PEÑA'];
   // Octubre: 2 sesiones × 3 días; ya tocaban (hasta hoy, 10/10) los 6; a tiempo: SES-1 día 1 y SES-2 día 1.
-  assert.deepEqual(oct, { REAC_PAC: 2, REAC_INM: 1, REAC_MED: 2, ENF_DEBIDOS: 6, ENF_A_TIEMPO: 2 });
-  assert.deepEqual(c['2026-09|Dra. KAREN DIANA MATOS PEÑA'], { REAC_PAC: 0, REAC_INM: 0, REAC_MED: 0, ENF_DEBIDOS: 3, ENF_A_TIEMPO: 0 });
+  assert.deepEqual(oct, { REAC_PAC: 2, REAC_INM: 1, REAC_MED: 2, ENF_DEBIDOS: 6, ENF_A_TIEMPO: 2, ENF_NO_RESPONDIO: 0 });
+  assert.deepEqual(c['2026-09|Dra. KAREN DIANA MATOS PEÑA'], { REAC_PAC: 0, REAC_INM: 0, REAC_MED: 0, ENF_DEBIDOS: 3, ENF_A_TIEMPO: 0, ENF_NO_RESPONDIO: 0 });
   const filas = plano(L.resumenConEnfermeria([{ MES: '2026-10', MEDICO: 'Dra. KAREN DIANA MATOS PEÑA', HIERRO: 2 }], c));
   assert.equal(filas.find(f => f.MES === '2026-10').ENF_A_TIEMPO, 2);
   assert.equal(filas.find(f => f.MES === '2026-09').ENF_DEBIDOS, 3, 'un mes sin fila en el resumen se agrega');
-  assert.ok(plano(L.CAMPOS_RESUMEN).slice(-5).join() === 'REAC_PAC,REAC_INM,REAC_MED,ENF_DEBIDOS,ENF_A_TIEMPO', 'campos nuevos al final');
+  assert.ok(plano(L.CAMPOS_RESUMEN).slice(-7, -2).join() === 'REAC_PAC,REAC_INM,REAC_MED,ENF_DEBIDOS,ENF_A_TIEMPO', 'campos nuevos al final');
+});
+
+/* ---------------- C. Cierre automático tras ENFERMERIA_MAX_INTENTOS «No contestó» ---------------- */
+
+test('reglas: ENFERMERIA_MAX_INTENTOS (2 por omisión, al menos 1)', () => {
+  assert.equal(R.maxIntentosEnfermeria, 2);
+  assert.equal(L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], [['ENFERMERIA_MAX_INTENTOS', 3]]).maxIntentosEnfermeria, 3);
+  assert.equal(L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], [['ENFERMERIA_MAX_INTENTOS', 0]]).maxIntentosEnfermeria, 2, 'cero no vale');
+});
+
+test('contactosEnfermeria: con 2 «No contestó» vivos el día deja de estar pendiente; los días siguientes siguen; anular uno lo devuelve', () => {
+  const nc = (id, dia, o) => ENF(id, 'SES-000001', dia, 'NO CONTESTO', o);
+  const uno = contactos({ enfermeria: [nc('ENF-000001', 1)] }).filter(x => !x.APLICACION);
+  assert.deepEqual(uno.map(x => [x.DIA, x.NO_CONTESTO]), [[1, 1], [3, 0], [5, 0]], 'tras el primero sigue en la lista');
+  const dos = contactos({ enfermeria: [nc('ENF-000001', 1), nc('ENF-000002', 1)] }).filter(x => !x.APLICACION);
+  assert.deepEqual(dos.map(x => x.DIA), [3, 5], 'el día 1 queda «No respondió»; el 3 y el 5 aparecen en su fecha');
+  const anulado = contactos({ enfermeria: [nc('ENF-000001', 1), nc('ENF-000002', 1, { ANULADO: 'SÍ' })] }).filter(x => !x.APLICACION);
+  assert.deepEqual(anulado.map(x => [x.DIA, x.NO_CONTESTO]), [[1, 1], [3, 0], [5, 0]], 'anular el último lo devuelve a pendiente');
+  const tres = contactos({ reglas: Object.assign({}, R, { maxIntentosEnfermeria: 3 }), enfermeria: [nc('ENF-000001', 1), nc('ENF-000002', 1)] });
+  assert.equal(tres.filter(x => x.DIA === 1)[0].NO_CONTESTO, 2, 'con 3 intentos aún sigue');
+  // Un contacto con un «No contestó» y después «Contactado» se cumple como siempre (no cuenta como no respondió).
+  assert.deepEqual(contactos({ enfermeria: [nc('ENF-000001', 1), ENF('ENF-000002', 'SES-000001', 1, 'CONTACTADO')] }).filter(x => !x.APLICACION).map(x => x.DIA), [3, 5]);
+});
+
+test('noRespondioEnfermeria y cifrasEnfermeria: «no respondieron» cuenta como no logrado a tiempo', () => {
+  const nc = (id, ses, dia, o) => ENF(id, ses, dia, 'NO CONTESTO', o);
+  const enf = [nc('ENF-1', 'SES-000001', 1), nc('ENF-2', 'SES-000001', 1), nc('ENF-3', 'SES-000001', 3), nc('ENF-4', 'SES-000001', 5),
+    nc('ENF-5', 'SES-000001', 5, { ANULADO: 'SÍ' })];
+  assert.deepEqual(plano(L.noRespondioEnfermeria(L.filasDeSesion_(enf, 'SES-000001'), 2)), { 1: 2 }, 'día 1 con dos intentos; el 3 y el 5 con uno');
+  const c = plano(L.cifrasEnfermeria({ registros: [REG('REG-000001')], sesiones: [SES('SES-000001', 'REG-000001', 1, '2026-10-01')], enfermeria: enf,
+    hoy: HOY, reglas: R, catalogos: CAT }));
+  assert.deepEqual(c['2026-10|Dra. KAREN DIANA MATOS PEÑA'], { REAC_PAC: 0, REAC_INM: 0, REAC_MED: 0, ENF_DEBIDOS: 3, ENF_A_TIEMPO: 0, ENF_NO_RESPONDIO: 1 });
 });

@@ -166,7 +166,7 @@ test('un campo motivo del payload nuevo no cambia MOTIVO de un resultado normal'
 test('bootstrap: reglas con las trece claves y metaDiaria 15; getPaciente trae telefonos', () => {
   const { ctx } = servidor();
   const b = plano(ctx.bootstrap());
-  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl', 'metaTratamiento', 'diasEnfermeria', 'corteEnfermeria'].sort());
+  assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl', 'metaTratamiento', 'diasEnfermeria', 'corteEnfermeria', 'maxIntentosEnfermeria'].sort());
   assert.equal(b.reglas.metaDiaria, 15);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).telefonos, ['987654321', '912345678']);
 });

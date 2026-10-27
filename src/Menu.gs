@@ -62,8 +62,9 @@ var CATALOGO_REGISTRO_INICIAL = {
 
 var PARAMETROS_REGISTRO = [['ESPERA_COTIZACION_DIAS', 7], ['DIAS_ENTRE_SESIONES', 7], ['GRACIA_AGENDA_DIAS', 2], ['META_DIARIA_SEGUIMIENTOS', 15],
   ['DIAS_POST_TRATAMIENTO', 30], ['DIAS_CONTROL_LAB', 15], ['AVISO_ALTA_CONTROL_DIAS', 30], ['META_CUMPLIMIENTO_TRATAMIENTO_PCT', 95],
-  // Enfermería: días tras cada sesión de hierro para llamar, y cuántos días atrás todavía se muestra un contacto.
-  ['ENFERMERIA_DIAS', '1,3,5'], ['ENFERMERIA_CORTE_DIAS', 10]];
+  // Enfermería: días tras cada sesión de hierro para llamar, cuántos días atrás todavía se muestra un contacto y cuántos
+  // «No contestó» lo dejan «No respondió» (sale de la lista).
+  ['ENFERMERIA_DIAS', '1,3,5'], ['ENFERMERIA_CORTE_DIAS', 10], ['ENFERMERIA_MAX_INTENTOS', 2]];
 
 /** Lo que la pestaña Registro necesita en hojas que ya existen. No borra ni mueve nada. Devuelve qué cambió. */
 function ampliarHojas_() {

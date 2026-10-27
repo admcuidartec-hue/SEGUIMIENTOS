@@ -310,7 +310,8 @@ function reglasDesdeFilas(encabezado, filas) {
   var idx = indiceDeEncabezado(encabezado);
   var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60,
     esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15,
-    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30, metaTratamiento: 95, diasEnfermeria: [1, 3, 5], corteEnfermeria: 10 };
+    postTratamiento: 30, controlLab: 15, avisoAltaControl: 30, metaTratamiento: 95, diasEnfermeria: [1, 3, 5], corteEnfermeria: 10,
+    maxIntentosEnfermeria: 2 };
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   (filas || []).forEach(function (f) {
     var esp = normTexto(celda(f, 'ESPECIALIDAD'));
@@ -335,6 +336,7 @@ function reglasDesdeFilas(encabezado, filas) {
       if (dias.length) r.diasEnfermeria = dias.filter(function (n, i) { return dias.indexOf(n) === i; }).sort(function (a, b) { return a - b; });
     }
     if (par === 'ENFERMERIA_CORTE_DIAS') r.corteEnfermeria = entero_(val, 10);
+    if (par === 'ENFERMERIA_MAX_INTENTOS') r.maxIntentosEnfermeria = entero_(val, 2, 1);
   });
   Object.keys(r.plazos).forEach(function (k) {
     if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;
@@ -1292,7 +1294,9 @@ function calcularKpi(citas, indicaciones, seguimientos, reglas, hoy, contactos, 
 var CAMPOS_RESUMEN = ['NUEVOS', 'NUEVOS_NO', 'NUEVOS_CURSO', 'NUEVOS_ALTA', 'CONTROL', 'CONTROL_NO', 'CONTROL_CURSO', 'CONTROL_ALTA',
   'HIERRO', 'HIERRO_NO', 'HIERRO_COMPLETO', 'PROC', 'PROC_NO', 'SEGUIMIENTOS', 'RECUPERADOS',
   // Enfermería (se suman en getResumen con resumenConEnfermeria): pacientes con reacción y contactos a tiempo.
-  'REAC_PAC', 'REAC_INM', 'REAC_MED', 'ENF_DEBIDOS', 'ENF_A_TIEMPO'];
+  'REAC_PAC', 'REAC_INM', 'REAC_MED', 'ENF_DEBIDOS', 'ENF_A_TIEMPO',
+  // Contactos que quedaron «No respondió» (ENFERMERIA_MAX_INTENTOS «No contestó») y hierros que trajo el paciente (ORIGEN_HIERRO).
+  'ENF_NO_RESPONDIO', 'HIERRO_PROPIO'];
 
 function resumenPorMes(citas, indicaciones, seguimientos, reglas, hoy, altas) {
   var acc = {};

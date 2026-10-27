@@ -33,6 +33,26 @@ function filasPorSesion_(enfermeria) {
   return idx;
 }
 
+/** Cuántos «No contestó» cierran un contacto (REGLAS.ENFERMERIA_MAX_INTENTOS, 2 por omisión). */
+function maxIntentosEnfermeria_(reglas) { return (reglas && Number(reglas.maxIntentosEnfermeria) >= 1) ? Number(reglas.maxIntentosEnfermeria) : 2; }
+
+/**
+ * Los días de llamada (1, 3, 5…; nunca la «Aplicación», DIA 0, que no es una llamada) que quedaron «No respondió»: sin ningún
+ * «Contactado» y con `max` o más «No contestó» sin anular. { dia: intentos }. `filas`: las de UNA sesión, sin anuladas.
+ */
+function noRespondioEnfermeria(filas, max) {
+  var nc = {}, ok = {}, out = {};
+  (filas || []).forEach(function (f) {
+    if (anulado_(f)) return;
+    var dia = Number(f.DIA), r = normTexto(f.RESULTADO);
+    if (!dia) return;
+    if (r === 'CONTACTADO') ok[dia] = 1;
+    if (r === 'NO CONTESTO') nc[dia] = (nc[dia] || 0) + 1;
+  });
+  Object.keys(nc).forEach(function (dia) { if (!ok[dia] && nc[dia] >= max) out[dia] = nc[dia]; });
+  return out;
+}
+
 /** Las sesiones vivas de los registros de hierro vivos: [{ r, s }]. */
 function sesionesDeHierro_(registros, sesiones) {
   var vivos = {};
@@ -43,18 +63,19 @@ function sesionesDeHierro_(registros, sesiones) {
 
 /**
  * Los contactos pendientes, en orden de llamada: vencidos (el más antiguo primero), los de hoy y los de los próximos
- * DIAS_PROXIMOS_ENFERMERIA días. Uno con «CONTACTADO» ya está cumplido; los «NO CONTESTO» solo se cuentan. No entran los
+ * DIAS_PROXIMOS_ENFERMERIA días. Uno con «CONTACTADO» ya está cumplido; los «NO CONTESTO» se cuentan y, con
+ * REGLAS.ENFERMERIA_MAX_INTENTOS (2) sin anular, el día queda «No respondió» y sale de la lista. No entran los
  * de un fallecido ni los que tocaban hace más de REGLAS.ENFERMERIA_CORTE_DIAS (al publicar no debe caer una avalancha).
  */
 function contactosEnfermeria(d) {
   var hoy = d.hoy, reglas = d.reglas || {}, dias = reglas.diasEnfermeria || [1, 3, 5];
   var corte = reglas.corteEnfermeria === undefined ? 10 : reglas.corteEnfermeria;
   var desde = sumarDias(hoy, -corte), hasta = sumarDias(hoy, DIAS_PROXIMOS_ENFERMERIA), muertos = fallecidos(d.seguimientos);
-  var out = [], porSesion = filasPorSesion_(d.enfermeria);
+  var out = [], porSesion = filasPorSesion_(d.enfermeria), max = maxIntentosEnfermeria_(reglas);
   sesionesDeHierro_(d.registros, d.sesiones).forEach(function (x) {
     var r = x.r, s = x.s, dni = normDni(r.DNI);
     if (muertos[dni]) return;
-    var filas = filasDeSesion_(d.enfermeria, s.ID, porSesion), fechaSes = fechaIso(s.FECHA);
+    var filas = filasDeSesion_(d.enfermeria, s.ID, porSesion), fechaSes = fechaIso(s.FECHA), cerrados = noRespondioEnfermeria(filas, max);
     var reacciones = filas.filter(function (f) { return normTexto(f.RESULTADO) === 'CONTACTADO' && normTexto(f.REACCION_TIPO) && normTexto(f.REACCION_TIPO) !== 'NINGUNA'; })
       .sort(function (a, b) { return Number(a.DIA) - Number(b.DIA); })
       .map(function (f) { return { DIA: Number(f.DIA) || 0, TIPO: normTexto(f.REACCION_TIPO), REACCION: textoLimpio_(f.REACCION) }; });
@@ -67,13 +88,15 @@ function contactosEnfermeria(d) {
       if (fecha < desde || fecha > hasta) return;
       var delDia = filas.filter(function (f) { return Number(f.DIA) === dia; });
       if (delDia.some(function (f) { return normTexto(f.RESULTADO) === 'CONTACTADO'; })) return;
+      // ENFERMERIA_MAX_INTENTOS «No contestó»: queda «No respondió» (no logrado) y deja de estar pendiente. Anular uno lo devuelve.
+      if (cerrados[dia]) return;
       out.push({
         CLAVE: s.ID + '|' + dia, ID_REGISTRO: r.ID, ID_SESION: s.ID, NUMERO_SESION: Number(s.NUMERO) || 0, DNI: dni,
         NOMBRE: textoLimpio_(r.NOMBRE), TELEFONOS: tel.join(' / '), USUARIO: contacto.length === 9 ? '' : textoLimpio_(r.CONTACTO),
         TRATAMIENTO: frase_(r.DETALLE), MARCA: frase_(r.MARCA), SESIONES: Number(r.SESIONES) || 1, FECHA_SESION: fechaSes,
         DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
         NO_CONTESTO: delDia.filter(function (f) { return normTexto(f.RESULTADO) === 'NO CONTESTO'; }).length,
-        APLICACION: dia === 0,
+        APLICACION: dia === 0, MAX_INTENTOS: max,
         REACCIONES: reacciones
       });
     });
@@ -159,15 +182,17 @@ function validarAnulacionEnfermeria(id, filas) {
  */
 function cifrasEnfermeria(d) {
   var out = {}, pac = {}, dias = (d.reglas && d.reglas.diasEnfermeria) || [1, 3, 5], hoy = d.hoy;
-  function de(k) { return out[k] = out[k] || { REAC_PAC: 0, REAC_INM: 0, REAC_MED: 0, ENF_DEBIDOS: 0, ENF_A_TIEMPO: 0 }; }
-  var porSesion = filasPorSesion_(d.enfermeria);
+  function de(k) { return out[k] = out[k] || { REAC_PAC: 0, REAC_INM: 0, REAC_MED: 0, ENF_DEBIDOS: 0, ENF_A_TIEMPO: 0, ENF_NO_RESPONDIO: 0 }; }
+  var porSesion = filasPorSesion_(d.enfermeria), max = maxIntentosEnfermeria_(d.reglas);
   sesionesDeHierro_(d.registros, d.sesiones).forEach(function (x) {
     var r = x.r, s = x.s, fechaSes = fechaIso(s.FECHA), k = mesDe(fechaSes) + '|' + (medicoDeRegistro(r, d.catalogos || {}) || 'SIN MÉDICO');
-    var o = de(k), filas = filasDeSesion_(d.enfermeria, s.ID, porSesion), dni = normDni(r.DNI);
+    var o = de(k), filas = filasDeSesion_(d.enfermeria, s.ID, porSesion), dni = normDni(r.DNI), noResp = noRespondioEnfermeria(filas, max);
     dias.forEach(function (dia) {
       var fecha = sumarDias(fechaSes, dia);
       if (fecha > hoy) return;
       o.ENF_DEBIDOS++;
+      // «No respondió» (ENFERMERIA_MAX_INTENTOS «No contestó»): cuenta entre los debidos como no logrado, y aparte.
+      if (noResp[dia]) o.ENF_NO_RESPONDIO++;
       if (filas.some(function (f) { return Number(f.DIA) === dia && normTexto(f.RESULTADO) === 'CONTACTADO' && fechaIso(f.FECHA_HORA) <= fecha; })) o.ENF_A_TIEMPO++;
     });
     var p = pac[k] = pac[k] || {};

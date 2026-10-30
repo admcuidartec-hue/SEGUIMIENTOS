@@ -5,10 +5,13 @@
    la sesión de un registro ya tienen su hoja: se delegan en darDeAlta y marcarSesion.
    ========================================================================== */
 
-/** Solo las tarjetas abiertas (todas menos Completado) aceptan un resultado: uno tardío sobre una serie cerrada la reabriría. */
+/**
+ * Solo las tarjetas abiertas (todas menos Completado) aceptan un resultado: uno tardío sobre una serie cerrada la reabriría.
+ * Las «Recién registrados · en espera» también (29/10/2026): van con COLUMNA = POR_CONTACTAR y aceptan lo mismo.
+ */
 function tarjetasAbiertas_(d) {
-  var c = armarTablero(d).columnas;
-  return (c.POR_CONTACTAR || []).concat(c.CONTACTADO || [], c.PAGO_REALIZADO || [], c.AGENDADO || [], c.EN_TRATAMIENTO || []);
+  var tab = armarTablero(d), c = tab.columnas;
+  return (c.POR_CONTACTAR || []).concat(c.CONTACTADO || [], c.PAGO_REALIZADO || [], c.AGENDADO || [], c.EN_TRATAMIENTO || [], tab.enEspera || []);
 }
 
 function registrarResultado(p) { return registrarResultado_(p, null); }
@@ -40,8 +43,8 @@ function exigirHojaPreparada_() {
 /** Tras una escritura delegada, la tarjeta recalculada (o '' si salió del tablero), para que la app confirme el movimiento. */
 function conTarjeta_(r, clave) {
   MEMO.datos = null;
-  var tab = armarTablero(datos_()), nueva = '';
-  Object.keys(tab.columnas).forEach(function (c) { tab.columnas[c].forEach(function (x) { if (x.CLAVE === clave && !nueva) nueva = x; }); });
+  var nueva = '';
+  todasLasTarjetas(armarTablero(datos_())).forEach(function (x) { if (x.CLAVE === clave && !nueva) nueva = x; });
   var out = {};
   Object.keys(r || {}).forEach(function (k) { out[k] = r[k]; });
   out.tarjeta = nueva;
@@ -53,10 +56,8 @@ function conOpSiHay_(q, op) { if (op) q.op = op; return q; }
 
 /** La tarjeta `clave` del paciente `dni`, calculada solo con sus filas, o null si salió del tablero. */
 function tarjetaDelPaciente_(d, dni, clave) {
-  var tab = armarTablero(derivar_(soloDelPaciente_(d, dni))), nueva = null;
-  Object.keys(tab.columnas).forEach(function (c) {
-    tab.columnas[c].forEach(function (x) { if (x.CLAVE === clave && !nueva) nueva = x; });
-  });
+  var nueva = null;
+  todasLasTarjetas(armarTablero(derivar_(soloDelPaciente_(d, dni)))).forEach(function (x) { if (x.CLAVE === clave && !nueva) nueva = x; });
   return nueva;
 }
 
@@ -195,4 +196,14 @@ function anularResultado(p) {
 
 function getTablero() {
   return limpiarParaEnvio(armarTablero(datos_()));
+}
+
+/**
+ * Buscador del tablero (29/10/2026): cuando lo buscado no coincide con ninguna tarjeta, los pacientes que coinciden (hasta 5) y,
+ * de cada uno, en qué franja está o por qué no tiene tarjeta (fueraDeTablero). Solo lectura: no toma el candado ni escribe.
+ * `p` = { q } o el texto.
+ */
+function motivoFueraDeTablero(p) {
+  var d = datos_();
+  return limpiarParaEnvio(fueraDeTablero(d, armarTablero(d), p && typeof p === 'object' ? p.q : p));
 }

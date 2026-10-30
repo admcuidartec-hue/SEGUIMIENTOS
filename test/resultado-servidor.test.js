@@ -234,7 +234,9 @@ function servidorResultado(opciones) {
   const escrito = { SEGUIMIENTOS: [], REGISTROS: [], BITACORA: [] };
   const lock = { tomado: 0, flush: 0 };
   const L = cargar();
-  const base = o.conRegistroCotizado ? [{ ID: 'REG-000010', FECHA_HORA: '2026-10-01 09:00', FECHA: '2026-10-01', ASESORA: 'MAGALY',
+  // conRegistroEnEspera: el caso de Rachel (29/10/2026), cotizado ayer sin fecha de primera sesión: aún en su espera de 7 días.
+  const fReg = o.conRegistroEnEspera ? '2026-10-08' : '2026-10-01';
+  const base = o.conRegistroCotizado || o.conRegistroEnEspera ? [{ ID: 'REG-000010', FECHA_HORA: fReg + ' 09:00', FECHA: fReg, ASESORA: 'MAGALY',
     DOCTOR: 'Dra. Karen Matos', NOMBRE: 'ROSA PRUEBA', DNI: '40111222', CONTACTO: '987654321', TIPO: 'HIERRO', DETALLE: 'HIERRO CARBOXIMALTOSA',
     MARCA: 'FERINJECT', SESIONES: 1, ANULADO: '', MOTIVO_ANULACION: '', FECHA_INICIO: '', EXAMENES: '', FECHA_RETORNO: '', EDITADO: '' }] : [];
   const indicaciones = o.conCotizacionHistorial ? [{ ID: 'IND-0001', FECHA: '2026-09-20', TIPO: 'HIERRO', DETALLE: 'HIERRO', CANTIDAD: 2, ESTADO: 'COTIZÓ',
@@ -396,4 +398,45 @@ test('registrarResultado con op: el reintento de un «No contestó» cuya respue
   // Sin op (una app vieja): como antes, otro intento.
   ctx.registrarResultado(p());
   assert.equal(escrito.SEGUIMIENTOS.length, 2);
+});
+
+/* ---------- «Recién registrados · en espera» y el buscador del tablero (29/10/2026) ---------- */
+
+test('en espera: getTablero la trae aparte (enEspera) y no suma en la cifra de Por contactar', () => {
+  const { ctx } = servidorResultado({ conRegistroEnEspera: true });
+  const t = plano(ctx.getTablero());
+  assert.deepEqual(t.columnas.POR_CONTACTAR, []);
+  assert.deepEqual([t.cifras.porContactar, t.cifras.enEspera], [0, 1]);
+  assert.deepEqual(t.enEspera.map(x => [x.CLAVE, x.EN_ESPERA, x.ETIQUETA]), [['REG-000010', true, 'Cotizó hace 1 día · se le escribe desde el 15/10']]);
+});
+
+test('en espera: acepta «Pagó», «No contestó», «Aceptó» y «No desea realizarse», como una tarjeta de Por contactar', () => {
+  const pedir = (o, res) => plano(o.ctx.registrarResultado(Object.assign({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010' }, res)));
+  const pago = servidorResultado({ conRegistroEnEspera: true });
+  const r1 = pedir(pago, { resultado: 'PAGO', fecha: '2026-10-09' });
+  assert.deepEqual([r1.tarjeta.COLUMNA, r1.tarjeta.EN_ESPERA], ['PAGO_REALIZADO', undefined]);
+  const nc = servidorResultado({ conRegistroEnEspera: true });
+  const r2 = pedir(nc, { resultado: 'NO CONTESTÓ' });
+  assert.equal(r2.tarjeta.COLUMNA, 'CONTACTADO', '«No contestó» adelanta el ciclo');
+  const ac = servidorResultado({ conRegistroEnEspera: true });
+  ac.ctx.actualizarCeldas_ = () => {};
+  ac.ctx.leerRegistros_ = () => { const r = ac.ctx.datos_().registros; return r; };
+  const r3 = pedir(ac, { resultado: 'ACEPTÓ', fecha: '2026-10-12' });
+  assert.equal(ac.escrito.SEGUIMIENTOS[0].RESULTADO, 'ACEPTÓ');
+  assert.ok(r3.ok);
+  const nd = servidorResultado({ conRegistroEnEspera: true });
+  const r4 = pedir(nd, { resultado: 'NO DESEA REALIZARSE', motivo: 'Lo pensó mejor' });
+  assert.deepEqual([nd.escrito.SEGUIMIENTOS[0].RESULTADO, r4.tarjeta], ['NO DESEA REALIZARSE', '']);
+});
+
+test('motivoFueraDeTablero: solo lectura; encuentra al de espera y explica al que no tiene tarjeta', () => {
+  const { ctx, escrito, lock } = servidorResultado({ conRegistroEnEspera: true });
+  const r = plano(ctx.motivoFueraDeTablero({ q: '040111222' }));
+  assert.deepEqual(r.pacientes.map(x => [x.DNI, x.EN_TABLERO, x.FRANJAS]), [['40111222', true, ['Por contactar · Recién registrados · en espera']]]);
+  assert.deepEqual(plano(ctx.motivoFueraDeTablero('nadie así')).pacientes, []);
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, escrito.BITACORA.length, lock.tomado], [0, 0, 0]);
+  // Cerrado: el motivo.
+  ctx.registrarResultado({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010', resultado: 'SIN CONTACTO' });
+  const c = plano(ctx.motivoFueraDeTablero({ q: 'rosa prueba' })).pacientes[0];
+  assert.deepEqual([c.EN_TABLERO, c.MOTIVOS], [false, ['seguimiento cerrado de su hierro: Sin contacto válido (09/10)']]);
 });

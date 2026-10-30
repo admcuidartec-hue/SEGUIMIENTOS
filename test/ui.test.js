@@ -199,7 +199,10 @@ test('DEMO: formas reales de getTablero, copias y contadores de llamadas', async
   try {
     const antes = await pagina.evaluate(() => DEMO._llamadas.getTablero || 0);
     const t = await pagina.evaluate(() => llamar('getTablero'));
-    assert.deepEqual(Object.keys(t), ['columnas', 'cerrados', 'cifras']);
+    assert.deepEqual(Object.keys(t), ['columnas', 'enEspera', 'cerrados', 'cifras']);
+    // Recién registrados · en espera (armarTablero): aparte, con COLUMNA POR_CONTACTAR y EN_ESPERA, sin contar en porContactar.
+    assert.deepEqual(t.enEspera.map(x => [x.CLAVE, x.COLUMNA, x.EN_ESPERA, x.ETIQUETA]), [['REG-000008', 'POR_CONTACTAR', true, 'Cotizó hace 1 día · se le escribe desde el 07/10']]);
+    assert.equal(t.cifras.enEspera, 1);
     assert.deepEqual(Object.keys(t.columnas), ['POR_CONTACTAR', 'CONTACTADO', 'PAGO_REALIZADO', 'AGENDADO', 'EN_TRATAMIENTO', 'COMPLETADO']);
     for (const c of Object.keys(t.columnas)) {
       assert.ok(t.columnas[c].length > 0, c);
@@ -385,9 +388,13 @@ test('tablero: seis franjas del embudo, de arriba hacia abajo, con las tarjetas 
     assert.deepEqual(franjas, [['1', '1', 'Por contactar'], ['5', '2', 'Contactado'], ['6', '3', 'Pago realizado'], ['2', '4', 'Agendado'],
       ['3', '5', 'En tratamiento'], ['4', '6', 'Completado']]);
     assert.equal(await pagina.locator('#tablero > .baja').count(), 5);
+    // Recién registrados · en espera: al final de Por contactar, con su ETIQUETA, fuera de la cifra.
+    const espera = (await pintadas(pagina, '1')).filter(v => v.grupo === 'espera');
+    assert.deepEqual(espera.map(v => v.id), d.enEspera.map(t => t.CLAVE));
+    assert.ok(espera[0].texto.includes('Cotizó hace 1 día · se le escribe desde el 07/10'), espera[0].texto);
     for (const c of FASES) {
       const claves = d.columnas[c].map(t => t.CLAVE);
-      const vistas = await pintadas(pagina, COL_N[c]);
+      const vistas = (await pintadas(pagina, COL_N[c])).filter(v => v.grupo !== 'espera');
       assert.ok(vistas.length > 0, `el DEMO tiene al menos una tarjeta en ${c}`);
       for (const v of vistas) {
         assert.ok(claves.includes(v.id), `${v.id} pintada en ${c} y el servidor la pone en otra`);
@@ -437,9 +444,10 @@ test('tablero: cada franja muestra hasta 12 tarjetas en su carril horizontal; «
     pc.forEach(t => por[grupoDe(diasDe(t))].push(t.CLAVE));   // ya vienen en el orden del servidor
     assert.ok(pc.length > 12, 'el DEMO tiene más de 12 por contactar');
     let vistas = await pintadas(pagina, '1');
-    // Las primeras 12 del servidor, pintadas por grupo (Recientes, Hace 1 a 2 meses, Más antiguos) y en su orden dentro de cada uno.
-    const doce = pc.slice(0, 12);
-    assert.deepEqual(vistas.map(v => v.id), ['rec', 'mes', 'ant'].flatMap(g => doce.filter(t => grupoDe(diasDe(t)) === g).map(t => t.CLAVE)));
+    // Las primeras 12 del servidor, pintadas por grupo (Recientes, Hace 1 a 2 meses, Más antiguos) y en su orden dentro de cada uno;
+    // al final, aparte, los recién registrados en espera (hasta 12 también).
+    const doce = pc.slice(0, 12), espera = d.enEspera.map(t => t.CLAVE);
+    assert.deepEqual(vistas.map(v => v.id), ['rec', 'mes', 'ant'].flatMap(g => doce.filter(t => grupoDe(diasDe(t)) === g).map(t => t.CLAVE)).concat(espera));
     // Separadores de grupo dentro del carril, con el total del grupo.
     const grupos = await pagina.locator('#tablero [data-col="1"] .carril > h3').evaluateAll(l => l.map(h => h.dataset.grupo));
     assert.deepEqual(grupos, [...new Set(vistas.map(v => v.grupo))]);
@@ -456,15 +464,15 @@ test('tablero: cada franja muestra hasta 12 tarjetas en su carril horizontal; «
     assert.equal(await barra('1'), '100%');
     assert.ok(parseInt(await barra('6'), 10) < 100);
     const mas = pagina.locator('#tablero [data-mas="1"]');
-    assert.equal((await mas.textContent()).trim(), `Ver los ${pc.length}`);
+    assert.equal((await mas.textContent()).trim(), `Ver los ${pc.length + espera.length}`);
     assert.equal(await pagina.locator('#tablero [data-mas]').count(), 1, 'solo la franja con más de 12');
     await mas.click();
     vistas = await pintadas(pagina, '1');
-    assert.deepEqual(vistas.map(v => v.id).sort(), pc.map(t => t.CLAVE).sort(), 'abierta: todas');
+    assert.deepEqual(vistas.map(v => v.id).sort(), pc.map(t => t.CLAVE).concat(espera).sort(), 'abierta: todas');
     assert.equal((await pagina.locator('#tablero [data-mas="1"]').textContent()).trim(), 'Ver menos');
     assert.equal(await pagina.locator('#tablero [data-mas="1"]').getAttribute('aria-expanded'), 'true');
     await pagina.locator('#tablero [data-mas="1"]').click();
-    assert.equal((await pintadas(pagina, '1')).length, 12);
+    assert.equal((await pintadas(pagina, '1')).length, 12 + espera.length);
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -478,7 +486,7 @@ test('tablero: el detalle de cada fase coincide con el DEMO y «N cerrados este 
     const pc = d.columnas.POR_CONTACTAR;
     const sinIntento = pc.filter(t => Number(t.N_SEGUIMIENTOS) === 0).length;
     assert.equal(pc.filter(t => Number(t.ATRASO) > 0).length, 1);
-    assert.equal(await sub('1'), `${sinIntento} sin ningún intento · 1 sesión atrasada`);
+    assert.equal(await sub('1'), `${sinIntento} sin ningún intento · 1 sesión atrasada · +${d.enEspera.length} en espera`);
     assert.equal(await sub('5'), 'esperan respuesta · 1 por cerrarse');
     assert.equal(await sub('6'), 'falta agendar');
     assert.equal(await sub('2'), '1 cita esta semana');
@@ -524,7 +532,7 @@ test('tablero: el filtro por tipo cambia los números y se recuerda; «Solo sin 
     await otra.waitForFunction(() => localStorage.getItem('seg.tipo') === 'HIERRO', null, { timeout: 5000 });
     await otra.close();
     const ids = (await pintadas(pagina, '1')).map(v => v.id);
-    assert.deepEqual(ids.slice().sort(), pc.filter(t => t.TIPO_SEGUIMIENTO === 'HIERRO').map(t => t.CLAVE).sort());
+    assert.deepEqual(ids.slice().sort(), pc.concat(d.enEspera).filter(t => t.TIPO_SEGUIMIENTO === 'HIERRO').map(t => t.CLAVE).sort(), 'con los hierros en espera');
     // Se recuerda al recargar.
     await pagina.reload();
     await pagina.waitForSelector('#tablero .tarjeta');
@@ -3690,7 +3698,7 @@ test('tablero: el filtro de mes muestra solo los pacientes de ese mes y se recue
     assert.ok(meses.length && meses.every(m => m === mes));
     assert.equal(await pagina.evaluate(() => localStorage.getItem('seg.mes')), mes);
     assert.equal(Number(await pagina.locator('#tablero [data-col="1"] h2 .n').textContent()),
-      await pagina.evaluate(() => filtrados(true).filter(p => p.col === 1).length), 'la cifra de Por contactar sigue al filtro');
+      await pagina.evaluate(() => filtrados(true).filter(p => p.col === 1 && !p.espera).length), 'la cifra de Por contactar sigue al filtro (sin los en espera)');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
@@ -5070,6 +5078,150 @@ test('admisionista: sin Enfermería en el menú; las funciones de Enfermería se
     assert.equal(e, 'Esta acción es de enfermería.');
     assert.equal(await pagina.evaluate(() => { try { DEMO.anularContactoEnfermeria({ usuario: 'ANA', id: 'ENF-000001', motivo: 'x' }); return ''; } catch (x) { return x.message; } }),
       'Esta acción es de enfermería.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+/* ---------- «Recién registrados · en espera» y el buscador del tablero (29/10/2026, reporte de Rachel) ---------- */
+
+const LUCIA_E = 'REG-000008';   // hierro Ferinject × 1 registrado ayer (30/09) sin fecha de primera sesión: en espera hasta el 07/10
+
+test('tablero: el hierro registrado ayer sin fecha aparece en «Recién registrados · en espera», fuera de todas las cifras', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const d = await datosDemo(pagina);
+    const pc = d.columnas.POR_CONTACTAR;
+    const vistas = await pintadas(pagina, '1');
+    const espera = vistas.filter(v => v.grupo === 'espera');
+    assert.deepEqual(espera.map(v => v.id), [LUCIA_E], 'su propio grupo, al final de Por contactar');
+    assert.equal(vistas[vistas.length - 1].id, LUCIA_E);
+    assert.match(espera[0].texto, /Lucía Prueba Ñahui/);
+    assert.match(espera[0].texto, /Cotizó hace 1 día · se le escribe desde el 07\/10/);
+    assert.match(await pagina.locator('#tablero [data-col="1"] h3[data-grupo="espera"]').textContent(), /Recién registrados · en espera.*1$/);
+    assert.equal(await pagina.locator(`#tablero [data-card="${LUCIA_E}"]`).evaluate(e => e.classList.contains('espera')), true);
+    // No cuenta: ni en la cifra de la franja, ni en «N por contactar», ni en el segmentado; el número va aparte.
+    assert.equal(await pagina.locator('#tablero [data-col="1"] h2 .n').textContent(), String(pc.length));
+    assert.equal(d.cifras.porContactar, pc.length);
+    assert.match(await pagina.locator('#subtit').textContent(), new RegExp(`· ${pc.length} por contactar$`));
+    assert.match(await pagina.locator('#seg button', { hasText: 'Hierro' }).textContent(), new RegExp(`Hierro\\s*${pc.filter(t => t.TIPO_SEGUIMIENTO === 'HIERRO').length}`));
+    assert.match(await pagina.locator('#tablero [data-col="1"] .f-sub').textContent(), /· \+1 en espera$/);
+    // Un hierro registrado hoy entra también: «Cotizó hoy».
+    await pagina.evaluate(async () => {
+      await llamar('guardarRegistro', { usuario: 'RACHEL', dni: '47123999', nombre: 'Nueva Prueba Hoy', contacto: '987123999', fecha: S.hoy,
+        doctor: 'Dra. Karen Matos', procedimientos: [], tratamiento: 'HIERRO CARBOXIMALTOSA', sesiones: 1, marca: 'FERINJECT' });
+      adaptarTablero(await llamar('getTablero')); pintarTablero();
+    });
+    const nuevas = (await pintadas(pagina, '1')).filter(v => v.grupo === 'espera');
+    assert.equal(nuevas.length, 2);
+    assert.match(nuevas[1].texto, /Nueva Prueba Hoy.*Cotizó hoy · se le escribe desde el 08\/10/);
+    assert.equal(await pagina.locator('#tablero [data-col="1"] h2 .n').textContent(), String(pc.length), 'la cifra sigue igual');
+    // Respeta los filtros: con «Reevaluaciones» no se ve.
+    await pagina.locator('#seg button', { hasText: 'Reevaluaciones' }).click();
+    assert.equal(await pagina.locator(`#tablero [data-card="${LUCIA_E}"]`).count(), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('tablero: una tarjeta en espera se abre y acepta «Pagó» (pasa a Pago realizado) y «No contestó» (pasa a Contactado)', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await abrirPanelDe(pagina, LUCIA_E);
+    assert.deepEqual(await pagina.locator('#panel .acc:not(.cierra) [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc)), ['nocontesto', 'pensara', 'acepto', 'pago']);
+    const cierres = await pagina.locator('#panel .acc.cierra [data-acc]').evaluateAll(b => b.map(x => x.dataset.acc));
+    assert.ok(cierres.includes('nodesea'), cierres.join());
+    await pagina.locator('#panel [data-acc="pago"]').click();
+    await confirmarPaso(pagina, HOY_DEMO);
+    await esperarEstable(pagina);
+    assert.deepEqual([(await ultimo(pagina, 'registrarResultado')).resultado, (await ultimo(pagina, 'registrarResultado')).referencia], ['PAGO', LUCIA_E]);
+    assert.equal(await pagina.locator(`#tablero [data-card="${LUCIA_E}"]`).evaluate(e => e.closest('[data-col]').dataset.col), '6');
+    assert.equal(await pagina.locator('#tablero [data-col="1"] h3[data-grupo="espera"]').count(), 0);
+    assert.doesNotMatch(await pagina.locator('#tablero [data-col="1"] .f-sub').textContent(), /en espera/);
+    const t = await datosDemo(pagina);
+    assert.deepEqual([t.enEspera.length, t.columnas.PAGO_REALIZADO.some(x => x.CLAVE === LUCIA_E && !x.EN_ESPERA)], [0, true]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+  const b = await abrirTablero();
+  try {
+    await abrirPanelDe(b.pagina, LUCIA_E);
+    await b.pagina.locator('#panel [data-acc="nocontesto"]').click();
+    await esperarEstable(b.pagina);
+    assert.equal(await b.pagina.locator(`#tablero [data-card="${LUCIA_E}"]`).evaluate(e => e.closest('[data-col]').dataset.col), '5', 'el primer contacto adelanta el ciclo');
+    assert.equal(await b.pagina.locator(`#tablero [data-card="${LUCIA_E}"]`).evaluate(e => e.classList.contains('espera')), false);
+    assert.deepEqual(b.errores, []);
+  } finally { await b.navegador.close(); }
+});
+
+test('buscador del tablero: el DNI de Rachel (con su cero) y el nombre encuentran la tarjeta en espera, sin aviso', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    for (const q of ['045123456', '45123456', 'lucia nahui', 'ÑAHUI']) {
+      await pagina.locator('#q').fill(q);
+      assert.deepEqual(await pagina.locator('#tablero [data-card]').evaluateAll(l => l.map(e => e.dataset.card)), [LUCIA_E], q);
+      await pagina.waitForTimeout(350);
+      assert.equal(await pagina.locator('#fuera').textContent(), '', q);
+    }
+    assert.equal(await llamadas(pagina, 'motivoFueraDeTablero'), 0, 'con tarjeta visible no se pregunta al servidor');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('buscador del tablero: oculto por los filtros, «Quitar filtros» conserva lo buscado', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.locator('#seg button', { hasText: 'Reevaluaciones' }).click();
+    await pagina.locator('#q').fill('045123456');
+    const caja = pagina.locator('#fuera .fuera');
+    await caja.waitFor();
+    assert.equal(await caja.getAttribute('data-fuera'), 'filtros');
+    assert.match(await caja.textContent(), /Está en el tablero, pero no con estos filtros\./);
+    assert.match(await caja.textContent(), /Lucía Prueba Ñahui.*DNI …3456.*Ver ficha/);
+    await pagina.locator('#fuera .js-quitar-filtros').click();
+    assert.equal(await pagina.evaluate(() => [S.tipo, S.q]).then(x => x.join('|')), '|045123456');
+    assert.deepEqual(await pagina.locator('#tablero [data-card]').evaluateAll(l => l.map(e => e.dataset.card)), [LUCIA_E]);
+    assert.equal(await pagina.locator('#fuera').textContent(), '');
+    assert.equal(await llamadas(pagina, 'motivoFueraDeTablero'), 0);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('buscador del tablero: sin tarjeta, el motivo del servidor y «Ver ficha»; si no existe, «Ir a Registro»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    const motivo = async q => {
+      await pagina.locator('#q').fill(q);
+      await pagina.waitForFunction(() => { const c = document.querySelector('#fuera .fuera'); return c && c.dataset.fuera !== 'buscando'; });
+      return pagina.locator('#fuera .fuera').evaluate(e => e.innerText.replace(/\s+/g, ' ').trim());
+    };
+    assert.match(await motivo('silva prado'), /No está en ninguna franja del tablero\. Héctor Manuel Silva Prado DNI …8999 Ver ficha Seguimiento cerrado de su reevaluación de Reumatología: Se atiende en otro lugar \(20\/09\)\./);
+    assert.deepEqual(await ultimo(pagina, 'motivoFueraDeTablero'), { q: 'silva prado' });
+    assert.match(await motivo('cardenas rios'), /Rosa Amelia Cárdenas Ríos .* Falleció \(24\/09\/2026\)\./);
+    assert.match(await motivo('zzzz'), /No hay ningún paciente con «zzzz»\./);
+    await pagina.locator('#fuera [data-fuera-registro]').click();
+    await pagina.waitForFunction(() => S.seccion === 'registro');
+    await pagina.locator('.menu [data-sec="tablero"]').click();
+    await pagina.waitForFunction(() => S.seccion === 'tablero');
+    await motivo('silva prado');
+    await pagina.locator('#fuera [data-fuera-ficha="41888999"]').click();
+    await pagina.waitForFunction(() => S.seccion === 'pacientes' && PA.dni === '41888999');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('buscador del tablero: varios pacientes sin tarjeta, hasta 5 con su DNI parcial; consulta también lo ve', async () => {
+  const { navegador, pagina, errores } = await abrirTablero({ guardado: { 'seg.usuario': 'ADMINISTRACION' } });
+  try {
+    await pagina.evaluate(() => {
+      DEMO.motivoFueraDeTablero = x => ({ q: x.q, total: 7, pacientes: [1, 2, 3, 4, 5].map(i => ({ DNI: '4900000' + i, DNI_PARCIAL: '…000' + i,
+        NOMBRE: 'PEDRO PRUEBA ' + i, EN_TABLERO: false, FRANJAS: [], MOTIVOS: ['su hierro está en espera hasta el 04/11', 'tiene alta médica vigente (Hematología, 27/10)'] })) });
+    });
+    await pagina.locator('#q').fill('pedro prueba');
+    await pagina.waitForFunction(() => { const c = document.querySelector('#fuera .fuera'); return c && c.dataset.fuera === 'motivo'; });
+    const texto = await pagina.locator('#fuera .fuera').evaluate(e => e.innerText.replace(/\s+/g, ' '));
+    assert.match(texto, /7 pacientes con «pedro prueba» no están en ninguna franja visible \(se muestran 5\)\./);
+    assert.equal(await pagina.locator('#fuera li').count(), 5);
+    assert.match(texto, /Pedro Prueba 1 DNI …0001 Ver ficha Su hierro está en espera hasta el 04\/11; tiene alta médica vigente \(Hematología, 27\/10\)\./);
+    await pagina.locator('#fuera [data-fuera-ficha="49000003"]').click();
+    await pagina.waitForFunction(() => S.seccion === 'pacientes' && PA.dni === '49000003');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

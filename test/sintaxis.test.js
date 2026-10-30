@@ -8,7 +8,7 @@ test('Logica.gs y Codigo.gs cargan juntos y exponen las funciones públicas', ()
   for (const f of ['doGet', 'bootstrap', 'getBandeja', 'getPaciente', 'buscar', 'marcarSeguimiento',
     'descartar', 'confirmarEmparejamiento', 'getKpi', 'getResumen',
     'guardarRegistro', 'marcarSesion', 'anularRegistro', 'anularSesion', 'darDeAlta', 'anularAlta', 'getRegistrosHoy', 'editarRegistro', 'getRegistros', 'buscarPacienteRegistro',
-    'registrarResultado', 'anularResultado', 'getTablero', 'asignarDniIndicacion']) {
+    'registrarResultado', 'anularResultado', 'getTablero', 'asignarDniIndicacion', 'motivoFueraDeTablero']) {
     assert.equal(typeof ctx[f], 'function', f);
   }
   assert.equal(ctx.CONFIG.SS_ID, '1L8fY-NXWE1agakIPEdqoLnLry0-lvYr0Z-9JfsfGxRM');

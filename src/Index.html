@@ -170,6 +170,23 @@ html.con-vt .vista{animation:none}
 .carril>h3 span{font-weight:400;color:var(--muted);font-size:12px}
 .carril>h3 .n{font-family:var(--mono)}
 .carril>.vacio{flex:1;flex-direction:row;justify-content:flex-start;padding:14px 10px}
+/* Recién registrados · en espera: en Por contactar, pero todavía no se les escribe (no cuentan en la cifra). */
+.carril>h3[data-grupo="espera"]{border-left-style:dashed}
+.tarjeta.espera{border-style:dashed;box-shadow:none}
+.tarjeta.espera .etq{color:var(--muted)}
+.f-sub .n-espera{color:var(--muted);white-space:nowrap}
+/* Buscador del tablero sin ninguna tarjeta visible: por qué (motivoFueraDeTablero). */
+.fuera{margin-top:16px;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1px solid var(--line-2);border-left:4px solid var(--info);border-radius:var(--r);background:var(--surface)}
+.fuera>i{font-size:22px;color:var(--info);margin-top:1px}
+.fuera>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.fuera b{font-weight:600}
+.fuera p{margin:0;color:var(--soft);font-size:13px;line-height:1.4}
+.fuera ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.fuera li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:13px;line-height:1.4;overflow-wrap:anywhere}
+.fuera li .quien{font-weight:600}
+.fuera li .dni{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.fuera .motivos{flex-basis:100%;color:var(--soft)}
+.fuera .acciones{display:flex;flex-wrap:wrap;gap:8px}
 .carril>.vacio i{font-size:20px}
 .mas{flex:0 0 auto;align-self:center;display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 12px;border:0;border-radius:var(--r-s);background:transparent;color:var(--accent);font-weight:600;font-size:13px;white-space:nowrap}
 .mas:hover{background:var(--surface)}
@@ -819,6 +836,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
           </div>
           <div class="atajos" aria-hidden="true"><span><span class="kbd">↑ ↓</span><span class="kbd">j k</span>cambiar de fase</span><span><span class="kbd">← →</span>moverse en la fase</span><span><span class="kbd">Enter</span>abrir</span><span><span class="kbd">C</span>copiar teléfono</span><span><span class="kbd">1–4</span>qué pasó (4 = pagó)</span><span><span class="kbd">X</span>cerrar seguimiento</span><span><span class="kbd">/</span>buscar</span><span><span class="kbd">Esc</span>salir del campo</span><span>o arrastre una tarjeta a otra fase</span></div>
           <div id="err"></div>
+          <div id="fuera" role="status" aria-live="polite"></div>
           <p class="ley-embudo" id="ley-embudo">Las fases van de arriba hacia abajo y cada tarjeta baja sola a la siguiente al registrar «¿Qué pasó?».</p>
           <section class="tablero" id="tablero" aria-label="Embudo de seguimientos"></section>
         </div>
@@ -1357,6 +1375,8 @@ function adaptarTarjeta(t) {
     porReevaluar: t.ESTADO === 'POR REEVALUAR' || (!!t.ID_REGISTRO && t.ESTADO_REGISTRO === 'COMPLETO'),
     // Tratamiento ya empezado: la próxima sesión se agenda («Agendó cita»), ya no se «acepta».
     enCurso: !!t.ID_REGISTRO && t.ESTADO_REGISTRO === 'EN CURSO',
+    // «Recién registrados · en espera»: en Por contactar, pero aparte y sin contar en ninguna cifra (armarTablero → enEspera).
+    espera: t.EN_ESPERA === true && col === 1,
     oculto: false,
     raw: t
   };
@@ -1365,7 +1385,8 @@ function adaptarTablero(r) {
   S.tablero = r || null;
   S.sinRecargar.clear();   // ya llegó la tarjeta del servidor, con su ULTIMA_SESION_ID
   const cols = (r && r.columnas) || {};
-  S.pacientes = Object.keys(COLUMNAS).flatMap(c => (cols[c] || []).map(adaptarTarjeta));
+  S.pacientes = Object.keys(COLUMNAS).flatMap(c => (cols[c] || []).map(adaptarTarjeta))
+    .concat(((r && Array.isArray(r.enEspera)) ? r.enEspera : []).map(adaptarTarjeta));
   S.cerrados = (r && Array.isArray(r.cerrados)) ? r.cerrados : [];
 }
 
@@ -1404,7 +1425,7 @@ function tarjetaHtml(p) {
   if (conChip(p.col)) pie = chipDe(p) + contactoHtml(p, 'der');
   else if (p.col === 4) pie = `<span class="izq ok"><i class="ph-fill ph-check-circle"></i>${esc(p.fin)}</span>`;
   else pie = contactoHtml(p, 'izq');
-  return `<article class="tarjeta${seleccion.id === p.id ? ' sel' : ''}" data-card="${esc(p.id)}" tabindex="0" role="button" aria-label="${esc(nombreDe(p))}, ${esc(tag)}">`
+  return `<article class="tarjeta${p.espera ? ' espera' : ''}${seleccion.id === p.id ? ' sel' : ''}" data-card="${esc(p.id)}" tabindex="0" role="button" aria-label="${esc(nombreDe(p))}, ${esc(tag)}${p.espera ? ', en espera' : ''}">`
     + `<div class="t1"><b>${esc(nombreDe(p))}</b><span class="tag t-${p.t}">${esc(tag)}</span></div><div class="t2">${esc(sub)}</div>${prog}${etq}<div class="t3">${pie}</div></article>`;
 }
 
@@ -1418,15 +1439,20 @@ function opcionesMes() {
   sel.value = S.mes;
 }
 
+/** ¿La tarjeta coincide con el buscador? Todas las palabras del nombre (normBusqueda) o parte del DNI (como normDni, sin ceros a la izquierda). */
+function coincideBusqueda(p) {
+  if (!S.q.trim()) return true;
+  const palabras = normBusqueda(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '').replace(/^0+/, '');   // como normDni: el DNI se guarda sin ceros a la izquierda
+  return !!((digitos && p.dni.includes(digitos)) || (palabras.length && palabras.every(w => normBusqueda(p.n).includes(w))));
+}
 /** Filtros de la pantalla. conTipo = false da la base de los números del segmentado. */
 function filtrados(conTipo) {
-  const palabras = normBusqueda(S.q).split(/\s+/).filter(Boolean), digitos = S.q.replace(/\D/g, '').replace(/^0+/, '');   // como normDni: el DNI se guarda sin ceros a la izquierda
   return S.pacientes.filter(p => !p.oculto
     && (!S.medico || norm(p.med) === norm(S.medico))
     && (!S.esp || norm(p.esp) === norm(S.esp))
     && (!S.sinTel || p.sinContacto)
     && (!S.mes || p.raw.MES === S.mes)
-    && (!S.q.trim() || (digitos && p.dni.includes(digitos)) || (palabras.length && palabras.every(w => normBusqueda(p.n).includes(w))))
+    && coincideBusqueda(p)
     && (!conTipo || !S.tipo || p.tipo === S.tipo));
 }
 const hayFiltros = () => !!(S.tipo || S.medico || S.mes || S.esp || S.sinTel || S.q.trim());
@@ -1507,18 +1533,28 @@ function iniciarTablero() {
       const b = $(`#tablero [data-mas="${c}"]`); if (b) b.focus({ preventScroll: true });
       return;
     }
-    if (e.target.closest('.js-quitar')) {
-      Object.assign(S, { tipo: '', medico: '', mes: '', esp: '', sinTel: false, q: '' });
-      LS.set('seg.tipo', ''); LS.set('seg.mes', ''); LS.set('seg.medico', ''); LS.set('seg.esp', '');
-      $('#q').value = '';
-      pintarTablero();
-    }
+    if (e.target.closest('.js-quitar')) quitarFiltros(true);
+  });
+  // Aviso del buscador (pintarFuera): «Quitar filtros» conserva lo buscado; «Ver ficha» abre Pacientes con esa ficha.
+  $('#fuera').addEventListener('click', e => {
+    if (e.target.closest('.js-quitar-filtros')) { quitarFiltros(false); return; }
+    const f = e.target.closest('[data-fuera-ficha]');
+    if (f) { S.fichaDni = f.dataset.fueraFicha; ir('pacientes'); return; }
+    if (e.target.closest('[data-fuera-registro]')) ir('registro');
   });
   ['#subtit', '#metadia', '#buscar', '#tab-cuerpo'].forEach(s => { $(s).hidden = false; });
   $('#v-tablero .cargando').hidden = true;
   tableroIniciado = true;
   pintarTablero();
   pastilla($('#seg'), true);
+}
+
+/** «Quitar filtros»: tipo, médico, mes, especialidad y «sin teléfono»; con `conQ`, también lo buscado. */
+function quitarFiltros(conQ) {
+  Object.assign(S, { tipo: '', medico: '', mes: '', esp: '', sinTel: false });
+  if (conQ) { S.q = ''; $('#q').value = ''; }
+  LS.set('seg.tipo', ''); LS.set('seg.mes', ''); LS.set('seg.medico', ''); LS.set('seg.esp', '');
+  pintarTablero();
 }
 
 /**
@@ -1579,7 +1615,8 @@ function pintarTablero() {
   const cargando = S.fase === 'cargando', listo = S.fase === 'listo';
   if (listo) opcionesMes();
   const vis = listo ? filtrados(true) : [], base = listo ? filtrados(false) : [];
-  const enCol = c => vis.filter(p => p.col === c);
+  // Las «en espera» van en Por contactar, pero aparte: no cuentan en la cifra, el saludo, el segmentado ni la barra.
+  const enCol = c => vis.filter(p => p.col === c && !p.espera), enEspera = vis.filter(p => p.espera);
   const nCol = c => listo ? enCol(c).length : '—';
   const d = diaUTC(S.hoy).getUTCDay();
   pintarSaludo();   // la hora cambia durante el día: el saludo se repasa con cada repintado del tablero
@@ -1595,7 +1632,12 @@ function pintarTablero() {
   const detalle = c => {
     if (!listo) return ['', false];
     const L = enCol(c);
-    if (c === 1) { const atr = L.filter(p => p.atraso > 0).length; return [esc(`${L.filter(p => !p.intentos).length} sin ningún intento`) + (atr ? ' · ' + esc(plural(atr, 'sesión atrasada', 'sesiones atrasadas')) : ''), false]; }
+    if (c === 1) {
+      const atr = L.filter(p => p.atraso > 0).length;
+      // Los recién registrados en espera, aparte: no son parte de la cifra (armarTablero → cifras.enEspera).
+      return [esc(`${L.filter(p => !p.intentos).length} sin ningún intento`) + (atr ? ' · ' + esc(plural(atr, 'sesión atrasada', 'sesiones atrasadas')) : '')
+        + (enEspera.length ? ` · <span class="n-espera" title="Recién registrados: todavía no se les escribe y no cuentan en la cifra">+${enEspera.length} en espera</span>` : ''), false];
+    }
     if (c === 5) { const sr = L.filter(p => p.agenda === 'SIN RESPUESTA').length; return [esc(sr ? `esperan respuesta · ${plural(sr, 'por cerrarse', 'por cerrarse')}` : 'esperan respuesta'), false]; }
     if (c === 6) return ['falta agendar', false];
     if (c === 2) return [esc(`${plural(L.filter(p => esCita(p) && (!p.fechaClave || p.fechaClave <= hoy6)).length, 'cita', 'citas')} esta semana`), false];
@@ -1606,7 +1648,7 @@ function pintarTablero() {
   else if (!$('#cerrados').hidden) pintarCerrados();
 
   // Filtros
-  const c1 = base.filter(p => p.col === 1);
+  const c1 = base.filter(p => p.col === 1 && !p.espera);
   $$('#seg [data-tipo]').forEach(b => {
     const k = b.dataset.tipo;
     b.setAttribute('aria-pressed', String(S.tipo === k));
@@ -1633,12 +1675,12 @@ function pintarTablero() {
   orden = {};
   const max = listo ? Math.max(1, ...COLS.map(c => enCol(c.id).length)) : 1;
   T.innerHTML = COLS.map((c, i) => {
-    const L = enCol(c.id), ids = [];
-    const abierta = !!S.verTodo[c.id], vistos = abierta ? L : L.slice(0, TOPE_FRANJA);
+    const L = enCol(c.id), ids = [], E = c.id === 1 ? enEspera : [];
+    const abierta = !!S.verTodo[c.id], vistos = abierta ? L : L.slice(0, TOPE_FRANJA), vistasE = abierta ? E : E.slice(0, TOPE_FRANJA);
     const pintar = lista => { lista.forEach(p => ids.push(p.id)); return lista.map(tarjetaHtml).join(''); };
     let html = '';
     if (cargando) html = '<div class="skel" aria-hidden="true"><i></i><i></i><i></i></div>'.repeat(c.id === 1 ? 3 : 2);
-    else if (!L.length) {
+    else if (!L.length && !E.length) {
       html = `<div class="vacio"><i class="${c.vi}"></i><span>${hayFiltros() ? 'Nadie con estos filtros.' : c.vacio}</span>`
         + `${hayFiltros() ? '<button type="button" class="pill js-quitar">Quitar filtros</button>' : ''}</div>`;
     } else if (c.id === 1 || c.id === 2) {
@@ -1649,9 +1691,11 @@ function pintarTablero() {
         const todos = L.filter(f), aqui = vistos.filter(f);
         return aqui.length ? `<h3 data-grupo="${k}">${t}${r ? `<span>${r}</span>` : ''}<span class="n">${todos.length}</span></h3>${pintar(aqui)}` : '';
       }).join('');
+      // Al final, los recién registrados que todavía esperan (se pueden abrir y registrar; pasan solos al grupo normal).
+      if (vistasE.length) html += `<h3 data-grupo="espera">Recién registrados · en espera<span>aún no se les escribe</span><span class="n">${E.length}</span></h3>${pintar(vistasE)}`;
     } else html = pintar(vistos);
-    if (listo && L.length > TOPE_FRANJA) {
-      html += `<button type="button" class="mas" data-mas="${c.id}" aria-expanded="${abierta}">${abierta ? '<i class="ph ph-arrow-left"></i>Ver menos' : `Ver los ${L.length}<i class="ph ph-arrow-right"></i>`}</button>`;
+    if (listo && (L.length > TOPE_FRANJA || E.length > TOPE_FRANJA)) {
+      html += `<button type="button" class="mas" data-mas="${c.id}" aria-expanded="${abierta}">${abierta ? '<i class="ph ph-arrow-left"></i>Ver menos' : `Ver los ${L.length + E.length}<i class="ph ph-arrow-right"></i>`}</button>`;
     }
     orden[c.id] = ids;
     const [sub, mal] = detalle(c.id), n = nCol(c.id);
@@ -1664,6 +1708,65 @@ function pintarTablero() {
   }).join('');
   $$('#tablero .carril').forEach(c => { const v = scroll[c.parentNode.dataset.col]; if (v) c.scrollLeft = v; });
   if (foco) { const el = tarjetaEl(seleccion.id); if (el) el.focus({ preventScroll: true }); }
+  pintarFuera(listo && vis.length === 0 ? S.q.trim() : '');
+}
+
+/* ---- Buscador del tablero cuando lo buscado no está en ninguna franja (29/10/2026) ---- */
+/**
+ * `q` = lo buscado, solo cuando no hay ninguna tarjeta visible ('' = no hay nada que avisar). Si coincide con tarjetas que ocultan
+ * los filtros, lo dice con «Quitar filtros» (conserva lo buscado); si no, pregunta al servidor por qué (motivoFueraDeTablero).
+ */
+function pintarFuera(q) {
+  const caja = $('#fuera');
+  if (!q || norm(q).replace(/\s/g, '').length < 3) { if (caja.innerHTML) caja.innerHTML = ''; S.fuera = null; return; }
+  const ocultas = S.pacientes.filter(p => !p.oculto && coincideBusqueda(p));
+  if (ocultas.length) {
+    S.fuera = null;
+    const pac = [...new Map(ocultas.map(p => [p.dni, p])).values()].slice(0, 5);
+    caja.innerHTML = `<div class="fuera" data-fuera="filtros"><i class="ph ph-funnel"></i><div><b>Está en el tablero, pero no con estos filtros.</b>`
+      + `<ul>${pac.map(p => `<li><span class="quien">${esc(nombreDe(p))}</span><span class="dni">DNI ${esc(dniCorto(p.dni))}</span>`
+        + `<button type="button" class="enlace" data-fuera-ficha="${esc(p.dni)}">Ver ficha</button></li>`).join('')}</ul>`
+      + `<div class="acciones"><button type="button" class="pill js-quitar-filtros">Quitar filtros</button></div></div></div>`;
+    return;
+  }
+  const clave = normBusqueda(q) + '|' + (S.tableroEn || 0);
+  if (!S.fuera || S.fuera.clave !== clave) {
+    S.fuera = { clave, q, estado: 'buscando', r: null };
+    clearTimeout(pintarFuera.t);
+    pintarFuera.t = setTimeout(() => pedirFuera(clave, q), 300);
+  }
+  const F = S.fuera;
+  if (F.estado === 'buscando') { caja.innerHTML = `<div class="fuera" data-fuera="buscando"><i class="ph ph-magnifying-glass"></i><div><p>Buscando a «${esc(q)}» fuera del tablero…</p></div></div>`; return; }
+  if (F.estado === 'error') { caja.innerHTML = `<div class="fuera" data-fuera="error"><i class="ph ph-warning-circle"></i><div><p>No se pudo averiguar por qué no aparece: ${esc(F.msg)}</p></div></div>`; return; }
+  const L = (F.r && Array.isArray(F.r.pacientes)) ? F.r.pacientes : [], total = Number(F.r && F.r.total) || L.length;
+  if (!L.length) {
+    caja.innerHTML = `<div class="fuera" data-fuera="nadie"><i class="ph ph-user-circle-minus"></i><div><b>No hay ningún paciente con «${esc(q)}».</b>`
+      + `<p>Revise lo escrito o, si es nuevo, regístrelo.</p><div class="acciones"><button type="button" class="pill" data-fuera-registro>Ir a Registro</button></div></div></div>`;
+    return;
+  }
+  const item = x => `<li><span class="quien">${esc(nombreBonito(x.NOMBRE) || 'DNI ' + x.DNI)}</span><span class="dni">DNI ${esc(x.DNI_PARCIAL || dniCorto(x.DNI))}</span>`
+    + `<button type="button" class="enlace" data-fuera-ficha="${esc(x.DNI)}">Ver ficha</button>`
+    + `<span class="motivos">${esc(x.EN_TABLERO ? 'Está en el tablero: ' + (x.FRANJAS || []).join(', ') + '.' : unirMotivos(x.MOTIVOS))}</span></li>`;
+  const uno = L.length === 1;
+  const titulo = uno ? (L[0].EN_TABLERO ? 'Está en el tablero, pero no con estos filtros.' : 'No está en ninguna franja del tablero.')
+    : `${total} pacientes con «${q}» no están en ninguna franja visible${total > L.length ? ` (se muestran ${L.length})` : ''}.`;
+  caja.innerHTML = `<div class="fuera" data-fuera="${uno && L[0].EN_TABLERO ? 'filtros' : 'motivo'}"><i class="ph ph-info"></i><div><b>${esc(titulo)}</b><ul>${L.map(item).join('')}</ul>`
+    + (L.some(x => x.EN_TABLERO) && hayFiltrosSinQ() ? '<div class="acciones"><button type="button" class="pill js-quitar-filtros">Quitar filtros</button></div>' : '') + '</div></div>';
+}
+const dniCorto = d => { const t = String(d || ''); return t.length > 4 ? '…' + t.slice(-4) : t; };
+const hayFiltrosSinQ = () => !!(S.tipo || S.medico || S.mes || S.esp || S.sinTel);
+/** «su hierro está en espera hasta el 04/11» → «Su hierro está en espera hasta el 04/11.»; varios, unidos con «; ». */
+const unirMotivos = m => { const t = (Array.isArray(m) ? m : []).filter(Boolean).join('; '); return t ? t.charAt(0).toUpperCase() + t.slice(1) + '.' : ''; };
+async function pedirFuera(clave, q) {
+  try {
+    const r = await llamar('motivoFueraDeTablero', { q });
+    if (!S.fuera || S.fuera.clave !== clave) return;   // ya se busca otra cosa
+    Object.assign(S.fuera, { estado: 'listo', r });
+  } catch (e) {
+    if (!S.fuera || S.fuera.clave !== clave) return;
+    Object.assign(S.fuera, { estado: 'error', msg: e.message });
+  }
+  pintarFuera(S.q.trim());
 }
 
 /* ============ Selección y teclado ============ */
@@ -2378,7 +2481,8 @@ function confirmarPaso(teclado) {
 function previsto(p, res, extra) {
   const R = S.reglas || {}, hoy = S.hoy, f = String(extra.fecha || '').slice(0, 10);
   const t = Object.assign({}, p.raw, { TELEFONOS_DESCARTADOS: (p.raw.TELEFONOS_DESCARTADOS || []).slice() });
-  const en = (col, etq, fc, mas) => Object.assign(t, { COLUMNA: col, ETIQUETA: etq, FECHA_CLAVE: fc || '' }, mas || {});
+  // Cualquier resultado que mueve la tarjeta termina su espera («Recién registrados · en espera»): el primer contacto adelanta el ciclo.
+  const en = (col, etq, fc, mas) => Object.assign(t, { COLUMNA: col, ETIQUETA: etq, FECHA_CLAVE: fc || '', EN_ESPERA: false }, mas || {});
   const agendar = (agenda, fecha, intento, etq) => {
     t.N_SEGUIMIENTOS = p.intentos + 1;
     return en(AGENDA_CONTACTO[agenda] ? 'CONTACTADO' : 'AGENDADO', etq, fecha, { ESTADO: 'AGENDADO', AGENDA: agenda, FECHA_AGENDA: fecha, INTENTO: intento, ATRASO: 0 });
@@ -5167,6 +5271,8 @@ const DEMO = (() => {
       ULTIMO_SEGUIMIENTO: '', ESTADO: estado, ESTADO_REGISTRO: estadoReg, FECHA_REEVALUAR: sinReev ? '' : reevaluar, SIN_REEVALUACION: sinReev,
       FECHA_INICIO: r.TIPO === 'CONTROL' ? r.FECHA_RETORNO || '' : r.FECHA_INICIO || '',
       ATRASO: enCurso && estado === 'PENDIENTE' ? dias - reglas.diasEntreSesiones : 0,
+      // Como pendientesRegistro: mientras espera, desde qué día se le escribe.
+      FIN_ESPERA: estado === 'EN ESPERA' ? mas(r.FECHA, reglas.esperaCotizacion) : '',
       CIERRE: '', FECHA_CIERRE: '', AGENDA: '', FECHA_AGENDA: '', INTENTO: 0 }, o || {});
   };
 
@@ -5178,6 +5284,8 @@ const DEMO = (() => {
       if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') return 'Debía volver el ' + dm(t.PROXIMA_ESPERADA) + ' · hace ' + plural(entre(t.PROXIMA_ESPERADA, hoy), 'día', 'días');
       if (t.ESTADO === 'POR REEVALUAR') return 'Por reevaluar · terminó el ' + dm(t.ULTIMA_SESION);
       if (t.ESTADO_REGISTRO === 'EN CURSO') return sesion + (t.ATRASO > 0 ? ' · atrasada ' + plural(t.ATRASO, 'día', 'días') : ' · tocaba hoy');
+      // Recién registrados · en espera (armarTablero).
+      if (t.EN_ESPERA) return 'Cotizó ' + (Number(t.DIAS) > 0 ? 'hace ' + plural(Number(t.DIAS), 'día', 'días') : 'hoy') + ' · se le escribe desde el ' + dm(t.FIN_ESPERA);
       return 'Cotizó hace ' + plural(t.DIAS, 'día', 'días');
     }
     if (t.COLUMNA === 'PAGO_REALIZADO') return 'Pagó el ' + dm(t.FECHA_PAGO) + ' · falta agendar';
@@ -5204,9 +5312,11 @@ const DEMO = (() => {
     if (columna === 'AGENDADO' && ['LLAMAR', 'REINTENTAR', 'SIN RESPUESTA'].includes(t.AGENDA)) columna = 'CONTACTADO';
     if (!t.FECHA_PAGO) t.FECHA_PAGO = '';
     t.COLUMNA = columna;
+    // Como armarTablero: un cotizado aún en su espera va en Por contactar, pero aparte («Recién registrados · en espera»).
+    if (columna === 'POR_CONTACTAR' && t.ESTADO === 'EN ESPERA') t.EN_ESPERA = true; else delete t.EN_ESPERA;
     t.ETIQUETA = etiqueta || '';
     t.ETIQUETA = etiquetaDe(t);
-    t.FECHA_CLAVE = fechaClave || (columna === 'AGENDADO' || columna === 'CONTACTADO' ? t.FECHA_AGENDA : columna === 'PAGO_REALIZADO' ? t.FECHA_PAGO
+    t.FECHA_CLAVE = fechaClave || (t.EN_ESPERA ? t.FIN_ESPERA : columna === 'AGENDADO' || columna === 'CONTACTADO' ? t.FECHA_AGENDA : columna === 'PAGO_REALIZADO' ? t.FECHA_PAGO
       : columna === 'EN_TRATAMIENTO' ? mas(t.ULTIMA_SESION, reglas.diasEntreSesiones) : '');
     if (!t.TELEFONOS_DESCARTADOS) t.TELEFONOS_DESCARTADOS = [];
     t.SIN_CONTACTO = !String(t.TELEFONOS || '').trim() && !String(t.USUARIO || '').trim();
@@ -5227,7 +5337,9 @@ const DEMO = (() => {
     // Etapa 2: hierro cotizado hace 10 días y sin empezar, para «Aceptó» y «No desea realizarse» con registro.
     R('REG-000021', '2026-09-21 10:30', '2026-09-21', 'RACHEL', 'Dr. Elí Cabanillas', 'SILVIA PRUEBA ROJAS', '43555666', '987555666', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 3),
     // Etapa 2: hierro de una sola sesión terminado el 12/08; a los 30 días pasó a «Por reevaluar» y reemplaza su reevaluación vencida.
-    R('REG-000022', '2026-08-05 10:00', '2026-08-05', 'MAGALY', 'Dr. Elí Cabanillas', 'BEATRIZ PRUEBA SALAZAR', '43666777', '987666777', 'HIERRO', 'HIERRO SACARATO', '', 1)
+    R('REG-000022', '2026-08-05 10:00', '2026-08-05', 'MAGALY', 'Dr. Elí Cabanillas', 'BEATRIZ PRUEBA SALAZAR', '43666777', '987666777', 'HIERRO', 'HIERRO SACARATO', '', 1),
+    // 29/10/2026 (caso de Rachel): hierro Ferinject × 1 registrado ayer, sin fecha de primera sesión: «Recién registrados · en espera».
+    R('REG-000008', '2026-09-30 16:20', '2026-09-30', 'RACHEL', 'Dra. Karen Matos', 'LUCÍA PRUEBA ÑAHUI', '45123456', '987123456', 'HIERRO', 'HIERRO CARBOXIMALTOSA', 'FERINJECT', 1)
   );
   const SES = (ID, ID_REGISTRO, NUMERO, FECHA, ASESORA) => ({ ID, FECHA_HORA: FECHA + ' 12:00', ID_REGISTRO, NUMERO, FECHA, ASESORA, NOTA: '', ANULADO: '', MOTIVO_ANULACION: '' });
   sesiones.push(SES('SES-000001', 'REG-000001', 1, '2026-09-10', 'MAGALY'), SES('SES-000002', 'REG-000002', 1, '2026-09-28', 'RACHEL'),
@@ -5427,6 +5539,7 @@ const DEMO = (() => {
     rosa: ubicar(reg(regPorId('REG-000001'), { TELEFONOS: '987654321 / 014332210' }), 'POR_CONTACTAR'),   // hierro en curso, atrasada, dos teléfonos
     ana: ubicar(reg(regPorId('REG-000003')), 'POR_CONTACTAR'),    // usuario @, sin teléfono
     silvia: ubicar(reg(regPorId('REG-000021')), 'POR_CONTACTAR'), // hierro cotizado hace 10 días, sin empezar
+    luciaEspera: ubicar(reg(regPorId('REG-000008')), 'POR_CONTACTAR'), // hierro registrado ayer: «Recién registrados · en espera»
     beatriz: ubicar(reg(regPorId('REG-000022')), 'POR_CONTACTAR'), // hierro completo: «Por reevaluar»
     beatrizReev: ubicar(beatrizReev, 'POR_CONTACTAR'),            // vencida, pero getTablero no la muestra
     pedro: ubicar(antiguas[0], 'POR_CONTACTAR'),                  // procedimiento antiguo
@@ -5794,7 +5907,9 @@ const DEMO = (() => {
       tarjetas.forEach(t => {
         if (!t.ID_REGISTRO && !String(t.USUARIO || '').trim()) { t.USUARIO = usuarioDe(t.DNI); if (t.USUARIO) t.SIN_CONTACTO = false; }
       });
-      tarjetas.forEach(t => { if (col[t.COLUMNA]) col[t.COLUMNA].push(t); });
+      const enEspera = [];
+      tarjetas.forEach(t => { if (t.EN_ESPERA && t.COLUMNA === 'POR_CONTACTAR') enEspera.push(t); else if (col[t.COLUMNA]) col[t.COLUMNA].push(t); });
+      enEspera.sort((a, b) => asc(a, b) || (a.DNI < b.DNI ? -1 : a.DNI > b.DNI ? 1 : 0));
       // Como armarTablero: un registro completo que ya toca reevaluar (en cualquier columna abierta) tapa la reevaluación del paciente.
       const tapa = {};
       const REEV_ABIERTAS = ['POR_CONTACTAR', 'CONTACTADO', 'PAGO_REALIZADO', 'AGENDADO'];
@@ -5810,14 +5925,58 @@ const DEMO = (() => {
       col.AGENDADO.sort(asc);
       col.EN_TRATAMIENTO.sort(asc);
       col.COMPLETADO.sort((a, b) => -asc(a, b));
-      return { columnas: col, cerrados,
-        cifras: { porContactar: col.POR_CONTACTAR.length, contactados: col.CONTACTADO.length, pagados: col.PAGO_REALIZADO.length,
+      return { columnas: col, enEspera, cerrados,
+        cifras: { porContactar: col.POR_CONTACTAR.length, enEspera: enEspera.length, contactados: col.CONTACTADO.length, pagados: col.PAGO_REALIZADO.length,
           agendados: col.AGENDADO.length, enTratamiento: col.EN_TRATAMIENTO.length,
           completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length,
           cerradosSinContacto: cerrados.filter(c => c.SIN_CONTACTO).length, hechosHoy: hechosEquipo, hechosHoyPor: Object.assign({}, hechosPor) } };
     },
 
     registrarResultado,
+
+    // Como motivoFueraDeTablero (fueraDeTablero, Tablero.gs): los pacientes que coinciden (como buscar, hasta 5) y, de cada uno,
+    // su franja o por qué no tiene tarjeta. Solo lectura.
+    motivoFueraDeTablero: x => {
+      const q = String((x && typeof x === 'object' ? x.q : x) || '').trim();
+      const hallados = api.buscar(q), tab = api.getTablero(), franjas = {};
+      const NOMBRES = { POR_CONTACTAR: 'Por contactar', CONTACTADO: 'Contactado', PAGO_REALIZADO: 'Pago realizado', AGENDADO: 'Agendado',
+        EN_TRATAMIENTO: 'En tratamiento', COMPLETADO: 'Completado' };
+      const poner = (dni, f) => { franjas[dni] = franjas[dni] || []; if (!franjas[dni].includes(f)) franjas[dni].push(f); };
+      Object.keys(NOMBRES).forEach(c => tab.columnas[c].forEach(t => poner(t.DNI, NOMBRES[c])));
+      tab.enEspera.forEach(t => poner(t.DNI, 'Por contactar · Recién registrados · en espera'));
+      const cierreTexto = m => norm(m) === 'SIN CONTACTO' ? 'Sin contacto válido' : norm(m) === 'NUMERO EQUIVOCADO' ? 'Sin contacto válido (número equivocado)' : frase(m);
+      const suj = t => t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? 'reevaluación de ' + frase(t.ESPECIALIDAD)
+        : t.TIPO_SEGUIMIENTO === 'HIERRO' ? 'hierro' : t.TIPO_SEGUIMIENTO === 'CONTROL' ? 'control' : 'procedimiento';
+      const motivo = t => {
+        const e = t.ESTADO;
+        if (e === 'EN ESPERA') return `su ${suj(t)} está en espera hasta el ${dm(t.FIN_ESPERA)}`;
+        if (e === 'CERRADO') return `seguimiento cerrado de su ${suj(t)}: ${cierreTexto(t.CIERRE)}${t.FECHA_CIERRE ? ' (' + dm(t.FECHA_CIERRE) + ')' : ''}`;
+        if (t.TIPO_SEGUIMIENTO === 'REEVALUACION') {
+          if (e === 'ALTA') { const a = vigente(t.DNI, t.ESPECIALIDAD); return `tiene alta médica vigente (${frase(t.ESPECIALIDAD)}${a ? ', ' + dm(a.FECHA) : ''})`; }
+          if (e === 'AL DÍA' || e === 'POR VENCER' || e === 'RECUPERADO') return `su ${suj(t)} todavía no vence (debe volver el ${dm(t.PROXIMA_ESPERADA)})`;
+          if (e === 'AGENDADO') return `tiene cita agendada el ${dm(t.FECHA_AGENDA || t.PROXIMA_AGENDADA)} (${frase(t.ESPECIALIDAD)})`;
+          return '';
+        }
+        if (e === 'COMPLETADO') {
+          if (t.ESTADO_REGISTRO === 'COMPLETO') return t.TIPO_SEGUIMIENTO === 'PROCEDIMIENTO' ? `se hizo su procedimiento (${dm(t.ULTIMA_SESION)})`
+            : `completó su tratamiento de ${suj(t)} (${dm(t.ULTIMA_SESION)})` + (t.FECHA_REEVALUAR ? ' · reevaluar el ' + dm(t.FECHA_REEVALUAR) : '');
+          return `ya se hizo su ${suj(t)}` + (t.FECHA_LOHIZO ? ' (' + dm(t.FECHA_LOHIZO) + ')' : '');
+        }
+        return '';
+      };
+      const filas = series.map(x => Object.assign({}, x, { TIPO_SEGUIMIENTO: 'REEVALUACION' }))
+        .concat(tarjetas.filter(t => t.TIPO_SEGUIMIENTO && t.TIPO_SEGUIMIENTO !== 'REEVALUACION'));
+      return { q, total: hallados.length, pacientes: hallados.slice(0, 5).map(h => {
+        const dni = h.DNI, en = franjas[dni] || [];
+        let motivos = [];
+        if (!en.length) {
+          if (muertos[dni]) motivos = ['falleció (' + dmy(muertos[dni].fecha) + ')'];
+          else filas.filter(t => t.DNI === dni).forEach(t => { const m = motivo(t); if (m && !motivos.includes(m)) motivos.push(m); });
+          if (!motivos.length) motivos = ['no tiene ningún seguimiento pendiente'];
+        }
+        return { DNI: dni, DNI_PARCIAL: dni.length > 4 ? '…' + dni.slice(-4) : dni, NOMBRE: h.NOMBRE, EN_TABLERO: en.length > 0, FRANJAS: en, MOTIVOS: motivos };
+      }) };
+    },
 
     anularResultado: x => {
       exigir(x, true);
@@ -5980,7 +6139,7 @@ const DEMO = (() => {
         // Control: Agendado «Control con resultados el …»; con fecha de inicio: Agendado «Sesión 1 el …» (pendientesRegistro).
         if (f.TIPO === 'CONTROL') tarjetas.push(ubicar(reg(f, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'PROGRAMADO', AGENDA: 'CONTROL', FECHA_AGENDA: f.FECHA_RETORNO }), 'AGENDADO'));
         else if (f.FECHA_INICIO) tarjetas.push(ubicar(reg(f, { ESTADO: 'AGENDADO', ESTADO_REGISTRO: 'PROGRAMADO', AGENDA: 'SESION', FECHA_AGENDA: f.FECHA_INICIO }), 'AGENDADO'));
-        else { const t = reg(f); tarjetas.push(ubicar(t, t.ESTADO === 'PENDIENTE' ? 'POR_CONTACTAR' : '')); }
+        else { const t = reg(f); tarjetas.push(ubicar(t, t.ESTADO === 'PENDIENTE' || t.ESTADO === 'EN ESPERA' ? 'POR_CONTACTAR' : '')); }
         f.TEXTO = textoRegistro(f);
       });
       reabrirSinContacto(dni);   // un contacto nuevo reabre lo cerrado «sin contacto válido»
@@ -6082,6 +6241,10 @@ const DEMO = (() => {
       tarjetas.filter(t => t.ID_REGISTRO === r.ID).forEach(t => {
         const n = reg(r);
         ['NOMBRE', 'MEDICO_ULTIMO', 'FECHA_COTIZACION', 'DETALLE', 'TRATAMIENTO', 'MARCA', 'ORIGEN_HIERRO', 'SESIONES', 'TELEFONOS', 'USUARIO'].forEach(k => { t[k] = n[k]; });
+        // Otra fecha de cotización cambia la espera (pendientesRegistro): sin ningún seguimiento, entra o sale de «en espera».
+        if (t.COLUMNA === 'POR_CONTACTAR' && !Number(t.N_SEGUIMIENTOS) && (n.ESTADO === 'EN ESPERA' || t.ESTADO === 'EN ESPERA') && n.ESTADO_REGISTRO === 'COTIZADO') {
+          Object.assign(t, { ESTADO: n.ESTADO, DIAS: n.DIAS, FIN_ESPERA: n.FIN_ESPERA });
+        }
         if (r.FECHA_INICIO && t.AGENDA === 'SESION') t.FECHA_AGENDA = r.FECHA_INICIO;
         if (control && t.AGENDA === 'CONTROL') t.FECHA_AGENDA = r.FECHA_RETORNO;
         // Otro total de sesiones puede cambiar el estado (estadoRegistro): se recalcula como al marcar una sesión. Completo,

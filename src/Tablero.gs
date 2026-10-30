@@ -180,6 +180,14 @@ function armarTablero(d) {
   retornosDelMes(d.seguimientos, d.citas, hoy).forEach(function (r) {
     col.COMPLETADO.push(tarjeta_(conTipo_(r, 'REEVALUACION'), 'COMPLETADO', reglas, hoy, r.FECHA, 'Volvió el ' + dm_(r.FECHA)));
   });
+  // Recién registrados · en espera (29/10/2026): los cotizados cuya ESPERA_COTIZACION_DIAS aún no vence. Van aparte (enEspera), con
+  // COLUMNA = POR_CONTACTAR para que acepten los mismos resultados, pero NO cuentan en la cifra de la franja ni en ninguna otra.
+  var enEspera = (d.pendientes || []).filter(function (t) { return t.ESTADO === 'EN ESPERA' && fechaIso(t.FIN_ESPERA); }).map(function (t) {
+    var o = tarjeta_(t, 'POR_CONTACTAR', reglas, hoy, t.FIN_ESPERA,
+      'Cotizó ' + (Number(t.DIAS) > 0 ? 'hace ' + plural_(Number(t.DIAS), 'día', 'días') : 'hoy') + ' · se le escribe desde el ' + dm_(t.FIN_ESPERA));
+    o.EN_ESPERA = true;
+    return o;
+  }).sort(function (a, b) { return a.FECHA_CLAVE < b.FECHA_CLAVE ? -1 : a.FECHA_CLAVE > b.FECHA_CLAVE ? 1 : a.DNI < b.DNI ? -1 : a.DNI > b.DNI ? 1 : 0; });
   var muertos = fallecidos(d.seguimientos);
   Object.keys(muertos).forEach(function (dni) {
     if (mesDe(muertos[dni].fecha) === mes) cerrados.push({ CLAVE: dni, DNI: dni, NOMBRE: nombrePorDni[dni] || '', TIPO_SEGUIMIENTO: '', CIERRE: 'FALLECIÓ', FECHA_CIERRE: muertos[dni].fecha });
@@ -234,8 +242,8 @@ function armarTablero(d) {
     return r && (r.grupo === 'SIGUE' || r.grupo === 'PAGO') && r.fecha === hoy && !sesionLigada(s);
   }).length;
   var marcadas = telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos);
-  Object.keys(col).forEach(function (c) {
-    col[c].forEach(function (t) {
+  Object.keys(col).map(function (c) { return col[c]; }).concat([enEspera]).forEach(function (lista) {
+    lista.forEach(function (t) {
       var dni = normDni(t.DNI);
       t.TELEFONOS_DESCARTADOS = marcadas[dni] || [];
       t.MES = mesDe(t.TIPO_SEGUIMIENTO === 'REEVALUACION' ? t.ULTIMA_CITA : t.FECHA_COTIZACION) || '';
@@ -244,10 +252,118 @@ function armarTablero(d) {
   });
   return {
     columnas: col,
+    enEspera: enEspera,
     cerrados: cerrados,
-    cifras: { porContactar: col.POR_CONTACTAR.length, contactados: col.CONTACTADO.length, pagados: col.PAGO_REALIZADO.length,
+    cifras: { porContactar: col.POR_CONTACTAR.length, enEspera: enEspera.length, contactados: col.CONTACTADO.length, pagados: col.PAGO_REALIZADO.length,
       agendados: col.AGENDADO.length, enTratamiento: col.EN_TRATAMIENTO.length,
       completadosMes: col.COMPLETADO.length, cerradosMes: cerrados.length,
       cerradosSinContacto: cerrados.filter(function (c) { return c.SIN_CONTACTO; }).length, hechosHoy: hechosHoy, hechosHoyPor: hechosHoyPor_(d) }
+  };
+}
+
+/** Todas las tarjetas de un armarTablero: las seis franjas y las «en espera» (validar un resultado, devolver la tarjeta movida). */
+function todasLasTarjetas(tab) {
+  var out = [];
+  COLUMNAS_TABLERO.forEach(function (c) { out = out.concat((tab.columnas || {})[c] || []); });
+  return out.concat(tab.enEspera || []);
+}
+
+/* ==========================================================================
+   BUSCADOR DEL TABLERO: POR QUÉ NO ESTÁ (29/10/2026)
+
+   Cuando lo buscado no coincide con ninguna tarjeta, la app pregunta al servidor (motivoFueraDeTablero) por los pacientes que
+   coinciden —con las reglas de buscarEnPacientes: DNI con normDni, nombre con normBusqueda— y, de cada uno, si tiene tarjeta
+   (y en qué franja) o por qué no: espera, alta vigente, seguimiento cerrado, tratamiento completo, reevaluación al día, cita
+   agendada, falleció… Solo lectura.
+   ========================================================================== */
+
+var TOPE_FUERA_DE_TABLERO = 5;
+var NOMBRE_FRANJA = { POR_CONTACTAR: 'Por contactar', CONTACTADO: 'Contactado', PAGO_REALIZADO: 'Pago realizado', AGENDADO: 'Agendado',
+  EN_TRATAMIENTO: 'En tratamiento', COMPLETADO: 'Completado' };
+
+function dniParcial(dni) { var s = String(dni || ''); return s.length > 4 ? '…' + s.slice(-4) : s; }
+function dmy_(iso) { return iso ? dm_(iso) + '/' + iso.slice(0, 4) : ''; }
+/** El nombre de un cierre para leer: SIN CONTACTO es «Sin contacto válido» (como textoCierre de Index.html). */
+function textoCierre_(m) {
+  var n = normTexto(m);
+  if (n === 'SIN CONTACTO') return 'Sin contacto válido';
+  if (n === 'NUMERO EQUIVOCADO') return 'Sin contacto válido (número equivocado)';
+  return frase_(m);
+}
+/** «hierro», «procedimiento», «control» o «reevaluación de Hematología». */
+function sujetoDe_(t) {
+  var tipo = t.TIPO_SEGUIMIENTO || 'REEVALUACION';
+  if (tipo === 'REEVALUACION') return 'reevaluación de ' + frase_(t.ESPECIALIDAD);
+  return tipo === 'HIERRO' ? 'hierro' : tipo === 'CONTROL' ? 'control' : 'procedimiento';
+}
+
+/** Por qué la fila `t` (de armarPacientes o de los pendientes) no está en el tablero, o '' si no hay nada que decir. */
+function motivoDeFila_(t, d) {
+  var tipo = t.TIPO_SEGUIMIENTO || 'REEVALUACION', reev = tipo === 'REEVALUACION', suj = sujetoDe_(t), e = t.ESTADO, corte = d.reglas.corteIndicaciones;
+  if (e === 'EN ESPERA') return 'su ' + suj + ' está en espera hasta el ' + dm_(t.FIN_ESPERA);
+  if (e === 'CERRADO') return 'seguimiento cerrado de su ' + suj + ': ' + textoCierre_(t.CIERRE) + (t.FECHA_CIERRE ? ' (' + dm_(fechaIso(t.FECHA_CIERRE)) + ')' : '');
+  if (reev) {
+    if (e === 'ALTA') {
+      var a = (d.vigentes || {})[claveSerie(t.DNI, t.ESPECIALIDAD)];
+      return 'tiene alta médica vigente (' + frase_(t.ESPECIALIDAD) + (a && fechaIso(a.FECHA) ? ', ' + dm_(fechaIso(a.FECHA)) : '') + ')'
+        + (t.FECHA_RETORNO ? ' · vuelve el ' + dm_(t.FECHA_RETORNO) : '');
+    }
+    if (e === 'AL DÍA' || e === 'POR VENCER' || e === 'RECUPERADO') return 'su ' + suj + ' todavía no vence (debe volver el ' + dm_(t.PROXIMA_ESPERADA) + ')';
+    if (e === 'AGENDADO') return 'tiene cita agendada el ' + dm_(t.FECHA_AGENDA || t.PROXIMA_AGENDADA) + ' (' + frase_(t.ESPECIALIDAD) + ')';
+    if (e === 'ANTIGUO') return 'su ' + suj + ' venció hace más de ' + corte + ' días (debía volver el ' + dmy_(t.PROXIMA_ESPERADA) + '): ya no se muestra';
+    return '';
+  }
+  if (e === 'COMPLETADO') {
+    if (t.VOLVIO) return 'su ' + suj + ' terminó: volvió a consulta el ' + dm_(t.VOLVIO);
+    if (t.ESTADO_REGISTRO === 'COMPLETO') {
+      if (tipo === 'PROCEDIMIENTO') return 'se hizo su procedimiento (' + dm_(t.ULTIMA_SESION) + ')';
+      return 'completó su tratamiento de ' + suj + ' (' + dm_(t.ULTIMA_SESION) + ')'
+        + (t.SIN_REEVALUACION ? ' · alta definitiva del ' + dm_(t.SIN_REEVALUACION) : t.FECHA_REEVALUAR ? ' · reevaluar el ' + dm_(t.FECHA_REEVALUAR) : '');
+    }
+    return 'ya se hizo su ' + suj + (t.FECHA_LOHIZO ? ' (' + dm_(t.FECHA_LOHIZO) + ')' : '');
+  }
+  if (e === 'ANTIGUO') {
+    var desde = t.FECHA_FALTA || t.FECHA_REEVALUAR || t.FECHA_COTIZACION;
+    return 'su ' + suj + ' lleva más de ' + corte + ' días sin seguimiento' + (desde ? ' (desde el ' + dmy_(desde) + ')' : '') + ': ya no se muestra';
+  }
+  return '';
+}
+
+/**
+ * `d` = datos_() (derivados), `tab` = armarTablero(d). { q, total, pacientes: [{ DNI, DNI_PARCIAL, NOMBRE, EN_TABLERO, FRANJAS, MOTIVOS }] }:
+ * hasta TOPE_FUERA_DE_TABLERO pacientes; total = cuántos coincidieron (buscarEnPacientes, que corta en 20).
+ */
+function fueraDeTablero(d, tab, q) {
+  var texto = textoLimpio_(q && typeof q === 'object' ? q.q : q);
+  var hallados = buscarEnPacientes(texto, { citas: d.citas, registros: d.registros, indicaciones: d.indicaciones });
+  var tarjetas = {}, muertos = fallecidos(d.seguimientos);
+  COLUMNAS_TABLERO.forEach(function (c) {
+    ((tab.columnas || {})[c] || []).forEach(function (t) {
+      var k = normDni(t.DNI);
+      (tarjetas[k] = tarjetas[k] || []).push(NOMBRE_FRANJA[c]);
+    });
+  });
+  (tab.enEspera || []).forEach(function (t) {
+    var k = normDni(t.DNI);
+    (tarjetas[k] = tarjetas[k] || []).push('Por contactar · Recién registrados · en espera');
+  });
+  var filas = ((d.pacientes || []).map(function (p) { return conTipo_(p, 'REEVALUACION'); })).concat(d.pendientes || []);
+  return {
+    q: texto,
+    total: hallados.length,
+    pacientes: hallados.slice(0, TOPE_FUERA_DE_TABLERO).map(function (h) {
+      var dni = normDni(h.DNI), franjas = tarjetas[dni] || [], motivos = [];
+      if (!franjas.length) {
+        if (muertos[dni]) motivos = ['falleció (' + dmy_(muertos[dni].fecha) + ')'];
+        else filas.forEach(function (t) {
+          if (normDni(t.DNI) !== dni) return;
+          var m = motivoDeFila_(t, d);
+          if (m && motivos.indexOf(m) < 0) motivos.push(m);
+        });
+        if (!motivos.length) motivos = ['no tiene ningún seguimiento pendiente'];
+      }
+      return { DNI: dni, DNI_PARCIAL: dniParcial(dni), NOMBRE: h.NOMBRE, EN_TABLERO: franjas.length > 0,
+        FRANJAS: franjas.filter(function (f, i) { return franjas.indexOf(f) === i; }), MOTIVOS: motivos };
+    })
   };
 }

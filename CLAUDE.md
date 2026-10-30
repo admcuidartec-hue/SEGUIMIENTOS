@@ -31,7 +31,7 @@ La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administ
   `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`, `guardarRegistro`,
   `marcarSesion`, `anularRegistro`, `anularSesion`, `darDeAlta`, `anularAlta`, `getRegistrosHoy`,
   `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`, `getEnfermeria`,
-  `registrarContactoEnfermeria`, `anularContactoEnfermeria`.
+  `registrarContactoEnfermeria`, `anularContactoEnfermeria`, `motivoFueraDeTablero`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.
@@ -248,6 +248,50 @@ en el panel va en «Cerrar el seguimiento» (X) y es la primera opción si la ta
 `@HEAD`, con el paciente de prueba: un hierro con «Hierro propio», dos «No contestó» de Enfermería y su «Deshacer», un «Sin
 contacto válido» y su «Deshacer» → `npm run actualizar`. Avisar a las admisionistas: el hierro que trae el paciente **también se
 registra**, y existe el cierre «Sin contacto válido».
+
+## Recién registrados en espera y el buscador del tablero (29/10/2026)
+
+Reporte de Rachel: registró un hierro (Ferinject × 1, sin fecha de primera sesión) y no lo encontraba en el Tablero —el buscador
+decía «Nadie con estos filtros» en todas las franjas— aunque en Pacientes figuraba «Pendiente». Un cotizado sin `FECHA_INICIO`
+espera `ESPERA_COTIZACION_DIAS` (7) antes de entrar en «Por contactar» y mientras tanto no estaba en ninguna franja.
+
+**1. «Recién registrados · en espera».** `pendientesRegistro` da a cada fila `EN ESPERA` su `FIN_ESPERA` (FECHA + espera);
+`armarTablero` las devuelve **aparte**, en `enEspera` (no en `columnas.POR_CONTACTAR`), con `COLUMNA = POR_CONTACTAR`, `EN_ESPERA =
+true`, `FECHA_CLAVE = FIN_ESPERA` y la etiqueta «Cotizó hoy · se le escribe desde el 04/11» / «Cotizó hace 2 días · se le escribe
+desde el 04/11»; `cifras.enEspera` las cuenta.
+- **No cuentan**: ni en la cifra de la franja, ni en «N por contactar» del saludo, ni en el segmentado, la barra, la meta o
+  Indicadores. La cabecera lo dice aparte: «… sin ningún intento · +3 en espera». En pantalla van **al final** de Por contactar, en su
+  grupo (tarjeta con borde punteado), con el mismo tope de 12 y «Ver los N →». Respetan los filtros y el buscador.
+- **Se abren y aceptan lo mismo que una tarjeta de Por contactar** («Pagó», «Aceptó» con fecha → Agendado, «No desea realizarse»,
+  los cierres, «Número equivocado»): `tarjetasAbiertas_` las incluye y `todasLasTarjetas(tab)` las devuelve como `r.tarjeta`.
+- **«No contestó» y «Lo pensará» también, y adelantan el ciclo** (decidido el 29/10/2026): el primer resultado termina la espera
+  (`dias < espera && !c.intentos`); la tarjeta sigue su camino normal (Contactado) y, si la fecha de «Lo pensará» pasa antes de
+  cumplirse los 7 días, vuelve a Por contactar, no a «en espera». Antes un «Pagó» en espera dejaba la tarjeta invisible: ahora va a
+  Pago realizado.
+- Vencida la espera, la tarjeta pasa sola al grupo normal (se recalcula al leer). El DEMO trae el caso: `REG-000008`, Lucía Prueba
+  Ñahui, registrada «ayer».
+
+**2. El buscador del tablero cuando lo buscado no está en ninguna franja.** Si el texto (3 caracteres o más; DNI con `normDni`,
+también con ceros, o nombre con `normBusqueda`) no coincide con ninguna tarjeta visible, arriba de las franjas aparece `#fuera`
+(`pintarFuera`):
+- Coincide con tarjetas que ocultan los filtros: «Está en el tablero, pero no con estos filtros.» con los pacientes (hasta 5, DNI
+  parcial «…3456», «Ver ficha») y **«Quitar filtros», que conserva lo buscado** (`quitarFiltros(false)`; el de las franjas vacías
+  sigue borrándolo todo).
+- Si no, pregunta al servidor **`motivoFueraDeTablero({ q })`** (solo lectura, sin candado; `fueraDeTablero` en `Tablero.gs`): los
+  pacientes de `buscarEnPacientes` (hasta 5, con `total`) y, de cada uno, `EN_TABLERO` + `FRANJAS` o sus `MOTIVOS`: «su hierro está
+  en espera hasta el 04/11», «tiene alta médica vigente (Hematología, 27/10)», «seguimiento cerrado de su hierro: Sin contacto
+  válido (28/10)», «completó su tratamiento de hierro (28/09) · reevaluar el 28/10», «su reevaluación de Hematología todavía no vence
+  (debe volver el 15/11)», «tiene cita agendada el 03/11 (Hematología)», «… lleva más de 180 días sin seguimiento…», «falleció
+  (10/10/2026)» o «no tiene ningún seguimiento pendiente». Con varios: «7 pacientes con «…» no están en ninguna franja visible (se
+  muestran 5).» «Ver ficha» abre Pacientes con esa ficha.
+- No existe: «No hay ningún paciente con «…».» con «Ir a Registro».
+- Se pide con 300 ms de pausa y una sola vez por texto y carga del tablero; solo vale la última respuesta. Roles: el Tablero no lo
+  ve la enfermera; Solo consulta ve el aviso y abre la ficha sin poder escribir. El servidor no exige rol (como `getTablero`).
+
+**Publicar**: sin hojas ni columnas nuevas. `npm run subir` → en el `@HEAD`, registrar un hierro de prueba sin fecha de primera
+sesión, verlo en «Recién registrados · en espera» y buscarlo por DNI con su cero; buscar a un paciente con alta o cerrado y ver el
+motivo → `npm run actualizar`. Avisar a las admisionistas: lo recién registrado aparece al final de «Por contactar» y no cuenta
+hasta que se le escribe.
 
 ## «¿Qué pasó?» (Etapa 1)
 

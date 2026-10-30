@@ -593,7 +593,9 @@ function pendientesRegistro(d) {
       // Un «por reevaluar» muy viejo no se muestra: al publicar no debe caer una avalancha de tarjetas.
       estado = sinReev ? 'COMPLETADO' : hoy < reevaluar ? 'COMPLETADO' : diasEntre(reevaluar, hoy) > reglas.corteIndicaciones ? 'ANTIGUO' : 'POR REEVALUAR';
     }
-    else if (dias < espera) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
+    // Un cotizado espera ESPERA_COTIZACION_DIAS antes de que se le escriba («Recién registrados · en espera» del tablero), salvo
+    // que ya se le haya escrito: el primer resultado («No contestó», «Lo pensará», «Pagó») adelanta el ciclo (29/10/2026).
+    else if (dias < espera && (enCurso || !c.intentos)) estado = enCurso ? 'EN TRATAMIENTO' : 'EN ESPERA';
     else if (dias > reglas.corteIndicaciones) estado = 'ANTIGUO';
     // Reabierta por un contacto nuevo («Sin contacto válido»): vuelve a Por contactar aunque fuera ANTIGUO.
     if (c.nuevoContacto && estado === 'ANTIGUO') estado = e.estado === 'COMPLETO' ? 'POR REEVALUAR' : 'PENDIENTE';
@@ -640,7 +642,9 @@ function pendientesRegistro(d) {
       FECHA_INICIO: e.inicio,
       FECHA_FALTA: falta,
       FECHA_PAGO: c.pago,
-      NUEVO_CONTACTO: (c.nuevoContacto || []).join(' / ')
+      NUEVO_CONTACTO: (c.nuevoContacto || []).join(' / '),
+      // Mientras espera: desde qué día se le escribe (la tarjeta pasa sola de «en espera» a Por contactar).
+      FIN_ESPERA: estado === 'EN ESPERA' ? sumarDias(desde, espera) : ''
     };
   }).filter(Boolean);
 }

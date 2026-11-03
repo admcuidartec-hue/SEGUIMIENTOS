@@ -242,6 +242,13 @@ html[data-rol="consulta"] .lohizo,html[data-rol="enfermeria"] .lohizo{display:no
 .panel{position:fixed;top:0;right:0;bottom:0;width:460px;max-width:100%;background:var(--surface);border-left:1px solid var(--line);transform:translateX(100%);visibility:hidden;transition:transform .3s var(--ease-drawer),visibility 0s linear .3s;z-index:51;display:flex;flex-direction:column;outline:none}
 .panel.abierto{transform:none;visibility:visible;box-shadow:var(--shadow-lg);transition:transform .4s var(--ease-drawer),visibility 0s}
 .panel.instantaneo,.velo.instantaneo{transition:none}
+/* Cambio de día con la pestaña abierta: tapa todo hasta recargar (vigilarCambioDeDia). */
+.nuevo-dia{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:16px;background:var(--velo)}
+.nuevo-dia[hidden]{display:none}
+.nd-caja{max-width:420px;padding:24px;border-radius:var(--r);background:var(--surface);color:var(--ink);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;outline:none}
+.nd-caja h2{margin:0;font-size:20px}
+.nd-caja p{margin:0;color:var(--muted);line-height:1.5}
+.nd-caja .ph{font-size:28px;color:var(--accent)}
 .p-top{padding:18px 24px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
 .p-cab{display:flex;align-items:flex-start;gap:12px}
 .p-cab>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
@@ -755,7 +762,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 #imprimible .imp-canales .fila-v span:last-child{font-family:var(--mono);min-width:24mm}
 @page{size:A4;margin:15mm}
 @media print{
-  .velo,.aviso,.navmovil,.topmovil{display:none!important}
+  .velo,.aviso,.navmovil,.topmovil,.nuevo-dia{display:none!important}
   html.imp-listo .app,html.imp-listo .panel{display:none!important}
   html.imp-listo #imprimible{display:block}
   html,body{background:var(--surface);color:var(--ink);font-size:10.5pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -899,6 +906,10 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 </nav>
 <section id="imprimible" aria-label="Resumen del mes para imprimir"></section>
 <div class="velo" id="velo"></div>
+<div class="nuevo-dia" id="nuevo-dia" role="alertdialog" aria-modal="true" aria-labelledby="nuevo-dia-t" aria-describedby="nuevo-dia-d" hidden>
+  <div class="nd-caja" tabindex="-1"><i class="ph ph-calendar-check"></i><h2 id="nuevo-dia-t">Es un nuevo día</h2><p id="nuevo-dia-d"></p>
+    <p>Presione <span class="kbd">F5</span> o cierre y vuelva a abrir el enlace.</p></div>
+</div>
 <aside class="panel" id="panel" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="panel-t"></aside>
 <div class="aviso" id="aviso" role="status" aria-live="polite"><span></span><button type="button" hidden></button></div>
 <div class="aviso aviso-srv" id="aviso-srv" role="status" aria-live="polite"><span></span></div>
@@ -993,6 +1004,7 @@ function textoDemasiadoLargo(p) {
     || largoMal(r.nota, LARGO_TEXTO, 'La nota de la reacción');
 }
 function llamar(fn, ...args0) {
+  if (S.diaVencido) return Promise.reject(new Error('Cambió el día: recargue la página (F5) para seguir.'));
   // Lo que el rol no puede hacer no sale de la pantalla (el servidor lo rechaza igual).
   const noRol = ESCRIBEN[fn] && args0[0] && typeof args0[0] === 'object' ? errorDeRolUi(rolDeUsuario(args0[0].usuario), fn) : '';
   if (noRol) return Promise.reject(new Error(noRol));
@@ -1021,6 +1033,7 @@ function llamar(fn, ...args0) {
 const S = {
   boot: null,       // adaptarBoot(bootstrap())
   hoy: '',          // ISO, de bootstrap().hoy (zona del libro, no la del navegador)
+  diaVencido: false, // cambió el día con la pestaña abierta: nada llega al servidor hasta recargar (vigilarCambioDeDia)
   reglas: null,     // bootstrap().reglas
   usuario: '',      // texto exacto del catálogo ('MAGALY'); '' = sin elegir
   modo: 'claro',
@@ -1180,6 +1193,32 @@ function saludoHora() {
   } catch (e) { h = NaN; }
   if (!(h >= 0 && h < 24)) h = new Date().getHours();
   return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
+/*
+ * S.hoy llega con bootstrap y no cambia mientras la pestaña siga abierta: una pestaña abierta el sábado seguía el lunes con
+ * «hoy» = sábado, y la fecha de la consulta venía puesta (y topada) en el sábado (02/11/2026). Al cambiar el día en Lima se tapa
+ * la pantalla hasta recargar. Se compara el día del navegador con el de cuando cargó, no con S.hoy: un reloj desajustado no
+ * dispara el aviso, y el DEMO (S.hoy fijo) tampoco.
+ */
+function diaLima() {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Lima' }).format(new Date());
+  } catch (e) { return new Date().toDateString(); }
+}
+function vigilarCambioDeDia() {
+  if (S.diaAlCargar) return;   // arrancar se puede reintentar: una sola vigilancia
+  S.diaAlCargar = diaLima();
+  const revisar = () => { if (!S.diaVencido && diaLima() !== S.diaAlCargar) avisarNuevoDia(); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) revisar(); });
+  addEventListener('focus', revisar);
+  setInterval(revisar, 60000);
+}
+function avisarNuevoDia() {
+  S.diaVencido = true;
+  const caja = $('#nuevo-dia');
+  $('#nuevo-dia-d').textContent = `La página se abrió el ${dmy(S.hoy)}. Para no guardar nada con la fecha de ese día, recárguela antes de seguir.`;
+  caja.hidden = false;
+  caja.querySelector('.nd-caja').focus();
 }
 function pintarSaludo() {
   const u = yo(), s = saludoHora();
@@ -5144,6 +5183,7 @@ async function arrancar() {
   S.boot = adaptarBoot(b);
   S.hoy = S.boot.hoy;
   S.reglas = S.boot.reglas;
+  vigilarCambioDeDia();
   // Sin usuario por omisión: solo se recupera el recordado si sigue en el catálogo.
   const recordado = LS.get('seg.usuario');
   S.usuario = S.boot.usuarios.some(u => u.v === recordado) ? recordado : '';

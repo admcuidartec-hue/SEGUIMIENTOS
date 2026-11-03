@@ -5225,3 +5225,27 @@ test('buscador del tablero: varios pacientes sin tarjeta, hasta 5 con su DNI par
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('cambio de día con la pestaña abierta: tapa la pantalla, dice desde cuándo y no deja llamar al servidor hasta recargar', async () => {
+  const navegador = await chromium.launch();
+  try {
+    // Navegador en Madrid: el día que cuenta es el de Lima (a las 23:50 de Lima allí ya es el día siguiente).
+    const pagina = await (await navegador.newContext({ timezoneId: 'Europe/Madrid' })).newPage();
+    const errores = [];
+    pagina.on('pageerror', e => errores.push(e.message));
+    await pagina.clock.install({ time: new Date('2026-10-01T23:50:00-05:00') });
+    await pagina.addInitScript(() => localStorage.setItem('seg.usuario', 'RACHEL'));
+    await pagina.goto('file://' + ARCHIVO);
+    await pagina.waitForFunction(() => S.fase === 'listo');
+    await pagina.evaluate(() => dispatchEvent(new Event('focus')));
+    assert.equal(await pagina.locator('#nuevo-dia').isVisible(), false, 'el mismo día de Lima: nada');
+    await pagina.clock.setSystemTime(new Date('2026-10-02T00:05:00-05:00'));
+    await pagina.clock.runFor(61000);   // la revisión de cada minuto, sin que nadie toque la pestaña
+    await pagina.waitForFunction(() => !document.querySelector('#nuevo-dia').hidden);
+    assert.match(await pagina.locator('#nuevo-dia-d').textContent(), /se abrió el 01\/10\/2026/);
+    assert.equal(await pagina.evaluate(() => document.activeElement.classList.contains('nd-caja')), true);
+    const rechazo = await pagina.evaluate(() => llamar('getTablero').then(() => 'pasó', e => e.message));
+    assert.equal(rechazo, 'Cambió el día: recargue la página (F5) para seguir.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

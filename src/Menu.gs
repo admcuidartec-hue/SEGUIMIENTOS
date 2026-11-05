@@ -435,6 +435,14 @@ function verificar() {
       ? '✗ A la "Hoja 1" le faltan: ' + r.faltantes.join(', ') + '.'
       : '✓ "Hoja 1": encabezado correcto, ' + Math.max(0, h.getLastRow() - 1) + ' filas.');
   }
+  // Hasta qué fecha llega SOFDOC (05/11/2026). FECHA_HORA puede volver como Date si Sheets convirtió el texto.
+  if (ss.getSheetByName('CITAS')) {
+    var cargas = leerOpcional_('BITACORA').map(function (b) {
+      return { FECHA_HORA: b.FECHA_HORA instanceof Date ? fechaHoraTexto_(b.FECHA_HORA) : String(b.FECHA_HORA || ''),
+        USUARIO: b.USUARIO, ACCION: b.ACCION, DETALLE: b.DETALLE };
+    });
+    lineasSofdoc(leerCitas_(), hoy_(), cargas).forEach(function (l) { lineas.push(l); });
+  }
   Object.keys(hojasBase_()).concat(['REGLAS', 'CATALOGOS']).forEach(function (n) {
     var s = ss.getSheetByName(n);
     lineas.push(s ? '✓ ' + n + ': ' + Math.max(0, s.getLastRow() - 1) + ' filas.' : '✗ Falta la hoja ' + n + '. Use «Preparar hojas».');

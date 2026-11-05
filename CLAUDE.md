@@ -293,6 +293,28 @@ sesión, verlo en «Recién registrados · en espera» y buscarlo por DNI con su
 motivo → `npm run actualizar`. Avisar a las admisionistas: lo recién registrado aparece al final de «Por contactar» y no cuenta
 hasta que se le escribe.
 
+## Cambio de día con la pestaña abierta (03/11/2026)
+
+`S.hoy` llega con `bootstrap` y no cambia mientras la pestaña siga abierta. Una pestaña abierta el sábado seguía el lunes con
+«hoy» = sábado: la fecha de la consulta venía puesta y topada en el sábado, y se podía guardar con esa fecha sin aviso.
+
+- `vigilarCambioDeDia` (Index.html) compara el día de Lima de ahora con el de cuando cargó la página: al volver a la pestaña,
+  al darle foco y cada minuto. Compara navegador con navegador, no con `S.hoy`: un reloj desajustado no lo dispara, y el DEMO tampoco.
+- Si cambió, `#nuevo-dia` tapa la pantalla («Es un nuevo día… presione F5») y `llamar()` rechaza toda llamada al servidor
+  (`S.diaVencido`): ni los atajos de teclado guardan con la fecha vieja.
+- **No recarga sola ni vuelve a llamar `arrancar()`**: los `iniciar*` conectan eventos una sola vez, y recargar el marco de
+  Apps Script desde dentro no es fiable. Recarga la persona, con F5.
+
+## «Verificar» dice hasta qué fecha llega SOFDOC (05/11/2026)
+
+`lineasSofdoc` (Logica.gs), llamada desde `verificar()`, agrega hasta tres líneas:
+
+- **✓ o ⚠ citas realizadas hasta el dd/mm/aaaa.** Se mide en citas `REALIZADO` hasta hoy: una cita agendada no dice que el
+  export esté al día. Con más de 2 días de atraso sale ⚠ y la indicación de exportar, pegar en la «Hoja 1» y «Actualizar».
+- **ℹ citas agendadas hasta…**, si hay citas futuras.
+- **ℹ última carga con citas nuevas…**, sacada de la `BITACORA`. Solo cuenta una carga correcta («filas leídas») que trajo citas
+  nuevas: la de las 7:00 relee la misma «Hoja 1» y, sin un export nuevo, no adelanta nada.
+
 ## «¿Qué pasó?» (Etapa 1)
 
 - La lista de resultados vive en `RESULTADOS` (`src/Resultados.gs`), no en `CATALOGOS`.

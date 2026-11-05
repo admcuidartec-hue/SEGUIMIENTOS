@@ -73,6 +73,51 @@ function diasEntre(desde, hasta) {
   return n === n ? n : 0;   // NaN (una fecha que no es yyyy-mm-dd) → 0
 }
 
+/** 'yyyy-mm-dd' → 'dd/mm/yyyy'; '' si no es una fecha. */
+function fechaDmy(iso) {
+  var f = fechaIso(iso);
+  return f ? f.slice(8, 10) + '/' + f.slice(5, 7) + '/' + f.slice(0, 4) : '';
+}
+
+/**
+ * La línea de «Verificar» sobre SOFDOC (05/11/2026): hasta qué fecha llegan las citas REALIZADO (una agendada no dice que el
+ * export esté al día), la más lejana agendada y la última carga de la «Hoja 1» que trajo citas nuevas. La actualización de las
+ * 7:00 relee la misma «Hoja 1»: sin un export nuevo, la base se queda donde estaba aunque «Actualizar» corra cada día.
+ * `cargas`: filas de BITACORA ({ FECHA_HORA: 'yyyy-mm-dd HH:mm', USUARIO, ACCION, DETALLE }), en el orden de la hoja.
+ */
+function lineasSofdoc(citas, hoy, cargas) {
+  var hasta = '', lejana = '';
+  (citas || []).forEach(function (c) {
+    var f = fechaIso(c.FECHA);
+    if (!f) return;
+    if (f > lejana) lejana = f;
+    if (normTexto(c.ESTADO) === 'REALIZADO' && f <= hoy && f > hasta) hasta = f;
+  });
+  var l = [];
+  if (!hasta) {
+    l.push('✗ SOFDOC: CITAS no tiene ninguna cita realizada. Pegue el export de SOFDOC en la «Hoja 1» y use «Actualizar».');
+  } else {
+    var dias = diasEntre(hasta, hoy);
+    var cuando = dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : 'hace ' + dias + ' días';
+    l.push(dias <= 2
+      ? '✓ SOFDOC: citas realizadas hasta el ' + fechaDmy(hasta) + ' (' + cuando + ').'
+      : '⚠ SOFDOC: citas realizadas hasta el ' + fechaDmy(hasta) + ', ' + cuando + '. Exporte de SOFDOC, péguelo en la «Hoja 1» y use «Actualizar».');
+    if (lejana > hoy) l.push('ℹ SOFDOC: hay citas agendadas hasta el ' + fechaDmy(lejana) + '.');
+  }
+  var ultima = null;
+  (cargas || []).forEach(function (b) {
+    var m = normTexto(b.ACCION) === 'ACTUALIZAR' && /filas leídas.*?(\d+) citas nuevas/.exec(String(b.DETALLE || ''));
+    if (m && Number(m[1]) > 0 && (!ultima || String(b.FECHA_HORA) >= ultima.cuando)) {
+      ultima = { cuando: String(b.FECHA_HORA), quien: textoLimpio_(b.USUARIO), nuevas: Number(m[1]) };
+    }
+  });
+  if (ultima && fechaIso(ultima.cuando)) {
+    l.push('ℹ SOFDOC: última carga con citas nuevas el ' + fechaDmy(ultima.cuando) + ultima.cuando.slice(10, 16) +
+      (ultima.quien ? ' (' + ultima.quien + ')' : '') + ': ' + ultima.nuevas + (ultima.nuevas === 1 ? ' cita nueva.' : ' citas nuevas.'));
+  }
+  return l;
+}
+
 /** La fecha `n` días después; '' si `iso` está vacía o no es una fecha (nunca «NaN-aN-aN» en una etiqueta: caso 6 de la batería de 80). */
 function sumarDias(iso, n) {
   var d = new Date(diaUtc_(iso) + n * 86400000);

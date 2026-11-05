@@ -517,7 +517,8 @@ la espera, y un cierre lo deja como descartado, aunque después se pulse «Desha
 
 - Script (incrustado en el libro madre): `10jN1KMUrKYWTAQNrh68hMlBrA6s5Hvc-YI06n1rHaZV9gDIT99hjdZZY`
 - Deployment estable (el que usa el equipo): `AKfycbzSvnyttpl1VOiKNDilyPPoqlD7VkxPDxwExa4kS75mgbgTfRbe16kJj6fpfGoBUWCkcA`
-  - En producción: **v14** (27/10/2026): correcciones de las baterías de 10 a 80 pruebas, rendimiento, idempotencia, roles (admisión, enfermería, solo consulta), hierro propio, «No respondió» y «Sin contacto válido». Para volver atrás: `--versionNumber 13`.
+  - En producción: **v15** (05/11/2026): «Recién registrados · en espera» en el tablero, el aviso del buscador cuando un paciente no tiene tarjeta (`motivoFueraDeTablero`) y el aviso de cambio de día con la pestaña abierta. Para volver atrás: `--versionNumber 14`.
+  - v14 (27/10/2026): correcciones de las baterías de 10 a 80 pruebas, rendimiento, idempotencia, roles (admisión, enfermería, solo consulta), hierro propio, «No respondió» y «Sin contacto válido».
   - URL: https://script.google.com/macros/s/AKfycbzSvnyttpl1VOiKNDilyPPoqlD7VkxPDxwExa4kS75mgbgTfRbe16kJj6fpfGoBUWCkcA/exec
 - `@HEAD` (`AKfycbx9-YbDPycofyq2BSq3n9KtKZ_GdbHrtYnPgtOkCnE1`) sirve el último código subido y nadie del equipo lo tiene: úselo antes de publicar.
   - URL: https://script.google.com/macros/s/AKfycbx9-YbDPycofyq2BSq3n9KtKZ_GdbHrtYnPgtOkCnE1/dev

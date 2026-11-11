@@ -894,23 +894,44 @@ var COLUMNAS_PACIENTES = ['DNI', 'ESPECIALIDAD', 'NOMBRE', 'TELEFONOS', 'MEDICO_
   'ULTIMO_SEGUIMIENTO', 'PENDIENTE', 'CIERRE', 'FECHA_CIERRE', 'AGENDA', 'FECHA_AGENDA', 'INTENTO'];
 
 /**
- * Teléfonos de cada paciente: primero los de hierro y procedimientos, luego los del CRM, sin repetir.
+ * Teléfonos de cada paciente: primero los agregados a mano («Agregar teléfono», hoja TELEFONOS; el más reciente primero: es el
+ * más fresco), luego los de hierro y procedimientos y luego los del CRM, sin repetir.
  * Sin los marcados como «número equivocado»; uno marcado vuelve solo si llega de nuevo
- * por un registro posterior a la marca (alguien lo confirmó con el paciente).
+ * por un registro posterior a la marca (alguien lo confirmó con el paciente). Uno agregado a mano se compara por fecha y hora:
+ * agregado después de la marca vuelve; marcado después de agregarlo, sale. `manuales` (opcional): las filas de TELEFONOS.
  */
-function telefonosPorDni(indicaciones, contactos, seguimientos) {
-  var out = {}, marcas = marcasTelefono(seguimientos);
-  function sumar(dni, telefono, fecha) {
+function telefonosPorDni(indicaciones, contactos, seguimientos, manuales) {
+  var out = {}, marcas = marcasTelefono(seguimientos), horas = null;
+  function sumar(dni, telefono, fecha, hora) {
     var t = normTelefono(telefono);
     if (!dni || !t) return;
     var m = marcas[dni] && marcas[dni][t];
-    if (m && !(fecha && fecha > m)) return;
+    if (m && hora) {
+      horas = horas || marcasTelefonoHora_(seguimientos);
+      if (!(hora > horas[dni][t])) return;
+    } else if (m && !(fecha && fecha > m)) return;
     out[dni] = out[dni] || [];
     if (out[dni].indexOf(t) < 0) out[dni].push(t);
   }
+  telefonosManualesVivos(manuales).forEach(function (f) { sumar(f.DNI, f.TELEFONO, '', f.FECHA_HORA); });
   (indicaciones || []).forEach(function (i) { sumar(i.DNI, i.TELEFONO, i.ORIGEN === 'REGISTROS' ? i.FECHA : ''); });
   (contactos || []).forEach(function (c) { sumar(c.DNI_PACIENTE, c.TELEFONO, ''); });
   return out;
+}
+
+/**
+ * Las filas de TELEFONOS que cuentan: sin anular, con DNI y teléfono, el más reciente primero (a igual hora, el de ID mayor). El
+ * DNI con normDni y el teléfono con normTelefono. Una fila sin FECHA_HORA (escrita a mano) cuenta, al final.
+ */
+function telefonosManualesVivos(manuales) {
+  return (manuales || []).filter(function (f) { return f && !anulado_(f) && normDni(f.DNI) && normTelefono(f.TELEFONO); })
+    .map(function (f) {
+      return { ID: textoLimpio_(f.ID), DNI: normDni(f.DNI), TELEFONO: normTelefono(f.TELEFONO), FECHA_HORA: String(f.FECHA_HORA || ''),
+        NOTA: textoLimpio_(f.NOTA), USUARIO: textoLimpio_(f.USUARIO) };
+    })
+    .sort(function (a, b) {
+      return a.FECHA_HORA !== b.FECHA_HORA ? (a.FECHA_HORA < b.FECHA_HORA ? 1 : -1) : (a.ID < b.ID ? 1 : a.ID > b.ID ? -1 : 0);
+    });
 }
 
 /** Cotizado y no aceptado después (mismo DNI y mismo tipo) = pendiente. */
@@ -945,11 +966,11 @@ function segsPorSerie(seguimientos) {
 
 /**
  * `usuarios` (opcional, usuariosPorDni): el contacto de Registro que no es teléfono (p. ej. «@usuario»), por DNI. Cuenta como
- * otro contacto: un «Número equivocado» no cierra mientras quede.
+ * otro contacto: un «Número equivocado» no cierra mientras quede. `manuales` (opcional): las filas de TELEFONOS (telefonosPorDni).
  */
-function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas, retornos, usuarios) {
+function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contactos, altas, retornos, usuarios, manuales) {
   var series = armarSeries(citas);
-  var tel = telefonosPorDni(indicaciones, contactos, seguimientos), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
+  var tel = telefonosPorDni(indicaciones, contactos, seguimientos, manuales), pend = pendientesPorDni(indicaciones), segs = segsPorSerie(seguimientos);
   var marcas = marcasTelefono(seguimientos), muertos = fallecidos(seguimientos);
   var out = [];
   Object.keys(series).forEach(function (k) {
@@ -1000,9 +1021,9 @@ function contactosTarjeta_(telefonos, usuario) {
 /**
  * Hierro y procedimientos cotizados y no hechos, como seguimientos propios:
  * una fila por DNI y tipo, estén o no al día con su reevaluación. En
- * SEGUIMIENTOS se registran con ESPECIALIDAD = HIERRO o PROCEDIMIENTO.
+ * SEGUIMIENTOS se registran con ESPECIALIDAD = HIERRO o PROCEDIMIENTO. `manuales` (opcional): las filas de TELEFONOS.
  */
-function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, contactos, usuarios) {
+function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, contactos, usuarios, manuales) {
   var aceptado = {}, grupos = {};
   (indicaciones || []).forEach(function (i) {
     if (!i.DNI || i.ESTADO !== 'ACEPTÓ' || !fechaIso(i.FECHA)) return;
@@ -1020,7 +1041,7 @@ function pendientesIndicacion(citas, indicaciones, seguimientos, reglas, hoy, co
     var texto = (i.TIPO === 'HIERRO' ? 'Hierro (Ferinject)' : (i.DETALLE || 'Procedimiento')) + (cantidad > 1 ? ' ×' + cantidad : '');
     if (g.detalles.indexOf(texto) < 0) g.detalles.push(texto);
   });
-  var porDni = realizadasPorDni_(citas), tel = telefonosPorDni(indicaciones, contactos, seguimientos), segs = {};
+  var porDni = realizadasPorDni_(citas), tel = telefonosPorDni(indicaciones, contactos, seguimientos, manuales), segs = {};
   var marcas = marcasTelefono(seguimientos), muertos = fallecidos(seguimientos);
   (seguimientos || []).forEach(function (s) {
     var t = normTexto(s.ESPECIALIDAD);

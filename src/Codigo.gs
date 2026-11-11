@@ -368,6 +368,13 @@ function leerAltas_() {
   return a;
 }
 
+/** TELEFONOS («Agregar teléfono», 11/11/2026) puede no existir todavía (antes de «Preparar hojas»): vacía. */
+function leerTelefonos_() {
+  var t = fechas_(leerOpcional_('TELEFONOS'));
+  t.forEach(function (x) { x.DNI = normDni(x.DNI); x.TELEFONO = normTelefono(x.TELEFONO); });
+  return t;
+}
+
 /** Todo lo que necesita la app, leído una vez por petición. */
 function datos_() {
   if (MEMO.datos) return MEMO.datos;
@@ -385,7 +392,9 @@ function datos_() {
     registros: leerRegistros_(),
     sesiones: leerSesiones_(),
     altas: leerAltas_(),
-    enfermeria: leerEnfermeria_()
+    enfermeria: leerEnfermeria_(),
+    // Los teléfonos que Admisión o Enfermería agregaron a mano: van primero en la lista de cada paciente (telefonosPorDni).
+    telefonosManual: leerTelefonos_()
   });
   return MEMO.datos;
 }
@@ -396,13 +405,13 @@ function derivar_(d) {
   d.indicacionesTodas = d.indicaciones.concat(indicacionesDeRegistros(d.registros, d.sesiones, d.catalogos, d.reglas, d.hoy));
   d.vigentes = altasVigentes(d.altas, d.seguimientos, d.citas, d.reglas, d.hoy);
   d.retornos = decisionesDeAlta(d.altas, d.citas, d.reglas, d.hoy).retornos;
-  d.telefonos = telefonosPorDni(d.indicacionesTodas, d.contactos, d.seguimientos);
+  d.telefonos = telefonosPorDni(d.indicacionesTodas, d.contactos, d.seguimientos, d.telefonosManual);
   // El «@usuario» de Registro también es un contacto: «Número equivocado» no cierra mientras quede (sinContacto_).
   d.usuarios = usuariosPorDni(d.registros);
   // Las citas no cambian dentro de una petición: el índice médico → especialidades se arma una vez (pendientesRegistro).
   if (!d.espPorMedico) d.espPorMedico = indiceEspecialidadesMedico(d.citas);
-  d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos, d.usuarios);
-  d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.usuarios)
+  d.pacientes = armarPacientes(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.vigentes, d.retornos, d.usuarios, d.telefonosManual);
+  d.pendientes = pendientesIndicacion(d.citas, d.indicacionesTodas, d.seguimientos, d.reglas, d.hoy, d.contactos, d.usuarios, d.telefonosManual)
     .concat(pendientesRegistro({ registros: d.registros, sesiones: d.sesiones, seguimientos: d.seguimientos, citas: d.citas,
       reglas: d.reglas, hoy: d.hoy, telefonos: d.telefonos, catalogos: d.catalogos, usuarios: d.usuarios, espPorMedico: d.espPorMedico,
       vigentes: d.vigentes }));
@@ -530,7 +539,9 @@ function getPaciente(dni) {
     telefonos: d.telefonos[k] || [],
     // Lo que no es un teléfono (p. ej. «@usuario» del registro): la ficha lo muestra como contacto.
     contactos: otrosContactos(d.registros, k),
-    telefonosDescartados: telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos)[k] || []
+    telefonosDescartados: telefonosDescartados(marcasTelefono(d.seguimientos), d.telefonos)[k] || [],
+    // Los agregados a mano («Agregar teléfono»), vivos, el más reciente primero: la ficha muestra quién, cuándo y la nota.
+    telefonosAgregados: telefonosManualesVivos((d.telefonosManual || []).filter(function (f) { return normDni(f.DNI) === k; }))
   });
 }
 

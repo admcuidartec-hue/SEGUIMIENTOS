@@ -104,6 +104,22 @@ function marcasTelefono(seguimientos) {
   return out;
 }
 
+/**
+ * Como marcasTelefono, pero con la fecha y hora de la última marca: { dni: { telefono: 'yyyy-mm-dd HH:mm' } }. Un teléfono agregado a
+ * mano (TELEFONOS) se compara con la hora: agregado después de la marca vuelve; marcado después de agregarlo, sale.
+ */
+function marcasTelefonoHora_(seguimientos) {
+  var out = {};
+  (seguimientos || []).forEach(function (s) {
+    var r = resultadoDe(s);
+    if (!r || r.resultado !== 'NÚMERO EQUIVOCADO' || !r.telefono) return;
+    var dni = normDni(s.DNI), h = r.fechaHora || r.fecha;
+    out[dni] = out[dni] || {};
+    if (!out[dni][r.telefono] || h > out[dni][r.telefono]) out[dni][r.telefono] = h;
+  });
+  return out;
+}
+
 /** Los marcados que ya no están entre los teléfonos vigentes: la ficha los muestra tachados. */
 function telefonosDescartados(marcas, telefonos) {
   var out = {};

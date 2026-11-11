@@ -390,3 +390,49 @@ test('actualizacionDiaria: un fallo del correo queda en BITACORA y no rompe la a
   ctx.actualizacionDiaria();
   assert.deepEqual(r.bitacora, [['AUTOMÁTICO', 'ALERTA SOFDOC', 'No se pudo enviar: sin permiso de correo']]);
 });
+
+/* ---- «Agregar teléfono» (11/11/2026): la hoja TELEFONOS ---- */
+test('«Preparar hojas» crea TELEFONOS si falta, con su encabezado y la OP, sin tocar las demás hojas', () => {
+  const { ctx, estado } = contexto();
+  const hojas = {};
+  for (const n of Object.keys(ctx.hojasBase_()).filter(n => n !== 'TELEFONOS')) hojas[n] = hojaFalsa([plano(ctx.hojasBase_()[n])]);
+  hojas.REGLAS = hojaFalsa([['ESPECIALIDAD', 'ESPERADO_DIAS', 'VENCE_DIAS', '', 'PARAMETRO', 'VALOR']].concat(plano(ctx.PARAMETROS_REGISTRO).map(p => ['', '', '', '', p[0], p[1]])));
+  hojas.CATALOGOS = hojaFalsa([['USUARIOS', 'MOTIVOS_DESCARTE'].concat(Object.keys(ctx.CATALOGO_REGISTRO_INICIAL)), ['MAGALY', 'OTRO']]);
+  const antes = JSON.stringify(Object.fromEntries(Object.entries(hojas).map(([n, h]) => [n, h.v])));
+  const creadas = [];
+  ctx.ss_ = () => ({
+    getSheetByName: n => hojas[n] || null,
+    insertSheet: n => { creadas.push(n); hojas[n] = Object.assign(hojaFalsa([]), { setFrozenRows: () => {} }); return hojas[n]; }
+  });
+  ctx.prepararHojas();
+  assert.deepEqual(creadas, ['TELEFONOS']);
+  assert.deepEqual(plano(hojas.TELEFONOS.v), [['ID', 'FECHA_HORA', 'DNI', 'TELEFONO', 'NOTA', 'USUARIO', 'ANULADO', 'MOTIVO_ANULACION', 'OP']]);
+  const despues = JSON.stringify(Object.fromEntries(Object.entries(hojas).filter(([n]) => n !== 'TELEFONOS').map(([n, h]) => [n, h.v])));
+  assert.equal(despues, antes, 'las demás hojas no cambian');
+  assert.match(estado.avisos[0].m, /^Hojas creadas: TELEFONOS\./);
+  // La segunda vez no crea nada.
+  ctx.prepararHojas();
+  assert.deepEqual(creadas, ['TELEFONOS']);
+  assert.match(estado.avisos[1].m, /^No faltaba ninguna hoja\./);
+});
+
+test('«Verificar» revisa TELEFONOS: si falta la hoja y el encabezado (columna que falta, OP que falta, todo en orden)', () => {
+  const { ctx, estado } = contexto();
+  const hojas = {};
+  ctx.ss_ = () => ({ getSheetByName: n => hojas[n] || null });
+  ctx.verificarCrm_ = () => [];
+  ctx.SpreadsheetApp = { openById: () => { throw new Error('sin acceso'); }, getUi: () => ({ alert: m => estado.avisos.push({ m }) }) };
+  const lineas = () => estado.avisos[estado.avisos.length - 1].m.split('\n').filter(l => /TELEFONOS/.test(l));
+  ctx.verificar();
+  assert.deepEqual(lineas(), ['✗ Falta la hoja TELEFONOS. Use «Preparar hojas».']);
+  hojas.TELEFONOS = hojaFalsa([['ID', 'FECHA_HORA', 'DNI', 'TELEFONO', 'USUARIO', 'ANULADO', 'MOTIVO_ANULACION', 'OP']]);
+  ctx.verificar();
+  assert.equal(lineas()[0], '✓ TELEFONOS: 0 filas.');
+  assert.match(lineas()[1], /^✗ A TELEFONOS le falta la columna NOTA/);
+  hojas.TELEFONOS = hojaFalsa([plano(ctx.COLUMNAS_TELEFONOS)]);
+  ctx.verificar();
+  assert.match(lineas()[1], /^✗ A TELEFONOS le falta la columna OP/);
+  hojas.TELEFONOS = hojaFalsa([plano(ctx.hojasBase_().TELEFONOS), ['TEL-000001', '2026-11-11 10:00', '40111222', '987654321', '', 'MAGALY', '', '', '']]);
+  ctx.verificar();
+  assert.deepEqual(lineas(), ['✓ TELEFONOS: 1 filas.', '✓ TELEFONOS tiene todas sus columnas.']);
+});

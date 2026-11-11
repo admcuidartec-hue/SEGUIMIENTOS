@@ -80,6 +80,61 @@ function telefonoMal_(v) {
   return /^\+?[\d\s().\-]+$/.test(t) && normTelefono(t).length !== 9 ? 'El teléfono debe tener 9 dígitos.' : '';
 }
 
+/* ---------- «Agregar teléfono» (11/11/2026): hoja TELEFONOS ---------- */
+
+/** Columnas de TELEFONOS. La OP va al final, como en las demás hojas que se escriben (conOp_). */
+var COLUMNAS_TELEFONOS = ['ID', 'FECHA_HORA', 'DNI', 'TELEFONO', 'NOTA', 'USUARIO', 'ANULADO', 'MOTIVO_ANULACION'];
+
+/**
+ * Por qué no vale el teléfono que se agrega, o ''. Aquí va solo un número: vacío, «Escriba el teléfono.»; con @ o letras, que
+ * es un usuario (se registra como contacto en Registro); y un número, lo mismo que pide Registro (telefonoMal_: 9 dígitos con
+ * normTelefono, vale el +51 y el 01 de un fijo de Lima). Index.html y el DEMO (telefonoAgregadoMal) dicen lo mismo.
+ */
+function telefonoAgregadoMal(v) {
+  var t = textoLimpio_(v);
+  if (v !== null && v !== undefined && typeof v !== 'string' && typeof v !== 'number') return 'El teléfono debe ser un texto.';
+  if (!t) return 'Escriba el teléfono.';
+  if (!/^\+?[\d\s().\-]+$/.test(t)) return 'Aquí va solo un número de teléfono (9 dígitos); un @usuario se registra como contacto en Registro.';
+  return telefonoMal_(t);
+}
+
+/**
+ * Los DNI que la plataforma conoce: con citas (SOFDOC), con un registro o un alta sin anular, o con una indicación del historial.
+ * Solo a ellos se les agrega un teléfono (como asignarDniIndicacion, que pide un DNI ya conocido).
+ */
+function dnisConocidos(d) {
+  var out = {};
+  var poner = function (x) { var k = normDni(x && x.DNI); if (k) out[k] = 1; };
+  (d.citas || []).forEach(poner);
+  (d.indicaciones || []).forEach(poner);
+  (d.registros || []).forEach(function (r) { if (!anulado_(r)) poner(r); });
+  (d.altas || []).forEach(function (a) { if (!anulado_(a)) poner(a); });
+  return out;
+}
+
+/**
+ * Valida «Agregar teléfono». `ctx`: { conocidos (dnisConocidos), telefonos ({ dni: [vigentes] }, telefonosPorDni), muertos
+ * (fallecidos) }. Devuelve { error } o { error: '', fila: { DNI, TELEFONO, NOTA }, yaEstaba }: `yaEstaba` si ese número ya es un
+ * teléfono vigente del paciente (de cualquier fuente): no se escribe otra fila.
+ */
+function validarTelefonoAgregado(p, ctx) {
+  p = p || {};
+  var c = ctx || {}, dni = normDni(p.dni);
+  if (!textoLimpio_(p.dni)) return { error: 'Falta el DNI del paciente.' };
+  // El DNI llega de una tarjeta o una ficha, ya con normDni («09997401» llega como 9997401): si se conoce, vale tal cual.
+  if (!(c.conocidos || {})[dni] && documentoMal(p.dni)) return { error: documentoMal(p.dni) };
+  if (!(c.conocidos || {})[dni]) return { error: 'El DNI ' + dni + ' no está en SOFDOC, en Registro ni en el historial: revise que esté bien escrito.' };
+  var muerto = mensajeFallecido((c.muertos || {})[dni]);
+  if (muerto) return { error: muerto };
+  var malTel = telefonoAgregadoMal(p.telefono);
+  if (malTel) return { error: malTel };
+  var malNota = largoMal_(p.nota, LARGO_TEXTO, 'La nota');
+  if (malNota) return { error: malNota };
+  var tel = normTelefono(p.telefono);
+  return { error: '', fila: { DNI: dni, TELEFONO: tel, NOTA: textoLimpio_(p.nota) },
+    yaEstaba: ((c.telefonos || {})[dni] || []).indexOf(tel) >= 0 };
+}
+
 /** DNI de 8 dígitos o carné de extranjería de 9 a 12 caracteres alfanuméricos. */
 function documentoValido(dni) {
   var d = normTexto(dni).replace(/[\s.\-]/g, '');

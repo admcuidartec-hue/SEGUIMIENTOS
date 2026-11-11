@@ -32,7 +32,8 @@ function soloDelPaciente_(d, dni) {
     seguimientosTodos: (d.seguimientosTodos || []).filter(suyo), seguimientos: (d.seguimientos || []).filter(suyo),
     contactos: (d.contactos || []).filter(function (c) { return normDni(c.DNI_PACIENTE) === k; }),
     registros: registros, sesiones: (d.sesiones || []).filter(function (x) { return ids[x.ID_REGISTRO]; }),
-    altas: (d.altas || []).filter(suyo), enfermeria: (d.enfermeria || []).filter(suyo) };
+    altas: (d.altas || []).filter(suyo), enfermeria: (d.enfermeria || []).filter(suyo),
+    telefonosManual: (d.telefonosManual || []).filter(suyo) };
 }
 
 /** Guarda contra la ventana de publicación: SEGUIMIENTOS necesita sus columnas nuevas (exigirColumnas_). */
@@ -127,7 +128,7 @@ function registrarResultado_(p, opciones) {
     var quedan = true;
     if (v.fila.TELEFONO) {
       var marca = { DNI: v.fila.DNI, RESULTADO: 'NÚMERO EQUIVOCADO', TELEFONO: v.fila.TELEFONO, FECHA_HORA: fechaHoraTexto_(ahora) };
-      quedan = (telefonosPorDni(dp.indicacionesTodas, dp.contactos, dp.seguimientos.concat([marca]))[v.fila.DNI] || []).length > 0 || !!t.USUARIO;
+      quedan = (telefonosPorDni(dp.indicacionesTodas, dp.contactos, dp.seguimientos.concat([marca]), dp.telefonosManual)[v.fila.DNI] || []).length > 0 || !!t.USUARIO;
     }
     // Lo escrito en esta llamada, para deshacerlo si falla la fila siguiente: todo o nada.
     var deshacer = [];

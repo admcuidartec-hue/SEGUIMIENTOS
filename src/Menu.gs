@@ -34,14 +34,16 @@ function hojasBase_() {
     REGISTROS: conTrasOp_('REGISTROS', COLUMNAS_REGISTROS),
     SESIONES: COLUMNAS_SESIONES.concat([COLUMNA_OP]),
     ALTAS: COLUMNAS_ALTAS.concat([COLUMNA_OP]),
-    ENFERMERIA: COLUMNAS_ENFERMERIA.concat([COLUMNA_OP])
+    ENFERMERIA: COLUMNAS_ENFERMERIA.concat([COLUMNA_OP]),
+    // «Agregar teléfono» (11/11/2026): los números que Admisión o Enfermería consiguen fuera de SOFDOC.
+    TELEFONOS: COLUMNAS_TELEFONOS.concat([COLUMNA_OP])
   };
 }
 
 /** Las hojas que se escriben por posición y llevan, al final, la columna OP de la idempotencia (conOp_). */
 function hojasConOp_() {
   return [['SEGUIMIENTOS', COLUMNAS_SEGUIMIENTOS], ['REGISTROS', COLUMNAS_REGISTROS], ['ALTAS', COLUMNAS_ALTAS],
-    ['ENFERMERIA', COLUMNAS_ENFERMERIA], ['SESIONES', COLUMNAS_SESIONES], ['BITACORA', COLUMNAS_BITACORA]];
+    ['ENFERMERIA', COLUMNAS_ENFERMERIA], ['SESIONES', COLUMNAS_SESIONES], ['BITACORA', COLUMNAS_BITACORA], ['TELEFONOS', COLUMNAS_TELEFONOS]];
 }
 
 /** Listas iniciales de la pestaña Registro (diseño §3.4). DOCTOR y DOCTOR_SOFDOC van fila a fila. */

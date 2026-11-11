@@ -5319,3 +5319,167 @@ test('Registro: primera sesión de hoy pide decir si ya se aplicó; «Ya se apli
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+/* ============ «Agregar teléfono» (11/11/2026) ============ */
+
+const JORGE_TEL = '40222333|HEMATOLOGÍA';
+
+test('Agregar teléfono (admisión): en una tarjeta «Sin teléfono», el número aparece en la tarjeta y el panel; «Deshacer» lo quita', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    assert.match(await textoTarjeta(pagina, JORGE_TEL), /Sin teléfono/);
+    await abrirPanelDe(pagina, JORGE_TEL);
+    assert.equal((await pagina.locator('#panel [data-tel-abrir]').textContent()).trim(), 'Agregar teléfono');
+    await pagina.locator('#panel [data-tel-abrir]').click();
+    assert.equal(await pagina.evaluate(() => document.activeElement.id), 'tel-num', 'el foco va al número');
+    assert.equal(await pagina.locator('#tel-num').getAttribute('inputmode'), 'tel');
+    // Un @usuario no va aquí, y un número corto tampoco: se dice antes de enviar.
+    await pagina.locator('#tel-num').fill('@jorge.m');
+    await pagina.locator('#panel [data-tel-guardar]').click();
+    assert.match(await pagina.locator('#aviso span').textContent(), /^Aquí va solo un número de teléfono \(9 dígitos\)/);
+    await pagina.locator('#tel-num').fill('98765');
+    await pagina.keyboard.press('Enter');
+    assert.equal(await pagina.locator('#aviso span').textContent(), 'El teléfono debe tener 9 dígitos.');
+    assert.equal(await llamadas(pagina, 'agregarTelefono'), 0);
+    // Esc cierra el formulario, no el panel.
+    await pagina.keyboard.press('Escape');
+    assert.equal(await pagina.locator('#panel .tel-form').count(), 0);
+    assert.equal(await pagina.evaluate(() => seleccion.panel), JORGE_TEL);
+    await pagina.locator('#panel [data-tel-abrir]').click();
+    await pagina.locator('#tel-num').fill('955 111 222');
+    await pagina.locator('#tel-nota').fill('es de la hija');
+    await pagina.locator('#panel [data-tel-guardar]').click();
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'Teléfono guardado.');
+    assert.deepEqual(await ultimo(pagina, 'agregarTelefono'), { usuario: 'MAGALY', dni: '40222333', telefono: '955 111 222', nota: 'es de la hija' });
+    await esperarEstable(pagina);
+    const t = await textoTarjeta(pagina, JORGE_TEL);
+    assert.doesNotMatch(t, /Sin teléfono/);
+    assert.match(t, /955 111 222/);
+    assert.match(await pagina.locator('#panel .contacto').first().textContent(), /955 111 222/);
+    assert.equal((await pagina.locator('#panel [data-tel-abrir]').textContent()).trim(), 'Agregar otro teléfono');
+    assert.equal(await pagina.locator('#panel [data-acc="numero"]').count(), 1, 'con teléfono ya hay «Número equivocado»');
+    // La ficha lo trae con quién lo agregó y la nota.
+    const ficha = await pagina.evaluate(() => llamar('getPaciente', '40222333'));
+    assert.deepEqual([ficha.telefonos, ficha.telefonosAgregados.map(a => [a.USUARIO, a.NOTA])], [['955111222'], [['MAGALY', 'es de la hija']]]);
+    // El mismo número otra vez: no se duplica.
+    await pagina.locator('#panel [data-tel-abrir]').click();
+    await pagina.locator('#tel-num').fill('955-111-222');
+    await pagina.keyboard.press('Enter');
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'Ese teléfono ya estaba registrado.');
+    assert.equal((await pagina.evaluate(() => llamar('getPaciente', '40222333'))).telefonosAgregados.length, 1);
+    // «Deshacer» del primero: vuelve a «Sin teléfono».
+    await pagina.locator('#panel [data-tel-abrir]').click();
+    await pagina.locator('#tel-num').fill('966333444');
+    await pagina.keyboard.press('Enter');
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'Teléfono guardado.');
+    await esperarEstable(pagina);
+    assert.match(await textoTarjeta(pagina, JORGE_TEL), /966 333 444/, 'el más reciente primero');
+    await pagina.locator('#aviso button').click();
+    await pagina.waitForFunction(() => /^Deshecho/.test(document.querySelector('#aviso span').textContent));
+    assert.equal((await ultimo(pagina, 'anularTelefono')).motivo, 'Deshecho al momento');
+    await pagina.waitForFunction(() => !/966 333 444/.test(document.querySelector('#tablero [data-card="40222333|HEMATOLOGÍA"]').textContent));
+    assert.match(await textoTarjeta(pagina, JORGE_TEL), /955 111 222/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Agregar teléfono reabre la tarjeta cerrada por «Sin contacto válido» (desde la ficha), con «Nuevo contacto»', async () => {
+  const { navegador, pagina, errores } = await abrirTablero();
+  try {
+    await pagina.evaluate(() => llamar('registrarResultado', { usuario: 'MAGALY', dni: '40222333', especialidad: 'HEMATOLOGÍA', referencia: '', resultado: 'SIN CONTACTO', nota: '' }));
+    await pagina.evaluate(() => cargarTablero(null, true));
+    await pagina.waitForFunction(() => !document.querySelector('#tablero [data-card="40222333|HEMATOLOGÍA"]'));
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await pagina.evaluate(() => abrirFicha('40222333'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    assert.match(await pagina.locator('#f-contacto').textContent(), /Sin teléfono/);
+    await pagina.locator('#f-contacto [data-tel-abrir]').click();
+    await pagina.locator('#tel-num').fill('955111222');
+    await pagina.locator('#tel-nota').fill('WhatsApp');
+    await pagina.locator('#f-contacto [data-tel-guardar]').click();
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'Teléfono guardado.');
+    await pagina.waitForFunction(() => /955 111 222/.test(document.querySelector('#f-contacto').textContent));
+    assert.match(await pagina.locator('#f-contacto').textContent(), /Agregado por Magaly el 01\/10 · WhatsApp/);
+    const t = await pagina.evaluate(() => llamar('getTablero'));
+    const j = t.columnas.POR_CONTACTAR.find(x => x.CLAVE === '40222333|HEMATOLOGÍA');
+    assert.deepEqual([j.NUEVO_CONTACTO, j.TELEFONOS], ['955111222', '955111222']);
+    assert.equal(t.cerrados.some(c => c.CLAVE === '40222333|HEMATOLOGÍA'), false);
+    // Al volver al Tablero (se escribió desde otra pantalla), la tarjeta está otra vez en Por contactar.
+    await pagina.locator('.menu [data-sec="tablero"]').click();
+    await pagina.waitForSelector('#tablero [data-card="40222333|HEMATOLOGÍA"]');
+    assert.match(await textoTarjeta(pagina, JORGE_TEL), /955 111 222/);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Agregar teléfono: solo consulta no ve el botón (panel ni ficha) y el DEMO lo rechaza', async () => {
+  const { navegador, pagina, errores } = await abrirTablero({ guardado: { 'seg.usuario': 'MARKETING' } });
+  try {
+    await abrirPanelDe(pagina, JORGE_TEL);
+    await pagina.waitForFunction(() => document.querySelector('#panel [data-tel-abrir]') && document.querySelector('#panel [data-tel-abrir]').disabled);
+    assert.equal(await pagina.locator('#panel [data-tel-abrir]').isVisible(), false);
+    await pagina.keyboard.press('Escape');
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await pagina.evaluate(() => abrirFicha('40222333'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    assert.equal(await pagina.locator('#f-contacto').isVisible(), true);
+    await pagina.waitForFunction(() => document.querySelector('#f-contacto [data-tel-abrir]').disabled);
+    assert.equal(await pagina.locator('#f-contacto [data-tel-abrir]').isVisible(), false);
+    const e = await pagina.evaluate(() => llamar('agregarTelefono', { usuario: 'MARKETING', dni: '40222333', telefono: '955111222' }).then(() => '', x => x.message));
+    assert.equal(e, 'Usuario de solo consulta: no puede modificar datos.');
+    assert.equal(await pagina.evaluate(() => { try { DEMO.agregarTelefono({ usuario: 'ADMINISTRACION', dni: '40222333', telefono: '955111222' }); return ''; } catch (x) { return x.message; } }),
+      'Usuario de solo consulta: no puede modificar datos.');
+    assert.equal(await llamadas(pagina, 'agregarTelefono'), 1, 'la llamada directa al DEMO, que la rechaza');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Agregar teléfono (enfermería): desde su pantalla y desde la ficha, que sigue en solo lectura para lo demás', async () => {
+  const { navegador, pagina, errores } = await abrirEnfermeria();
+  try {
+    const clave = 'SES-000002|3';
+    const fila = `#enf-cuerpo [data-enf="${clave}"]`;
+    assert.equal((await pagina.locator(`${fila} [data-tel-abrir]`).textContent()).trim(), 'Agregar otro teléfono');
+    await pagina.locator(`${fila} [data-tel-abrir]`).click();
+    await pagina.locator(`${fila} #tel-num`).fill('944 555 666');
+    await pagina.locator(`${fila} [data-tel-guardar]`).click();
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'Teléfono guardado.');
+    await pagina.waitForFunction(f => /944 555 666/.test(document.querySelector(f + ' .enf-tel').textContent), fila);
+    assert.deepEqual(await ultimo(pagina, 'agregarTelefono'), { usuario: 'ENFERMERA PRUEBA', dni: '41111222', telefono: '944 555 666', nota: '' });
+    // Todas las filas de Sofía muestran el número nuevo primero.
+    const tels = await pagina.locator('#enf-cuerpo [data-enf^="SES-000002|"] .enf-tel').allTextContents();
+    assert.ok(tels.length > 1 && tels.every(t => /944 555 666/.test(t)), tels.join(' | '));
+    // En la ficha (solo lectura): «Agregar teléfono» sí; Editar o la decisión del médico, no.
+    await pagina.locator('.menu [data-sec="pacientes"]').click();
+    await pagina.evaluate(() => abrirFicha('40555666'));
+    await pagina.waitForFunction(() => PA.estado === 'listo');
+    await pagina.waitForTimeout(50);
+    const b = pagina.locator('#f-contacto [data-tel-abrir]');
+    assert.equal(await b.isVisible(), true);
+    assert.equal(await b.isDisabled(), false);
+    assert.equal(await pagina.locator('#ficha [data-editar-ficha]').evaluateAll(l => l.filter(x => !x.disabled).length), 0, 'Editar sigue cerrado');
+    await b.click();
+    await pagina.locator('#tel-num').fill('933222111');
+    await pagina.keyboard.press('Enter');
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'Teléfono guardado.');
+    await pagina.waitForFunction(() => /933 222 111/.test(document.querySelector('#f-contacto').textContent));
+    assert.match(await pagina.locator('#f-contacto').textContent(), /Usuario.*@ana\.flores/, 'el @usuario sigue');
+    assert.equal((await ultimo(pagina, 'agregarTelefono')).usuario, 'ENFERMERA PRUEBA');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('Agregar teléfono en el DEMO: valida como el servidor (DNI desconocido, fallecido, nota larga)', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'RACHEL' } });
+  try {
+    const e = o => pagina.evaluate(o => { try { DEMO.agregarTelefono(Object.assign({ usuario: 'RACHEL', dni: '40222333', telefono: '955111222' }, o)); return ''; } catch (x) { return x.message; } }, o);
+    assert.equal(await e({ dni: '' }), 'Falta el DNI del paciente.');
+    assert.equal(await e({ dni: '45678901' }), 'El DNI 45678901 no está en SOFDOC, en Registro ni en el historial: revise que esté bien escrito.');
+    assert.equal(await e({ dni: '1234567' }), 'El DNI debe tener 8 dígitos (o el carné de extranjería, de 9 a 12 caracteres).');
+    assert.match(await e({ dni: '41999000' }), /^Este paciente figura como fallecido desde el 24\/09\/2026/);
+    assert.equal(await e({ telefono: '' }), 'Escriba el teléfono.');
+    assert.equal(await e({ nota: 'x'.repeat(2001) }), 'La nota va hasta 2000 caracteres (tiene 2001).');
+    assert.equal(await e({ usuario: 'NADIE' }), 'Elija quién es usted en el selector de arriba.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

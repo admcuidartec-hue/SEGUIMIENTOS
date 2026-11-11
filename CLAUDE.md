@@ -21,6 +21,7 @@ La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administ
 | `src/RegistroServidor.gs` | Funciones de la pestaña Registro que escriben `REGISTROS`, `SESIONES` y `ALTAS` |
 | `src/Enfermeria.gs` | Lógica pura de Enfermería: contactos tras cada sesión de hierro, reacciones, «No respondió» y sus cifras |
 | `src/EnfermeriaServidor.gs` | Funciones de Enfermería que leen y escriben `ENFERMERIA` |
+| `src/TelefonosServidor.gs` | «Agregar teléfono»: `agregarTelefono` y `anularTelefono`, que escriben `TELEFONOS` |
 | `src/Menu.gs` | Menú `Seguimientos` del Sheets |
 | `src/Index.html` | La app. El bloque `DEMO` del final permite abrirla en el navegador sin desplegar: **no lo elimine** |
 
@@ -31,7 +32,7 @@ La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administ
   `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`, `guardarRegistro`,
   `marcarSesion`, `anularRegistro`, `anularSesion`, `darDeAlta`, `anularAlta`, `getRegistrosHoy`,
   `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`, `getEnfermeria`,
-  `registrarContactoEnfermeria`, `anularContactoEnfermeria`, `motivoFueraDeTablero`.
+  `registrarContactoEnfermeria`, `anularContactoEnfermeria`, `motivoFueraDeTablero`, `agregarTelefono`, `anularTelefono`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.
@@ -83,7 +84,7 @@ La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administ
 ## Escrituras seguras y rendimiento (23/10/2026, batería de 50 pruebas)
 
 - **Idempotencia (`op`)**: cada acción que escribe (`registrarResultado`, `marcarSesion`, `guardarRegistro`,
-  `registrarContactoEnfermeria`, `darDeAlta` y las cinco anulaciones) lleva un identificador de operación que pone `llamar`
+  `registrarContactoEnfermeria`, `darDeAlta`, `agregarTelefono` y las seis anulaciones) lleva un identificador de operación que pone `llamar`
   (`conOp`). Si la respuesta se pierde y la persona repite lo mismo, va el **mismo** `op` y el servidor devuelve lo de la
   primera vez (`repetida: true`) sin escribir otra vez (`opDe_`, `filasDeOp_`). Se guarda en una columna **`OP` al final** de
   `SEGUIMIENTOS`, `SESIONES`, `REGISTROS`, `ALTAS`, `ENFERMERIA` y `BITACORA` (las anulaciones se reconocen por la BITACORA;
@@ -140,7 +141,7 @@ por su nombre (se quitaron el filtro propuesto del médico y su entrada directa 
 | Rol | Quién (`CATALOGOS`) | Pantallas | Escribe |
 |---|---|---|---|
 | Admisión | `USUARIOS` (Magaly, Ana, Rachel) | Tablero, Registro, Pacientes, Indicadores | Todo menos Enfermería: resultados, registros, sesiones, Editar, decisiones del médico, anulaciones, asignar DNI |
-| Enfermería | `USUARIOS_ENFERMERIA` (LISET) | Enfermería (entra directo) y Pacientes (ficha en solo lectura) | Solo `registrarContactoEnfermeria`, `anularContactoEnfermeria` y la «Aplicación» (DIA 0) |
+| Enfermería | `USUARIOS_ENFERMERIA` (LISET) | Enfermería (entra directo) y Pacientes (ficha en solo lectura) | Solo `registrarContactoEnfermeria`, `anularContactoEnfermeria`, la «Aplicación» (DIA 0) y «Agregar teléfono» (también en la ficha) |
 | Solo consulta | `USUARIOS_CONSULTA` (ADMINISTRACION, MARKETING) | Todas, con la nota «Usuario de solo consulta»; sin meta del día | Nada |
 
 - **Basta con estar en su columna** para aparecer en «¿Quién es usted?» (`catalogosDesdeFilas` une `USUARIOS`,
@@ -337,6 +338,46 @@ Enfermería no las veía. Ahora, con la fecha de hoy, Registro pregunta (`#rhoy`
 y no deja registrar sin elegir. «Ya se aplicó hoy» manda `aplicadaHoy: true` y `validarRegistro` marca la sesión 1 hecha hoy, como
 una fecha pasada. Sin la marca (una pestaña vieja), programada como antes. Los registros anteriores se corrigen en su tarjeta con
 «Marcar sesión 1 hecha».
+
+## Agregar teléfono (11/11/2026)
+
+El export de SOFDOC no trae teléfono: muchas tarjetas decían «Sin teléfono» aunque Admisión o Enfermería lo consiguieran por otro
+lado (la historia clínica, un familiar, WhatsApp), y no había dónde guardarlo. Los teléfonos salían solo de `telefonosPorDni`
+(contacto de Registro, CRM e historial `INDICACIONES`).
+
+- **Hoja `TELEFONOS`** (`ID, FECHA_HORA, DNI, TELEFONO, NOTA, USUARIO, ANULADO, MOTIVO_ANULACION` + `OP`; `COLUMNAS_TELEFONOS` en
+  `Registro.gs`). Una fila por número agregado (`TEL-000001`…); nunca se borra: se anula. Se lee con `leerTelefonos_` (vacía si la
+  hoja aún no existe) y viaja en `datos_().telefonosManual`.
+- **`telefonosPorDni(…, manuales)`** pone los agregados **primero, el más reciente antes** (`telefonosManualesVivos`), y después las
+  fuentes de siempre, sin repetir. Llega a todas las tarjetas del DNI (también a la reevaluación), a la ficha y a la fila de
+  Enfermería. `armarPacientes` y `pendientesIndicacion` lo reciben como último parámetro; `soloDelPaciente_` y la cuenta de
+  «Número equivocado» (`quedan`) también.
+- **«Número equivocado»** vale igual para ellos, comparando **fecha y hora** (`marcasTelefonoHora_`): agregado después de la marca, el
+  número vuelve (alguien lo confirmó); marcado después de agregarlo, sale.
+- **Reapertura**: no hay lógica propia. Un número agregado es un contacto que no estaba al cerrar, así que `leerCiclo` reabre la
+  tarjeta cerrada por «Sin contacto válido» (o por el último «Número equivocado») con «Nuevo contacto: …» y un ciclo nuevo.
+- **`agregarTelefono({ usuario, dni, telefono, nota, op })`** (`TelefonosServidor.gs`): admisión **y enfermería**; solo consulta
+  recibe el mensaje de siempre, quien no está, «Elija quién es usted…» (`exigirRolTelefono_`, antes de leer nada). Valida
+  (`validarTelefonoAgregado`): el DNI tiene que ser de un paciente conocido (`dnisConocidos`: citas, historial, registros o altas sin
+  anular; un DNI desconocido se revisa con `documentoMal`), sin «Falleció» vigente; **solo un número** (`telefonoAgregadoMal`: un
+  @usuario o un texto con letras se rechaza —ese va como contacto en Registro—, y el número, como en Registro, `telefonoMal_`); nota
+  opcional hasta `LARGO_TEXTO`. Si ese número ya es un teléfono vigente del paciente (de cualquier fuente) no escribe:
+  `{ ok, yaEstaba: true }` y la app dice «Ese teléfono ya estaba registrado.». Con candado, `op` y revalidación dentro del candado;
+  BITACORA `AGREGAR TELÉFONO` con el ID, el DNI y los tres últimos dígitos. Devuelve `telefonos` (los vigentes del DNI).
+- **`anularTelefono({ usuario, id, motivo, op })`**: solo `TEL-…`, con motivo; es el «Deshacer» del aviso. BITACORA `ANULAR TELÉFONO`.
+- **Pantalla**: «Agregar teléfono» (o «Agregar otro teléfono») bajo el contacto del panel de la tarjeta, de la ficha y de cada fila de
+  Enfermería; formulario en el sitio (número con `inputmode="tel"`, nota opcional, Guardar/Cancelar; Enter guarda, Esc cierra solo
+  el formulario). Al guardar, las tarjetas, la ficha y Enfermería del DNI se ponen al día en el acto y se recargan
+  (`aplicarTelefonos`, `refrescarTrasTel`). La ficha dice bajo el número «Agregado por … el dd/mm · nota».
+- **Roles en la pantalla**: el botón está en `ESCRITURA` (solo consulta no lo ve) y en `ESCRITURA_AMBOS`: `puedeEscribirAqui` lo deja a
+  la enfermera **también en la ficha**, que para lo demás sigue en solo lectura. `errorDeRolUi` con `DE_AMBOS`.
+- **DEMO**: `agregarTelefono` y `anularTelefono` con los mismos mensajes; el número llega a las tarjetas del DNI y reabre la cerrada
+  sin contacto (`ponerTelefono`, `reabrirSinContacto(dni, extra)`).
+
+**Publicar**: `npm run subir` → en el Sheets, **«Preparar hojas»** (crea `TELEFONOS`; no toca las demás) → «Verificar» (debe decir
+«✓ TELEFONOS: 0 filas.» y «TELEFONOS tiene todas sus columnas») → en el `@HEAD`, con el paciente de prueba: agregar un teléfono, ver
+que la tarjeta deja de decir «Sin teléfono», «Deshacer»; y con la enfermera, agregar uno desde su pantalla → `npm run actualizar`.
+Sin «Preparar hojas», agregar un teléfono se niega con «Falta la hoja "TELEFONOS"…» y lo demás funciona como antes.
 
 ## «¿Qué pasó?» (Etapa 1)
 

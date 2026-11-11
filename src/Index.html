@@ -285,6 +285,12 @@ html[data-rol="consulta"] .lohizo,html[data-rol="enfermeria"] .lohizo{display:no
 .copiar.ok{background:var(--good-soft);color:var(--good);border-color:var(--good)}
 .sin-tel{margin:0;padding:12px 14px;border:1px dashed var(--line-2);border-radius:var(--r-s);color:var(--soft)}
 .sin-tel b{color:var(--ink)}
+/* «Agregar teléfono»: el botón bajo los contactos y su formulario en la misma sección (panel, ficha y Enfermería). */
+.tel-abrir{align-self:flex-start;margin-top:8px}
+.tel-form{display:flex;flex-direction:column;gap:10px;margin-top:8px;padding:12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface-2)}
+.tel-form .botones{display:flex;gap:8px;flex-wrap:wrap}
+.tel-form input#tel-num{font-family:var(--mono);font-size:16px}
+.tel-agregado{display:block;font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
 .acc{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border-radius:var(--r-s);transition:box-shadow .15s ease}
 .acc button{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 12px;text-align:left;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface-2);color:var(--ink);font-weight:500;line-height:1.25;transition:border-color .15s ease,transform .16s var(--ease-out)}
 .acc button:hover{border-color:var(--accent)}
@@ -965,16 +971,19 @@ const EN_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.
  * sin escribir otra vez (opDe_ y filasDeOp_ en el servidor). Lo que salió bien suelta su op; uno viejo (10 minutos) se renueva.
  */
 const ESCRIBEN_CON_OP = { registrarResultado: 1, marcarSesion: 1, guardarRegistro: 1, registrarContactoEnfermeria: 1, darDeAlta: 1,
-  anularRegistro: 1, anularSesion: 1, anularAlta: 1, anularResultado: 1, anularContactoEnfermeria: 1 };
+  anularRegistro: 1, anularSesion: 1, anularAlta: 1, anularResultado: 1, anularContactoEnfermeria: 1, agregarTelefono: 1, anularTelefono: 1 };
 const OPS = new Map(), OP_VIGENCIA_MS = 10 * 60 * 1000;
 /** Todo lo que escribe (con op o sin él). */
 const ESCRIBEN = Object.assign({ editarRegistro: 1, asignarDniIndicacion: 1, confirmarEmparejamiento: 1, marcarSeguimiento: 1, descartar: 1 }, ESCRIBEN_CON_OP);
 /* Roles (26/10/2026, como errorDeRol de Logica.gs): Enfermería es de la enfermera; lo demás que escribe, de admisión; el usuario
    de solo consulta no escribe nada. */
 const DE_ENFERMERIA = { registrarContactoEnfermeria: 1, anularContactoEnfermeria: 1 };
+/* «Agregar teléfono» (11/11/2026): de admisión y de enfermería; solo consulta, no (exigirRolTelefono_ del servidor). */
+const DE_AMBOS = { agregarTelefono: 1, anularTelefono: 1 };
 const MENSAJES_ROL = { CONSULTA: 'Usuario de solo consulta: no puede modificar datos.', ADMISION: 'Esta acción es de admisión.',
   ENFERMERIA: 'Esta acción es de enfermería.' };
 function errorDeRolUi(rol, fn) {
+  if (DE_AMBOS[fn]) return rol === 'CONSULTA' ? MENSAJES_ROL.CONSULTA : '';
   const pide = DE_ENFERMERIA[fn] ? 'ENFERMERIA' : 'ADMISION';
   if (!rol || rol === pide) return '';
   return rol === 'CONSULTA' ? MENSAJES_ROL.CONSULTA : MENSAJES_ROL[pide];
@@ -1124,12 +1133,15 @@ const seccionesDe = rol => SECCIONES_ROL[rol] || Object.keys(VISTAS);
 /** Los botones que escriben. Se deshabilitan donde el rol no escribe (puedeEscribirAqui). */
 const ESCRITURA = '[data-acc],[data-confirmar],[data-confirmar-ultima],[data-anular-ultima],[data-marcar-sesion],[data-anular],[data-confirmar-anular],'
   + '[data-anular-ses],[data-anular-reg],[data-anular-alta],[data-editar],[data-editar-ficha],[data-guardar-edicion],[data-decision],[data-alta-ok],'
-  + '[data-lohizo],[data-asignar],[data-emparejar],#rgo,[data-enf-ya],[data-enf-nc],[data-enf-guardar]';
+  + '[data-lohizo],[data-asignar],[data-emparejar],#rgo,[data-enf-ya],[data-enf-nc],[data-enf-guardar],[data-tel-abrir],[data-tel-guardar]';
+/** «Agregar teléfono» lo usan admisión y enfermería en cualquier pantalla (también en la ficha, que para la enfermera es de solo lectura). */
+const ESCRITURA_AMBOS = '[data-tel-abrir],[data-tel-guardar]';
 /** ¿Puede el rol escribir con este botón? Enfermería escribe solo en su pantalla; admisión, en todas menos esa; consulta, en ninguna. */
 function puedeEscribirAqui(el) {
   const rol = rolActual();
   if (!rol) return true;
   if (rol === 'CONSULTA') return false;
+  if (el && el.matches && el.matches(ESCRITURA_AMBOS)) return true;
   const enf = !!(el && el.closest && el.closest('#v-enfermeria'));
   return rol === 'ENFERMERIA' ? enf : !enf;
 }
@@ -2182,6 +2194,7 @@ function cerrarPanel(silencio, teclado) {
   const id = seleccion.panel;
   seleccion.panel = '';
   Object.assign(P, { clave: '', paso: null, nota: '', cierre: false, contacto: false, anulando: '', hist: null });
+  if (TEL.donde === 'panel' && !TEL.enVuelo) Object.assign(TEL, { donde: '', dni: '', num: '', nota: '' });
   if (teclado) { $('#panel').classList.add('instantaneo'); $('#velo').classList.add('instantaneo'); }
   $('#panel').classList.remove('abierto');
   $('#velo').classList.remove('abierto');
@@ -2252,6 +2265,131 @@ function contactosHtml(p) {
     + p.malos.map(t => `<div class="contacto malo"><span class="v"><small>Equivocado</small><span class="num">${esc(telBonito(t))}</span></span></div>`).join('')
     + (!act.length && !p.usuario ? '<p class="sin-tel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>' : '');
 }
+/* ============ «Agregar teléfono» (11/11/2026): en el panel de la tarjeta, en la ficha y en Enfermería ============ */
+/*
+ * SOFDOC no trae teléfonos: el que consigan Admisión o Enfermería se guarda en TELEFONOS (agregarTelefono) y va primero en todas
+ * las tarjetas del DNI. Un solo formulario abierto a la vez (TEL.donde: 'panel', 'ficha' o 'enf:<CLAVE>'); vive en TEL, así que
+ * sobrevive a los repintados. Al guardar, las tarjetas, la ficha y la lista de Enfermería del DNI se ponen al día en el acto y
+ * luego se recargan del servidor.
+ */
+const TEL = { donde: '', dni: '', num: '', nota: '', enVuelo: false };
+/** Como telefonoAgregadoMal (Registro.gs): aquí va solo un número, con las reglas del contacto de Registro (telefonoMal). */
+function telefonoAgregadoMal(v) {
+  if (v !== null && v !== undefined && typeof v !== 'string' && typeof v !== 'number') return 'El teléfono debe ser un texto.';
+  const t = limpioTexto(v);
+  if (!t) return 'Escriba el teléfono.';
+  if (!/^\+?[\d\s().\-]+$/.test(t)) return 'Aquí va solo un número de teléfono (9 dígitos); un @usuario se registra como contacto en Registro.';
+  return telefonoMal(t);
+}
+const telAbierto = (donde, dni) => TEL.donde === donde && TEL.dni === dni;
+/** El botón (con o sin teléfonos ya conocidos). Solo consulta no lo ve (ESCRITURA + data-sl). */
+const telBoton = (donde, dni, hay) => `<button type="button" class="btn btn-s tel-abrir" data-tel-abrir="${esc(dni)}" data-tel-donde="${esc(donde)}">`
+  + `<i class="ph ph-phone-plus"></i>${hay ? 'Agregar otro teléfono' : 'Agregar teléfono'}</button>`;
+const telForm = () => '<div class="tel-form" role="group" aria-label="Agregar teléfono">'
+  + `<label class="campo">Teléfono<input id="tel-num" type="text" inputmode="tel" autocomplete="off" placeholder="987 654 321" value="${esc(TEL.num)}"></label>`
+  + `<label class="campo">Nota (opcional)<input id="tel-nota" type="text" autocomplete="off" placeholder="Es de la hija, solo WhatsApp…" value="${esc(TEL.nota)}"></label>`
+  + `<div class="botones"><button type="button" class="btn btn-p" data-tel-guardar${TEL.enVuelo ? ' disabled' : ''}>${TEL.enVuelo ? 'Guardando…' : 'Guardar'}</button>`
+  + `<button type="button" class="btn btn-s" data-tel-cancelar${TEL.enVuelo ? ' disabled' : ''}>Cancelar</button></div></div>`;
+const telHtml = (donde, dni, hay) => telAbierto(donde, dni) ? telForm() : telBoton(donde, dni, hay);
+/** Repinta donde vive el formulario. */
+function repintarTel(donde) {
+  if (donde === 'panel') pintarPanel();
+  else if (donde === 'ficha') pintarFicha();
+  else if (String(donde).indexOf('enf:') === 0) pintarEnfermeria();
+}
+function abrirTel(donde, dni) {
+  if (TEL.enVuelo) return;
+  const antes = TEL.donde;
+  Object.assign(TEL, { donde, dni: normDni(dni), num: '', nota: '' });
+  if (antes && antes !== donde) repintarTel(antes);
+  repintarTel(donde);
+  const c = $('#tel-num');
+  if (c) c.focus({ preventScroll: true });
+}
+function cerrarTel(enfocar) {
+  if (!TEL.donde || TEL.enVuelo) return;
+  const { donde, dni } = TEL;
+  Object.assign(TEL, { donde: '', dni: '', num: '', nota: '' });
+  repintarTel(donde);
+  const b = enfocar && $$('[data-tel-abrir]').find(x => x.dataset.telDonde === donde && x.dataset.telAbrir === dni);
+  if (b) b.focus({ preventScroll: true });
+}
+/** Pone `tels` (los vigentes que devuelve el servidor, el agregado primero) en todo lo que se ve de ese DNI, y repinta. */
+function aplicarTelefonos(dni, tels) {
+  const lista = (Array.isArray(tels) ? tels : []).map(String);
+  S.pacientes.filter(p => p.dni === dni).forEach(p => {
+    p.tel = lista.slice();
+    p.malos = p.malos.filter(x => !lista.includes(x));
+    p.sinContacto = !lista.length && !p.usuario;
+  });
+  if (tableroIniciado && S.fase === 'listo') pintarTablero();
+  if (seleccion.panel) pintarPanel();
+  if (PA.p && normDni(PA.dni) === dni) {
+    PA.p.tels = lista.slice();
+    PA.p.malos = PA.p.malos.filter(x => !lista.includes(x));
+    pintarFicha();
+  }
+  if (EN.lista && EN.lista.some(c => normDni(c.DNI) === dni)) {
+    EN.lista = EN.lista.map(c => normDni(c.DNI) === dni && lista.length ? Object.assign({}, c, { TELEFONOS: lista.join(' / ') }) : c);
+    pintarEnfermeria();
+  }
+}
+/** Tras guardar o deshacer: lo que se ve de ese DNI se vuelve a pedir (la tarjeta cerrada «Sin contacto válido» vuelve sola). */
+function refrescarTrasTel(dni) {
+  if (tableroIniciado && S.fase === 'listo' && rolActual() !== 'ENFERMERIA') cargarTablero(null, true);
+  if (PA.dni && normDni(PA.dni) === dni && PA.estado === 'listo') cargarFicha();
+  if (EN.lista) cargarEnfermeria(true);
+}
+async function guardarTel() {
+  if (!TEL.donde || TEL.enVuelo || !exigirUsuario()) return;
+  const m = telefonoAgregadoMal(TEL.num) || largoMal(TEL.nota, LARGO_TEXTO, 'La nota');
+  if (m) { avisar(m); const c = $('#tel-num'); if (c) c.focus({ preventScroll: true }); return; }
+  const { donde, dni } = TEL, quien = S.usuario;
+  TEL.enVuelo = true;
+  repintarTel(donde);
+  let r;
+  try {
+    r = await llamar('agregarTelefono', { usuario: quien, dni, telefono: limpioTexto(TEL.num), nota: limpioTexto(TEL.nota) });
+  } catch (e) {
+    TEL.enVuelo = false;
+    repintarTel(donde);
+    avisar('No se guardó: ' + e.message);
+    const c = $('#tel-num'); if (c) c.focus({ preventScroll: true });
+    return;
+  }
+  Object.assign(TEL, { donde: '', dni: '', num: '', nota: '', enVuelo: false });
+  repintarTel(donde);
+  aplicarTelefonos(dni, r.telefonos);
+  if (r.yaEstaba) avisar('Ese teléfono ya estaba registrado.');
+  else avisar('Teléfono guardado.', r.id ? { texto: 'Deshacer', fn: () => deshacerTel(r.id, quien, dni) } : null);
+  refrescarTrasTel(dni);
+}
+async function deshacerTel(id, quien, dni) {
+  try {
+    const r = await llamar('anularTelefono', { usuario: quien, id, motivo: 'Deshecho al momento' });
+    aplicarTelefonos(dni, r.telefonos);
+    avisar('Deshecho: se quitó el teléfono.');
+  } catch (e) { avisar('No se deshizo: ' + e.message); }
+  refrescarTrasTel(dni);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-tel-abrir],[data-tel-guardar],[data-tel-cancelar]');
+  if (!b || b.disabled) return;
+  if (b.hasAttribute('data-tel-abrir')) abrirTel(b.dataset.telDonde, b.dataset.telAbrir);
+  else if (b.hasAttribute('data-tel-guardar')) guardarTel();
+  else cerrarTel(true);
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'tel-num') TEL.num = e.target.value;
+  else if (e.target.id === 'tel-nota') TEL.nota = e.target.value;
+});
+// En captura: Enter guarda y Esc cierra solo el formulario, antes de que el panel (o la ficha) lo tome para sí.
+document.addEventListener('keydown', e => {
+  if (e.target.id !== 'tel-num' && e.target.id !== 'tel-nota') return;
+  if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); guardarTel(); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrarTel(true); }
+}, true);
+
 function quePasoHtml(p) {
   if (p.col === 4) return `<p class="ok-cerrado"><i class="ph-fill ph-check-circle"></i><span><b>Seguimiento cerrado.</b> ${esc(p.fin)}</span></p>`;
   if (P.paso) return htmlPaso(p);
@@ -2352,7 +2490,7 @@ function pintarPanel() {
     + `<section>${p.t === 'hier' && p.raw.DETALLE ? `<div class="p-trat">${esc(p.raw.DETALLE)}</div>` : ''}`
     + `<dl class="datos">${datosDe(p).map(([l, v]) => `<div><dt>${l}</dt><dd>${esc(v) || '&nbsp;'}</dd></div>`).join('')}</dl>${prog}`
     + `<p class="alerta${tono ? ' ' + tono : ''}">${esc(alerta)}</p>${pend}${yaEscrito(p)}</section>`
-    + `<section><h3>Contacto</h3>${contactosHtml(p)}</section>`
+    + `<section><h3>Contacto</h3>${contactosHtml(p)}${telHtml('panel', p.dni, activos(p).length > 0)}</section>`
     + quePasoHtml(p)
     + (p.col !== 4 ? `<label class="campo nota-resp">Nota (opcional)<textarea id="nota" rows="2" placeholder="Se guarda con la respuesta">${esc(P.nota)}</textarea></label>` : '')
     + '<section><h3>Historia</h3><div id="p-hist"></div></section>'
@@ -3800,6 +3938,7 @@ function adaptarFicha(r) {
     fallecido: r.fallecido ? { f: isoDe(r.fallecido.fecha), quien: nombreBonito(r.fallecido.quien) } : null,
     malos,
     tels: (r.telefonos || []).map(String).filter(t => t && malos.indexOf(t) < 0),
+    agregados: (r.telefonosAgregados || []).map(a => ({ tel: String(a.TELEFONO || ''), quien: String(a.USUARIO || ''), f: isoDe(a.FECHA_HORA), nota: String(a.NOTA || '') })),
     // Contactos que no son teléfono (p. ej. «@usuario» del registro): otrosContactos del servidor.
     otros: (r.contactos || []).map(String).filter(Boolean),
     porConfirmar: (r.porConfirmar || []).map(i => ({ id: String(i.ID || ''), tipo: frase(i.TIPO), f: isoDe(i.FECHA), nombre: nombreBonito(i.NOMBRE),
@@ -3993,14 +4132,19 @@ function htmlFicha(p) {
       + p.previos.map(x => `<tr><td class="mono">${esc(dmy(x.f))}</td><td>${esc(x.tipo)}</td><td>${esc(x.det)}</td><td>${esc(x.estado)}</td><td class="mono">${esc(x.tel)}</td><td class="obs">${esc(x.obs)}</td></tr>`).join('')
       + '</tbody></table></div>' : '<p class="p-vacio">Ninguno.</p>'}</section>`
     + '</div><aside class="lado">'
-    + `<section class="bloque" id="f-contacto"><h3>Contacto</h3> ${p.tels.length || p.otros.length ? p.tels.map(t => `<div class="contacto"><span class="v"><small>Teléfono</small><span class="num">${esc(telBonito(t))}</span></span>`
+    + `<section class="bloque" id="f-contacto"><h3>Contacto</h3> ${p.tels.length || p.otros.length ? p.tels.map(t => `<div class="contacto"><span class="v"><small>Teléfono</small><span class="num">${esc(telBonito(t))}</span>${agregadoHtml(p, t)}</span>`
       + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(t)}"><i class="ph ph-copy"></i>Copiar</button></div>`).join('')
       + p.otros.map(u => `<div class="contacto"><span class="v"><small>Usuario</small><span class="num">${esc(u)}</span></span>`
       + `<button type="button" class="btn btn-s copiar" data-copiar="${esc(u)}"><i class="ph ph-copy"></i>Copiar</button></div>`).join('')
-      : '<p class="sin-tel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}</section>`
+      : '<p class="sin-tel"><b>Sin teléfono.</b> No hay número en SOFDOC ni en la otra base.</p>'}${telHtml('ficha', normDni(p.dni || PA.dni), p.tels.length > 0)}</section>`
     + `<section class="bloque" id="f-altas"><h3>Altas médicas</h3> ${p.altas.length ? '<ul class="altas">' + p.altas.map(htmlAlta).join('') + '</ul>' : '<p class="p-vacio">Ninguna.</p>'}</section>`
     + `<section class="bloque" id="f-hist"><h3>Historia de seguimientos</h3> ${htmlHistoria({ estado: 'listo', filas: p.hist }, h, 'fmotivo', PA.motivo, !!h && PA.enVuelo === h)}</section>`
     + '</aside></article>';
+}
+/** Bajo un teléfono agregado a mano: quién, cuándo y su nota («Agregar teléfono»). */
+function agregadoHtml(p, t) {
+  const a = (p.agregados || []).find(x => x.tel === t);
+  return a ? `<span class="tel-agregado">Agregado por ${esc(nombreBonito(a.quien))}${a.f ? ' el ' + esc(dm(a.f)) : ''}${a.nota ? ' · ' + esc(a.nota) : ''}</span>` : '';
 }
 function htmlEmparejar(p, i) {
   return `<section class="emparejar" data-ind="${esc(i.id)}"><h3>¿Es esta la misma persona?</h3>`
@@ -5078,8 +5222,10 @@ function htmlContactoEnf(c) {
     + reacs + (c.NO_CONTESTO ? `<span class="enf-nc">No contestó ${c.NO_CONTESTO === 1 ? '1 vez' : c.NO_CONTESTO + ' veces'}${c.NO_CONTESTO === maxIntentosEnf(c) - 1 ? ' · se cierra al siguiente intento' : ''}</span>` : '')
     + '<div class="enf-pie">' + (tel ? `<span class="enf-tel"><i class="ph ph-phone"></i>${esc(telBonito(tel))}<button type="button" class="btn btn-s" data-enf-copiar="${esc(tel)}"><i class="ph ph-copy"></i>Copiar</button></span>`
       : c.USUARIO ? `<span class="enf-tel"><i class="ph ph-at"></i>${esc(c.USUARIO)}</span>` : '<span class="enf-tel sin"><i class="ph ph-phone-slash"></i>Sin teléfono</span>')
+    + (telAbierto('enf:' + c.CLAVE, normDni(c.DNI)) ? '' : telBoton('enf:' + c.CLAVE, normDni(c.DNI), !!tel))
     + `<span class="enf-acc"><button type="button" class="btn btn-p" data-enf-ya="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''} aria-expanded="${abierto}"><i class="ph ph-check"></i>${c.APLICACION ? 'Registrar' : 'Ya me contacté'}</button>`
     + (c.APLICACION ? '' : `<button type="button" class="btn btn-s" data-enf-nc="${esc(c.CLAVE)}"${EN.enVuelo === c.CLAVE ? ' disabled' : ''}><i class="ph ph-phone-x"></i>No contestó</button>`) + '</span></div>'
+    + (telAbierto('enf:' + c.CLAVE, normDni(c.DNI)) ? telForm() : '')
     + (abierto ? htmlPanelEnf(c) : '') + '</li>';
 }
 /** «Ya me contacté»: ¿tuvo reacción? (No / Inmediata / Mediata), cuáles (chips), nota (obligatoria con «Otra») y Guardar. */
@@ -5436,6 +5582,10 @@ const DEMO = (() => {
   const DIAS_ENF = [1, 3, 5], CORTE_ENF = 10, MAX_ENF = 2;   // MAX_ENF: REGLAS.ENFERMERIA_MAX_INTENTOS
   const enfermeria = [];
   const idEnf = () => siguiente(enfermeria, 'ENF');
+  // «Agregar teléfono» (TELEFONOS): los números agregados a mano, vivos, el más reciente primero (telefonosManualesVivos).
+  const telefonosManual = [];
+  const manualesDe = dni => telefonosManual.filter(f => !f.ANULADO && f.DNI === dni)
+    .sort((a, b) => a.FECHA_HORA !== b.FECHA_HORA ? (a.FECHA_HORA < b.FECHA_HORA ? 1 : -1) : (a.ID < b.ID ? 1 : -1)).map(f => f.TELEFONO);
   const ENFR = (FECHA_HORA, ID_SESION, ID_REGISTRO, NUMERO_SESION, DNI, DIA, RESULTADO, REACCION_TIPO, REACCION, NOTA) =>
     enfermeria.push({ ID: idEnf(), FECHA_HORA, ID_REGISTRO, ID_SESION, NUMERO_SESION, DNI, DIA, RESULTADO, REACCION_TIPO: REACCION_TIPO || '',
       REACCION: REACCION || '', NOTA: NOTA || '', ENFERMERA: 'ENFERMERA PRUEBA', ANULADO: '', MOTIVO_ANULACION: '' });
@@ -5461,6 +5611,8 @@ const DEMO = (() => {
       const reacciones = filas.filter(f => f.RESULTADO === 'CONTACTADO' && f.REACCION_TIPO && f.REACCION_TIPO !== 'NINGUNA')
         .sort((a, b) => a.DIA - b.DIA).map(f => ({ DIA: f.DIA, TIPO: f.REACCION_TIPO, REACCION: f.REACCION }));
       const tel = normTel(r.CONTACTO);
+      // Como contactosEnfermeria: los teléfonos del paciente (los agregados primero) y, si no hay, el del registro.
+      const tels = [...new Set(manualesDe(r.DNI).concat(tel.length === 9 ? [tel] : []))];
       // Como contactosEnfermeria: DIA 0 = «Aplicación» (la enfermera registra si hubo reacción al aplicarla).
       [0].concat(DIAS_ENF).forEach(dia => {
         const fecha = mas(x.FECHA, dia);
@@ -5470,7 +5622,7 @@ const DEMO = (() => {
         // Como noRespondioEnfermeria: MAX_ENF «No contestó» vivos dejan el día «No respondió» (sale de la lista).
         if (dia !== 0 && delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length >= MAX_ENF) return;
         out.push({ CLAVE: x.ID + '|' + dia, ID_REGISTRO: r.ID, ID_SESION: x.ID, NUMERO_SESION: Number(x.NUMERO), DNI: r.DNI, NOMBRE: r.NOMBRE,
-          TELEFONOS: tel.length === 9 ? tel : '', USUARIO: tel.length === 9 ? '' : r.CONTACTO, TRATAMIENTO: frase(r.DETALLE), MARCA: frase(r.MARCA), ORIGEN_HIERRO: origenDe(r),
+          TELEFONOS: tels.join(' / '), USUARIO: tel.length === 9 ? '' : r.CONTACTO, TRATAMIENTO: frase(r.DETALLE), MARCA: frase(r.MARCA), ORIGEN_HIERRO: origenDe(r),
           SESIONES: Number(r.SESIONES), FECHA_SESION: x.FECHA, DIA: dia, FECHA: fecha, GRUPO: fecha < hoy ? 'VENCIDO' : fecha === hoy ? 'HOY' : 'PROXIMO',
           NO_CONTESTO: delDia.filter(f => f.RESULTADO === 'NO CONTESTO').length, APLICACION: dia === 0, MAX_INTENTOS: MAX_ENF, REACCIONES: reacciones });
       });
@@ -5680,8 +5832,8 @@ const DEMO = (() => {
    * Como leerCiclo con los contactos de ahora: una tarjeta cerrada sin contacto vuelve sola a «Por contactar» si su paciente tiene
    * un contacto (de un registro) que no estaba al cerrar, con «Nuevo contacto: …» y un ciclo nuevo.
    */
-  function reabrirSinContacto(dni) {
-    const deRegistro = registros.filter(r => r.DNI === dni && !r.ANULADO).map(r => String(r.CONTACTO || '').trim()).filter(Boolean);
+  function reabrirSinContacto(dni, extra) {
+    const deRegistro = registros.filter(r => r.DNI === dni && !r.ANULADO).map(r => String(r.CONTACTO || '').trim()).filter(Boolean).concat(extra || []);
     tarjetas.filter(t => t.DNI === dni && t.ESTADO === 'CERRADO' && t.CONTACTOS_CIERRE && !t.COLUMNA).forEach(t => {
       const habia = new Set(t.CONTACTOS_CIERRE.map(claveContacto)), nuevos = [];
       contactosTarjeta(t).concat(deRegistro).forEach(c => { const k = claveContacto(c); if (k && !habia.has(k)) { habia.add(k); nuevos.push(normTel(c).length === 9 ? normTel(c) : c); } });
@@ -5867,6 +6019,21 @@ const DEMO = (() => {
   const telefonosDe = dni => [...new Set(tarjetas.concat(series).filter(t => t.DNI === dni)
     .flatMap(t => String(t.TELEFONOS || '').split(' / ').filter(Boolean)))];
   const descartadosDe = dni => [...new Set(tarjetas.filter(t => t.DNI === dni).flatMap(t => t.TELEFONOS_DESCARTADOS || []))];
+  /** Como telefonosPorDni: los agregados a mano primero y después los demás, sin los marcados como equivocados. */
+  const telefonosVigentesDe = dni => { const malos = descartadosDe(dni); return [...new Set(manualesDe(dni).concat(telefonosDe(dni)))].filter(t => !malos.includes(t)); };
+  /**
+   * Un teléfono agregado llega a todas las tarjetas del DNI, primero; deja de estar «equivocado» (se confirmó con el paciente) y, como
+   * leerCiclo, reabre la que se cerró sin contacto (reabrirSinContacto, antes de ponerlo: es el contacto nuevo).
+   */
+  function ponerTelefono(dni, nuevo) {
+    const suyas = [...new Set(tarjetas.concat(series).filter(t => t.DNI === dni))];
+    suyas.forEach(t => { if (t.TELEFONOS_DESCARTADOS) t.TELEFONOS_DESCARTADOS = t.TELEFONOS_DESCARTADOS.filter(x => x !== nuevo); });
+    reabrirSinContacto(dni, [nuevo]);
+    suyas.forEach(t => {
+      t.TELEFONOS = [...new Set([nuevo].concat(String(t.TELEFONOS || '').split(' / ').map(x => x.trim()).filter(Boolean)))].join(' / ');
+      if ('SIN_CONTACTO' in t) t.SIN_CONTACTO = false;
+    });
+  }
   const CAMPOS_TARJETA = ['CLAVE', 'COLUMNA', 'ETIQUETA', 'FECHA_CLAVE', 'TIPO_SEGUIMIENTO', 'TELEFONOS_DESCARTADOS', 'SIN_CONTACTO'];
   const comoSerie = s => { const o = clonar(s); CAMPOS_TARJETA.forEach(k => delete o[k]); return o; };
   // Como armarPacientes: toda persona con consultas realizadas tiene su serie, aunque solo venga por hierro o procedimiento.
@@ -5967,6 +6134,40 @@ const DEMO = (() => {
         DIA: c.DIA, RESULTADO: resultado, REACCION_TIPO: tipo, REACCION: reaccion, NOTA: nota, ENFERMERA: quien, ANULADO: '', MOTIVO_ANULACION: '' };
       enfermeria.push(f);
       return { ok: true, fila: f, contactos: contactosDemo() };
+    },
+
+    // Como agregarTelefono (TelefonosServidor.gs) y validarTelefonoAgregado (Registro.gs): admisión y enfermería; solo consulta, no.
+    agregarTelefono: x => {
+      const quien = exigir(x);
+      if (!String(x.dni || '').trim()) throw new Error('Falta el DNI del paciente.');
+      const dni = dniDe(x.dni);
+      const conocido = citas.some(c => c.DNI === dni) || indicaciones.some(i => i.DNI === dni) || registros.some(r => r.DNI === dni && !r.ANULADO)
+        || altas.some(a => a.DNI === dni && !a.ANULADO);
+      if (!conocido && documentoMal(x.dni)) throw new Error(documentoMal(x.dni));
+      if (!conocido) throw new Error('El DNI ' + dni + ' no está en SOFDOC, en Registro ni en el historial: revise que esté bien escrito.');
+      if (muertos[dni]) throw new Error(mensajeFallecido(muertos[dni]));
+      const mal = telefonoAgregadoMal(x.telefono) || largoMal(x.nota, LARGO_TEXTO, 'La nota');
+      if (mal) throw new Error(mal);
+      const t = normTel(x.telefono);
+      if (telefonosVigentesDe(dni).includes(t)) return { ok: true, yaEstaba: true, telefonos: telefonosVigentesDe(dni) };
+      const f = { ID: siguiente(telefonosManual, 'TEL'), FECHA_HORA: ahora(), DNI: dni, TELEFONO: t, NOTA: limpioTexto(x.nota), USUARIO: quien,
+        ANULADO: '', MOTIVO_ANULACION: '' };
+      fotos[f.ID] = foto(dni, quien, 0, false);   // «Deshacer» devuelve las tarjetas a como estaban
+      telefonosManual.push(f);
+      ponerTelefono(dni, t);
+      return { ok: true, id: f.ID, fila: clonar(f), telefonos: telefonosVigentesDe(dni) };
+    },
+
+    anularTelefono: x => {
+      exigir(x, true);
+      const id = String(x.id || '').trim();
+      if (id.indexOf('TEL-') !== 0) throw new Error('Aquí solo se anulan teléfonos agregados (TEL-…).');
+      const f = telefonosManual.find(y => y.ID === id);
+      if (!f) throw new Error('No encontré ' + id + '.');
+      if (f.ANULADO) throw new Error(id + ' ya estaba anulado.');
+      f.ANULADO = 'SÍ'; f.MOTIVO_ANULACION = String(x.motivo).trim();
+      if (fotos[id]) { restaurar(fotos[id]); delete fotos[id]; }
+      return { ok: true, telefonos: telefonosVigentesDe(f.DNI) };
     },
 
     anularContactoEnfermeria: x => {
@@ -6106,7 +6307,9 @@ const DEMO = (() => {
         }),
         altas: altasFicha(k),
         fallecido: muertos[k] || null,
-        telefonos: telefonosDe(k),
+        telefonos: [...new Set(manualesDe(k).concat(telefonosDe(k)))],
+        // Como getPaciente: los agregados a mano, con quién, cuándo y la nota.
+        telefonosAgregados: telefonosManual.filter(f => !f.ANULADO && f.DNI === k).sort((a, b) => a.FECHA_HORA < b.FECHA_HORA ? 1 : -1).map(clonar),
         // Como otrosContactos (Registro.gs): lo que no es un teléfono de 9 dígitos, sin anulados ni repetidos, lo más reciente primero.
         contactos: [...new Set(registros.filter(r => r.DNI === k && !r.ANULADO)
           .sort((a, b) => (a.FECHA + ' ' + a.FECHA_HORA) < (b.FECHA + ' ' + b.FECHA_HORA) ? 1 : -1)

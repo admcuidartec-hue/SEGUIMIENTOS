@@ -48,6 +48,10 @@ a{color:var(--accent)}a:hover{color:var(--accent-hover)}
 .solo-consulta{display:flex;align-items:center;gap:8px;margin:0 0 14px;padding:8px 12px;border-radius:var(--r-s);background:var(--info-soft);color:var(--ink);font-size:13.5px;font-weight:500}
 .solo-consulta[hidden]{display:none}
 .solo-consulta i{color:var(--info);font-size:18px}
+/* SOFDOC atrasado (11/11/2026): para todos los roles y en todas las pantallas, hasta que se cargue (pintarAvisoSofdoc). */
+.aviso-sofdoc{display:flex;align-items:flex-start;gap:8px;margin:0 0 14px;padding:10px 12px;border-radius:var(--r-s);background:var(--warn-soft);color:var(--ink);border-left:4px solid var(--warn);font-size:13.5px;line-height:1.45}
+.aviso-sofdoc[hidden]{display:none}
+.aviso-sofdoc i{color:var(--warn);font-size:18px;flex:0 0 auto;margin-top:1px}
 .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
 [hidden]{display:none!important}
 
@@ -818,6 +822,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
     </header>
     <main id="vista">
       <p class="solo-consulta" id="solo-consulta" role="status" hidden><i class="ph ph-eye"></i><span>Usuario de solo consulta: puede ver todo, pero no modificar datos.</span></p>
+      <p class="aviso-sofdoc" id="aviso-sofdoc" role="alert" hidden><i class="ph ph-warning"></i><span></span></p>
       <section class="vista" id="v-tablero">
         <div class="cab">
           <div>
@@ -1098,7 +1103,8 @@ function adaptarBoot(b) {
     tratamientos: b.tratamientos || [],
     marcas: b.marcas || {},
     reacciones: b.reacciones || [],   // Enfermería: CATALOGOS.REACCIONES
-    reglas: b.reglas || {}
+    reglas: b.reglas || {},
+    sofdoc: b.sofdoc || null   // frescuraSofdoc: el aviso de SOFDOC atrasado (pintarAvisoSofdoc)
   };
 }
 
@@ -1219,6 +1225,21 @@ function avisarNuevoDia() {
   $('#nuevo-dia-d').textContent = `La página se abrió el ${dmy(S.hoy)}. Para no guardar nada con la fecha de ese día, recárguela antes de seguir.`;
   caja.hidden = false;
   caja.querySelector('.nd-caja').focus();
+}
+/**
+ * SOFDOC atrasado (bootstrap().sofdoc, frescuraSofdoc en Logica.gs): los pacientes que volvieron después de esa fecha siguen en
+ * la lista y las «No vino» pueden ser falsas. Se dice a todos, porque cualquiera puede avisar a quien carga SOFDOC.
+ */
+function pintarAvisoSofdoc() {
+  const p = $('#aviso-sofdoc'), f = S.boot && S.boot.sofdoc;
+  if (!p) return;
+  p.hidden = !(f && f.atrasado);
+  if (p.hidden) return;
+  p.querySelector('span').innerHTML = f.hasta
+    ? `<b>Los datos de SOFDOC llegan hasta el ${esc(dmy(f.hasta))}</b> (${esc(f.dias === 1 ? 'ayer' : 'hace ' + f.dias + ' días')}). `
+      + 'Los pacientes que volvieron después siguen en la lista y algunas «No vino» pueden no ser ciertas. '
+      + 'Avise a quien carga SOFDOC: exportar, pegar en la «Hoja 1» y usar «Actualizar».'
+    : '<b>No hay citas de SOFDOC cargadas.</b> Avise a quien carga SOFDOC: exportar, pegar en la «Hoja 1» y usar «Actualizar».';
 }
 function pintarSaludo() {
   const u = yo(), s = saludoHora();
@@ -5189,6 +5210,7 @@ async function arrancar() {
   S.usuario = S.boot.usuarios.some(u => u.v === recordado) ? recordado : '';
   pintarUsuarios();
   pintarSaludo();
+  pintarAvisoSofdoc();
   aplicarRol(true);
   iniciarTablero();
   iniciarRegistro();
@@ -5898,7 +5920,9 @@ const DEMO = (() => {
       especialidades: [...new Set(series.map(x => x.ESPECIALIDAD).concat(antiguas.map(x => x.ESPECIALIDAD_CONSULTA)))].sort(),
       medicos: [...new Set(series.concat(antiguas).map(x => x.MEDICO_ULTIMO))].sort(),
       doctores, procedimientos, tratamientos, marcas, reacciones: REACCIONES.slice(),
-      reglas: Object.assign({ diasEnfermeria: DIAS_ENF.slice(), corteEnfermeria: CORTE_ENF, maxIntentosEnfermeria: MAX_ENF }, reglas)
+      reglas: Object.assign({ diasEnfermeria: DIAS_ENF.slice(), corteEnfermeria: CORTE_ENF, maxIntentosEnfermeria: MAX_ENF }, reglas),
+      // Como frescuraSofdoc: el DEMO está al día (window.DEMO_SOFDOC, puesto antes de cargar, simula otro estado).
+      sofdoc: window.DEMO_SOFDOC || { hasta: mas(hoy, -1), lejana: mas(hoy, 30), dias: 1, habiles: 1, atrasado: false }
     }),
 
     getEnfermeria: () => ({ hoy, contactos: contactosDemo(), reacciones: REACCIONES.slice(), dias: DIAS_ENF.slice() }),

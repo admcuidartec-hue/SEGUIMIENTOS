@@ -14,6 +14,7 @@ function onOpen() {
     .addItem('Actualizar', 'actualizar')
     .addItem('Verificar', 'verificar')
     .addItem('Activar actualización diaria (7:00)', 'activarDiaria')
+    .addItem('Probar el correo de SOFDOC atrasado', 'probarAlertaSofdoc')
     .addItem('Importar lo que falta de la base de hierro', 'importarLoQueFalta')
     .addSeparator()
     .addItem('Preparar hojas', 'prepararHojas')
@@ -261,12 +262,48 @@ function actualizacionDiaria() {
   try {
     var r = actualizar_('AUTOMÁTICO');
     if (!r.ok) bitacora_('AUTOMÁTICO', 'ACTUALIZAR', r.mensaje);
+    // Después de actualizar (o de que la «Hoja 1» no sirviera): si SOFDOC sigue atrasado, correo. Su fallo no tapa el de arriba.
+    try { alertaSofdoc_(false); } catch (eA) { bitacora_('AUTOMÁTICO', 'ALERTA SOFDOC', 'No se pudo enviar: ' + eA.message); }
   } catch (e) {
     try { bitacora_('AUTOMÁTICO', 'ACTUALIZAR', 'Error: ' + e.message); } catch (e2) { /* la bitácora tampoco: queda el correo de Google */ }
     throw e;
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * El correo de SOFDOC atrasado (11/11/2026). Va a REGLAS.CORREOS_ALERTA_SOFDOC y, si no hay ninguno, al dueño del script.
+ * `prueba`: se envía aunque esté al día, para comprobar que llega (y, la primera vez, para que Google pida el permiso de correo).
+ * Devuelve a quiénes se envió, o '' si no hacía falta.
+ */
+function alertaSofdoc_(prueba) {
+  var d = datos_(), f = frescuraSofdoc(d.citas, d.hoy);
+  if (!f.atrasado && !prueba) return '';
+  var para = d.reglas.correosAlerta.length ? d.reglas.correosAlerta : [Session.getEffectiveUser().getEmail()];
+  var estado = !f.hasta ? 'No hay citas de SOFDOC cargadas.'
+    : 'Las citas realizadas de SOFDOC llegan hasta el ' + fechaDmy(f.hasta) + ' (' + haceDias(f.dias) + ').';
+  var asunto = (prueba ? '[Prueba] ' : '') + (f.atrasado ? 'SOFDOC atrasado en Seguimientos CHP' : 'SOFDOC al día en Seguimientos CHP');
+  var cuerpo = [
+    estado,
+    '',
+    f.atrasado
+      ? 'Mientras no se cargue, los pacientes que volvieron después de esa fecha siguen en la lista para llamar y algunas «No vino» pueden no ser ciertas.'
+      : 'Está al día: este correo es solo una prueba.',
+    '',
+    'Para cargarlo: exportar el reporte de citas de SOFDOC, pegarlo en la «Hoja 1» del libro BD SOFDOC SEGUIMIENTOS y usar el menú Seguimientos → «Actualizar». Después, «Verificar» debe decir ✓.',
+    '',
+    'Este aviso se envía cada mañana a las 7:00 mientras siga atrasado. Destinatarios: REGLAS → CORREOS_ALERTA_SOFDOC.'
+  ].join('\n');
+  MailApp.sendEmail(para.join(','), asunto, cuerpo);
+  bitacora_(prueba ? 'MENÚ' : 'AUTOMÁTICO', 'ALERTA SOFDOC', (prueba ? 'Prueba. ' : '') + estado + ' Enviado a ' + para.length +
+    (para.length === 1 ? ' destinatario.' : ' destinatarios.'));
+  return para.join(', ');
+}
+
+function probarAlertaSofdoc() {
+  var a = alertaSofdoc_(true);
+  SpreadsheetApp.getUi().alert('Correo de prueba enviado a: ' + a + '. Si no llega en unos minutos, revise la carpeta de spam.');
 }
 
 /** Deja un único activador diario a las 7:00 (Lima). Devuelve cuántos anteriores reemplazó. */

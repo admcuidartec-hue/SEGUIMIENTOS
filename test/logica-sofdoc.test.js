@@ -36,3 +36,29 @@ test('la última carga es la más reciente que trajo citas nuevas: ni la de las 
   assert.equal(L.lineasSofdoc([c('2026-11-05', 'REALIZADO')], HOY, cargas.concat(una))[1],
     'ℹ SOFDOC: última carga con citas nuevas el 05/11/2026 11:40 (MENÚ): 1 cita nueva.');
 });
+
+test('frescuraSofdoc: los domingos no cuentan para el atraso (el lunes no avisa por el domingo sin atención)', () => {
+  // 2026-11-09 es lunes; 2026-11-07 sábado.
+  const f = L.frescuraSofdoc([c('2026-11-07', 'REALIZADO')], '2026-11-09');
+  assert.deepEqual(plano([f.hasta, f.dias, f.habiles, f.atrasado]), ['2026-11-07', 2, 1, false]);
+  // Del jueves 05/11 al lunes 09/11: 4 días, 3 sin el domingo → atrasado.
+  const g = L.frescuraSofdoc([c('2026-11-05', 'REALIZADO')], '2026-11-09');
+  assert.deepEqual(plano([g.dias, g.habiles, g.atrasado]), [4, 3, true]);
+  // Del viernes 06/11 al lunes 09/11: 3 días, 2 sin el domingo → al día.
+  assert.equal(L.frescuraSofdoc([c('2026-11-06', 'REALIZADO')], '2026-11-09').atrasado, false);
+  // Sin ninguna realizada: atrasado, sin fecha.
+  const h = L.frescuraSofdoc([c('2026-11-20', 'PROGRAMADO')], '2026-11-09');
+  assert.deepEqual(plano([h.hasta, h.lejana, h.atrasado]), ['', '2026-11-20', true]);
+});
+
+test('lineasSofdoc usa la misma regla: el lunes con la última del viernes sale ✓', () => {
+  assert.match(L.lineasSofdoc([c('2026-11-06', 'REALIZADO')], '2026-11-09', [])[0], /^✓ SOFDOC: citas realizadas hasta el 06\/11\/2026 \(hace 3 días\)\.$/);
+});
+
+test('correosAlerta y REGLAS.CORREOS_ALERTA_SOFDOC: solo correos válidos, sin repetir; no viajan en las reglas por omisión', () => {
+  assert.deepEqual(plano(L.correosAlerta(' Ana@chp.pe; ana@chp.pe, no-es-correo  jefe@x.com ')), ['ana@chp.pe', 'jefe@x.com']);
+  assert.deepEqual(plano(L.correosAlerta('')), []);
+  const r = L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], [['CORREOS_ALERTA_SOFDOC', 'a@b.pe, c@d.pe'], ['MAX_SEGUIMIENTOS', 2]]);
+  assert.deepEqual(plano(r.correosAlerta), ['a@b.pe', 'c@d.pe']);
+  assert.deepEqual(plano(L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], []).correosAlerta), []);
+});

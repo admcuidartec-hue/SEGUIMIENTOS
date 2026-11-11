@@ -80,12 +80,12 @@ function fechaDmy(iso) {
 }
 
 /**
- * La línea de «Verificar» sobre SOFDOC (05/11/2026): hasta qué fecha llegan las citas REALIZADO (una agendada no dice que el
- * export esté al día), la más lejana agendada y la última carga de la «Hoja 1» que trajo citas nuevas. La actualización de las
- * 7:00 relee la misma «Hoja 1»: sin un export nuevo, la base se queda donde estaba aunque «Actualizar» corra cada día.
- * `cargas`: filas de BITACORA ({ FECHA_HORA: 'yyyy-mm-dd HH:mm', USUARIO, ACCION, DETALLE }), en el orden de la hoja.
+ * Qué tan al día está SOFDOC (11/11/2026): la última cita REALIZADO hasta hoy (`hasta`), la más lejana de cualquier estado
+ * (`lejana`), los días de calendario desde `hasta` (`dias`) y si está atrasado: más de 2 días sin contar domingos (`habiles`),
+ * para que el lunes no avise solo porque el domingo no se atiende. Sin ninguna cita realizada, atrasado.
+ * La usan «Verificar», el aviso de la app (bootstrap) y el correo de la actualización de las 7:00.
  */
-function lineasSofdoc(citas, hoy, cargas) {
+function frescuraSofdoc(citas, hoy) {
   var hasta = '', lejana = '';
   (citas || []).forEach(function (c) {
     var f = fechaIso(c.FECHA);
@@ -93,13 +93,44 @@ function lineasSofdoc(citas, hoy, cargas) {
     if (f > lejana) lejana = f;
     if (normTexto(c.ESTADO) === 'REALIZADO' && f <= hoy && f > hasta) hasta = f;
   });
+  if (!hasta) return { hasta: '', lejana: lejana, dias: 0, habiles: 0, atrasado: true };
+  var dias = diasEntre(hasta, hoy), habiles = 0;
+  for (var i = 1; i <= dias; i++) if (new Date(diaUtc_(sumarDias(hasta, i))).getUTCDay() !== 0) habiles++;
+  return { hasta: hasta, lejana: lejana, dias: dias, habiles: habiles, atrasado: habiles > 2 };
+}
+
+/** «hoy», «ayer» o «hace N días». */
+function haceDias(dias) {
+  return dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : 'hace ' + dias + ' días';
+}
+
+/**
+ * Los correos del aviso de SOFDOC atrasado: REGLAS.CORREOS_ALERTA_SOFDOC, separados por coma, punto y coma o espacio. Solo los
+ * que parecen correos; sin repetir.
+ */
+function correosAlerta(texto) {
+  var out = [];
+  String(texto == null ? '' : texto).split(/[\s,;]+/).forEach(function (c) {
+    c = c.trim().toLowerCase();
+    if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c) && out.indexOf(c) < 0) out.push(c);
+  });
+  return out;
+}
+
+/**
+ * La línea de «Verificar» sobre SOFDOC (05/11/2026): hasta qué fecha llegan las citas REALIZADO (una agendada no dice que el
+ * export esté al día), la más lejana agendada y la última carga de la «Hoja 1» que trajo citas nuevas. La actualización de las
+ * 7:00 relee la misma «Hoja 1»: sin un export nuevo, la base se queda donde estaba aunque «Actualizar» corra cada día.
+ * `cargas`: filas de BITACORA ({ FECHA_HORA: 'yyyy-mm-dd HH:mm', USUARIO, ACCION, DETALLE }), en el orden de la hoja.
+ */
+function lineasSofdoc(citas, hoy, cargas) {
+  var fr = frescuraSofdoc(citas, hoy), hasta = fr.hasta, lejana = fr.lejana;
   var l = [];
   if (!hasta) {
     l.push('✗ SOFDOC: CITAS no tiene ninguna cita realizada. Pegue el export de SOFDOC en la «Hoja 1» y use «Actualizar».');
   } else {
-    var dias = diasEntre(hasta, hoy);
-    var cuando = dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : 'hace ' + dias + ' días';
-    l.push(dias <= 2
+    var cuando = haceDias(fr.dias);
+    l.push(!fr.atrasado
       ? '✓ SOFDOC: citas realizadas hasta el ' + fechaDmy(hasta) + ' (' + cuando + ').'
       : '⚠ SOFDOC: citas realizadas hasta el ' + fechaDmy(hasta) + ', ' + cuando + '. Exporte de SOFDOC, péguelo en la «Hoja 1» y use «Actualizar».');
     if (lejana > hoy) l.push('ℹ SOFDOC: hay citas agendadas hasta el ' + fechaDmy(lejana) + '.');
@@ -356,7 +387,7 @@ function reglasDesdeFilas(encabezado, filas) {
   var r = { plazos: { '*': { esperado: 30, vence: 45 } }, espera: 15, maxSeguimientos: 3, corte: 180, corteIndicaciones: 180, metaRetorno: 60,
     esperaCotizacion: 7, diasEntreSesiones: 7, graciaAgenda: 2, metaDiaria: 15,
     postTratamiento: 30, controlLab: 15, avisoAltaControl: 30, metaTratamiento: 95, diasEnfermeria: [1, 3, 5], corteEnfermeria: 10,
-    maxIntentosEnfermeria: 2 };
+    maxIntentosEnfermeria: 2, correosAlerta: [] };
   function celda(f, k) { return idx[k] === undefined ? '' : f[idx[k]]; }
   (filas || []).forEach(function (f) {
     var esp = normTexto(celda(f, 'ESPECIALIDAD'));
@@ -382,6 +413,8 @@ function reglasDesdeFilas(encabezado, filas) {
     }
     if (par === 'ENFERMERIA_CORTE_DIAS') r.corteEnfermeria = entero_(val, 10);
     if (par === 'ENFERMERIA_MAX_INTENTOS') r.maxIntentosEnfermeria = entero_(val, 2, 1);
+    // Solo para el correo de SOFDOC atrasado: no viaja a la app (bootstrap elige qué reglas manda).
+    if (par === 'CORREOS_ALERTA_SOFDOC') r.correosAlerta = correosAlerta(val);
   });
   Object.keys(r.plazos).forEach(function (k) {
     if (r.plazos[k].vence < r.plazos[k].esperado) r.plazos[k].vence = r.plazos[k].esperado;

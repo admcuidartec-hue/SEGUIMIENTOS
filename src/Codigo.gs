@@ -447,6 +447,8 @@ function bootstrap() {
     tratamientos: d.catalogos.tratamientos,
     marcas: d.catalogos.marcas,
     reacciones: d.catalogos.reacciones,
+    // Qué tan al día está SOFDOC: la app avisa a todos si está atrasado (pintarAvisoSofdoc).
+    sofdoc: frescuraSofdoc(d.citas, d.hoy),
     reglas: { espera: d.reglas.espera, maxSeguimientos: d.reglas.maxSeguimientos, graciaAgenda: d.reglas.graciaAgenda,
       diasEntreSesiones: d.reglas.diasEntreSesiones, esperaCotizacion: d.reglas.esperaCotizacion,
       metaRetorno: d.reglas.metaRetorno, metaTratamiento: d.reglas.metaTratamiento, metaDiaria: d.reglas.metaDiaria,

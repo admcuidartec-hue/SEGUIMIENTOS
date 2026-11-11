@@ -348,3 +348,45 @@ test('«Preparar hojas» agrega OP al final de las seis hojas que se escriben po
   hojas.SESIONES = hojaFalsa([ctx.COLUMNAS_SESIONES.slice()]); ctx.MEMO = {};
   assert.deepEqual(plano(ctx.conOp_('SESIONES', ctx.COLUMNAS_SESIONES)), plano(ctx.COLUMNAS_SESIONES));
 });
+
+/** Para alertaSofdoc_: datos_ con citas inventadas, correo y bitácora capturados. */
+function conAlerta(ctx, citas, correos) {
+  const enviados = [], bitacora = [];
+  ctx.datos_ = () => ({ hoy: '2026-11-09', citas, reglas: { correosAlerta: correos || [] } });
+  ctx.MailApp = { sendEmail: (para, asunto, cuerpo) => enviados.push({ para, asunto, cuerpo }) };
+  ctx.Session = { getEffectiveUser: () => ({ getEmail: () => 'duenio@ejemplo.pe' }) };
+  ctx.bitacora_ = (u, a, d) => bitacora.push([u, a, d]);
+  return { enviados, bitacora };
+}
+
+test('alertaSofdoc_: atrasado → correo a REGLAS.CORREOS_ALERTA_SOFDOC y línea en BITACORA; al día → nada', () => {
+  const { ctx } = contexto();
+  let r = conAlerta(ctx, [{ FECHA: '2026-10-28', ESTADO: 'REALIZADO' }], ['ana@chp.pe', 'jefe@chp.pe']);
+  assert.equal(ctx.alertaSofdoc_(false), 'ana@chp.pe, jefe@chp.pe');
+  assert.equal(r.enviados.length, 1);
+  assert.equal(r.enviados[0].para, 'ana@chp.pe,jefe@chp.pe');
+  assert.equal(r.enviados[0].asunto, 'SOFDOC atrasado en Seguimientos CHP');
+  assert.match(r.enviados[0].cuerpo, /llegan hasta el 28\/10\/2026 \(hace 12 días\)/);
+  assert.deepEqual(r.bitacora.map(b => b.slice(0, 2)), [['AUTOMÁTICO', 'ALERTA SOFDOC']]);
+  r = conAlerta(ctx, [{ FECHA: '2026-11-07', ESTADO: 'REALIZADO' }]);
+  assert.equal(ctx.alertaSofdoc_(false), '');
+  assert.equal(r.enviados.length, 0);
+});
+
+test('alertaSofdoc_: sin destinatarios en REGLAS va al dueño; la prueba se envía aunque esté al día', () => {
+  const { ctx } = contexto();
+  const r = conAlerta(ctx, [{ FECHA: '2026-11-07', ESTADO: 'REALIZADO' }]);
+  assert.equal(ctx.alertaSofdoc_(true), 'duenio@ejemplo.pe');
+  assert.equal(r.enviados[0].asunto, '[Prueba] SOFDOC al día en Seguimientos CHP');
+  assert.deepEqual(r.bitacora[0].slice(0, 2), ['MENÚ', 'ALERTA SOFDOC']);
+});
+
+test('actualizacionDiaria: un fallo del correo queda en BITACORA y no rompe la actualización', () => {
+  const { ctx } = contexto();
+  const r = conAlerta(ctx, [{ FECHA: '2026-10-28', ESTADO: 'REALIZADO' }]);
+  ctx.CONFIG.ESPERA_LOCK_MS = 1;
+  ctx.actualizar_ = () => ({ ok: true, mensaje: 'Listo.' });
+  ctx.MailApp = { sendEmail: () => { throw new Error('sin permiso de correo'); } };
+  ctx.actualizacionDiaria();
+  assert.deepEqual(r.bitacora, [['AUTOMÁTICO', 'ALERTA SOFDOC', 'No se pudo enviar: sin permiso de correo']]);
+});

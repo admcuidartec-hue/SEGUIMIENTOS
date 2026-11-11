@@ -177,7 +177,7 @@ test('adaptadores: adaptarBoot, nombreBonito, telBonito y medicoCorto', async ()
       medicos: ['Dr. ELÍ FABRIZIO CABANILLAS HUALPA', 'Dra. ALEJANDRA LA TORRE MATUK', 'Dr. JUVENAL HANAMPA ROQUE'].map(medicoCorto)
     }));
     assert.deepEqual(Object.keys(r.boot).sort(),
-      ['doctores', 'especialidades', 'hoy', 'marcas', 'medicos', 'procedimientos', 'reacciones', 'reglas', 'tratamientos', 'usuarios']);
+      ['doctores', 'especialidades', 'hoy', 'marcas', 'medicos', 'procedimientos', 'reacciones', 'reglas', 'sofdoc', 'tratamientos', 'usuarios']);
     assert.deepEqual(r.boot.usuarios[0], { v: 'MAGALY', l: 'Magaly', rol: 'ADMISION' });
     assert.deepEqual(r.boot.usuarios.filter(u => u.rol !== 'ADMISION').map(u => [u.v, u.rol]),
       [['ENFERMERA PRUEBA', 'ENFERMERIA'], ['ADMINISTRACION', 'CONSULTA'], ['MARKETING', 'CONSULTA']]);
@@ -5246,6 +5246,37 @@ test('cambio de día con la pestaña abierta: tapa la pantalla, dice desde cuán
     assert.equal(await pagina.evaluate(() => document.activeElement.classList.contains('nd-caja')), true);
     const rechazo = await pagina.evaluate(() => llamar('getTablero').then(() => 'pasó', e => e.message));
     assert.equal(rechazo, 'Cambió el día: recargue la página (F5) para seguir.');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('aviso de SOFDOC atrasado: se ve en todas las pantallas y para todos los roles; al día, no aparece', async () => {
+  const navegador = await chromium.launch();
+  try {
+    const abrir = async (sofdoc, usuario) => {
+      const pagina = await (await navegador.newContext()).newPage();
+      const errores = [];
+      pagina.on('pageerror', e => errores.push(e.message));
+      await pagina.addInitScript(([s, u]) => { window.DEMO_SOFDOC = s; localStorage.setItem('seg.usuario', u); }, [sofdoc, usuario]);
+      await pagina.goto('file://' + ARCHIVO);
+      await pagina.waitForFunction(() => S.fase === 'listo');
+      return { pagina, errores };
+    };
+    const atrasado = { hasta: '2026-09-21', lejana: '2026-09-21', dias: 10, habiles: 9, atrasado: true };
+    let { pagina, errores } = await abrir(atrasado, 'RACHEL');
+    assert.equal(await pagina.locator('#aviso-sofdoc').isVisible(), true);
+    assert.match(await pagina.locator('#aviso-sofdoc').innerText(),
+      /Los datos de SOFDOC llegan hasta el 21\/09\/2026 \(hace 10 días\)\. Los pacientes que volvieron después siguen en la lista/);
+    await pagina.locator('.menu [data-sec="registro"]').click();
+    await pagina.waitForFunction(() => S.seccion === 'registro');
+    assert.equal(await pagina.locator('#aviso-sofdoc').isVisible(), true, 'también fuera del Tablero');
+    assert.deepEqual(errores, []);
+    ({ pagina, errores } = await abrir(atrasado, 'ADMINISTRACION'));
+    assert.equal(await pagina.locator('#aviso-sofdoc').isVisible(), true, 'también para solo consulta');
+    ({ pagina, errores } = await abrir({ hasta: '', lejana: '', dias: 0, habiles: 0, atrasado: true }, 'RACHEL'));
+    assert.match(await pagina.locator('#aviso-sofdoc').innerText(), /No hay citas de SOFDOC cargadas\./);
+    ({ pagina, errores } = await abrir(null, 'RACHEL'));
+    assert.equal(await pagina.locator('#aviso-sofdoc').isVisible(), false, 'el DEMO está al día');
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });

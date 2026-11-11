@@ -315,6 +315,21 @@ hasta que se le escribe.
 - **ℹ última carga con citas nuevas…**, sacada de la `BITACORA`. Solo cuenta una carga correcta («filas leídas») que trajo citas
   nuevas: la de las 7:00 relee la misma «Hoja 1» y, sin un export nuevo, no adelanta nada.
 
+## Alarma de SOFDOC atrasado (11/11/2026)
+
+Del 02/10 al 05/11/2026 SOFDOC no se cargó y nadie lo notó: 183 pacientes que ya habían vuelto seguían en la lista.
+
+- `frescuraSofdoc(citas, hoy)` (Logica.gs): última cita `REALIZADO` hasta hoy, días desde entonces y `atrasado` = más de 2 días
+  **sin contar domingos** (el lunes no avisa por el domingo sin atención). La usan «Verificar» (`lineasSofdoc`), la app y el correo.
+- **App**: `bootstrap().sofdoc` → `#aviso-sofdoc` arriba de todas las pantallas y para todos los roles (`pintarAvisoSofdoc`).
+  El DEMO está al día; `window.DEMO_SOFDOC` simula otro estado.
+- **Correo**: `actualizacionDiaria` (7:00), después de actualizar, llama a `alertaSofdoc_`: si sigue atrasado, correo a
+  `REGLAS.CORREOS_ALERTA_SOFDOC` (separados por coma; si no hay, al dueño del script) y línea `ALERTA SOFDOC` en `BITACORA`.
+  Un fallo del correo queda en la BITACORA y no rompe la actualización. Los correos no viajan a la app.
+- **Permisos nuevos** en `appsscript.json`: `script.send_mail` y `userinfo.email`. **Al publicar, el dueño tiene que autorizarlos**:
+  `npm run subir` → recargar el Sheets → menú «Probar el correo de SOFDOC atrasado» → aceptar → `npm run actualizar`. Sin esa
+  autorización, la app y la actualización de las 7:00 fallan por permisos.
+
 ## «¿Qué pasó?» (Etapa 1)
 
 - La lista de resultados vive en `RESULTADOS` (`src/Resultados.gs`), no en `CATALOGOS`.

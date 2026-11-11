@@ -330,6 +330,14 @@ Del 02/10 al 05/11/2026 SOFDOC no se cargó y nadie lo notó: 183 pacientes que 
   `npm run subir` → recargar el Sheets → menú «Probar el correo de SOFDOC atrasado» → aceptar → `npm run actualizar`. Sin esa
   autorización, la app y la actualización de las 7:00 fallan por permisos.
 
+## «Ya se aplicó hoy» en la primera sesión (11/11/2026)
+
+Una primera sesión con fecha de **hoy** quedaba siempre programada: las dosis aplicadas el mismo día seguían en Agendado y
+Enfermería no las veía. Ahora, con la fecha de hoy, Registro pregunta (`#rhoy`): «Ya se aplicó hoy» o «Se aplicará más tarde»,
+y no deja registrar sin elegir. «Ya se aplicó hoy» manda `aplicadaHoy: true` y `validarRegistro` marca la sesión 1 hecha hoy, como
+una fecha pasada. Sin la marca (una pestaña vieja), programada como antes. Los registros anteriores se corrigen en su tarjeta con
+«Marcar sesión 1 hecha».
+
 ## «¿Qué pasó?» (Etapa 1)
 
 - La lista de resultados vive en `RESULTADOS` (`src/Resultados.gs`), no en `CATALOGOS`.

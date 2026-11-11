@@ -5280,3 +5280,42 @@ test('aviso de SOFDOC atrasado: se ve en todas las pantallas y para todos los ro
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('Registro: primera sesión de hoy pide decir si ya se aplicó; «Ya se aplicó hoy» marca la sesión 1 hecha (Enfermería la ve)', async () => {
+  const { navegador, pagina, errores } = await abrirRegistro();
+  try {
+    const hoy = await pagina.evaluate(() => S.hoy);
+    await pagina.locator('#rdni').fill('46111777');
+    await pagina.locator('#rnom').fill('Paciente Prueba Hoy');
+    await pagina.locator('#rtel').fill('987111777');
+    await pagina.locator('#rmed').selectOption({ index: 1 });
+    await pagina.locator('#rtrats [data-trat="HIERRO SACARATO"]').click();
+    await pagina.locator('#rses [data-ses="2"]').click();
+    assert.equal(await pagina.locator('#rhoy').isVisible(), false, 'sin fecha no se pregunta');
+    await pagina.locator('#rinicio').fill(hoy);
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rhoy').isVisible(), true);
+    assert.equal(await pagina.locator('#rgo').isDisabled(), true, 'sin elegir no se registra');
+    assert.match(await pagina.locator('#rfalta').textContent(), /si la primera sesión ya se aplicó/);
+    await pagina.locator('input[name="rhoy"][value="PROGRAMADA"]').check();
+    assert.match((await pagina.locator('#rinicio-n').textContent()).trim(), /^Quedará programada para el /);
+    await pagina.locator('input[name="rhoy"][value="HECHA"]').check();
+    assert.match((await pagina.locator('#rinicio-n').textContent()).trim(), /^La sesión 1 se marcará como hecha el /);
+    // Otra fecha: la pregunta se va y la elección se borra.
+    await pagina.locator('#rinicio').fill(await pagina.evaluate(() => masDias(S.hoy, 2)));
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    assert.equal(await pagina.locator('#rhoy').isVisible(), false);
+    assert.equal(await pagina.locator('input[name="rhoy"]:checked').count(), 0);
+    await pagina.locator('#rinicio').fill(hoy);
+    await pagina.locator('#rinicio').dispatchEvent('input');
+    await pagina.locator('input[name="rhoy"][value="HECHA"]').check();
+    await pagina.locator('#rgo').click();
+    await pagina.waitForFunction(() => /^Registro guardado/.test(document.querySelector('#aviso span').textContent));
+    assert.match(await aviso(pagina), /sesión 1 hecha el /);
+    const datos = await ultimo(pagina, 'guardarRegistro');
+    assert.deepEqual([datos.fechaInicio, datos.aplicadaHoy], [hoy, true]);
+    const r = await pagina.evaluate(() => llamar('getPaciente', '46111777'));
+    assert.deepEqual(r.registros[0].sesiones.map(s => [s.NUMERO, s.FECHA]), [[1, hoy]]);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

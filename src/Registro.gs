@@ -157,7 +157,8 @@ function validarRegistro(p, catalogos, hoy) {
   if (textoLimpio_(p.fechaInicio) && !inicio) return no('La fecha de la primera sesión no es válida.');
   // Pasada: la enfermera registra después de aplicar; desde la fecha del registro, la sesión 1 se marca hecha al guardar.
   if (inicio && inicio < fecha) return no('La primera sesión no puede ser anterior a la fecha del registro (' + fechaDma_(fecha) + ').');
-  var sesionHecha = inicio && inicio < hoy ? inicio : '';
+  // Hoy, solo si la persona dijo que ya se aplicó (aplicadaHoy, 11/11/2026): sin eso, programada (una pestaña vieja no lo manda).
+  var sesionHecha = inicio && (inicio < hoy || (inicio === hoy && p.aplicadaHoy === true)) ? inicio : '';
   if (inicio && inicio > sumarDias(hoy, 180)) return no('La fecha de la primera sesión va hasta 180 días desde hoy.');
   base0.FECHA_INICIO = inicio || '';
   var proc = textoLimpio_(p.procedimiento), trat = textoLimpio_(p.tratamiento);

@@ -403,6 +403,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .edita .aviso-edicion{grid-column:1/-1;margin:0;color:var(--warn);font-size:13px}
 .edita .aviso-edicion:empty{display:none}
 .decs{display:flex;flex-direction:column;gap:8px}
+.decs[hidden]{display:none}
 .dec{display:flex;align-items:center;gap:10px;min-height:44px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);cursor:pointer}
 .dec:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
 .dec input{accent-color:var(--accent);width:18px;height:18px;margin:0}
@@ -3130,6 +3131,9 @@ function pintarFormRegistro(anim) {
       <div id="rses"></div></fieldset>
     <fieldset><legend><span class="k">5</span>Primera sesión<small>opcional: si ya la agendó o si ya se aplicó</small></legend>
       <label class="campo">Fecha de la primera sesión<input id="rinicio" type="date" min="${hoy}" max="${esc(masDias(S.hoy, 180))}"></label>
+      <div class="decs" id="rhoy" role="radiogroup" aria-label="¿Ya se aplicó hoy?" hidden>
+        <label class="dec"><input type="radio" name="rhoy" value="HECHA"><span>Ya se aplicó hoy</span></label>
+        <label class="dec"><input type="radio" name="rhoy" value="PROGRAMADA"><span>Se aplicará más tarde (queda programada)</span></label></div>
       <p class="nota-dec" id="rinicio-n" aria-live="polite" hidden></p></fieldset>
     <div id="rdup"></div>${barra('Registrar')}`;
   else if (RG.modo === 'control') f.innerHTML = paciente + `
@@ -3325,6 +3329,8 @@ function faltanRegistro() {
   }
   if (RG.modo === 'indicacion') {
     if (!RG.procs.length && !RG.trat) f.push('un procedimiento o tratamiento');
+    // Primera sesión de hoy: decir si ya se aplicó (11/11/2026). Sin elegir, quedaba programada y Enfermería no la veía.
+    if (v('#rinicio') && v('#rinicio') === S.hoy && !$('input[name="rhoy"]:checked')) f.push('si la primera sesión ya se aplicó');
     if (RG.trat) {
       const n = sesionesElegidas();
       if (!(Number.isInteger(n) && n >= (RG.ses === 'otro' ? 6 : 1) && n <= 20)) f.push('sesiones');
@@ -3378,9 +3384,17 @@ function primeraSesionHecha() {
   if (!c || !n) return '';
   const fec = ($('#rfec') && $('#rfec').value) || S.hoy, v = c.value;
   c.min = fec < S.hoy ? fec : S.hoy;
-  const pasada = v && v < S.hoy && v >= fec ? v : '';
-  n.hidden = !v;
-  n.innerHTML = !v ? '' : pasada ? `<i class="ph ph-check-circle"></i>La sesión 1 se marcará como hecha el ${esc(dm(pasada))}.`
+  // Hoy: la persona dice si ya se aplicó (#rhoy). Antes, hoy quedaba siempre programada.
+  const grupo = $('#rhoy'), esHoy = v === S.hoy, eleccion = esHoy && $('input[name="rhoy"]:checked');
+  if (grupo) {
+    grupo.hidden = !esHoy;
+    if (!esHoy) document.querySelectorAll('input[name="rhoy"]').forEach(x => { x.checked = false; });
+  }
+  const hoyHecha = eleccion && eleccion.value === 'HECHA';
+  const pasada = v && ((v < S.hoy && v >= fec) || hoyHecha) ? v : '';
+  const sinElegir = esHoy && !eleccion;
+  n.hidden = !v || sinElegir;
+  n.innerHTML = !v || sinElegir ? '' : pasada ? `<i class="ph ph-check-circle"></i>La sesión 1 se marcará como hecha el ${esc(dm(pasada))}.`
     : v < fec ? '<i class="ph ph-warning-circle"></i>La primera sesión no puede ser anterior a la fecha del registro.'
     : `<i class="ph ph-calendar-check"></i>Quedará programada para el ${esc(dm(v))}.`;
   return pasada;
@@ -3439,6 +3453,8 @@ async function registrar(forzar, teclado) {
         Object.assign(datos, { procedimientos: RG.procs.slice(), tratamiento: RG.trat, sesiones: RG.trat ? sesionesElegidas() : '', marca: RG.trat ? RG.marca : '' });
         if (RG.trat && RG.propio) datos.origenHierro = 'PACIENTE';
         if ($('#rinicio').value) datos.fechaInicio = $('#rinicio').value;
+        const rhoy = $('input[name="rhoy"]:checked');
+        if ($('#rinicio').value === S.hoy && rhoy && rhoy.value === 'HECHA') datos.aplicadaHoy = true;
       }
       if (forzar) datos.confirmado = true;
       const r = await llamar('guardarRegistro', datos);
@@ -6155,7 +6171,7 @@ const DEMO = (() => {
       if (!filas.length && inicio && !/^\d{4}-\d{2}-\d{2}$/.test(inicio)) throw new Error('La fecha de la primera sesión no es válida.');
       // Enfermería, A: pasada (desde la fecha del registro), la sesión 1 se marca hecha al guardar.
       if (!filas.length && inicio && inicio < fecha) throw new Error('La primera sesión no puede ser anterior a la fecha del registro (' + dmyDemo(fecha) + ').');
-      const hecha = !filas.length && inicio && inicio < hoy ? inicio : '';
+      const hecha = !filas.length && inicio && (inicio < hoy || (inicio === hoy && x.aplicadaHoy === true)) ? inicio : '';
       if (!filas.length && inicio && inicio > mas(hoy, 180)) throw new Error('La fecha de la primera sesión va hasta 180 días desde hoy.');
       base.FECHA_INICIO = inicio;
       const procs = filas.length ? [] : (Array.isArray(x.procedimientos) ? x.procedimientos : []).concat(x.procedimiento ? [x.procedimiento] : []).map(p => String(p).trim()).filter(Boolean);

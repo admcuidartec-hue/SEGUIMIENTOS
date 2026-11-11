@@ -37,6 +37,14 @@ test('A: hoy o futura: programada como siempre, sin sesión hecha', () => {
   assert.equal(plano(L.validarRegistro(reg({}), CAT, HOY)).sesionHecha, '', 'sin fecha: cotizado');
 });
 
+test('A: hoy con «Ya se aplicó hoy» (aplicadaHoy): la sesión 1 se marca hecha hoy; sin la marca, programada (11/11/2026)', () => {
+  const h = plano(L.validarRegistro(reg({ fechaInicio: HOY, aplicadaHoy: true }), CAT, HOY));
+  assert.deepEqual([h.error, h.sesionHecha, h.filas[0].FECHA_INICIO], ['', HOY, HOY]);
+  assert.equal(plano(L.validarRegistro(reg({ fechaInicio: HOY, aplicadaHoy: 'true' }), CAT, HOY)).sesionHecha, '', 'solo el booleano');
+  assert.equal(plano(L.validarRegistro(reg({ fechaInicio: '2026-10-20', aplicadaHoy: true }), CAT, HOY)).sesionHecha, '',
+    'una fecha futura nunca se marca hecha');
+});
+
 /* ---------------- B. Contactos de enfermería ---------------- */
 
 test('reglas: ENFERMERIA_DIAS («1,3,5») y ENFERMERIA_CORTE_DIAS (10); catálogo de reacciones', () => {

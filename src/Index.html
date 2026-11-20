@@ -662,6 +662,23 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 .cifras dt{font-size:13.5px;color:var(--soft)}
 .sec-i{max-width:1120px;display:flex;flex-direction:column;gap:12px}
 .sec-i .desplazable,.bloque-i .desplazable{max-width:100%}
+/* «Descargar pacientes que no regresaron» (20/11/2026): panel en el sitio, bajo la cabecera de Indicadores. */
+.noreg{margin-top:22px;padding:18px 20px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);box-shadow:var(--shadow);display:flex;flex-direction:column;gap:14px;max-width:980px;min-width:0}
+.noreg[hidden]{display:none}
+.noreg-cab{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.noreg-cab h2{margin:0;font-size:17px;font-weight:600}
+.noreg-cab p{margin:4px 0 0;color:var(--soft);font-size:13.5px;max-width:72ch}
+.noreg-cab .cerrar-nr{width:40px;height:40px;flex:0 0 40px;border:1px solid var(--line);border-radius:999px;background:transparent;color:var(--soft);display:grid;place-items:center}
+.noreg-cab .cerrar-nr:hover{border-color:var(--accent);color:var(--ink)}
+.noreg-f{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px 16px}
+.noreg-f .campo input,.noreg-f .campo select{height:40px;font-size:14px;min-width:0;width:100%}
+.noreg-est{margin:0;padding:0;border:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px}
+.noreg-est legend{padding:0;margin-bottom:6px;font-size:12.5px;color:var(--muted)}
+.noreg-pie{display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;border-top:1px solid var(--line);padding-top:14px}
+.noreg-cuenta{margin:0 auto 0 0;font-weight:600}
+.noreg-cuenta b{font-family:var(--mono);font-weight:500;color:var(--accent)}
+.noreg-nota{margin:0;font-size:12.5px;color:var(--muted);display:flex;gap:6px;align-items:baseline}
+.noreg .skel{max-width:520px}
 
 /* Enfermería (spec 2026-10-20-enfermeria) */
 .enf-grupo{margin-top:26px;display:flex;flex-direction:column;gap:10px;max-width:980px}
@@ -887,6 +904,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
             <div class="mes" role="group" aria-label="Mes" id="imes-c" hidden><button type="button" id="mant" aria-label="Mes anterior"><i class="ph ph-caret-left"></i></button><span id="imes" aria-live="polite"></span><button type="button" id="msig" aria-label="Mes siguiente"><i class="ph ph-caret-right"></i></button></div>
           </div>
           <div class="ind-der">
+            <button type="button" class="btn btn-s redondo" id="inoreg" aria-expanded="false" aria-controls="noreg"><i class="ph ph-download-simple"></i>Descargar pacientes que no regresaron</button>
             <button type="button" class="btn btn-p redondo" id="iimprimir"><i class="ph ph-printer"></i>Resumen para imprimir</button>
             <div id="ifiltros" hidden>
               <label class="sel-chip"><i class="ph ph-stethoscope"></i><select id="imed" aria-label="Médico"></select><i class="ph ph-caret-down"></i></label>
@@ -894,6 +912,12 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
             </div>
           </div>
         </div>
+        <section class="noreg" id="noreg" aria-labelledby="noreg-t" hidden>
+          <div class="noreg-cab"><div><h2 id="noreg-t">Pacientes que no regresaron</h2>
+            <p>Vinieron, se atendieron y no volvieron a su reevaluación: vencidos, antiguos (tan atrasados que ya no salen en el tablero) y cerrados.</p></div>
+            <button type="button" class="cerrar-nr" id="noreg-cerrar" aria-label="Cerrar"><i class="ph ph-x"></i></button></div>
+          <div id="noreg-cuerpo"></div>
+        </section>
         <p class="cargando" role="status">Cargando…</p>
         <div id="ind-cuerpo" hidden>
           <div class="seg iseg" id="iseg" role="tablist" aria-label="Secciones de indicadores"><span class="pastilla" aria-hidden="true"></span></div>
@@ -1349,6 +1373,12 @@ $('#aviso button').addEventListener('click', () => {
  * que a veces bloquea navigator.clipboard: por eso el plan B con execCommand.
  */
 async function copiar(texto) {
+  const ok = await alPortapapeles(texto);
+  avisar(ok ? 'Copiado: ' + texto : 'No se pudo copiar. El número es ' + texto);
+  return ok;
+}
+/** El portapapeles sin aviso: true si se copió (navigator.clipboard o, si el marco lo bloquea, execCommand). */
+async function alPortapapeles(texto) {
   let ok = false;
   try {
     if (navigator.clipboard && window.isSecureContext) { await navigator.clipboard.writeText(texto); ok = true; }
@@ -1364,7 +1394,6 @@ async function copiar(texto) {
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     t.remove();
   }
-  avisar(ok ? 'Copiado: ' + texto : 'No se pudo copiar. El número es ' + texto);
   return ok;
 }
 
@@ -4995,6 +5024,7 @@ function iniciarIndicadores() {
   $('#mant').addEventListener('click', e => { const m = mesesInd(); cambiarMes(m[m.indexOf(IND.mes) - 1], e.detail !== 0); });
   $('#msig').addEventListener('click', e => { const m = mesesInd(); cambiarMes(m[m.indexOf(IND.mes) + 1], e.detail !== 0); });
   $('#iimprimir').addEventListener('click', imprimirResumen);
+  iniciarNoRegresaron();
   $('#imed').addEventListener('change', e => { IND.medico = e.target.value; pintarIndicadores(false); });
   $('#iesp').addEventListener('change', e => { IND.esp = e.target.value; pintarIndicadores(false); });
   $('#ipanel').addEventListener('click', e => {
@@ -5022,6 +5052,7 @@ VISTAS.indicadores.mostrar = sinAnim => {
   IND.quieto = !!sinAnim;   // se entró con el teclado (o al arrancar): nada se anima, ni al llegar los datos
   pastilla($('#iseg'), true);
   cargarIndicadores();
+  if (NR.abierto) cargarNR();   // el panel de «no regresaron» abierto: se vuelve a pedir si hubo una escritura
 };
 
 /* ---- Resumen para imprimir (2 páginas A4, para el director; MAPEO §4) ---- */
@@ -5169,6 +5200,146 @@ window.addEventListener('beforeprint', () => {
   if ($('#imprimible').dataset.clave !== claveImp()) document.documentElement.classList.remove('imp-listo');
 });
 window.addEventListener('afterprint', () => { document.documentElement.classList.remove('imp-listo'); aplicarModo(); });
+
+/* ============ «DESCARGAR PACIENTES QUE NO REGRESARON» (Indicadores, 20/11/2026) ============ */
+/*
+ * Las series de reevaluación VENCIDO, ANTIGUO y CERRADO (getNoRegresaron → filasNoRegresaron del servidor), en un panel bajo la
+ * cabecera de Indicadores. Se piden al abrirlo y valen hasta la próxima escritura (S.indGen, como S.kpi). Los filtros solo
+ * cambian la cuenta. El archivo es un CSV en UTF-8 con BOM y «;», que el Excel en español abre en columnas; como el marco de
+ * Apps Script puede bloquear la descarga en algún navegador, «Copiar para Excel» pone lo mismo en el portapapeles con tabuladores.
+ */
+const NR = { abierto: false, datos: null, gen: -1, pidiendo: false, error: '',
+  f: { desde: '', hasta: '', esp: '', med: '', grupo: '', estados: { VENCIDO: true, ANTIGUO: true, CERRADO: true } } };
+const NR_GRUPO = { UNA: 'Una sola consulta', VARIAS: 'Dejó de venir' };
+const NR_ESTADO = { VENCIDO: 'Vencido', ANTIGUO: 'Antiguo', CERRADO: 'Cerrado' };
+/** En una reevaluación, «Número equivocado» como cierre es siempre el último contacto (sinContacto_). */
+const cierreNR = m => !m ? '' : norm(m) === 'NUMERO EQUIVOCADO' ? 'Sin contacto válido (número equivocado)' : textoCierre(m);
+/** Las columnas del archivo, en su orden: encabezado y valor. Fechas dd/mm/aaaa. */
+const NR_COLUMNAS = [
+  ['DNI', f => f.DNI], ['Paciente', f => nombreBonito(f.NOMBRE)], ['Especialidad', f => nombreBonito(f.ESPECIALIDAD)],
+  ['Médico (última)', f => nombreBonito(f.MEDICO_ULTIMO)], ['Primera consulta', f => dmy(f.PRIMERA_CITA)], ['Última consulta', f => dmy(f.ULTIMA_CITA)],
+  ['N.º de consultas', f => f.N_REALIZADAS], ['Grupo', f => NR_GRUPO[f.GRUPO] || ''], ['Debía volver', f => dmy(f.PROXIMA_ESPERADA)],
+  ['Días de atraso', f => f.DIAS_ATRASO], ['Estado', f => NR_ESTADO[f.ESTADO] || frase(f.ESTADO)], ['Motivo de cierre', f => cierreNR(f.CIERRE)],
+  ['Fecha de cierre', f => dmy(f.FECHA_CIERRE)], ['Intentos de contacto', f => f.N_SEGUIMIENTOS], ['Último seguimiento', f => dmy(f.ULTIMO_SEGUIMIENTO)],
+  ['Teléfonos', f => f.TELEFONOS]
+];
+/** Las filas que dejan pasar los filtros del panel (la última consulta entre desde y hasta, ambas incluidas). */
+function filasNR() {
+  const f = NR.f;
+  return ((NR.datos && NR.datos.filas) || []).filter(x => f.estados[x.ESTADO] && (!f.desde || x.ULTIMA_CITA >= f.desde)
+    && (!f.hasta || x.ULTIMA_CITA <= f.hasta) && (!f.esp || norm(x.ESPECIALIDAD) === norm(f.esp))
+    && (!f.med || x.MEDICO_ULTIMO === f.med) && (!f.grupo || x.GRUPO === f.grupo));
+}
+const tablaNR = filas => [NR_COLUMNAS.map(c => c[0])].concat(filas.map(x => NR_COLUMNAS.map(c => c[1](x))));
+/** Excel ejecuta como fórmula una celda que empieza por =, +, - o @: se le antepone un apóstrofo. */
+const sinFormula = v => { const s = String(v == null ? '' : v); return /^[=+\-@]/.test(s) ? "'" + s : s; };
+/** Una celda de CSV: entre comillas si lleva «;», comillas o saltos de línea, con las comillas dobladas. */
+const celdaCsv = v => { const s = sinFormula(v); return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+const csvNR = filas => '﻿' + tablaNR(filas).map(r => r.map(celdaCsv).join(';')).join('\r\n') + '\r\n';
+/** Para pegar en Excel: tabuladores y una fila por línea; un tabulador o salto dentro de un valor sería otra celda. */
+const tsvNR = filas => tablaNR(filas).map(r => r.map(v => sinFormula(v).replace(/[\t\r\n]+/g, ' ')).join('\t')).join('\r\n');
+
+function abrirNR(abrir) {
+  NR.abierto = abrir === undefined ? !NR.abierto : !!abrir;
+  $('#noreg').hidden = !NR.abierto;
+  $('#inoreg').setAttribute('aria-expanded', String(NR.abierto));
+  if (NR.abierto) cargarNR();
+}
+/** Pide la lista si no la hay o quedó vieja tras una escritura; mientras tanto, el esqueleto. */
+function cargarNR() {
+  if (NR.datos && NR.gen === S.indGen) { pintarNR(); return; }
+  NR.datos = null;
+  if (!NR.pidiendo) {
+    const gen = S.indGen;
+    NR.pidiendo = true; NR.error = '';
+    llamar('getNoRegresaron').then(r => {
+      NR.pidiendo = false;
+      if (gen !== S.indGen) { if (NR.abierto) cargarNR(); return; }
+      NR.datos = r; NR.gen = gen;
+      if (NR.abierto) pintarNR();
+    }, e => {
+      NR.pidiendo = false; NR.error = e.message;
+      if (NR.abierto) pintarNR();
+    });
+  }
+  pintarNR();
+}
+function pintarNR() {
+  const C = $('#noreg-cuerpo');
+  if (!NR.datos) {
+    C.innerHTML = NR.error
+      ? `<p class="vacio">No se pudo cargar la lista: ${esc(NR.error)} <button type="button" class="pill" data-nr-reintentar><i class="ph ph-arrow-clockwise"></i>Reintentar</button></p>`
+      : '<p class="vacio" role="status">Cargando la lista…</p><div class="skel" aria-hidden="true"><i></i><i></i><i></i></div>';
+    return;
+  }
+  const filas = NR.datos.filas || [], f = NR.f;
+  // La misma especialidad con y sin tilde sale una vez; un filtro que ya no está en la lista se olvida.
+  const esps = [], vistas = {};
+  filas.forEach(x => { const k = norm(x.ESPECIALIDAD); if (k && !vistas[k]) { vistas[k] = 1; esps.push(x.ESPECIALIDAD); } });
+  esps.sort((a, b) => norm(a) < norm(b) ? -1 : 1);
+  const meds = [...new Set(filas.map(x => x.MEDICO_ULTIMO).filter(Boolean))].sort((a, b) => nombreBonito(a).localeCompare(nombreBonito(b), 'es'));
+  if (f.esp && !vistas[norm(f.esp)]) f.esp = '';
+  if (f.med && !meds.includes(f.med)) f.med = '';
+  const opcion = (v, t, sel) => `<option value="${esc(v)}"${sel ? ' selected' : ''}>${esc(t)}</option>`;
+  C.innerHTML = `<div class="noreg-f">
+      <label class="campo">Última consulta desde<input type="date" id="nr-desde" value="${esc(f.desde)}" max="${esc(S.hoy)}"></label>
+      <label class="campo">Hasta<input type="date" id="nr-hasta" value="${esc(f.hasta)}" max="${esc(S.hoy)}"></label>
+      <label class="campo">Especialidad<select id="nr-esp">${opcion('', 'Todas', !f.esp)}${esps.map(e => opcion(e, nombreBonito(e), norm(e) === norm(f.esp))).join('')}</select></label>
+      <label class="campo">Médico<select id="nr-med">${opcion('', 'Todos', !f.med)}${meds.map(m => opcion(m, nombreBonito(m), m === f.med)).join('')}</select></label>
+      <label class="campo">Grupo<select id="nr-grupo">${opcion('', 'Todos', !f.grupo)}${Object.keys(NR_GRUPO).map(k => opcion(k, NR_GRUPO[k], k === f.grupo)).join('')}</select></label>
+    </div>
+    <fieldset class="noreg-est"><legend>Estado</legend>${Object.keys(NR_ESTADO).map(k =>
+      `<label class="propio"><input type="checkbox" data-nr-estado="${k}"${f.estados[k] ? ' checked' : ''}>${NR_ESTADO[k]}</label>`).join('')}</fieldset>
+    <div class="noreg-pie"><p class="noreg-cuenta" id="nr-cuenta" aria-live="polite"></p>
+      <button type="button" class="btn btn-p" id="nr-descargar"><i class="ph ph-download-simple"></i>Descargar (Excel)</button>
+      <button type="button" class="btn btn-s" id="nr-copiar"><i class="ph ph-copy"></i>Copiar para Excel</button></div>
+    <p class="noreg-nota"><i class="ph ph-lock-simple" aria-hidden="true"></i>Contiene datos personales: compártalo solo dentro del equipo.</p>`;
+  contarNR();
+}
+function contarNR() {
+  const n = filasNR().length;
+  $('#nr-cuenta').innerHTML = `<b>${n}</b> ${n === 1 ? 'paciente' : 'pacientes'} con estos filtros`;
+  $('#nr-descargar').disabled = $('#nr-copiar').disabled = !n;
+}
+function descargarNR() {
+  const filas = filasNR();
+  if (!filas.length) return;
+  try {
+    const url = URL.createObjectURL(new Blob([csvNR(filas)], { type: 'text/csv;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = `no_regresaron_${(NR.datos && NR.datos.hoy) || S.hoy}.csv`; a.target = '_self';   // la página trae <base target="_top">
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    avisar(`Se descargaron ${plural(filas.length, 'paciente', 'pacientes')}.`);
+  } catch (e) { avisar('No se pudo descargar: use «Copiar para Excel».'); }
+}
+async function copiarNR() {
+  const filas = filasNR();
+  if (!filas.length) return;
+  avisar(await alPortapapeles(tsvNR(filas)) ? 'Copiado: pegue en Excel con Ctrl+V.' : 'No se pudo copiar: use «Descargar (Excel)».');
+}
+function iniciarNoRegresaron() {
+  $('#inoreg').addEventListener('click', () => abrirNR());
+  $('#noreg-cerrar').addEventListener('click', () => { abrirNR(false); $('#inoreg').focus(); });
+  const P = $('#noreg');
+  const leer = e => {
+    const t = e.target, f = NR.f;
+    if (t.id === 'nr-desde') f.desde = t.value; else if (t.id === 'nr-hasta') f.hasta = t.value;
+    else if (t.id === 'nr-esp') f.esp = t.value; else if (t.id === 'nr-med') f.med = t.value; else if (t.id === 'nr-grupo') f.grupo = t.value;
+    else if (t.dataset.nrEstado) f.estados[t.dataset.nrEstado] = t.checked;
+    else return;
+    contarNR();
+  };
+  P.addEventListener('input', leer);
+  P.addEventListener('change', leer);
+  P.addEventListener('click', e => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.id === 'nr-descargar') descargarNR();
+    else if (t.id === 'nr-copiar') copiarNR();
+    else if (t.matches('[data-nr-reintentar]')) { NR.error = ''; cargarNR(); }
+  });
+  P.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); abrirNR(false); $('#inoreg').focus(); } });
+}
 
 /* ============ ENFERMERÍA (spec 2026-10-20-enfermeria-design.md) ============ */
 /*
@@ -5723,6 +5894,12 @@ const DEMO = (() => {
   const normaReev = reev({ DNI: '43777888', NOMBRE: 'NORMA PRUEBA QUISPE', TELEFONOS: '987777888', MEDICO_ULTIMO: KAREN, ULTIMA_CITA: '2026-07-20',
     ESTADO: 'PAGO REALIZADO', FECHA_PAGO: '2026-09-30', N_SEGUIMIENTOS: 2, ULTIMO_SEGUIMIENTO: '2026-09-30' });
   series.push(normaReev);
+  // «Descargar pacientes que no regresaron» (20/11/2026): dos series ANTIGUO (tan atrasadas que no salen en el tablero), una con una
+  // sola consulta y otra que dejó de venir tras tres.
+  series.push(reev({ DNI: '44100200', NOMBRE: 'OLGA NATIVIDAD HUERTAS PINEDO', TELEFONOS: '976100200', MEDICO_ULTIMO: KAREN, ULTIMA_CITA: '2026-01-12',
+    ESTADO: 'ANTIGUO' }));
+  series.push(reev({ DNI: '44100300', ESPECIALIDAD: 'REUMATOLOGÍA', NOMBRE: 'WILFREDO SAMUEL ARCE YUPANQUI', MEDICO_ULTIMO: HANAMPA,
+    PRIMERA_CITA: '2025-09-03', ULTIMA_CITA: '2026-02-10', N_REALIZADAS: 3, ESTADO: 'ANTIGUO', N_SEGUIMIENTOS: 3, ULTIMO_SEGUIMIENTO: '2026-04-02' }));
   const serie = (dni, esp) => series.find(s => s.DNI === dni && mismo(s.ESPECIALIDAD, esp));
 
   /* ---- Indicaciones antiguas (INDICACIONES) y sus filas de seguimiento ---- */
@@ -6811,6 +6988,21 @@ const DEMO = (() => {
       sinCandidato: sinCandidato.map(x => Object.assign({}, x)),
       meta: reglas.metaRetorno
     }),
+
+    // Como getNoRegresaron (filasNoRegresaron, Logica.gs): las series VENCIDO, ANTIGUO y CERRADO, sin las de un fallecido (en el
+    // servidor ya son FALLECIDO) ni un cierre por «Falleció»; los teléfonos, los vigentes del DNI (telefonosPorDni); el atraso, desde
+    // VENCE también en las cerradas (estadoDeSerie lo calcula antes del cierre). Lo más reciente primero y, a igual fecha, por nombre.
+    getNoRegresaron: () => ({ hoy, filas: series
+      .filter(s => ['VENCIDO', 'ANTIGUO', 'CERRADO'].includes(s.ESTADO) && !muertos[s.DNI] && !(s.ESTADO === 'CERRADO' && norm(s.CIERRE) === 'FALLECIO'))
+      .map(s => {
+        const n = Number(s.N_REALIZADAS) || 0, cerrado = s.ESTADO === 'CERRADO';
+        return { DNI: s.DNI, NOMBRE: s.NOMBRE, ESPECIALIDAD: s.ESPECIALIDAD, MEDICO_ULTIMO: s.MEDICO_ULTIMO, PRIMERA_CITA: s.PRIMERA_CITA,
+          ULTIMA_CITA: s.ULTIMA_CITA, N_REALIZADAS: n, GRUPO: n >= 2 ? 'VARIAS' : 'UNA', PROXIMA_ESPERADA: s.PROXIMA_ESPERADA,
+          DIAS_ATRASO: Math.max(0, entre(s.VENCE, hoy)), ESTADO: s.ESTADO, CIERRE: cerrado ? s.CIERRE || '' : '',
+          FECHA_CIERRE: cerrado ? s.FECHA_CIERRE || '' : '', N_SEGUIMIENTOS: Number(s.N_SEGUIMIENTOS) || 0,
+          ULTIMO_SEGUIMIENTO: String(s.ULTIMO_SEGUIMIENTO || '').slice(0, 10), TELEFONOS: telefonosVigentesDe(s.DNI).join(' / ') };
+      })
+      .sort((a, b) => a.ULTIMA_CITA !== b.ULTIMA_CITA ? (a.ULTIMA_CITA < b.ULTIMA_CITA ? 1 : -1) : a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0) }),
 
     // Una fila por mes y médico, como resumenPorMes. Setiembre está en curso (NUEVOS_CURSO y CONTROL_CURSO).
     getResumen: () => {

@@ -5483,3 +5483,172 @@ test('Agregar teléfono en el DEMO: valida como el servidor (DNI desconocido, fa
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+/* ---- «Descargar pacientes que no regresaron» (Indicadores, 20/11/2026) ---- */
+async function abrirNoRegresaron(usuario) {
+  const r = await abrir({ guardado: { 'seg.usuario': usuario || 'RACHEL' } });
+  try {
+    await r.pagina.locator('.menu [data-sec="indicadores"]').click();
+    await r.pagina.locator('#inoreg').click();
+    await r.pagina.waitForSelector('#nr-cuenta');
+  } catch (e) { await r.navegador.close(); throw e; }
+  return r;
+}
+const cuentaNR = p => p.locator('#nr-cuenta').textContent();
+
+test('No regresaron: el botón está para admisión y solo consulta; el panel se abre, pide una vez y se cierra', async () => {
+  for (const u of ['RACHEL', 'ADMINISTRACION']) {
+    const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': u } });
+    try {
+      await pagina.locator('.menu [data-sec="indicadores"]').click();
+      const b = pagina.locator('#inoreg');
+      await b.waitFor({ state: 'visible', timeout: 5000 });
+      assert.equal(await b.isDisabled(), false, u + ': solo lee, también para solo consulta');
+      assert.match(await b.textContent(), /Descargar pacientes que no regresaron/);
+      assert.equal(await visible(pagina, '#noreg'), false, 'cerrado al entrar');
+      await b.click();
+      await pagina.waitForSelector('#nr-cuenta');
+      assert.equal(await b.getAttribute('aria-expanded'), 'true');
+      const n = await pagina.evaluate(() => NR.datos.filas.length);
+      assert.ok(n > 3);
+      assert.equal(await cuentaNR(pagina), `${n} pacientes con estos filtros`);
+      assert.match(await pagina.locator('#noreg').textContent(), /Contiene datos personales: compártalo solo dentro del equipo\./);
+      // Cerrar y volver a abrir no vuelve a pedir: vale hasta la próxima escritura.
+      await pagina.locator('#noreg-cerrar').click();
+      assert.equal(await visible(pagina, '#noreg'), false);
+      await b.click();
+      await pagina.waitForSelector('#nr-cuenta');
+      assert.equal(await llamadas(pagina, 'getNoRegresaron'), 1);
+      // Tras una escritura (invalidarIndicadores) se vuelve a pedir. Esc dentro del panel lo cierra.
+      await pagina.evaluate(() => invalidarIndicadores());
+      await pagina.locator('#nr-grupo').focus();
+      await pagina.keyboard.press('Escape');
+      assert.equal(await visible(pagina, '#noreg'), false);
+      assert.equal(await pagina.evaluate(() => document.activeElement.id), 'inoreg');
+      await b.click();
+      await pagina.waitForFunction(() => DEMO._llamadas.getNoRegresaron === 2, null, { timeout: 5000 });
+      assert.deepEqual(errores, []);
+    } finally { await navegador.close(); }
+  }
+});
+
+test('No regresaron: el DEMO trae vencidos, antiguos y cerrados de los dos grupos, sin el fallecido ni otros estados', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'RACHEL' } });
+  try {
+    const r = await pagina.evaluate(() => llamar('getNoRegresaron'));
+    const por = k => [...new Set(r.filas.map(f => f[k]))].sort();
+    assert.deepEqual(por('ESTADO'), ['ANTIGUO', 'CERRADO', 'VENCIDO']);
+    assert.deepEqual(por('GRUPO'), ['UNA', 'VARIAS']);
+    for (const e of ['ANTIGUO', 'VENCIDO']) assert.deepEqual([...new Set(r.filas.filter(f => f.ESTADO === e).map(f => f.GRUPO))].sort(), ['UNA', 'VARIAS'], e);
+    assert.equal(r.filas.some(f => f.DNI === '41999000'), false, 'Rosa falleció');
+    assert.equal(r.filas.some(f => f.DNI === '40777888' || f.DNI === '41222333' || f.DNI === '41666777'), false, 'agendado, al día y alta: fuera');
+    assert.ok(r.filas.every(f => f.GRUPO === (f.N_REALIZADAS >= 2 ? 'VARIAS' : 'UNA')));
+    assert.equal(r.filas.find(f => f.DNI === '41888999').CIERRE, 'SE ATIENDE EN OTRO LUGAR');
+    assert.equal(r.filas.find(f => f.DNI === '40444555').TELEFONOS, '923456789');
+    assert.equal(r.hoy, '2026-10-01');
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('No regresaron: los filtros cambian la cuenta y los botones se apagan con cero', async () => {
+  const { navegador, pagina, errores } = await abrirNoRegresaron();
+  try {
+    const filas = await pagina.evaluate(() => DEMO.getNoRegresaron().filas);
+    const cuenta = n => `${n} ${n === 1 ? 'paciente' : 'pacientes'} con estos filtros`;
+    await pagina.locator('[data-nr-estado="VENCIDO"]').uncheck();
+    assert.equal(await cuentaNR(pagina), cuenta(filas.filter(f => f.ESTADO !== 'VENCIDO').length));
+    await pagina.locator('[data-nr-estado="VENCIDO"]').check();
+    await pagina.locator('#nr-grupo').selectOption('VARIAS');
+    assert.equal(await cuentaNR(pagina), cuenta(filas.filter(f => f.N_REALIZADAS >= 2).length));
+    assert.deepEqual(await pagina.locator('#nr-grupo option').allTextContents(), ['Todos', 'Una sola consulta', 'Dejó de venir']);
+    await pagina.locator('#nr-grupo').selectOption('');
+    assert.deepEqual(await pagina.locator('#nr-esp option').allTextContents(), ['Todas', 'Hematología', 'Reumatología']);
+    await pagina.locator('#nr-esp').selectOption({ label: 'Reumatología' });
+    assert.equal(await cuentaNR(pagina), cuenta(filas.filter(f => f.ESPECIALIDAD === 'REUMATOLOGÍA').length));
+    await pagina.locator('#nr-esp').selectOption('');
+    await pagina.locator('#nr-med').selectOption({ label: 'Dr. Juvenal Hanampa Roque' });
+    assert.equal(await cuentaNR(pagina), cuenta(filas.filter(f => /HANAMPA/.test(f.MEDICO_ULTIMO)).length));
+    await pagina.locator('#nr-med').selectOption('');
+    // Última consulta entre desde y hasta, ambas incluidas.
+    await pagina.locator('#nr-desde').fill('2026-08-01');
+    await pagina.locator('#nr-hasta').fill('2026-08-12');
+    assert.equal(await cuentaNR(pagina), cuenta(filas.filter(f => f.ULTIMA_CITA >= '2026-08-01' && f.ULTIMA_CITA <= '2026-08-12').length));
+    for (const k of ['VENCIDO', 'ANTIGUO', 'CERRADO']) await pagina.locator(`[data-nr-estado="${k}"]`).uncheck();
+    assert.equal(await cuentaNR(pagina), '0 pacientes con estos filtros');
+    assert.equal(await pagina.locator('#nr-descargar').isDisabled(), true);
+    assert.equal(await pagina.locator('#nr-copiar').isDisabled(), true);
+    // Los filtros se conservan al cerrar y volver a abrir.
+    await pagina.locator('#noreg-cerrar').click();
+    await pagina.locator('#inoreg').click();
+    assert.equal(await pagina.locator('#nr-desde').inputValue(), '2026-08-01');
+    assert.equal(await pagina.locator('[data-nr-estado="VENCIDO"]').isChecked(), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('No regresaron: «Descargar (Excel)» baja un CSV con BOM, «;», el encabezado y una fila por paciente', async () => {
+  const { navegador, pagina, errores } = await abrirNoRegresaron();
+  try {
+    await pagina.locator('[data-nr-estado="VENCIDO"]').uncheck();
+    const n = Number((await cuentaNR(pagina)).split(' ')[0]);
+    assert.ok(n >= 3);
+    const [descarga] = await Promise.all([pagina.waitForEvent('download'), pagina.locator('#nr-descargar').click()]);
+    assert.equal(descarga.suggestedFilename(), 'no_regresaron_2026-10-01.csv');
+    const bytes = fs.readFileSync(await descarga.path());
+    assert.deepEqual([...bytes.subarray(0, 3)], [0xEF, 0xBB, 0xBF], 'UTF-8 con BOM');
+    const lineas = bytes.toString('utf8').slice(1).split('\r\n').filter(Boolean);
+    assert.equal(lineas[0], 'DNI;Paciente;Especialidad;Médico (última);Primera consulta;Última consulta;N.º de consultas;Grupo;Debía volver;'
+      + 'Días de atraso;Estado;Motivo de cierre;Fecha de cierre;Intentos de contacto;Último seguimiento;Teléfonos');
+    assert.equal(lineas.length, n + 1);
+    assert.ok(lineas.every(l => l.split(';').length === 16), 'dieciséis columnas en cada fila');
+    const hector = lineas.find(l => l.startsWith('41888999;')).split(';');
+    assert.deepEqual([hector[1], hector[2], hector[7], hector[10], hector[11], hector[12], hector[15]],
+      ['Héctor Manuel Silva Prado', 'Reumatología', 'Una sola consulta', 'Cerrado', 'Se atiende en otro lugar', '20/09/2026', '955888999']);
+    const wilfredo = lineas.find(l => l.startsWith('44100300;')).split(';');
+    assert.deepEqual([wilfredo[4], wilfredo[5], wilfredo[6], wilfredo[7], wilfredo[10], wilfredo[13], wilfredo[14]],
+      ['03/09/2025', '10/02/2026', '3', 'Dejó de venir', 'Antiguo', '3', '02/04/2026']);
+    await pagina.waitForFunction(n => document.querySelector('#aviso span').textContent === `Se descargaron ${n} pacientes.`, n);
+    // Comillas, «;», saltos de línea y lo que Excel tomaría por fórmula.
+    assert.deepEqual(await pagina.evaluate(() => ['a;b', 'dijo "hola"', 'una\nlínea', '=1+1', 'normal'].map(celdaCsv)),
+      ['"a;b"', '"dijo ""hola"""', '"una\nlínea"', "'=1+1", 'normal']);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('No regresaron: «Copiar para Excel» pone el TSV con encabezado en el portapapeles', async () => {
+  const { navegador, pagina, errores } = await abrirNoRegresaron();
+  try {
+    await pagina.evaluate(() => {
+      window.__copiado = null;
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: t => { window.__copiado = t; return Promise.resolve(); } } });
+    });
+    await pagina.locator('#nr-grupo').selectOption('UNA');
+    const n = Number((await cuentaNR(pagina)).split(' ')[0]);
+    await pagina.locator('#nr-copiar').click();
+    await pagina.waitForFunction(() => document.querySelector('#aviso span').textContent === 'Copiado: pegue en Excel con Ctrl+V.');
+    const texto = await pagina.evaluate(() => window.__copiado);
+    const lineas = texto.split('\r\n');
+    assert.equal(lineas.length, n + 1);
+    assert.equal(lineas[0].split('\t')[0], 'DNI');
+    assert.equal(lineas[0].split('\t').length, 16);
+    assert.ok(lineas.slice(1).every(l => l.split('\t')[7] === 'Una sola consulta'));
+    assert.equal(texto.includes(';'), false);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});
+
+test('No regresaron: si falla, «Reintentar» lo vuelve a pedir', async () => {
+  const { navegador, pagina, errores } = await abrir({ guardado: { 'seg.usuario': 'MAGALY' } });
+  try {
+    await pagina.evaluate(() => { DEMO._fallar.getNoRegresaron = 'La hoja no responde'; });
+    await pagina.locator('.menu [data-sec="indicadores"]').click();
+    await pagina.locator('#inoreg').click();
+    await pagina.waitForSelector('#noreg [data-nr-reintentar]');
+    assert.match(await pagina.locator('#noreg-cuerpo').textContent(), /No se pudo cargar la lista: La hoja no responde/);
+    await pagina.evaluate(() => { delete DEMO._fallar.getNoRegresaron; });
+    await pagina.locator('#noreg [data-nr-reintentar]').click();
+    await pagina.waitForSelector('#nr-cuenta');
+    assert.equal(await llamadas(pagina, 'getNoRegresaron'), 2);
+    assert.deepEqual(errores, []);
+  } finally { await navegador.close(); }
+});

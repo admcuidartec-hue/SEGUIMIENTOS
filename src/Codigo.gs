@@ -686,3 +686,12 @@ function getResumen() {
   return limpiarParaEnvio({ hoy: d.hoy, filas: filas, medicos: Object.keys(medicos).sort(), meta: d.reglas.metaRetorno,
     metaTratamiento: d.reglas.metaTratamiento });
 }
+
+/**
+ * Indicadores → «Descargar pacientes que no regresaron» (20/11/2026): las series VENCIDO, ANTIGUO y CERRADO, con los teléfonos
+ * del tablero (filasNoRegresaron). Solo lectura, sin candado ni rol, como getResumen; la app filtra y arma el archivo.
+ */
+function getNoRegresaron() {
+  var d = datos_();
+  return limpiarParaEnvio({ hoy: d.hoy, filas: filasNoRegresaron(d.pacientes, d.telefonos) });
+}

@@ -32,7 +32,8 @@ La usan las **admisionistas** (Magaly, Ana, Rachel) y **la enfermera**; Administ
   `marcarSeguimiento`, `descartar`, `confirmarEmparejamiento`, `getKpi`, `getResumen`, `guardarRegistro`,
   `marcarSesion`, `anularRegistro`, `anularSesion`, `darDeAlta`, `anularAlta`, `getRegistrosHoy`,
   `buscarPacienteRegistro`, `registrarResultado`, `anularResultado`, `getTablero`, `getEnfermeria`,
-  `registrarContactoEnfermeria`, `anularContactoEnfermeria`, `motivoFueraDeTablero`, `agregarTelefono`, `anularTelefono`.
+  `registrarContactoEnfermeria`, `anularContactoEnfermeria`, `motivoFueraDeTablero`, `agregarTelefono`, `anularTelefono`,
+  `getNoRegresaron`.
 - Paciente = `DNI`, cita = `IDCITA`, indicación = `ID`. **Nunca el número de fila.**
 - Las reglas de negocio (plazos, usuarios, motivos, alias de médicos) viven en las hojas
   `REGLAS` y `CATALOGOS`. Cambiar un plazo es editar una celda, no publicar.
@@ -378,6 +379,36 @@ lado (la historia clínica, un familiar, WhatsApp), y no había dónde guardarlo
 «✓ TELEFONOS: 0 filas.» y «TELEFONOS tiene todas sus columnas») → en el `@HEAD`, con el paciente de prueba: agregar un teléfono, ver
 que la tarjeta deja de decir «Sin teléfono», «Deshacer»; y con la enfermera, agregar uno desde su pantalla → `npm run actualizar`.
 Sin «Preparar hojas», agregar un teléfono se niega con «Falta la hoja "TELEFONOS"…» y lo demás funciona como antes.
+
+## Descargar pacientes que no regresaron (20/11/2026)
+
+Para llamar o escribir a quien vino, se atendió y no volvió, fuera del tablero y en Excel.
+
+- **Qué entra**: las series de reevaluación (hoja `PACIENTES`, `d.pacientes`: una fila por DNI y especialidad) en `VENCIDO`,
+  `ANTIGUO` o `CERRADO`. Nada más: ni AL DÍA, POR VENCER, AGENDADO, PAGO REALIZADO, RECUPERADO, ALTA, FALLECIDO o SIN ATENCIÓN,
+  ni un CERRADO por «Falleció» (una fila vieja: con «Falleció» vigente la serie ya es FALLECIDO). Hierro y procedimientos no
+  entran: son de Registro, no de «no volvió a su consulta».
+- **Grupo**: `N_REALIZADAS` = 1 → «Una sola consulta» (`UNA`); 2 o más → «Dejó de venir» (`VARIAS`).
+- **Servidor**: `getNoRegresaron()` (Codigo.gs, solo lectura, sin candado ni rol, como `getResumen`) devuelve
+  `limpiarParaEnvio({ hoy, filas })`. Las filas las arma la función pura `filasNoRegresaron(pacientes, telefonos)` (Logica.gs,
+  `test/logica-noregresaron.test.js`): fechas en ISO, lo más reciente primero, y los teléfonos de `d.telefonos` —los mismos del
+  tablero: con los agregados a mano y sin los «Número equivocado»—, unidos con « / ».
+- **Pantalla**: en Indicadores, el botón «Descargar pacientes que no regresaron» abre un panel bajo la cabecera (`#noreg`) que pide
+  la lista al abrirse y la guarda hasta la próxima escritura (`S.indGen`, como `S.kpi`); si falla, «Reintentar». Filtros: última
+  consulta desde/hasta, especialidad, médico, grupo y estado (Vencido, Antiguo y Cerrado marcados); la cuenta («N pacientes con
+  estos filtros») cambia al momento. Lo ven admisión y solo consulta (todos los que ven Indicadores); la enfermera no.
+- **El archivo**: «Descargar (Excel)» baja `no_regresaron_AAAA-MM-DD.csv` en UTF-8 **con BOM** y separado por **«;»**, que es lo que
+  el Excel en español abre en columnas y con tildes. Columnas: DNI · Paciente · Especialidad · Médico (última) · Primera consulta ·
+  Última consulta · N.º de consultas · Grupo · Debía volver · Días de atraso · Estado · Motivo de cierre · Fecha de cierre · Intentos
+  de contacto · Último seguimiento · Teléfonos (fechas dd/mm/aaaa, nombres con `nombreBonito`). Una celda con «;», comillas o saltos
+  va entre comillas; una que empieza por `=`, `+`, `-` o `@` lleva un apóstrofo delante, para que Excel no la ejecute como fórmula.
+- **Plan B**: el marco de Apps Script puede bloquear descargas en algún navegador. «Copiar para Excel» pone lo mismo, con
+  encabezado y tabuladores, en el portapapeles («Copiado: pegue en Excel con Ctrl+V.»).
+- **Privacidad**: el panel dice «Contiene datos personales: compártalo solo dentro del equipo.» El archivo lleva nombres, DNI y
+  teléfonos: no se adjunta a correos fuera del CHP ni se sube a otras plataformas.
+- **DEMO**: `getNoRegresaron` con la misma regla sobre sus series (dos ANTIGUO agregadas para esto: Olga Huertas y Wilfredo Arce).
+- **Publicar**: sin hojas ni columnas nuevas. `npm run subir` → en el `@HEAD`, abrir el panel, descargar y abrir el CSV en Excel
+  (tildes y columnas bien), probar «Copiar para Excel» → `npm run actualizar`.
 
 ## «¿Qué pasó?» (Etapa 1)
 

@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { cargar, plano } = require('./cargar');
-const { cita, reglas } = require('./fixtures');
+const { cita, seg, reglas } = require('./fixtures');
 
 const CAT = { usuarios: ['MAGALY', 'RACHEL'], motivos: [], alias: {}, doctores: [{ doctor: 'Dra. Karen Matos', sofdoc: '' }],
   procedimientos: [], tratamientos: [], marcas: {} };
@@ -439,4 +439,18 @@ test('motivoFueraDeTablero: solo lectura; encuentra al de espera y explica al qu
   ctx.registrarResultado({ usuario: 'MAGALY', dni: '40111222', especialidad: 'HIERRO', referencia: 'REG-000010', resultado: 'SIN CONTACTO' });
   const c = plano(ctx.motivoFueraDeTablero({ q: 'rosa prueba' })).pacientes[0];
   assert.deepEqual([c.EN_TABLERO, c.MOTIVOS], [false, ['seguimiento cerrado de su hierro: Sin contacto válido (09/10)']]);
+});
+
+test('getNoRegresaron: solo lectura; las series vencidas con los teléfonos del tablero (sin el equivocado), limpias para enviar', () => {
+  const marca = Object.assign(seg({ fecha: '2026-09-20' }), { ID: 'SEG-EQ', RESULTADO: 'NÚMERO EQUIVOCADO', ACCION: 'TELEFONO', MOTIVO: 'NÚMERO EQUIVOCADO',
+    TELEFONO: '912345678', ANULADO: '' });
+  const { ctx, escrito, lock } = servidor([marca]);
+  const r = plano(ctx.getNoRegresaron());
+  assert.equal(r.hoy, '2026-10-06');
+  assert.deepEqual(r.filas.map(f => [f.DNI, f.ESTADO, f.GRUPO, f.N_REALIZADAS, f.ULTIMA_CITA, f.PROXIMA_ESPERADA, f.TELEFONOS]),
+    [['40111222', 'VENCIDO', 'UNA', 1, '2026-07-01', '2026-07-31', '987654321']]);
+  // Nada de undefined, null ni NaN: google.script.run devolvería null entero.
+  const valores = r.filas.flatMap(f => Object.values(f));
+  assert.ok(valores.every(v => typeof v === 'string' || (typeof v === 'number' && Number.isFinite(v))), JSON.stringify(r.filas));
+  assert.deepEqual([escrito.SEGUIMIENTOS.length, escrito.BITACORA.length, lock.tomado, lock.flush], [0, 0, 0, 0]);
 });

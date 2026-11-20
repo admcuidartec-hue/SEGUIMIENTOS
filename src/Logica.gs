@@ -1011,6 +1011,36 @@ function armarPacientes(citas, indicaciones, seguimientos, reglas, hoy, contacto
   return out.sort(function (a, b) { return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0; });
 }
 
+/**
+ * «Descargar pacientes que no regresaron» (Indicadores, 20/11/2026): las series de reevaluación (hoja PACIENTES) de quien vino,
+ * se atendió y no volvió. Solo VENCIDO, ANTIGUO y CERRADO; AL DÍA, POR VENCER, AGENDADO, PAGO REALIZADO, RECUPERADO, ALTA,
+ * FALLECIDO y SIN ATENCIÓN no son «no regresó». Un CERRADO por «Falleció» tampoco (con «Falleció» vigente la serie ya es
+ * FALLECIDO; esto cubre una fila vieja). GRUPO: UNA (una sola consulta) o VARIAS (dejó de venir).
+ * `telefonos`: el de telefonosPorDni (d.telefonos), el mismo que ve el tablero: con los agregados a mano y sin los equivocados.
+ * Lo más reciente primero (última consulta), y a igual fecha por nombre. Las fechas van en ISO: la app las escribe dd/mm/aaaa.
+ */
+var ESTADOS_NO_REGRESARON = { VENCIDO: 1, ANTIGUO: 1, CERRADO: 1 };
+function filasNoRegresaron(pacientes, telefonos) {
+  var tel = telefonos || {};
+  return (pacientes || []).filter(function (p) {
+    return p && ESTADOS_NO_REGRESARON[p.ESTADO] && !(p.ESTADO === 'CERRADO' && normTexto(p.CIERRE) === 'FALLECIO');
+  }).map(function (p) {
+    var n = Number(p.N_REALIZADAS) || 0, dni = normDni(p.DNI), cerrado = p.ESTADO === 'CERRADO';
+    return {
+      DNI: dni, NOMBRE: p.NOMBRE || '', ESPECIALIDAD: p.ESPECIALIDAD || '', MEDICO_ULTIMO: p.MEDICO_ULTIMO || '',
+      PRIMERA_CITA: fechaIso(p.PRIMERA_CITA), ULTIMA_CITA: fechaIso(p.ULTIMA_CITA), N_REALIZADAS: n,
+      GRUPO: n >= 2 ? 'VARIAS' : 'UNA',
+      PROXIMA_ESPERADA: fechaIso(p.PROXIMA_ESPERADA), DIAS_ATRASO: Number(p.DIAS_ATRASO) || 0, ESTADO: p.ESTADO,
+      CIERRE: cerrado ? p.CIERRE || '' : '', FECHA_CIERRE: cerrado ? fechaIso(p.FECHA_CIERRE) : '',
+      N_SEGUIMIENTOS: Number(p.N_SEGUIMIENTOS) || 0, ULTIMO_SEGUIMIENTO: fechaIso(p.ULTIMO_SEGUIMIENTO),
+      TELEFONOS: (tel[dni] || []).join(' / ')
+    };
+  }).sort(function (a, b) {
+    if (a.ULTIMA_CITA !== b.ULTIMA_CITA) return a.ULTIMA_CITA < b.ULTIMA_CITA ? 1 : -1;
+    return a.NOMBRE < b.NOMBRE ? -1 : a.NOMBRE > b.NOMBRE ? 1 : 0;
+  });
+}
+
 var TIPOS_INDICACION = { HIERRO: 1, PROCEDIMIENTO: 1 };
 
 /** Los contactos de una tarjeta para leerCiclo: sus teléfonos y, si hay, el @usuario. */

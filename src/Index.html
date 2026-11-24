@@ -63,6 +63,9 @@ a{color:var(--accent)}a:hover{color:var(--accent-hover)}
 .logo.chico{width:32px;height:32px;flex-basis:32px;font-size:11px}
 .marca b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em}
 .marca small{display:block;font-size:11.5px;color:var(--muted);line-height:1.3}
+/* Hasta cuándo llega SOFDOC y cuándo se cargó (24/11/2026): discreto, bajo el logo (pintarCargaSofdoc). */
+.carga-sofdoc{margin:-4px 0 0;padding:0 6px;font-size:11.5px;line-height:1.45;color:var(--muted);font-variant-numeric:tabular-nums}
+.carga-sofdoc.atrasado{color:var(--warn)}
 .menu{display:flex;flex-direction:column;gap:2px}
 /* El menú son botones: con <base target="_top"> un href="#…" navegaría la ventana de arriba. */
 .menu button{display:flex;align-items:center;gap:10px;width:100%;height:44px;padding:0 12px;border:0;border-radius:var(--r-s);background:transparent;color:var(--soft);font-weight:500;text-align:left;transition:background-color .15s ease,color .15s ease}
@@ -826,6 +829,7 @@ body.arrastrando{cursor:grabbing;user-select:none;-webkit-user-select:none}
 <div class="app">
   <aside class="side">
     <div class="marca"><span class="logo">CHP</span><span><b>Seguimientos</b><small>Centro Hematológico del Perú</small></span></div>
+    <p class="carga-sofdoc" id="carga-sofdoc" hidden></p>
     <nav class="menu" aria-label="Secciones">
       <button type="button" data-sec="tablero"><i class="ph ph-kanban"></i>Tablero</button>
       <button type="button" data-sec="registro"><i class="ph ph-note-pencil"></i>Registro</button>
@@ -1277,6 +1281,17 @@ function pintarAvisoSofdoc() {
       + 'Los pacientes que volvieron después siguen en la lista y algunas «No vino» pueden no ser ciertas. '
       + 'Avise a quien carga SOFDOC: exportar, pegar en la «Hoja 1» y usar «Actualizar».'
     : '<b>No hay citas de SOFDOC cargadas.</b> Avise a quien carga SOFDOC: exportar, pegar en la «Hoja 1» y usar «Actualizar».';
+}
+/** Bajo el logo: «SOFDOC hasta el dd/mm/aaaa» y «Cargado el dd/mm/aaaa HH:mm» (bootstrap().sofdoc). */
+function pintarCargaSofdoc() {
+  const p = $('#carga-sofdoc'), f = S.boot && S.boot.sofdoc;
+  if (!p) return;
+  p.hidden = !(f && (f.hasta || f.ultimaCarga));
+  if (p.hidden) return;
+  p.classList.toggle('atrasado', !!f.atrasado);
+  const carga = String(f.ultimaCarga || '');
+  p.innerHTML = (f.hasta ? `SOFDOC hasta el ${esc(dmy(f.hasta))}` : 'Sin citas de SOFDOC')
+    + (carga ? `<br>Cargado el ${esc(dmy(carga.slice(0, 10)))} ${esc(carga.slice(11, 16))}` : '');
 }
 function pintarSaludo() {
   const u = yo(), s = saludoHora();
@@ -5544,6 +5559,7 @@ async function arrancar() {
   pintarUsuarios();
   pintarSaludo();
   pintarAvisoSofdoc();
+  pintarCargaSofdoc();
   aplicarRol(true);
   iniciarTablero();
   iniciarRegistro();
@@ -6282,7 +6298,7 @@ const DEMO = (() => {
       doctores, procedimientos, tratamientos, marcas, reacciones: REACCIONES.slice(),
       reglas: Object.assign({ diasEnfermeria: DIAS_ENF.slice(), corteEnfermeria: CORTE_ENF, maxIntentosEnfermeria: MAX_ENF }, reglas),
       // Como frescuraSofdoc: el DEMO está al día (window.DEMO_SOFDOC, puesto antes de cargar, simula otro estado).
-      sofdoc: window.DEMO_SOFDOC || { hasta: mas(hoy, -1), lejana: mas(hoy, 30), dias: 1, habiles: 1, atrasado: false }
+      sofdoc: window.DEMO_SOFDOC || { hasta: mas(hoy, -1), lejana: mas(hoy, 30), dias: 1, habiles: 1, atrasado: false, ultimaCarga: hoy + ' 08:15' }
     }),
 
     getEnfermeria: () => ({ hoy, contactos: contactosDemo(), reacciones: REACCIONES.slice(), dias: DIAS_ENF.slice() }),

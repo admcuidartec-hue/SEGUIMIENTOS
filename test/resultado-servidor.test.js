@@ -190,7 +190,10 @@ test('un campo motivo del payload nuevo no cambia MOTIVO de un resultado normal'
 
 test('bootstrap: reglas con las trece claves y metaDiaria 15; getPaciente trae telefonos', () => {
   const { ctx } = servidor();
+  // La última carga de SOFDOC sale de la BITACORA (cargasBitacora_): aquí, una carga con citas nuevas.
+  ctx.cargasBitacora_ = () => [{ FECHA_HORA: '2026-11-24 09:28', USUARIO: 'MENÚ', ACCION: 'ACTUALIZAR', DETALLE: '9 filas leídas, 3 citas nuevas' }];
   const b = plano(ctx.bootstrap());
+  assert.equal(b.sofdoc.ultimaCarga, '2026-11-24 09:28');
   assert.deepEqual(Object.keys(b.reglas).sort(), ['diasEntreSesiones', 'esperaCotizacion', 'espera', 'graciaAgenda', 'maxSeguimientos', 'metaDiaria', 'metaRetorno', 'postTratamiento', 'controlLab', 'avisoAltaControl', 'metaTratamiento', 'diasEnfermeria', 'corteEnfermeria', 'maxIntentosEnfermeria'].sort());
   assert.equal(b.reglas.metaDiaria, 15);
   assert.deepEqual(plano(ctx.getPaciente('40111222')).telefonos, ['987654321', '912345678']);

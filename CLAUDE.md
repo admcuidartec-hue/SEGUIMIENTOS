@@ -410,6 +410,12 @@ Para llamar o escribir a quien vino, se atendió y no volvió, fuera del tablero
 - **Publicar**: sin hojas ni columnas nuevas. `npm run subir` → en el `@HEAD`, abrir el panel, descargar y abrir el CSV en Excel
   (tildes y columnas bien), probar «Copiar para Excel» → `npm run actualizar`.
 
+## Fecha de SOFDOC en el menú lateral (24/11/2026)
+
+Bajo el logo, discreto: «SOFDOC hasta el dd/mm/aaaa» (`frescuraSofdoc().hasta`) y «Cargado el dd/mm/aaaa HH:mm», la última carga
+con citas nuevas (`ultimaCargaSofdoc`, la misma regla que «Verificar», leída de la BITACORA con `cargasBitacora_`). Va en
+`bootstrap().sofdoc.ultimaCarga`; en ámbar si SOFDOC está atrasado (`pintarCargaSofdoc`). Sin hojas nuevas.
+
 ## «¿Qué pasó?» (Etapa 1)
 
 - La lista de resultados vive en `RESULTADOS` (`src/Resultados.gs`), no en `CATALOGOS`.

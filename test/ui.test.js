@@ -5652,3 +5652,23 @@ test('No regresaron: si falla, «Reintentar» lo vuelve a pedir', async () => {
     assert.deepEqual(errores, []);
   } finally { await navegador.close(); }
 });
+
+test('menú lateral: hasta cuándo llega SOFDOC y la hora de la última carga; en ámbar si está atrasado', async () => {
+  const navegador = await chromium.launch();
+  try {
+    const abrir = async sofdoc => {
+      const pagina = await (await navegador.newContext()).newPage();
+      await pagina.addInitScript(s => { if (s) window.DEMO_SOFDOC = s; localStorage.setItem('seg.usuario', 'RACHEL'); }, sofdoc);
+      await pagina.goto('file://' + ARCHIVO);
+      await pagina.waitForFunction(() => S.fase === 'listo');
+      return pagina;
+    };
+    let p = await abrir({ hasta: '2026-11-23', lejana: '', dias: 1, habiles: 1, atrasado: false, ultimaCarga: '2026-11-24 09:28' });
+    assert.equal((await p.locator('#carga-sofdoc').innerText()).replace(/\s+/g, ' ').trim(),
+      'SOFDOC hasta el 23/11/2026 Cargado el 24/11/2026 09:28');
+    assert.equal(await p.locator('#carga-sofdoc').evaluate(e => e.classList.contains('atrasado')), false);
+    p = await abrir({ hasta: '2026-11-10', lejana: '', dias: 14, habiles: 12, atrasado: true, ultimaCarga: '' });
+    assert.equal((await p.locator('#carga-sofdoc').innerText()).trim(), 'SOFDOC hasta el 10/11/2026');
+    assert.equal(await p.locator('#carga-sofdoc').evaluate(e => e.classList.contains('atrasado')), true);
+  } finally { await navegador.close(); }
+});

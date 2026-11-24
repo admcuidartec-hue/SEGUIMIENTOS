@@ -375,6 +375,14 @@ function leerTelefonos_() {
   return t;
 }
 
+/** Las filas de BITACORA para ultimaCargaSofdoc. FECHA_HORA puede volver como Date si Sheets convirtió el texto. */
+function cargasBitacora_() {
+  return leerOpcional_('BITACORA').map(function (b) {
+    return { FECHA_HORA: b.FECHA_HORA instanceof Date ? fechaHoraTexto_(b.FECHA_HORA) : String(b.FECHA_HORA || ''),
+      USUARIO: b.USUARIO, ACCION: b.ACCION, DETALLE: b.DETALLE };
+  });
+}
+
 /** Todo lo que necesita la app, leído una vez por petición. */
 function datos_() {
   if (MEMO.datos) return MEMO.datos;
@@ -457,7 +465,8 @@ function bootstrap() {
     marcas: d.catalogos.marcas,
     reacciones: d.catalogos.reacciones,
     // Qué tan al día está SOFDOC: la app avisa a todos si está atrasado (pintarAvisoSofdoc).
-    sofdoc: frescuraSofdoc(d.citas, d.hoy),
+    // + la última carga con citas nuevas (fecha y hora), que el menú lateral muestra bajo el logo.
+    sofdoc: Object.assign(frescuraSofdoc(d.citas, d.hoy), { ultimaCarga: (ultimaCargaSofdoc(cargasBitacora_()) || {}).cuando || '' }),
     reglas: { espera: d.reglas.espera, maxSeguimientos: d.reglas.maxSeguimientos, graciaAgenda: d.reglas.graciaAgenda,
       diasEntreSesiones: d.reglas.diasEntreSesiones, esperaCotizacion: d.reglas.esperaCotizacion,
       metaRetorno: d.reglas.metaRetorno, metaTratamiento: d.reglas.metaTratamiento, metaDiaria: d.reglas.metaDiaria,

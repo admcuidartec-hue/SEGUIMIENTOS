@@ -62,3 +62,14 @@ test('correosAlerta y REGLAS.CORREOS_ALERTA_SOFDOC: solo correos válidos, sin r
   assert.deepEqual(plano(r.correosAlerta), ['a@b.pe', 'c@d.pe']);
   assert.deepEqual(plano(L.reglasDesdeFilas(['PARAMETRO', 'VALOR'], []).correosAlerta), []);
 });
+
+test('ultimaCargaSofdoc: la más reciente con citas nuevas; null si no hay ninguna', () => {
+  const cargas = [
+    { FECHA_HORA: '2026-11-20 09:00', USUARIO: 'MENÚ', ACCION: 'ACTUALIZAR', DETALLE: '900 filas leídas, 12 citas nuevas' },
+    { FECHA_HORA: '2026-11-24 07:00', USUARIO: 'AUTOMÁTICO', ACCION: 'ACTUALIZAR', DETALLE: '900 filas leídas, 0 citas nuevas' },
+    { FECHA_HORA: '2026-11-24 09:28', USUARIO: 'MENÚ', ACCION: 'ACTUALIZAR', DETALLE: '916 filas leídas, 16 citas nuevas' }
+  ];
+  assert.deepEqual(plano(L.ultimaCargaSofdoc(cargas)), { cuando: '2026-11-24 09:28', quien: 'MENÚ', nuevas: 16 });
+  assert.equal(L.ultimaCargaSofdoc(cargas.slice(1, 2)), null);
+  assert.equal(L.ultimaCargaSofdoc([]), null);
+});

@@ -1,11 +1,12 @@
 # Videos de la plataforma
 
-Proyecto que arma los dos videos de Seguimientos CHP con [Remotion](https://www.remotion.dev):
+Proyectos que arman los videos de Seguimientos CHP con [Remotion](https://www.remotion.dev):
 
 | Video | Composición | Guion | Script |
 |---|---|---|---|
 | Instructivo general | `TutorialSeguimientos` | `narrar.py` | `video-tutorial.py` |
 | Presentación a gerencia | `PresentacionGerencia` | `narrar-ger.py` | `video-gerencia.py` |
+| Instructivo animado (sin capturas) | `InstructivoAnimado` | `instructivo-animado/src/constants/guion.ts` | ver `instructivo-animado/LEEME.md` |
 
 Las capturas de `tutorial-chp/public/cap/` y `ger/` salen del modo demo de `src/Index.html`:
 **pacientes inventados, ningún dato real**. Se rehacen con `video-caps.js`, `ger-caps.js` y
